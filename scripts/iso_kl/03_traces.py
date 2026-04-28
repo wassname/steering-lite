@@ -4,7 +4,7 @@ A stranger reading the markdown should be able to judge: coherent? gibberish?
 on-topic for honesty? off the rails?
 
 Usage:
-  uv run python scripts/sampled_trace_demo.py \\
+  uv run python scripts/iso_kl/03_traces.py \\
     --iso-tv-json outputs/iso_kl/iso_kl__...json \\
     --alphas 0.5 1 4 --max-new 128 --situation-idx 0 --seed 0
 """

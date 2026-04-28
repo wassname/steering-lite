@@ -8,7 +8,7 @@ We aggregate per-position metrics across prompts and save a CSV with
 (method, t, n_prompts, mean_*, std_*) and a matplotlib plot.
 
 Usage:
-  uv run python scripts/aggregate_dist_shift.py \\
+  uv run python scripts/iso_kl/02_aggregate.py \\
     --iso-tv-json outputs/iso_tv/iso__Qwen--Qwen3-0.6B-Base__L4__free_dnll0.1__seeds0_1_2__1777346635.json \\
     --n-prompts 8 --max-new 256 --seed 0
 """
