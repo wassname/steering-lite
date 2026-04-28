@@ -15,7 +15,7 @@ import torch
 from loguru import logger
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, format_mcq_thinking
+from steering_lite.daily_dilemmas import load_pairs, format_mcq, format_mcq_thinking
 
 
 METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical"]
