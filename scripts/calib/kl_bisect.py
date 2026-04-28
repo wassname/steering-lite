@@ -71,7 +71,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", required=True)
     p.add_argument("--target", default="honesty")
-    p.add_argument("--layers", default="4")
+    p.add_argument("--layers", default="mid",
+                   help="comma-separated indices, OR 'mid' (30-80%% of model layers), OR 'all'.")
     p.add_argument("--mode", choices=["greedy", "sampled"], default="greedy")
     p.add_argument("--target-kl", type=float, default=1.0)
     p.add_argument("--target-stat", default=None)
@@ -95,7 +96,7 @@ def main():
         # p95 is robust max over ~20 tokens; less noisy than true max but still bounds spikes
         args.target_stat = "kl_p95" if args.mode == "greedy" else "kl_mean"
 
-    layers = tuple(int(x) for x in args.layers.split(","))
+    layers = None  # resolved after model load
     dtype = getattr(torch, args.torch_dtype)
     methods = args.methods.split(",")
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -108,6 +109,15 @@ def main():
     eos_id = tok.eos_token_id
     pad_id = tok.pad_token_id
     model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
+
+    n_hidden = model.config.num_hidden_layers
+    if args.layers.strip().lower() == "mid":
+        layers = tuple(range(int(n_hidden * 0.30), int(n_hidden * 0.80)))
+    elif args.layers.strip().lower() == "all":
+        layers = tuple(range(n_hidden))
+    else:
+        layers = tuple(int(x) for x in args.layers.split(","))
+    logger.info(f"layers resolved: {layers} (model has {n_hidden} hidden layers)")
 
     do_sample_calib = args.mode == "sampled"
     all_summary = []

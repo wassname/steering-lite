@@ -68,7 +68,9 @@ class BenchmarkConfig:
     model: str = "hf-internal-testing/tiny-random-LlamaForCausalLM"
     method: str = "mean_diff"  # use 'baseline' for no-steering control
     target: str = "honesty"
-    layers: tuple[int, ...] = (1,)
+    # `layers`: tuple of layer indices, OR () meaning "resolve from model: 30-80% band".
+    # Don't single-layer by default -- gives misleading per-method rankings.
+    layers: tuple[int, ...] = ()
     coeff: float = 2.0
     n_train: int = 32
     n_eval: int = 32
@@ -86,12 +88,19 @@ def cfg_for_method(bcfg: BenchmarkConfig, dtype: torch.dtype):
     common = dict(layers=bcfg.layers, coeff=bcfg.coeff, dtype=dtype, seed=bcfg.seed)
     table = {
         "mean_diff": sl.MeanDiffConfig(**common),
+        "caa": sl.CAAConfig(**common),
+        "act_add": sl.ActAddConfig(**common),
         "pca": sl.PCAConfig(**common),
         "topk_clusters": sl.TopKClustersConfig(**common, k=min(bcfg.n_train, 4)),
         # tau=-1.1 -> always-on gate; sweep tau on real benches
         "cosine_gated": sl.CosineGatedConfig(**common, tau=0.0),
         "sspace": sl.SSpaceConfig(**common, r=min(bcfg.n_train, 4)),
         "spherical": sl.SphericalConfig(**common),
+        "directional_ablation": sl.DirectionalAblationConfig(**common),
+        "chars": sl.CHaRSConfig(**common, k=min(bcfg.n_train, 4)),
+        "linear_act": sl.LinearAcTConfig(**common),
+        "angular_steering": sl.AngularSteeringConfig(**common),
+        "mean_centred": sl.MeanCentredConfig(**common),
     }
     if bcfg.method == "baseline":
         return None
@@ -152,6 +161,28 @@ def _mean(xs: list[float]) -> float:
     return float(sum(xs) / len(xs)) if xs else float("nan")
 
 
+def _parse_layers(s: str) -> tuple[int, ...]:
+    """Parse --layers: 'mid'/'all' -> () sentinel (resolved after model load); else int list."""
+    s = s.strip().lower()
+    if s in ("mid", "all"):
+        # Encode sentinel via empty tuple. Resolved in run() after model load:
+        # 'mid' -> 30-80% band, 'all' -> all layers. We stash the choice on the
+        # tuple via a module-level dict because tuple is immutable. Simpler: use
+        # negative ints {-1: mid, -2: all}.
+        return (-1,) if s == "mid" else (-2,)
+    return tuple(int(x) for x in s.split(","))
+
+
+def _resolve_layers(layers: tuple[int, ...], n_hidden: int) -> tuple[int, ...]:
+    """Resolve sentinel layers. (-1,) = mid 30-80%, (-2,) = all."""
+    if layers == (-1,):
+        lo, hi = int(n_hidden * 0.30), int(n_hidden * 0.80)
+        return tuple(range(lo, hi))
+    if layers == (-2,):
+        return tuple(range(n_hidden))
+    return layers
+
+
 def run(cfg: BenchmarkConfig) -> dict:
     random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
@@ -164,6 +195,11 @@ def run(cfg: BenchmarkConfig) -> dict:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token or tok.unk_token or "<pad>"
     model = AutoModelForCausalLM.from_pretrained(cfg.model, torch_dtype=dtype).to(cfg.device).eval()
+
+    # Resolve sentinel layers ((-1,)=mid 30-80%, (-2,)=all) against actual model.
+    n_hidden = model.config.num_hidden_layers
+    cfg.layers = _resolve_layers(cfg.layers, n_hidden)
+    logger.info(f"layers resolved: {cfg.layers} (model has {n_hidden} hidden layers)")
 
     if cfg.synthetic:
         pos, neg, eval_pairs = _synth_pairs(cfg.n_train, cfg.n_eval)
@@ -280,7 +316,8 @@ def _parse_args():
     p.add_argument("--method", default=BenchmarkConfig.method,
                    help="mean_diff|pca|topk_clusters|cosine_gated|sspace|spherical|baseline")
     p.add_argument("--target", default=BenchmarkConfig.target)
-    p.add_argument("--layers", default="1", help="comma-separated layer indices")
+    p.add_argument("--layers", default="mid",
+                   help="comma-separated indices, OR 'mid' (30-80%% of model layers), OR 'all'. Default: 'mid'.")
     p.add_argument("--coeff", type=float, default=BenchmarkConfig.coeff)
     p.add_argument("--n-train", type=int, default=BenchmarkConfig.n_train)
     p.add_argument("--n-eval", type=int, default=BenchmarkConfig.n_eval)
@@ -295,7 +332,7 @@ def _parse_args():
         model=args.model,
         method=args.method,
         target=args.target,
-        layers=tuple(int(x) for x in args.layers.split(",")),
+        layers=_parse_layers(args.layers),
         coeff=args.coeff,
         n_train=args.n_train,
         n_eval=args.n_eval,
