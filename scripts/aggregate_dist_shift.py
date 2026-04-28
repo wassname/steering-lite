@@ -198,7 +198,7 @@ def main():
     fig, axes = plt.subplots(1, n_alphas, figsize=(5.5 * n_alphas, 4.5), squeeze=False)
     colors = plt.cm.tab10.colors
     method_color = {m: colors[i] for i, m in enumerate(methods_coeffs)}
-    window = 16
+    window = 4
     metric, ylabel, log = "kl_sb", "KL(steer || base) [nats]", True
     for j, alpha in enumerate(args.alphas):
         ax = axes[0, j]
@@ -222,7 +222,12 @@ def main():
         ax.axvline(20, color="black", lw=1.0, ls=":", alpha=0.7, zorder=5)
         ax.grid(True, alpha=0.3)
     axes[0, 0].legend(loc="best", fontsize=8)
-    fig.suptitle(f"Crash-off-road sweep · α multipliers on iso-free-dNLL=0.10 calibrated coeff · N={args.n_prompts} prompts · T={args.max_new} · smoothed (window={window})\n{model_id}  layer={layers[0]}", fontsize=10)
+    iso_args = iso.get("args", {})
+    iso_label = (
+        f"{iso_args.get('mode', 'free-dNLL')}_{iso_args.get('target_stat', '')}={iso_args.get('target_kl', iso_args.get('target_metric_value', '?'))}"
+        if 'mode' in iso_args else f"free-dNLL={iso_args.get('target_metric_value', '?')}"
+    )
+    fig.suptitle(f"Distribution drift along the trajectory · KL(steer∥base) by token position · {model_id}  layer={layers[0]}  N={args.n_prompts} prompts · iso-calibration: {iso_label}\nsolid p50, band p10–p90, dotted t={iso_args.get('t_calib', 20)} (calibration window), heavy line KL=1", fontsize=9)
     fig.tight_layout()
     png = out_dir / f"agg_dist_shift__{model_id.replace('/', '--')}__N{args.n_prompts}__T{args.max_new}__{alpha_tag}__seed{args.seed}.png"
     fig.savefig(png, dpi=110, bbox_inches="tight")
