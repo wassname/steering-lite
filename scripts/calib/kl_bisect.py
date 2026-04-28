@@ -15,7 +15,7 @@ import torch
 from loguru import logger
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, make_prompt
+from steering_lite.daily_dilemmas import load_pairs, format_mcq
 
 
 METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical"]
@@ -34,15 +34,18 @@ def make_cfg(method: str, layers: tuple[int, ...], coeff: float, dtype, seed: in
     return table[method]
 
 
-def build_prompts(tok, situations, chat: bool, enable_thinking: bool):
+def build_prompts(tok, pairs, chat: bool, enable_thinking: bool):
+    """Build calib/val probe prompts. Uses MCQ format ending at 'My choice:' to
+    match the bench eval read-off position. KL is measured on what model
+    generates after that point (Yes/No + reasoning), which is exactly what
+    eval logratio is computed over.
+    """
     out = []
-    for s in situations:
-        if chat:
-            messages = [{"role": "user", "content": s}]
-            text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True,
-                                           enable_thinking=enable_thinking)
-        else:
-            text = make_prompt(s)
+    for p in pairs:
+        # Format MCQ ending at 'My choice:' (uses chat template internally if
+        # available). Use action_pos arbitrarily; we just need a representative
+        # generation distribution to characterize KL shift.
+        text = format_mcq(p.situation, p.action_pos, tok)
         ids = tok(text, return_tensors="pt", truncation=True, max_length=512).input_ids[0]
         out.append(ids)
     return out
@@ -129,14 +132,12 @@ def main():
         train_pairs = pairs[: args.n_train]
         calib_pairs = pairs[args.n_train : args.n_train + args.n_calib]
         val_pairs = pairs[args.n_train + args.n_calib : args.n_train + args.n_calib + args.n_validate]
-        pos = [make_prompt(pp.situation) + pp.action_pos for pp in train_pairs]
-        neg = [make_prompt(pp.situation) + pp.action_neg for pp in train_pairs]
+        pos = [format_mcq(pp.situation, pp.action_pos, tok) for pp in train_pairs]
+        neg = [format_mcq(pp.situation, pp.action_neg, tok) for pp in train_pairs]
         logger.info(f"target={args.target} n_train={len(pos)} n_calib={len(calib_pairs)} n_val={len(val_pairs)}")
 
-        prompts_calib = build_prompts(tok, [pp.situation for pp in calib_pairs],
-                                      args.chat_template, args.enable_thinking)
-        prompts_val = build_prompts(tok, [pp.situation for pp in val_pairs],
-                                    args.chat_template, args.enable_thinking)
+        prompts_calib = build_prompts(tok, calib_pairs, args.chat_template, args.enable_thinking)
+        prompts_val = build_prompts(tok, val_pairs, args.chat_template, args.enable_thinking)
 
         for method in methods:
             logger.info(f"=== seed={seed} {method} ===")
