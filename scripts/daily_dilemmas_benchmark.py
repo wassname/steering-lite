@@ -29,7 +29,7 @@ from loguru import logger
 import steering_lite as sl
 from steering_lite.daily_dilemmas import (
     COMMON_VALUES, DilemmaPair, DilemmaRow, load_pairs, load_eval_rows,
-    format_mcq, get_choice_ids, score_mcq,
+    format_mcq, get_choice_ids, score_mcq, score_mcq_guided,
 )
 
 
@@ -83,6 +83,13 @@ class BenchmarkConfig:
     output_dir: Path = Path("outputs/daily_dilemmas")
     save_load_check: bool = False
     save_load_tol: float = 1e-4
+    # Guided CoT eval: let the model think (greedy, under steering) for
+    # max_think_tokens, then force '</think>\nMy choice:' and score Yes/No.
+    # Steering acts differently when allowed to think first, so this gives a
+    # more representative signal than teacher-forcing the bare prompt.
+    # See https://gist.github.com/wassname/733c568cd29c2a402be4442d6a061899
+    guided: bool = True
+    max_think_tokens: int = 32
 
 
 def cfg_for_method(bcfg: BenchmarkConfig, dtype: torch.dtype):
@@ -154,6 +161,7 @@ def _real_train_and_rows(
 
 def _eval_run(
     model, tok, eval_rows: list[DilemmaRow], choice_ids, device,
+    *, guided: bool = False, max_think_tokens: int = 32,
 ) -> tuple[dict, list[dict]]:
     """MCQ Yes/No eval, multi-label.
 
@@ -170,7 +178,11 @@ def _eval_run(
     per_row = []
     n_nan = 0
     for r in eval_rows:
-        out = score_mcq(model, tok, r.situation, r.action, choice_ids, device)
+        if guided:
+            out = score_mcq_guided(model, tok, r.situation, r.action, choice_ids,
+                                   device, max_think_tokens=max_think_tokens)
+        else:
+            out = score_mcq(model, tok, r.situation, r.action, choice_ids, device)
         lr = out["logratio"]
         sign = 1.0 if r.action_type == "to_do" else -1.0
         is_nan = (lr != lr)
@@ -245,7 +257,15 @@ def run(cfg: BenchmarkConfig) -> dict:
         f"yes_ids={len(choice_ids[1])} no_ids={len(choice_ids[0])}"
     )
 
-    base_by_value, base_rows = _eval_run(model, tok, eval_rows, choice_ids, cfg.device)
+    # Guided eval requires real chat template + <think> support; synthetic mode
+    # uses tiny-random model with no chat template, so force teacher-forced.
+    use_guided = cfg.guided and not cfg.synthetic
+    logger.info(f"eval mode: {'guided CoT' if use_guided else 'teacher-forced'} "
+                f"(max_think_tokens={cfg.max_think_tokens if use_guided else 0})")
+    base_by_value, base_rows = _eval_run(
+        model, tok, eval_rows, choice_ids, cfg.device,
+        guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+    )
 
     s_cfg = cfg_for_method(cfg, dtype)
     vector_norms = {}
@@ -270,7 +290,10 @@ def run(cfg: BenchmarkConfig) -> dict:
                 reloaded_logits = model(**ids).logits.detach().float()
             save_load_err = float((steered_logits - reloaded_logits).abs().max())
             os.remove(path)
-        steered_by_value, steered_rows = _eval_run(model, tok, eval_rows, choice_ids, cfg.device)
+        steered_by_value, steered_rows = _eval_run(
+            model, tok, eval_rows, choice_ids, cfg.device,
+            guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+        )
         sl.detach(model)
 
     effects = {}
@@ -383,6 +406,9 @@ def _parse_args():
     p.add_argument("--synthetic", action="store_true")
     p.add_argument("--save-load-check", action="store_true")
     p.add_argument("--output-dir", default=str(BenchmarkConfig.output_dir))
+    p.add_argument("--no-guided", action="store_true",
+                   help="Use teacher-forced single-token MCQ instead of guided CoT.")
+    p.add_argument("--max-think-tokens", type=int, default=BenchmarkConfig.max_think_tokens)
     args = p.parse_args()
     return BenchmarkConfig(
         model=args.model,
@@ -398,6 +424,8 @@ def _parse_args():
         synthetic=args.synthetic,
         save_load_check=args.save_load_check,
         output_dir=Path(args.output_dir),
+        guided=not args.no_guided,
+        max_think_tokens=args.max_think_tokens,
     )
 
 

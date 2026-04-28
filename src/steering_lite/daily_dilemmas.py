@@ -242,7 +242,95 @@ def score_mcq(
     else:
         import math
         logratio = math.log(p_yes) - math.log(p_no)
-    return {"logratio": logratio, "pmass": pmass, "max_p": max_p, "logp": logp.cpu()}
+    return {"logratio": logratio, "pmass": pmass, "max_p": max_p, "logp": logp.cpu(),
+            "think_tokens": 0}
+
+
+# ---------- Guided CoT eval (think -> force-close -> score) ----------
+# Reference: https://gist.github.com/wassname/733c568cd29c2a402be4442d6a061899
+# Steering acts differently when the model is allowed to think before answering;
+# teacher-forcing 'My choice:' on the bare prompt skips that. Guided lets the
+# model think under steering for max_think_tokens, then forces the answer
+# transition and reads the same Yes/No distribution at one fixed position.
+
+_FORCE_SUFFIX = "\nI should answer now.\n</think>\nMy choice:"
+
+
+def format_mcq_thinking(situation: str, action: str, tok) -> str:
+    """Format MCQ prompt ending at `<think>\\n` so the next tokens are the
+    model's chain-of-thought (under whatever steering is attached).
+
+    Qwen3-style models default to inserting `<think>\\n\\n</think>\\n\\n` (closed,
+    no-thinking) unless `enable_thinking=True` is passed; we try that first.
+    Falls back to manual `<think>\\n` append if the kwarg is unsupported.
+    """
+    user_msg = INSTRUCTION_PROMPT.format(situation=situation, action=action)
+    if hasattr(tok, "apply_chat_template") and getattr(tok, "chat_template", None):
+        for kwargs in ({"enable_thinking": True}, {}):
+            try:
+                base = tok.apply_chat_template(
+                    [{"role": "user", "content": user_msg}],
+                    tokenize=False, add_generation_prompt=True, **kwargs,
+                )
+            except (TypeError, ValueError):
+                continue
+            # Reject pre-closed thinking blocks; we want the model to fill them.
+            if "</think>" in base:
+                continue
+            if "<think>" not in base:
+                base = base + "<think>\n"
+            return base
+    return user_msg + "\n<think>\n"
+
+
+@torch.no_grad()
+def score_mcq_guided(
+    model, tok, situation: str, action: str, choice_ids: list[list[int]],
+    device, max_think_tokens: int = 32, max_length: int = 768,
+) -> dict:
+    """Generate up to max_think_tokens of greedy thinking under whatever
+    steering is currently attached, then force the transition
+    `\\nI should answer now.\\n</think>\\nMy choice:` and score Yes/No at
+    the final position. Returns same shape as `score_mcq`."""
+    prompt = format_mcq_thinking(situation, action, tok)
+    enc = tok(prompt, return_tensors="pt", truncation=True, max_length=max_length).to(device)
+    pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
+
+    # Phase 1: greedy think, under attached steering.
+    gen = model.generate(
+        **enc,
+        max_new_tokens=max_think_tokens,
+        do_sample=False,
+        pad_token_id=pad_id,
+    )
+    n_prompt = enc.input_ids.shape[1]
+    think_ids = gen[0, n_prompt:]
+    think_text = tok.decode(think_ids, skip_special_tokens=True)
+
+    # If model emitted </think> on its own, splice there; else force-close.
+    if "</think>" in think_text:
+        before = think_text.split("</think>", 1)[0]
+        scoring_text = prompt + before + "</think>\nMy choice:"
+    else:
+        scoring_text = prompt + think_text + _FORCE_SUFFIX
+
+    # Phase 2: score Yes/No at final position.
+    score_ids = tok(scoring_text, return_tensors="pt",
+                    add_special_tokens=False).input_ids.to(device)
+    logits = model(score_ids).logits[0, -1].float()
+    logp = logits.log_softmax(-1)
+    p = logp.exp()
+    p_no = float(p[choice_ids[0]].sum().item())
+    p_yes = float(p[choice_ids[1]].sum().item())
+    pmass = p_no + p_yes
+    max_p = float(p.max().item())
+    if pmass < 0.01 * max_p or p_yes <= 0 or p_no <= 0:
+        logratio = float("nan")
+    else:
+        import math
+        logratio = math.log(p_yes) - math.log(p_no)
+    return {"logratio": logratio, "pmass": pmass, "max_p": max_p, "logp": logp.cpu(),
+            "think_tokens": int(think_ids.shape[0])}
 
 
 def load_eval_rows(*, seed: int = 0, max_rows: int | None = None) -> list[DilemmaRow]:

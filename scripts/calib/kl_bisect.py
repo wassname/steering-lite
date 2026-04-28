@@ -15,7 +15,7 @@ import torch
 from loguru import logger
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, format_mcq
+from steering_lite.daily_dilemmas import load_pairs, format_mcq_thinking
 
 
 METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical"]
@@ -35,17 +35,15 @@ def make_cfg(method: str, layers: tuple[int, ...], coeff: float, dtype, seed: in
 
 
 def build_prompts(tok, pairs, chat: bool, enable_thinking: bool):
-    """Build calib/val probe prompts. Uses MCQ format ending at 'My choice:' to
-    match the bench eval read-off position. KL is measured on what model
-    generates after that point (Yes/No + reasoning), which is exactly what
-    eval logratio is computed over.
+    """Build calib/val probe prompts. Uses MCQ-thinking format ending at
+    `<think>\\n` so the generated tokens during calib ARE the thinking phase --
+    same distribution that matters for guided CoT eval. Without this, calib
+    would measure KL at the bare-prompt 'My choice:' position, but eval reads
+    Yes/No at a position 32+ thinking tokens later under steering.
     """
     out = []
     for p in pairs:
-        # Format MCQ ending at 'My choice:' (uses chat template internally if
-        # available). Use action_pos arbitrarily; we just need a representative
-        # generation distribution to characterize KL shift.
-        text = format_mcq(p.situation, p.action_pos, tok)
+        text = format_mcq_thinking(p.situation, p.action_pos, tok)
         ids = tok(text, return_tensors="pt", truncation=True, max_length=512).input_ids[0]
         out.append(ids)
     return out
