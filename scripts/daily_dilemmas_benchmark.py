@@ -28,7 +28,8 @@ from loguru import logger
 
 import steering_lite as sl
 from steering_lite.daily_dilemmas import (
-    COMMON_VALUES, DilemmaPair, DilemmaRow, load_pairs, load_eval_rows,
+    COMMON_VALUES, PROMPT_PRESETS, DilemmaPair, DilemmaRow,
+    load_pairs, load_eval_rows,
     format_mcq, get_choice_ids, score_mcq, score_mcq_guided,
 )
 
@@ -74,7 +75,7 @@ class BenchmarkConfig:
     layers: tuple[int, ...] = ()
     coeff: float = 2.0
     n_train: int = 32
-    n_eval: int = 32
+    n_eval: int | None = None  # None = whole dataset (~2k party='You' rows)
     max_seq_length: int = 256
     torch_dtype: str = "float32"
     device: str = "cpu"
@@ -83,6 +84,11 @@ class BenchmarkConfig:
     output_dir: Path = Path("outputs/daily_dilemmas")
     save_load_check: bool = False
     save_load_tol: float = 1e-4
+    # Prompt-baseline control: inject a system prompt (e.g., AxBench engineered
+    # honesty). Empty = no system prompt. Combined with method='baseline' to
+    # measure prompt-only steering as a control vs weight/activation steering.
+    prompt_preset: str = "base"  # base|simple_honest|simple_dishonest|engineered_honest|engineered_dishonest
+    system_prompt: str = ""  # raw override; takes priority over prompt_preset
     # Guided CoT eval: let the model think (greedy, under steering) for
     # max_think_tokens, then force '</think>\nMy choice:' and score Yes/No.
     # Steering acts differently when allowed to think first, so this gives a
@@ -161,7 +167,7 @@ def _real_train_and_rows(
 
 def _eval_run(
     model, tok, eval_rows: list[DilemmaRow], choice_ids, device,
-    *, guided: bool = False, max_think_tokens: int = 32,
+    *, guided: bool = False, max_think_tokens: int = 32, system_prompt: str = "",
 ) -> tuple[dict, list[dict]]:
     """MCQ Yes/No eval, multi-label.
 
@@ -180,9 +186,11 @@ def _eval_run(
     for r in eval_rows:
         if guided:
             out = score_mcq_guided(model, tok, r.situation, r.action, choice_ids,
-                                   device, max_think_tokens=max_think_tokens)
+                                   device, max_think_tokens=max_think_tokens,
+                                   system_prompt=system_prompt)
         else:
-            out = score_mcq(model, tok, r.situation, r.action, choice_ids, device)
+            out = score_mcq(model, tok, r.situation, r.action, choice_ids, device,
+                            system_prompt=system_prompt)
         lr = out["logratio"]
         sign = 1.0 if r.action_type == "to_do" else -1.0
         is_nan = (lr != lr)
@@ -247,6 +255,18 @@ def run(cfg: BenchmarkConfig) -> dict:
     cfg.layers = _resolve_layers(cfg.layers, n_hidden)
     logger.info(f"layers resolved: {cfg.layers} (model has {n_hidden} hidden layers)")
 
+    # Resolve prompt baseline. Raw `system_prompt` overrides the preset name.
+    if cfg.system_prompt:
+        sys_prompt = cfg.system_prompt
+        prompt_name = "custom"
+    else:
+        if cfg.prompt_preset not in PROMPT_PRESETS:
+            raise ValueError(f"unknown prompt_preset={cfg.prompt_preset!r}; "
+                             f"options: {list(PROMPT_PRESETS)}")
+        sys_prompt = PROMPT_PRESETS[cfg.prompt_preset]
+        prompt_name = cfg.prompt_preset
+    logger.info(f"prompt baseline: preset={prompt_name} (len={len(sys_prompt)} chars)")
+
     if cfg.synthetic:
         pos, neg, eval_rows = _synth_train_and_rows(tok, cfg.n_train, cfg.n_eval)
     else:
@@ -265,6 +285,7 @@ def run(cfg: BenchmarkConfig) -> dict:
     base_by_value, base_rows = _eval_run(
         model, tok, eval_rows, choice_ids, cfg.device,
         guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+        system_prompt=sys_prompt,
     )
 
     s_cfg = cfg_for_method(cfg, dtype)
@@ -293,6 +314,7 @@ def run(cfg: BenchmarkConfig) -> dict:
         steered_by_value, steered_rows = _eval_run(
             model, tok, eval_rows, choice_ids, cfg.device,
             guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+            system_prompt=sys_prompt,
         )
         sl.detach(model)
 
@@ -354,6 +376,7 @@ def run(cfg: BenchmarkConfig) -> dict:
         "effects": effects,
         "summary": {
             "target": cfg.target,
+            "prompt": prompt_name,
             "target_effect": target_effect,
             "leakage_mean": leakage,
             "surgical_informedness": surgical_informedness,
@@ -372,11 +395,53 @@ def run(cfg: BenchmarkConfig) -> dict:
         "save_load_err": save_load_err,
     }
     os.makedirs(cfg.output_dir, exist_ok=True)
-    out_path = cfg.output_dir / (
-        f"{cfg.model.replace('/', '--')}__{cfg.method}__{cfg.target}__c{cfg.coeff}__seed{cfg.seed}__{int(time.time())}.json"
+    out_stem = (
+        f"{cfg.model.replace('/', '--')}__{cfg.method}__{cfg.target}"
+        f"__c{cfg.coeff}__p{prompt_name}__seed{cfg.seed}__{int(time.time())}"
     )
+    out_path = cfg.output_dir / f"{out_stem}.json"
     out_path.write_text(json.dumps(result, indent=2))
-    logger.info(f"wrote {out_path}")
+
+    # Per-row CSV for downstream flip-based SI aggregation. One row per
+    # (dilemma_idx, action_type) at this (method, coeff, prompt) condition.
+    # `idx` is the canonical join key across runs at different coeffs.
+    # `logratio_honesty` is logratio_act for honesty-tagged rows (signed so
+    # >0 = endorses honesty), NaN otherwise. Matches weight-steering schema.
+    csv_path = cfg.output_dir / f"{out_stem}__per_row.csv"
+    target_l = cfg.target.lower().strip()
+    rows_for_csv = []
+    for r in steered_rows:
+        idx = f"{r['dilemma_idx']}:{r['action_type']}"
+        is_target = target_l in [v.lower() for v in r["values"]]
+        lr_t = r["logratio_act"] if is_target else float("nan")
+        lr = r["logratio"]
+        pmass = r["pmass"]
+        max_p = r["max_p"]
+        low_pmass = (pmass < 0.01 * max_p) or (lr != lr)
+        rows_for_csv.append({
+            "idx": idx,
+            "dilemma_idx": r["dilemma_idx"],
+            "action_type": r["action_type"],
+            "method": cfg.method,
+            "coeff": float(cfg.coeff) if s_cfg is not None else 0.0,
+            "prompt": prompt_name,
+            "model": cfg.model,
+            "target": cfg.target,
+            "seed": cfg.seed,
+            f"logratio_{cfg.target}": lr_t,
+            "logratio_act": r["logratio_act"],
+            "pmass": pmass,
+            "max_p": max_p,
+            "low_pmass": int(bool(low_pmass)),
+            "is_target": int(is_target),
+        })
+    import csv as _csv
+    if rows_for_csv:
+        with open(csv_path, "w", newline="") as fh:
+            w = _csv.DictWriter(fh, fieldnames=list(rows_for_csv[0].keys()))
+            w.writeheader()
+            w.writerows(rows_for_csv)
+    logger.info(f"wrote {out_path} and {csv_path} ({len(rows_for_csv)} rows)")
     logger.info(
         f"target_effect={target_effect:+.4f} leakage={leakage:+.4f} "
         f"SI={surgical_informedness:+.4f} | "
@@ -399,7 +464,8 @@ def _parse_args():
                    help="comma-separated indices, OR 'mid' (30-80%% of model layers), OR 'all'. Default: 'mid'.")
     p.add_argument("--coeff", type=float, default=BenchmarkConfig.coeff)
     p.add_argument("--n-train", type=int, default=BenchmarkConfig.n_train)
-    p.add_argument("--n-eval", type=int, default=BenchmarkConfig.n_eval)
+    p.add_argument("--n-eval", type=int, default=BenchmarkConfig.n_eval,
+                   help="number of eval rows; omit/None for whole dataset (~2k)")
     p.add_argument("--torch-dtype", default=BenchmarkConfig.torch_dtype)
     p.add_argument("--device", default=BenchmarkConfig.device)
     p.add_argument("--seed", type=int, default=BenchmarkConfig.seed)
@@ -409,6 +475,10 @@ def _parse_args():
     p.add_argument("--no-guided", action="store_true",
                    help="Use teacher-forced single-token MCQ instead of guided CoT.")
     p.add_argument("--max-think-tokens", type=int, default=BenchmarkConfig.max_think_tokens)
+    p.add_argument("--prompt-preset", default=BenchmarkConfig.prompt_preset,
+                   help="base|simple_honest|simple_dishonest|engineered_honest|engineered_dishonest")
+    p.add_argument("--system-prompt", default="",
+                   help="raw system prompt; overrides --prompt-preset when non-empty")
     args = p.parse_args()
     return BenchmarkConfig(
         model=args.model,
@@ -426,6 +496,8 @@ def _parse_args():
         output_dir=Path(args.output_dir),
         guided=not args.no_guided,
         max_think_tokens=args.max_think_tokens,
+        prompt_preset=args.prompt_preset,
+        system_prompt=args.system_prompt,
     )
 
 
