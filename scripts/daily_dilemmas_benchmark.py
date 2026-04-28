@@ -28,7 +28,8 @@ from loguru import logger
 
 import steering_lite as sl
 from steering_lite.daily_dilemmas import (
-    COMMON_VALUES, DilemmaPair, load_pairs, score_action_full, dist_metrics,
+    COMMON_VALUES, DilemmaPair, DilemmaRow, load_pairs, load_eval_rows,
+    format_mcq, get_choice_ids, score_mcq,
 )
 
 
@@ -107,54 +108,87 @@ def cfg_for_method(bcfg: BenchmarkConfig, dtype: torch.dtype):
     return table[bcfg.method]
 
 
-def _synth_pairs(n_train: int, n_eval: int) -> tuple[list[str], list[str], list[DilemmaPair]]:
-    """Synthetic pairs for smoke test. Ignores dataset entirely."""
-    pos = SYNTH_POS[:n_train]
-    neg = SYNTH_NEG[:n_train]
-    eval_pairs = []
-    for i, sit in enumerate(SYNTH_SITUATIONS[:n_eval]):
-        eval_pairs.append(DilemmaPair(
-            dilemma_idx=i, situation=sit,
-            action_pos=SYNTH_POS[i % len(SYNTH_POS)].split(".")[0],
-            action_neg=SYNTH_NEG[i % len(SYNTH_NEG)].split(".")[0],
-            values_pos=["honesty"], values_neg=["deception"],
+def _synth_train_and_rows(tok, n_train: int, n_eval: int) -> tuple[list[str], list[str], list[DilemmaRow]]:
+    """Synthetic data for smoke. Uses the real MCQ format so train/eval activations align."""
+    sit_cycle = SYNTH_SITUATIONS * ((n_train // len(SYNTH_SITUATIONS)) + 2)
+    pos = [format_mcq(sit_cycle[i], SYNTH_POS[i % len(SYNTH_POS)].split(".")[0], tok)
+           for i in range(n_train)]
+    neg = [format_mcq(sit_cycle[i], SYNTH_NEG[i % len(SYNTH_NEG)].split(".")[0], tok)
+           for i in range(n_train)]
+    rows = []
+    for i, sit in enumerate(SYNTH_SITUATIONS):
+        rows.append(DilemmaRow(
+            dilemma_idx=i, action_type="to_do", situation=sit,
+            action=SYNTH_POS[i % len(SYNTH_POS)].split(".")[0],
+            values=["honesty"],
         ))
-    return pos, neg, eval_pairs
+        rows.append(DilemmaRow(
+            dilemma_idx=i, action_type="not_to_do", situation=sit,
+            action=SYNTH_NEG[i % len(SYNTH_NEG)].split(".")[0],
+            values=["deception"],
+        ))
+    return pos, neg, rows[:n_eval]
 
 
-def _real_pairs(target: str, n_train: int, n_eval: int, seed: int) -> tuple[list[str], list[str], list[DilemmaPair]]:
+def _real_train_and_rows(
+    tok, target: str, n_train: int, n_eval_rows: int, seed: int,
+) -> tuple[list[str], list[str], list[DilemmaRow]]:
+    # Training: per-target pos/neg pairs (unchanged) -- needed to extract a
+    # *target-specific* steering direction. Format prompts as MCQ ending at
+    # 'My choice:' so activations at the read-off position match eval.
     pairs = load_pairs(target, seed=seed)
-    if len(pairs) < n_train + n_eval:
+    if len(pairs) < n_train:
         raise RuntimeError(
-            f"only {len(pairs)} pairs for value={target!r}; need {n_train + n_eval}"
+            f"only {len(pairs)} pairs for value={target!r}; need n_train={n_train}"
         )
     train_pairs = pairs[:n_train]
-    eval_pairs = pairs[n_train : n_train + n_eval]
-    # Extract prompts must match eval scoring format: situation + "\nI would: " + action.
-    # Bare action strings yield activations that don't transfer to in-situation scoring.
-    from steering_lite.daily_dilemmas import make_prompt
-    pos = [make_prompt(p.situation) + p.action_pos for p in train_pairs]
-    neg = [make_prompt(p.situation) + p.action_neg for p in train_pairs]
-    return pos, neg, eval_pairs
+    pos = [format_mcq(p.situation, p.action_pos, tok) for p in train_pairs]
+    neg = [format_mcq(p.situation, p.action_neg, tok) for p in train_pairs]
+
+    # Eval: ALL rows from the full dataset, scored once each. Multi-label means
+    # honesty-tagged rows AND fairness-tagged rows AND ... contribute to *every*
+    # value they're tagged with from the same forward pass.
+    eval_rows = load_eval_rows(seed=seed, max_rows=n_eval_rows)
+    return pos, neg, eval_rows
 
 
-def _eval_run(model, tok, eval_pairs: list[DilemmaPair], device) -> tuple[dict, list[dict]]:
-    """Run model on all eval pairs, returning:
-        by_value: dict[value] -> list of action scores (mean per-token logprob)
-        per_pair: list of dicts {pos_logp, neg_logp, pos_token_ids, neg_token_ids}
-                  capturing the full action-position distributions for later TV/KL/JS.
+def _eval_run(
+    model, tok, eval_rows: list[DilemmaRow], choice_ids, device,
+) -> tuple[dict, list[dict]]:
+    """MCQ Yes/No eval, multi-label.
+
+    For each row: format MCQ -> forward pass -> logratio = log P(Yes) - log P(No).
+    Sign-flip not_to_do rows so logratio_act > 0 always means 'endorse the
+    values this action expresses'. Each row's logratio_act contributes to every
+    value in row.values (multi-label).
+
+    Returns:
+        by_value: dict[value] -> list[logratio_act]  (NaN excluded)
+        per_row: list of {logratio, logratio_act, pmass, max_p, values, action_type, dilemma_idx, logp}
     """
     by_value: dict[str, list[float]] = {}
-    per_pair = []
-    for p in eval_pairs:
-        rp = score_action_full(model, tok, p.situation, p.action_pos, device)
-        rn = score_action_full(model, tok, p.situation, p.action_neg, device)
-        for v in p.values_pos:
-            by_value.setdefault(v, []).append(rp["score"])
-        for v in p.values_neg:
-            by_value.setdefault(v, []).append(rn["score"])
-        per_pair.append({"pos": rp, "neg": rn, "values_pos": p.values_pos, "values_neg": p.values_neg})
-    return by_value, per_pair
+    per_row = []
+    n_nan = 0
+    for r in eval_rows:
+        out = score_mcq(model, tok, r.situation, r.action, choice_ids, device)
+        lr = out["logratio"]
+        sign = 1.0 if r.action_type == "to_do" else -1.0
+        is_nan = (lr != lr)
+        if is_nan:
+            n_nan += 1
+            lr_act = float("nan")
+        else:
+            lr_act = sign * lr
+            for v in r.values:
+                by_value.setdefault(v, []).append(lr_act)
+        per_row.append({
+            "dilemma_idx": r.dilemma_idx, "action_type": r.action_type,
+            "values": r.values, "logratio": lr, "logratio_act": lr_act,
+            "pmass": out["pmass"], "max_p": out["max_p"], "logp": out["logp"],
+        })
+    if n_nan > 0:
+        logger.warning(f"NaN logratio (low Yes/No pmass) on {n_nan}/{len(eval_rows)} rows")
+    return by_value, per_row
 
 
 def _mean(xs: list[float]) -> float:
@@ -202,18 +236,22 @@ def run(cfg: BenchmarkConfig) -> dict:
     logger.info(f"layers resolved: {cfg.layers} (model has {n_hidden} hidden layers)")
 
     if cfg.synthetic:
-        pos, neg, eval_pairs = _synth_pairs(cfg.n_train, cfg.n_eval)
+        pos, neg, eval_rows = _synth_train_and_rows(tok, cfg.n_train, cfg.n_eval)
     else:
-        pos, neg, eval_pairs = _real_pairs(cfg.target, cfg.n_train, cfg.n_eval, cfg.seed)
-    logger.info(f"target={cfg.target} n_train={len(pos)} n_eval={len(eval_pairs)}")
+        pos, neg, eval_rows = _real_train_and_rows(tok, cfg.target, cfg.n_train, cfg.n_eval, cfg.seed)
+    choice_ids = get_choice_ids(tok)
+    logger.info(
+        f"target={cfg.target} n_train={len(pos)} n_eval_rows={len(eval_rows)} "
+        f"yes_ids={len(choice_ids[1])} no_ids={len(choice_ids[0])}"
+    )
 
-    base_by_value, base_pairs = _eval_run(model, tok, eval_pairs, cfg.device)
+    base_by_value, base_rows = _eval_run(model, tok, eval_rows, choice_ids, cfg.device)
 
     s_cfg = cfg_for_method(cfg, dtype)
     vector_norms = {}
     save_load_err = None
     steered_by_value = base_by_value
-    steered_pairs = base_pairs
+    steered_rows = base_rows
     if s_cfg is not None:
         logger.info(f"extracting steering vectors via method={cfg.method}")
         vectors = sl.train(model, tok, pos, neg, s_cfg, batch_size=4, max_length=cfg.max_seq_length)
@@ -223,7 +261,7 @@ def run(cfg: BenchmarkConfig) -> dict:
             path = str(cfg.output_dir / f"_tmp_{cfg.method}_{int(time.time())}.safetensors")
             os.makedirs(cfg.output_dir, exist_ok=True)
             sl.save(model, path)
-            ids = tok(eval_pairs[0].situation, return_tensors="pt").to(cfg.device)
+            ids = tok(eval_rows[0].situation, return_tensors="pt").to(cfg.device)
             with torch.no_grad():
                 steered_logits = model(**ids).logits.detach().float()
             sl.detach(model)
@@ -232,7 +270,7 @@ def run(cfg: BenchmarkConfig) -> dict:
                 reloaded_logits = model(**ids).logits.detach().float()
             save_load_err = float((steered_logits - reloaded_logits).abs().max())
             os.remove(path)
-        steered_by_value, steered_pairs = _eval_run(model, tok, eval_pairs, cfg.device)
+        steered_by_value, steered_rows = _eval_run(model, tok, eval_rows, choice_ids, cfg.device)
         sl.detach(model)
 
     effects = {}
@@ -246,37 +284,47 @@ def run(cfg: BenchmarkConfig) -> dict:
     leakage = _mean([effects[v]["delta"] for v in other_values])
     surgical_informedness = target_effect - leakage
 
-    # Distribution-change metrics: TV/KL/JS between base and steered logp at each
-    # action position. Computed per pair, then split by whether the action was
-    # tagged with the target value (target) or not (other). For baseline runs,
-    # base_pairs == steered_pairs so all metrics are 0.
+    # Per-row TV/KL/JS at the 'My choice:' choice position (full vocab dist).
+    # Split by whether the row was tagged with the target value vs not.
     target_l = cfg.target.lower().strip()
-    dist_target = []
-    dist_other = []
-    for bp, sp in zip(base_pairs, steered_pairs):
-        for side in ("pos", "neg"):
-            tags = bp["values_pos"] if side == "pos" else bp["values_neg"]
-            m = dist_metrics(bp[side]["logp"], sp[side]["logp"])
-            if target_l in [t.lower() for t in tags]:
-                dist_target.append(m)
-            else:
-                dist_other.append(m)
+    dist_target_rows = []
+    dist_other_rows = []
+    for br, sr in zip(base_rows, steered_rows):
+        if br["logp"] is None or sr["logp"] is None:
+            continue
+        logp_a = br["logp"]
+        logp_b = sr["logp"]
+        p_a = logp_a.exp()
+        p_b = logp_b.exp()
+        tv = float(0.5 * (p_a - p_b).abs().sum().item())
+        kl_ab = float((p_a * (logp_a - logp_b)).sum().item())
+        kl_ba = float((p_b * (logp_b - logp_a)).sum().item())
+        p_m = 0.5 * (p_a + p_b)
+        logp_m = p_m.clamp_min(1e-12).log()
+        js = float(0.5 * ((p_a * (logp_a - logp_m)).sum() + (p_b * (logp_b - logp_m)).sum()).item())
+        m = {"tv": tv, "kl_ab": kl_ab, "kl_ba": kl_ba, "js": js}
+        tags = [t.lower() for t in br["values"]]
+        (dist_target_rows if target_l in tags else dist_other_rows).append(m)
 
     def _agg(rows, key):
-        vals = [r[key] for r in rows if r[key] == r[key]]  # filter NaN
+        vals = [r[key] for r in rows if r[key] == r[key]]
         return float(sum(vals) / len(vals)) if vals else float("nan")
 
     dist = {
-        "target": {k: _agg(dist_target, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
-        "other": {k: _agg(dist_other, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
-        "n_target": len(dist_target),
-        "n_other": len(dist_other),
+        "target": {k: _agg(dist_target_rows, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
+        "other": {k: _agg(dist_other_rows, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
+        "n_target": len(dist_target_rows),
+        "n_other": len(dist_other_rows),
     }
-    # Surgical informedness in distribution space: TV-shift on target-tagged
-    # actions minus TV-shift on non-target actions. Sign-symmetric (TV is
-    # always >= 0), so this is interpretable for any coeff direction.
     si_tv = dist["target"]["tv"] - dist["other"]["tv"]
     si_js = dist["target"]["js"] - dist["other"]["js"]
+
+    # Coherence: fraction of rows where Yes/No held >= 1% of max-token prob mass
+    # (i.e., the model's actually answering the MCQ, not refusing/incoherent).
+    base_valid = sum(1 for r in base_rows if r["logratio"] == r["logratio"])
+    steered_valid = sum(1 for r in steered_rows if r["logratio"] == r["logratio"])
+    base_pmass = _mean([r["pmass"] for r in base_rows])
+    steered_pmass = _mean([r["pmass"] for r in steered_rows])
 
     result = {
         "config": {**asdict(cfg), "output_dir": str(cfg.output_dir)},
@@ -289,6 +337,12 @@ def run(cfg: BenchmarkConfig) -> dict:
             "si_tv": si_tv,
             "si_js": si_js,
             "n_other_values": len(other_values),
+            "n_eval_rows": len(eval_rows),
+            "n_values_scored": len(set(base_by_value) | set(steered_by_value)),
+            "base_pct_valid": base_valid / max(len(base_rows), 1),
+            "steered_pct_valid": steered_valid / max(len(steered_rows), 1),
+            "base_pmass_mean": base_pmass,
+            "steered_pmass_mean": steered_pmass,
         },
         "distribution": dist,
         "vector_norms": vector_norms,
@@ -304,7 +358,9 @@ def run(cfg: BenchmarkConfig) -> dict:
         f"target_effect={target_effect:+.4f} leakage={leakage:+.4f} "
         f"SI={surgical_informedness:+.4f} | "
         f"tv_target={dist['target']['tv']:.4f} tv_other={dist['other']['tv']:.4f} "
-        f"SI_TV={si_tv:+.4f} SI_JS={si_js:+.4f}"
+        f"SI_TV={si_tv:+.4f} SI_JS={si_js:+.4f} | "
+        f"valid base/steered={base_valid}/{steered_valid}/{len(base_rows)} "
+        f"pmass={base_pmass:.3f}/{steered_pmass:.3f}"
     )
     return result
 
