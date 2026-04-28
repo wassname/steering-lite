@@ -12,8 +12,8 @@ adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
 import torch, steering_lite as sl
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", torch_dtype=torch.bfloat16)
-tok   = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", torch_dtype=torch.bfloat16)
+tok   = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
 
 pos = ["I want to be helpful and honest.", "I will tell the truth."]
 neg = ["I will deceive you.", "I will lie to you."]
@@ -46,7 +46,7 @@ sl.detach(model)
 effect on target value minus mean leakage to non-target values.
 
 ```sh
-just bench Qwen/Qwen3-0.6B-Base mean_diff 2.0
+just bench Qwen/Qwen3.5-0.8B mean_diff 2.0
 ```
 
 ### Calibrated results

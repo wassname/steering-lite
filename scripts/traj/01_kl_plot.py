@@ -9,7 +9,7 @@ We aggregate per-position metrics across prompts and save a CSV with
 
 Usage:
   uv run python scripts/iso_kl/02_aggregate.py \\
-    --iso-tv-json outputs/iso_tv/iso__Qwen--Qwen3-0.6B-Base__L4__free_dnll0.1__seeds0_1_2__1777346635.json \\
+    --iso-tv-json outputs/iso_tv/iso__Qwen--Qwen3.5-0.8B__L4__free_dnll0.1__seeds0_1_2__1777346635.json \\
     --n-prompts 8 --max-new 256 --seed 0
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, make_prompt
+from steering_lite.daily_dilemmas import load_pairs, format_mcq
 
 
 def make_cfg(method, layers, coeff, dtype, seed, n_train):
@@ -81,7 +81,8 @@ def per_pos_metrics(logp_b, logp_s, y_ids):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--iso-tv-json", required=True)
-    ap.add_argument("--layers", type=int, nargs="+", default=[4])
+    ap.add_argument("--layers", type=int, nargs="+", default=None,
+                    help="layer indices to steer at; default = mid 30-80%% of model depth resolved at runtime")
     ap.add_argument("--max-new", type=int, default=256)
     ap.add_argument("--n-prompts", type=int, default=8)
     ap.add_argument("--target-value", default=None)
@@ -109,7 +110,6 @@ def main():
     iso = json.load(open(args.iso_tv_json))
     model_id = iso["args"]["model"]
     target_value = args.target_value or iso["args"].get("target", "honesty")
-    layers = tuple(args.layers)
     dtype = torch.bfloat16
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -117,31 +117,32 @@ def main():
     methods_coeffs = {r["method"]: r["calibrated_coeff"] for r in rows}
     if args.methods:
         methods_coeffs = {m: c for m, c in methods_coeffs.items() if m in args.methods}
-    logger.info(f"BLUF: model={model_id} L={layers} N_prompts={args.n_prompts} max_new={args.max_new} alphas={args.alphas}")
+    logger.info(f"BLUF: model={model_id} N_prompts={args.n_prompts} max_new={args.max_new} alphas={args.alphas}")
     logger.info(f"methods×coeffs(α=1): {methods_coeffs}")
 
     tok = AutoTokenizer.from_pretrained(model_id)
     if tok.pad_token is None: tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype).to(device).eval()
 
+    # Resolve layers: default = mid 30-80% band of the loaded model.
+    if args.layers is None:
+        n_h = model.config.num_hidden_layers
+        layers = tuple(range(int(n_h * 0.30), int(n_h * 0.80)))
+        logger.info(f"layers default: mid 30-80% -> {layers} ({len(layers)}/{n_h} layers)")
+    else:
+        layers = tuple(args.layers)
+    logger.info(f"layers={layers}")
+
     pairs = load_pairs(target_value, seed=args.seed)
     train_pairs = pairs[: args.n_train]
-    pos = [make_prompt(p.situation) + p.action_pos for p in train_pairs]
-    neg = [make_prompt(p.situation) + p.action_neg for p in train_pairs]
+    pos = [format_mcq(p.situation, p.action_pos, tok) for p in train_pairs]
+    neg = [format_mcq(p.situation, p.action_neg, tok) for p in train_pairs]
     eval_pool = pairs[args.n_train:][: args.n_prompts]
-    raw_prompts = [make_prompt(p.situation) for p in eval_pool]
+    # For trajectory generation, prompt = MCQ ending at "My choice:" so the
+    # generated tokens (Yes/No + reasoning) are exactly what the bench scores.
+    prompts = [format_mcq(p.situation, p.action_pos, tok) for p in eval_pool]
     if args.chat_template:
-        prompts = [
-            tok.apply_chat_template(
-                [{"role": "user", "content": p}],
-                tokenize=False, add_generation_prompt=True,
-                enable_thinking=args.enable_thinking,
-            )
-            for p in raw_prompts
-        ]
-        logger.info(f"chat template applied (thinking={args.enable_thinking}); first prompt tail: ...{prompts[0][-200:]!r}")
-    else:
-        prompts = raw_prompts
+        logger.warning("--chat-template ignored: format_mcq already handles chat templating")
     logger.info(f"got {len(prompts)} eval prompts")
 
     # storage: [(method, alpha)] -> list of dicts of [T] arrays

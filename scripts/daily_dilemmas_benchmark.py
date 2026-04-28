@@ -13,7 +13,7 @@ Synthetic mode: pass `--synthetic` for a tiny offline run on tiny-random Llama
 (used by the smoke test).
 
 Usage:
-    python scripts/daily_dilemmas_benchmark.py --model Qwen/Qwen3-0.6B-Base --method mean_diff --coeff 2.0 --target honesty
+    python scripts/daily_dilemmas_benchmark.py --model Qwen/Qwen3.5-0.8B --method mean_diff --coeff 2.0 --target honesty
 """
 from __future__ import annotations
 import json
