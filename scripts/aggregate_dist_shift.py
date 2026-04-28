@@ -227,7 +227,8 @@ def main():
         f"{iso_args.get('mode', 'free-dNLL')}_{iso_args.get('target_stat', '')}={iso_args.get('target_kl', iso_args.get('target_metric_value', '?'))}"
         if 'mode' in iso_args else f"free-dNLL={iso_args.get('target_metric_value', '?')}"
     )
-    fig.suptitle(f"Distribution drift along the trajectory · KL(steer∥base) by token position · {model_id}  layer={layers[0]}  N={args.n_prompts} prompts · iso-calibration: {iso_label}\nsolid p50, band p10–p90, dotted t={iso_args.get('t_calib', 20)} (calibration window), heavy line KL=1", fontsize=9)
+    layer_tag = f"layer={layers[0]}" if len(layers) == 1 else f"layers=[{layers[0]}..{layers[-1]}] ({len(layers)} layers)"
+    fig.suptitle(f"Distribution drift along the trajectory · KL(steer∥base) by token position · {model_id}  {layer_tag}  N={args.n_prompts} prompts · iso-calibration: {iso_label}\nsolid p50, band p10–p90, dotted t={iso_args.get('t_calib', 20)} (calibration window), heavy line KL=1", fontsize=9)
     fig.tight_layout()
     png = out_dir / f"agg_dist_shift__{model_id.replace('/', '--')}__N{args.n_prompts}__T{args.max_new}__{alpha_tag}__seed{args.seed}.png"
     fig.savefig(png, dpi=110, bbox_inches="tight")
