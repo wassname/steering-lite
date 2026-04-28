@@ -115,3 +115,75 @@ def score_action(model, tok, situation: str, action: str, device) -> float:
     target = ids_full[0, n_p:n_f]  # [n_action]
     pred = logp[0, n_p - 1 : n_f - 1, :].gather(-1, target.unsqueeze(-1)).squeeze(-1)
     return float(pred.mean())
+
+
+@torch.no_grad()
+def score_action_full(model, tok, situation: str, action: str, device) -> dict:
+    """Return per-token log-prob of action AND the full log-softmax distribution
+    at each action position. Used to compute TV/KL/JS between base and steered runs.
+
+    Returns dict with:
+        score: float -- mean per-token log-prob (same as score_action)
+        logp: Tensor [n_action, V] -- log-softmax at each action position
+        token_ids: Tensor [n_action] -- token ids of the action
+    """
+    prompt = make_prompt(situation)
+    full = prompt + action
+    ids_full = tok(full, return_tensors="pt", truncation=True, max_length=512).input_ids.to(device)
+    ids_prompt = tok(prompt, return_tensors="pt", truncation=True, max_length=512).input_ids.to(device)
+    n_p = ids_prompt.shape[1]
+    n_f = ids_full.shape[1]
+    if n_f <= n_p:
+        return {"score": 0.0, "logp": None, "token_ids": None}
+    logits = model(ids_full).logits.float()  # [1, n_f, V]
+    logp_all = torch.log_softmax(logits, dim=-1)
+    target = ids_full[0, n_p:n_f]
+    logp_action = logp_all[0, n_p - 1 : n_f - 1, :]  # [n_action, V]
+    score = float(logp_action.gather(-1, target.unsqueeze(-1)).squeeze(-1).mean())
+    return {"score": score, "logp": logp_action.cpu(), "token_ids": target.cpu()}
+
+
+def dist_metrics(logp_a, logp_b, tail_k: int = 32) -> dict:
+    """Mean per-token distances between two [n_tok, V] log-prob distributions.
+    Convention: a = base/reference, b = steered.
+
+    Returns:
+        tv: 0.5 * |p_a - p_b|_1   -- bounded [0,1], mass-equal
+        kl_ab: KL(a||b)            -- coverage loss (base mass missing under steered)
+        kl_ba: KL(b||a)            -- hallucinated tail mass (steered tokens base ranks low)
+                                      this is what compounds over a CoT trajectory
+        js: JS distance            -- symmetric, bounded
+        tail_b: sum of steered prob on tokens NOT in base top-tail_k
+                                   -- direct tail-leak metric, "gibberish probability"
+        delta_nll: nll_b - nll_a on base's argmax token  -- forward NLL increase
+                                   -- "steering tax" per token, compounds over CoT
+        flip_rate: mean(argmax_a != argmax_b)  -- fraction of tokens where greedy
+                                   decoding would diverge
+    """
+    if logp_a is None or logp_b is None or logp_a.shape != logp_b.shape:
+        return {"tv": float("nan"), "kl_ab": float("nan"), "kl_ba": float("nan"),
+                "js": float("nan"), "tail_b": float("nan"),
+                "delta_nll": float("nan"), "flip_rate": float("nan")}
+    p_a = logp_a.exp()
+    p_b = logp_b.exp()
+    tv = 0.5 * (p_a - p_b).abs().sum(dim=-1).mean().item()
+    kl_ab = (p_a * (logp_a - logp_b)).sum(dim=-1).mean().item()
+    kl_ba = (p_b * (logp_b - logp_a)).sum(dim=-1).mean().item()
+    p_m = 0.5 * (p_a + p_b)
+    logp_m = p_m.clamp_min(1e-12).log()
+    js = 0.5 * ((p_a * (logp_a - logp_m)).sum(dim=-1) + (p_b * (logp_b - logp_m)).sum(dim=-1)).mean().item()
+    # Tail leak: prob mass b puts on tokens a does not consider top-k
+    k = min(tail_k, p_a.shape[-1])
+    top_idx = p_a.topk(k, dim=-1).indices  # [n, k] -- base's top-k tokens
+    mask = torch.zeros_like(p_b, dtype=torch.bool)
+    mask.scatter_(-1, top_idx, True)
+    tail_b = p_b.masked_fill(mask, 0.0).sum(dim=-1).mean().item()
+    # Forward delta-NLL on base's argmax token (matches trajectory plot)
+    argmax_a = logp_a.argmax(dim=-1)  # [n]
+    argmax_b = logp_b.argmax(dim=-1)  # [n]
+    nll_a_arg = -logp_a.gather(-1, argmax_a.unsqueeze(-1)).squeeze(-1)
+    nll_b_arg = -logp_b.gather(-1, argmax_a.unsqueeze(-1)).squeeze(-1)
+    delta_nll = (nll_b_arg - nll_a_arg).mean().item()
+    flip_rate = (argmax_a != argmax_b).float().mean().item()
+    return {"tv": tv, "kl_ab": kl_ab, "kl_ba": kl_ba, "js": js, "tail_b": tail_b,
+            "delta_nll": delta_nll, "flip_rate": flip_rate}

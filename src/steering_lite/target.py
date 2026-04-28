@@ -13,14 +13,22 @@ from torch import nn
 
 def _get_blocks(model: nn.Module) -> nn.ModuleList:
     # llama-family: model.model.layers
+    # gemma3-multimodal: model.language_model.layers (or model.model.language_model.layers)
+    candidates = []
     inner = getattr(model, "model", model)
-    blocks = getattr(inner, "layers", None)
-    if blocks is None:
-        raise RuntimeError(
-            f"could not find .model.layers on {type(model).__name__}; "
-            f"override _get_blocks for non-llama architectures"
-        )
-    return blocks
+    candidates.append(inner)
+    lm = getattr(inner, "language_model", None)
+    if lm is not None:
+        candidates.append(lm)
+        candidates.append(getattr(lm, "model", lm))
+    for c in candidates:
+        blocks = getattr(c, "layers", None)
+        if blocks is not None:
+            return blocks
+    raise RuntimeError(
+        f"could not find .layers on {type(model).__name__}; "
+        f"override _get_blocks for non-llama architectures"
+    )
 
 
 def find_targets(model: nn.Module, cfg) -> list[tuple[str, nn.Module, int]]:
@@ -40,6 +48,10 @@ def find_targets(model: nn.Module, cfg) -> list[tuple[str, nn.Module, int]]:
 def get_d_model(model: nn.Module) -> int:
     cfg = getattr(model, "config", None)
     d = getattr(cfg, "hidden_size", None)
+    if d is None:
+        # multimodal configs (gemma3): text sub-config
+        text_cfg = getattr(cfg, "text_config", None)
+        d = getattr(text_cfg, "hidden_size", None)
     if d is None:
         raise RuntimeError("model has no .config.hidden_size")
     return int(d)

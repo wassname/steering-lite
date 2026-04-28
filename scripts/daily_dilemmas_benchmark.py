@@ -28,7 +28,7 @@ from loguru import logger
 
 import steering_lite as sl
 from steering_lite.daily_dilemmas import (
-    COMMON_VALUES, DilemmaPair, load_pairs, score_action,
+    COMMON_VALUES, DilemmaPair, load_pairs, score_action_full, dist_metrics,
 )
 
 
@@ -129,18 +129,23 @@ def _real_pairs(target: str, n_train: int, n_eval: int, seed: int) -> tuple[list
     return pos, neg, eval_pairs
 
 
-def _eval_scores(model, tok, eval_pairs: list[DilemmaPair], device) -> dict:
-    """Return dict[value] -> list of action scores. Each pair contributes its
-    pos action under each tag in values_pos, and neg action under each tag in values_neg."""
+def _eval_run(model, tok, eval_pairs: list[DilemmaPair], device) -> tuple[dict, list[dict]]:
+    """Run model on all eval pairs, returning:
+        by_value: dict[value] -> list of action scores (mean per-token logprob)
+        per_pair: list of dicts {pos_logp, neg_logp, pos_token_ids, neg_token_ids}
+                  capturing the full action-position distributions for later TV/KL/JS.
+    """
     by_value: dict[str, list[float]] = {}
+    per_pair = []
     for p in eval_pairs:
-        s_pos = score_action(model, tok, p.situation, p.action_pos, device)
-        s_neg = score_action(model, tok, p.situation, p.action_neg, device)
+        rp = score_action_full(model, tok, p.situation, p.action_pos, device)
+        rn = score_action_full(model, tok, p.situation, p.action_neg, device)
         for v in p.values_pos:
-            by_value.setdefault(v, []).append(s_pos)
+            by_value.setdefault(v, []).append(rp["score"])
         for v in p.values_neg:
-            by_value.setdefault(v, []).append(s_neg)
-    return by_value
+            by_value.setdefault(v, []).append(rn["score"])
+        per_pair.append({"pos": rp, "neg": rn, "values_pos": p.values_pos, "values_neg": p.values_neg})
+    return by_value, per_pair
 
 
 def _mean(xs: list[float]) -> float:
@@ -166,12 +171,13 @@ def run(cfg: BenchmarkConfig) -> dict:
         pos, neg, eval_pairs = _real_pairs(cfg.target, cfg.n_train, cfg.n_eval, cfg.seed)
     logger.info(f"target={cfg.target} n_train={len(pos)} n_eval={len(eval_pairs)}")
 
-    base_by_value = _eval_scores(model, tok, eval_pairs, cfg.device)
+    base_by_value, base_pairs = _eval_run(model, tok, eval_pairs, cfg.device)
 
     s_cfg = cfg_for_method(cfg, dtype)
     vector_norms = {}
     save_load_err = None
     steered_by_value = base_by_value
+    steered_pairs = base_pairs
     if s_cfg is not None:
         logger.info(f"extracting steering vectors via method={cfg.method}")
         vectors = sl.train(model, tok, pos, neg, s_cfg, batch_size=4, max_length=cfg.max_seq_length)
@@ -190,7 +196,7 @@ def run(cfg: BenchmarkConfig) -> dict:
                 reloaded_logits = model(**ids).logits.detach().float()
             save_load_err = float((steered_logits - reloaded_logits).abs().max())
             os.remove(path)
-        steered_by_value = _eval_scores(model, tok, eval_pairs, cfg.device)
+        steered_by_value, steered_pairs = _eval_run(model, tok, eval_pairs, cfg.device)
         sl.detach(model)
 
     effects = {}
@@ -204,6 +210,38 @@ def run(cfg: BenchmarkConfig) -> dict:
     leakage = _mean([effects[v]["delta"] for v in other_values])
     surgical_informedness = target_effect - leakage
 
+    # Distribution-change metrics: TV/KL/JS between base and steered logp at each
+    # action position. Computed per pair, then split by whether the action was
+    # tagged with the target value (target) or not (other). For baseline runs,
+    # base_pairs == steered_pairs so all metrics are 0.
+    target_l = cfg.target.lower().strip()
+    dist_target = []
+    dist_other = []
+    for bp, sp in zip(base_pairs, steered_pairs):
+        for side in ("pos", "neg"):
+            tags = bp["values_pos"] if side == "pos" else bp["values_neg"]
+            m = dist_metrics(bp[side]["logp"], sp[side]["logp"])
+            if target_l in [t.lower() for t in tags]:
+                dist_target.append(m)
+            else:
+                dist_other.append(m)
+
+    def _agg(rows, key):
+        vals = [r[key] for r in rows if r[key] == r[key]]  # filter NaN
+        return float(sum(vals) / len(vals)) if vals else float("nan")
+
+    dist = {
+        "target": {k: _agg(dist_target, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
+        "other": {k: _agg(dist_other, k) for k in ("tv", "kl_ab", "kl_ba", "js")},
+        "n_target": len(dist_target),
+        "n_other": len(dist_other),
+    }
+    # Surgical informedness in distribution space: TV-shift on target-tagged
+    # actions minus TV-shift on non-target actions. Sign-symmetric (TV is
+    # always >= 0), so this is interpretable for any coeff direction.
+    si_tv = dist["target"]["tv"] - dist["other"]["tv"]
+    si_js = dist["target"]["js"] - dist["other"]["js"]
+
     result = {
         "config": {**asdict(cfg), "output_dir": str(cfg.output_dir)},
         "effects": effects,
@@ -212,8 +250,11 @@ def run(cfg: BenchmarkConfig) -> dict:
             "target_effect": target_effect,
             "leakage_mean": leakage,
             "surgical_informedness": surgical_informedness,
+            "si_tv": si_tv,
+            "si_js": si_js,
             "n_other_values": len(other_values),
         },
+        "distribution": dist,
         "vector_norms": vector_norms,
         "save_load_err": save_load_err,
     }
@@ -225,7 +266,9 @@ def run(cfg: BenchmarkConfig) -> dict:
     logger.info(f"wrote {out_path}")
     logger.info(
         f"target_effect={target_effect:+.4f} leakage={leakage:+.4f} "
-        f"surgical_informedness={surgical_informedness:+.4f}"
+        f"SI={surgical_informedness:+.4f} | "
+        f"tv_target={dist['target']['tv']:.4f} tv_other={dist['other']['tv']:.4f} "
+        f"SI_TV={si_tv:+.4f} SI_JS={si_js:+.4f}"
     )
     return result
 
