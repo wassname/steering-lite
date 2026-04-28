@@ -64,4 +64,19 @@ save/load round-trip preserves generation.
 - per-method calibration sweep (open question)
 - MoE support, multi-token aggregation
 
-TODO citation bibtex repo
+
+See also
+
+- [IBM/AISteer360 - an extensible library for general purpose steering of LLMs. ](https://github.com/IBM/AISteer360)
+- [a hackable PCA steering library](https://github.com/vgel/repeng)
+
+# Citation
+
+```bibtex
+@misc{wassname2026steeringlite,
+  title = {steering-lite},
+  author = {Michael J Clark},
+  year = {2026},
+  url = {https://github.com/wassname/steering-lite}
+}
+```
