@@ -51,24 +51,27 @@ just bench Qwen/Qwen3.5-0.8B mean_diff 2.0
 
 ### Calibrated results
 
-Qwen3.5-0.8B, target=`honesty`, layers 7..19 (13/24, ~30-80% depth), seed=0,
-n_train=n_eval=32. Coeffs from [iso-KL calibration](src/steering_lite/calibrate.py)
-at KL_p95=1.0 nat (greedy, T=20, N_calib=4) so all methods compare at equal
-distributional budget. Baseline target log-prob = -1.851.
+Qwen3.5-0.8B, target=`honesty`, layers 7..18 (12/24, ~30-80% depth), seed=0,
+n_train=n_eval=32. Eval uses **guided CoT**: 32 think tokens under steering,
+then force `</think>\nMy choice:` and read log P(Yes) - log P(No)
+([gist](https://gist.github.com/wassname/733c568cd29c2a402be4442d6a061899)).
+Coeffs from [iso-KL calibration](src/steering_lite/calibrate.py)
+at KL_p95=1.0 nat (greedy, T=20, N_calib=4) on thinking-prefix probes so all
+methods compare at equal distributional budget. Baseline target logratio = +0.312.
 
-| method        | coeff | target_lp_steered | target_effect Δ | leakage_mean Δ | surgical_informedness |
+| method        | coeff | target_lr_steered | target_effect Δ | leakage_mean Δ | surgical_informedness |
 | ------------- | ----: | ----------------: | --------------: | -------------: | --------------------: |
-| spherical     | 0.038 |            -2.929 |          -1.078 |         -1.649 |                +0.571 |
-| mean_diff     | 0.166 |            -2.910 |          -1.059 |         -1.556 |                +0.496 |
-| sspace        | 0.147 |            -2.798 |          -0.947 |         -1.336 |                +0.390 |
-| pca           | 0.742 |            -2.568 |          -0.718 |         -0.584 |                -0.134 |
-| topk_clusters | 0.227 |            -2.799 |          -0.948 |         -0.777 |                -0.171 |
-| cosine_gated  | 1.948 |            -5.970 |          -4.119 |         -2.702 |                -1.417 |
+| mean_diff     | 0.149 |            +0.625 |          +0.312 |         +0.115 |                +0.198 |
+| sspace        | 0.148 |            +0.531 |          +0.219 |         +0.089 |                +0.130 |
+| topk_clusters | 0.239 |            -0.313 |          -0.625 |         -0.714 |                +0.088 |
+| spherical     | 0.050 |            +0.312 |          +0.000 |         -0.057 |                +0.057 |
+| pca           | 0.284 |            -0.000 |          -0.313 |         -0.000 |                -0.313 |
+| cosine_gated  | 1.968 |            -0.469 |          -0.782 |         +0.292 |                -1.074 |
 
-Δ = steered − baseline log-prob. `surgical_informedness = target_effect - leakage_mean`,
-so positive means the method preserves target-value action probabilities more than
-it preserves non-target ones, at matched KL. Reproduce:
-`bash scripts/bench_l7-19_calibrated.sh && uv run python scripts/aggregate_bench.py outputs/daily_dilemmas/v6_L7-19_calibrated`.
+Δ = steered − baseline Yes/No logratio. `surgical_informedness = target_effect - leakage_mean`,
+so positive means the method shifts target-tagged actions more than non-target ones at
+matched KL. Reproduce:
+`bash scripts/bench_v8_guided.sh && uv run python scripts/aggregate_bench.py outputs/daily_dilemmas/v8_guided`.
 
 ## Functional test
 
