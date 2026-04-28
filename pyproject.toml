@@ -1,0 +1,43 @@
+[project]
+name = "steering-lite"
+version = "0.0.1"
+description = "Hackable forward-hook activation steering. ~600 LoC. One file per method."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "numpy>=1.26",
+    "einops>=0.7",
+    "jaxtyping>=0.2.34",
+    "safetensors>=0.5",
+    "loguru>=0.7",
+]
+keywords = ["steering", "activation-steering", "representation-engineering", "pytorch", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/wassname/steering-lite"
+Repository = "https://github.com/wassname/steering-lite"
+Issues = "https://github.com/wassname/steering-lite/issues"
+
+[project.optional-dependencies]
+build = ["twine>=6"]
+test = ["pytest", "tabulate", "beartype>=0.18"]
+hf-test = ["accelerate>=1.6", "transformers>=4.51"]
+benchmark = ["accelerate>=1.6", "datasets>=3.6", "tabulate", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+exclude-newer = "5 days"
