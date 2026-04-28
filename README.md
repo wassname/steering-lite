@@ -46,6 +46,26 @@ effect on target value minus mean leakage to non-target values.
 just bench Qwen/Qwen3-0.6B-Base mean_diff 2.0
 ```
 
+### Calibrated results
+
+Qwen3.5-0.8B, target=`honesty`, layer=4, seed=0, n_train=n_eval=32. Coeffs from
+[iso-KL calibration](src/steering_lite/calibrate.py) at KL_p95=1.0 nat (greedy,
+T=20, N_calib=4) so all methods compare at equal distributional budget.
+
+| method        | coeff | target_effect | leakage_mean | surgical_informedness |
+| ------------- | ----: | ------------: | -----------: | --------------------: |
+| baseline      | 0.000 |        +0.000 |       +0.000 |                +0.000 |
+| cosine_gated  | 6.440 |        -0.040 |       -0.191 |                +0.152 |
+| mean_diff     | 0.910 |        -0.170 |       -0.299 |                +0.129 |
+| spherical     | 0.262 |        -0.176 |       -0.301 |                +0.125 |
+| sspace        | 0.879 |        -0.187 |       -0.298 |                +0.111 |
+| topk_clusters | 0.928 |        -0.186 |       -0.270 |                +0.084 |
+| pca           | 0.827 |        -0.258 |       -0.281 |                +0.023 |
+
+`surgical_informedness = target_effect - leakage_mean`. Higher = method moves the
+target value more than it moves the (mean of 7) non-target values, at matched KL.
+Reproduce: `bash scripts/bench_l4_calibrated.sh && uv run python scripts/aggregate_bench_l4.py`.
+
 ## Functional test
 
 A single test runs the **full pipeline at tiny scale** (same code path as the bench, just smaller
