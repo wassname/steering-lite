@@ -9,3 +9,7 @@ outputs/
 logs/
 .uv/
 *.pyc
+# manually added id at all
+PLAN.md
+docs/
+*.bak

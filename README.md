@@ -63,3 +63,5 @@ save/load round-trip preserves generation.
 - [weight-steering](https://github.com/wassname/weight-steering)
 - per-method calibration sweep (open question)
 - MoE support, multi-token aggregation
+
+TODO citation bibtex repo
