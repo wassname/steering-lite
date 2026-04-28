@@ -32,9 +32,12 @@ sl.detach(model)
 | Mean-diff (CAA)   | [mean_diff.py](src/steering_lite/variants/mean_diff.py)         | [Panickssery+ 2023](https://arxiv.org/abs/2312.06681)          |
 | PCA               | [pca.py](src/steering_lite/variants/pca.py)                     | [Zou+ 2023 RepE](https://arxiv.org/abs/2310.01405)             |
 | Top-k clusters    | [topk_clusters.py](src/steering_lite/variants/topk_clusters.py) | -                                                              |
-| Cosine-gated      | [cosine_gated.py](src/steering_lite/variants/cosine_gated.py)   | [Lee+ 2024 CAST](https://arxiv.org/abs/2409.05907)             |
-| S-space (SVD)     | [sspace.py](src/steering_lite/variants/sspace.py)               | [ssteer-eval-aware](https://github.com/wassname/ssteer-eval-aware) |
-| Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)         | [chili-lab/Spherical-Steering](https://github.com/chili-lab/Spherical-Steering) |
+| Cosine-gated      | [cosine_gated.py](src/steering_lite/variants/cosine_gated.py)   | CAST-inspired soft gate, [Lee+ 2024](https://arxiv.org/abs/2409.05907) |
+| S-space (SVD)     | [sspace.py](src/steering_lite/variants/sspace.py)               | internal activation-diff SVD baseline                         |
+| Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)         | ungated core of [Spherical Steering](https://arxiv.org/abs/2602.08169) |
+| CHaRS             | [chars.py](src/steering_lite/variants/chars.py)                 | [Abdullaev+ 2026](https://arxiv.org/abs/2603.02237)            |
+| Linear-AcT        | [linear_act.py](src/steering_lite/variants/linear_act.py)       | [Rodriguez+ 2025](https://openreview.net/forum?id=l2zFn6TIQi)  |
+| Angular Steering  | [angular_steering.py](src/steering_lite/variants/angular_steering.py) | [Vu+ 2025](https://arxiv.org/abs/2510.26243)              |
 
 ## Eval
 

@@ -1,14 +1,15 @@
 """Top-k cluster steering.
 
-K-means on the paired diffs. At runtime, pick the centroid most aligned with
+Cosine-assignment k-means on the paired diffs. At runtime, pick the centroid most aligned with
 the current residual (max cosine similarity) and add it. Idea: different
 prompts may need different steering directions; clusters discover the modes.
 
-$$\\{c_1, ..., c_k\\} = \\text{KMeans}_k(H^+ - H^-)$$
+$$\\{c_1, ..., c_k\\} = \\text{cosine-kmeans}_k(H^+ - H^-)$$
 $$h \\leftarrow h + \\alpha \\cdot c_{j^*}, \\quad j^* = \\arg\\max_j \\cos(h, c_j)$$
 
-No paper; novel-ish baseline. Useful as a sanity check that the diff-vector
-manifold isn't unimodal.
+Folk / novel-ish baseline. Closest neighbours are CHaRS-style cluster-aware
+steering and SVF/KNN local steering, but this exact cosine-kmeans router is an
+internal baseline.
 """
 from dataclasses import dataclass
 import torch
@@ -63,9 +64,12 @@ class TopKClusters:
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
-            n = min(pos_acts[li].shape[0], neg_acts[li].shape[0])
-            diffs = (pos_acts[li][:n] - neg_acts[li][:n]).float()
-            k = min(cfg.k, n)
+            if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
+                raise ValueError(f"layer {li}: pos/neg counts differ")
+            diffs = (pos_acts[li] - neg_acts[li]).float()
+            if cfg.k > diffs.shape[0]:
+                raise ValueError(f"k={cfg.k} exceeds n={diffs.shape[0]}")
+            k = cfg.k
             C = _kmeans(diffs, k=k, n_iters=cfg.n_iters, seed=cfg.seed)  # [k, d]
             if cfg.normalize:
                 C = C / (C.norm(dim=1, keepdim=True) + 1e-8)

@@ -25,7 +25,7 @@ sys.modules[SPEC.name] = benchmark
 SPEC.loader.exec_module(benchmark)
 
 
-METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical", "baseline"]
+METHODS = ["mean_diff", "caa", "act_add", "mean_centred", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical", "directional_ablation", "chars", "linear_act", "angular_steering", "baseline"]
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 
 
@@ -35,7 +35,7 @@ def quick_cfg(method: str, tmp_path: Path) -> "benchmark.BenchmarkConfig":
         method=method,
         target="honesty",
         layers=(1,),
-        coeff=0.1 if method == "spherical" else 2.0,
+        coeff=0.1 if method in ("spherical", "angular_steering", "linear_act") else 2.0,
         n_train=8,
         n_eval=4,
         max_seq_length=64,

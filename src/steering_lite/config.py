@@ -17,9 +17,9 @@ class SteeringConfig:
     # None = all layers (rarely what you want; pick a few mid layers)
     layers: tuple[int, ...] | None = None
 
-    # scalar applied to the steering update; methods interpret this as
-    # "addition magnitude" (mean_diff, pca), "slerp angle in radians" (spherical),
-    # or "projection scale" (sspace).
+    # scalar applied to the steering update. Interpretation is method-specific:
+    # addition magnitude (mean_diff/pca), slerp fraction (spherical), rotation
+    # angle in radians (angular_steering), or interpolation weight (linear_act).
     coeff: float = 1.0
 
     # which point in the block to add at: "residual" = block output (post mlp+attn),

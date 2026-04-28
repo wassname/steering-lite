@@ -1,7 +1,8 @@
-"""Record last-token hidden states at selected layers via forward hooks.
+"""Record last non-pad-token hidden states at selected layers via forward hooks.
 
-We hook each block's forward output (it returns `(hidden_states, ...)`), grab
-`hidden_states[:, -1, :]`, and stack across prompts. No grad.
+We hook each block's forward output (it returns `(hidden_states, ...)`), gather
+the final non-padding token from `attention_mask`, and stack across prompts.
+No grad.
 """
 from __future__ import annotations
 import torch
@@ -26,11 +27,12 @@ def record_activations(
     device = next(model.parameters()).device
 
     bucket: dict[int, list[Tensor]] = {l: [] for l in layers}
+    captured: dict[int, Tensor] = {}
 
     def make_hook(li: int):
         def hook(_mod, _args, out):
             h = out[0] if isinstance(out, tuple) else out
-            bucket[li].append(h[:, -1, :].detach().to("cpu"))
+            captured[li] = h
         return hook
 
     handles = [blocks[li].register_forward_hook(make_hook(li)) for li in layers]
@@ -40,7 +42,13 @@ def record_activations(
         for i in range(0, len(prompts), batch_size):
             batch = prompts[i : i + batch_size]
             enc = tok(batch, return_tensors="pt", padding=True, truncation=True, max_length=max_length).to(device)
+            captured.clear()
             model(**enc)
+            mask = enc["attention_mask"]
+            last_idx = mask.shape[1] - 1 - mask.flip([-1]).argmax(-1)
+            batch_idx = torch.arange(mask.shape[0], device=last_idx.device)
+            for li in layers:
+                bucket[li].append(captured[li][batch_idx, last_idx].detach().to("cpu"))
         if was_training:
             model.train()
     finally:

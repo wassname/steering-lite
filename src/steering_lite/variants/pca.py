@@ -1,4 +1,4 @@
-"""PCA steering (RepE-style).
+"""PCA steering (RepE/LAT-inspired, vgel pca_diff-like).
 
 For each layer L, compute PCA on the **paired differences** `h^+ - h^-`. Take
 the top principal component as the steering direction.
@@ -9,6 +9,9 @@ $$\\text{sign}_L = \\text{sign}\\left(\\sum_i \\mathbb{1}[(D_L)_i \\cdot V_{:,0}
 $$v_L = V_{:,0} \\cdot \\text{sign}_L$$
 
 Sign-fixed by majority vote of paired-diff projections (repeng/vgel style).
+This is a lightweight control-vector baseline, not the full Zou et al. LAT
+reader: it omits per-diff normalization, label-based sign selection, and
+train-mean recentering for reading scores.
 PCA is sign-ambiguous; the vote is more robust than alignment-with-the-mean
 when paired diffs are heterogeneous (mean can cancel without the vote
 changing). If the vote is close to 50/50 the principal axis isn't well
@@ -50,8 +53,9 @@ class PCA:
         out = {}
         for li in pos_acts:
             # paired diffs assume aligned ordering of pos/neg prompts
-            n = min(pos_acts[li].shape[0], neg_acts[li].shape[0])
-            diffs = (pos_acts[li][:n] - neg_acts[li][:n]).float()  # [n, d]
+            if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
+                raise ValueError(f"layer {li}: pos/neg counts differ")
+            diffs = (pos_acts[li] - neg_acts[li]).float()  # [n, d]
             mean = diffs.mean(0, keepdim=True)
             centered = diffs - mean
             # SVD on centered diffs; right singular vectors are PC directions

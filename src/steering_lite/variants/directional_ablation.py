@@ -1,0 +1,70 @@
+"""Mean-diff directional ablation (Arditi-inspired projection-out).
+
+Project the steering direction *out of* the residual stream instead of (or in
+addition to) adding to it. Unlike `mean_diff` which translates by $\\alpha v$,
+ablation removes the component of $h$ along $\\hat v$:
+
+$$h \\leftarrow h - (h \\cdot \\hat v)\\hat v + \\alpha\\hat v$$
+
+When `coeff=0` this is pure ablation (refusal-direction style); when `coeff!=0`
+this is ablation followed by a constant nudge (useful to ablate "old" behavior
+and inject "new"). The two terms are mathematically distinct -- ablation is a
+*projection* (idempotent), addition is a *translation*.
+
+Norms shrink by $|h \\cdot \\hat v|$ which is informative -- a near-zero shrink
+means the direction wasn't present in the first place, so the intervention is
+a no-op. Compare to `mean_diff` which always pays a constant $\\alpha\\|\\hat v\\|$
+per token regardless of whether the direction is present.
+
+Refs / inspiration:
+  - Arditi et al. 2024 "Refusal in language models is mediated by a single direction"
+    https://arxiv.org/abs/2406.11717
+  - andyrdt/refusal_direction https://github.com/andyrdt/refusal_direction
+"""
+from dataclasses import dataclass
+from einops import einsum
+from jaxtyping import Float
+from torch import Tensor
+
+from ..config import SteeringConfig, register_config
+from ..method import register
+
+
+@register_config
+@dataclass
+class DirectionalAblationConfig(SteeringConfig):
+    method: str = "directional_ablation"
+    coeff: float = 0.0  # post-ablation additive nudge along v_hat; 0.0 = pure ablation
+
+
+@register
+class DirectionalAblation:
+    name = "directional_ablation"
+
+    @staticmethod
+    def extract(
+        pos_acts: dict[int, Float[Tensor, "n d"]],
+        neg_acts: dict[int, Float[Tensor, "m d"]],
+        cfg: DirectionalAblationConfig,
+    ) -> dict[int, dict[str, Tensor]]:
+        out = {}
+        for li in pos_acts:
+            v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
+            v = v / (v.norm() + 1e-8)  # ablation requires unit v
+            out[li] = {"v": v}
+        return out
+
+    @staticmethod
+    def apply(
+        block,
+        h: Float[Tensor, "b s d"],
+        state: dict[str, Tensor],
+        cfg: DirectionalAblationConfig,
+    ) -> Float[Tensor, "b s d"]:
+        v = state["v"].to(h.dtype).to(h.device)  # [d], unit
+        # projection scalar per token: <h, v_hat>
+        proj = einsum(h, v, "b s d, d -> b s")  # [b, s]
+        h = h - proj.unsqueeze(-1) * v          # ablate
+        if cfg.coeff != 0.0:
+            h = h + cfg.coeff * v
+        return h

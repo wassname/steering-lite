@@ -1,7 +1,8 @@
-"""Spherical steering (slerp on residual hypersphere).
+"""Ungated spherical steering core (slerp on residual hypersphere).
 
 Treat the residual as a point on the (d-1)-sphere and rotate it toward a target
-direction `v` by angle `coeff` (radians). Slerp preserves norm exactly:
+direction `v` by slerp fraction `coeff`. Slerp preserves norm except at the
+antipodal degeneracy where the geodesic is not unique:
 
 $$h_{\\text{rot}} = \\text{slerp}(\\hat{h}, \\hat{v}, \\alpha) \\cdot \\|h\\|$$
 
@@ -9,10 +10,11 @@ where slerp is
 
 $$\\text{slerp}(a, b, t) = \\frac{\\sin((1-t)\\Omega)}{\\sin\\Omega} a + \\frac{\\sin(t\\Omega)}{\\sin\\Omega} b, \\quad \\Omega = \\arccos(a \\cdot b)$$
 
-For numerical stability when `a` and `b` are nearly parallel, we fall back to
-linear interpolation.
+This is the fixed-t, ungated core of Spherical Steering. It omits the paper's
+vMF confidence gate (`kappa`, `alpha`, `beta`).
 
 Refs:
+    - Spherical Steering https://arxiv.org/abs/2602.08169
   - chili-lab/Spherical-Steering https://github.com/chili-lab/Spherical-Steering
 """
 from dataclasses import dataclass
@@ -28,8 +30,7 @@ from ..method import register
 @dataclass
 class SphericalConfig(SteeringConfig):
     method: str = "spherical"
-    # coeff is interpreted here as the slerp t in [0, 1] (or beyond, extrapolation).
-    # Default 0.1 = small rotation toward v.
+    # coeff is the slerp fraction t in [0, 1] (or beyond, extrapolation).
 
 
 @register
@@ -68,7 +69,6 @@ class Spherical:
         a = torch.sin((1 - t) * omega) / sin_omega
         b = torch.sin(t * omega) / sin_omega
         rot = a * h_hat + b * v
-        # fallback to lerp where omega ~ 0
         near_parallel = sin_omega.abs() < 1e-4
         lerp = (1 - t) * h_hat + t * v
         rot = torch.where(near_parallel, lerp, rot)

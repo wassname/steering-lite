@@ -13,6 +13,11 @@ from .config import SteeringConfig
 from .method import REGISTRY
 from .target import find_targets
 from .extract import record_activations
+from .extract_attn import (
+    record_activations_attn,
+    record_activations_mean,
+    Mode, PairAgg, Pool,
+)
 
 
 _ATTACHED_ATTR = "_steering_lite_attached"
@@ -104,6 +109,66 @@ def train(
     layers = tuple(li for _, _, li in targets)
     pos_acts = record_activations(model, tok, pos_prompts, layers, batch_size=batch_size, max_length=max_length)
     neg_acts = record_activations(model, tok, neg_prompts, layers, batch_size=batch_size, max_length=max_length)
+    return method.extract(pos_acts, neg_acts, cfg)
+
+
+def train_attn(
+    model: nn.Module,
+    tok,
+    pos_prompts: list[str],
+    neg_prompts: list[str],
+    cfg: SteeringConfig,
+    *,
+    pool: Pool = "attn_v",
+    pair_agg: PairAgg = "mean",
+    batch_size: int = 8,
+    max_length: int = 256,
+) -> dict[int, dict[str, torch.Tensor]]:
+    """Like train(), but with a choice of token-pooling strategy.
+
+    pool: how to aggregate prefix tokens into a single per-prompt vector before
+        running cfg.method.extract. Works with any registered method
+        (mean_diff, pca, sspace, ...) -- pooling is orthogonal to direction.
+        - "last": equivalent to train().
+        - "mean": plain non-pad mean pooling. No attention needed.
+        - "attn_v": pair-aware shared-attention pooling, isolates V content
+          signal. Requires output_attentions (eager attn).
+        - "attn_kq": uses attention-weight difference times shared content,
+          tests K/Q routing. Requires output_attentions (eager attn).
+    pair_agg: only used when pool="attn_v". Controls how (pos, neg) attention
+        rows are combined: mean / max / min / hdiff. See extract_attn.
+
+    Returns the same per-layer state dict as train().
+    """
+    if len(pos_prompts) != len(neg_prompts):
+        raise ValueError("pos and neg prompt lists must be the same length")
+    method = REGISTRY[cfg.method]
+    targets = find_targets(model, cfg)
+    layers = tuple(li for _, _, li in targets)
+
+    if pool == "last":
+        pos_acts = record_activations(model, tok, pos_prompts, layers,
+                                      batch_size=batch_size, max_length=max_length)
+        neg_acts = record_activations(model, tok, neg_prompts, layers,
+                                      batch_size=batch_size, max_length=max_length)
+    elif pool == "mean":
+        pos_acts = record_activations_mean(model, tok, pos_prompts, layers,
+                                           batch_size=batch_size, max_length=max_length)
+        neg_acts = record_activations_mean(model, tok, neg_prompts, layers,
+                                           batch_size=batch_size, max_length=max_length)
+    elif pool in ("attn_v", "attn_kq"):
+        interleaved = [p for pair in zip(pos_prompts, neg_prompts) for p in pair]
+        mode: Mode = "v" if pool == "attn_v" else "kq"
+        acts = record_activations_attn(
+            model, tok, interleaved, layers,
+            mode=mode, pair_agg=pair_agg,
+            batch_size=batch_size, max_length=max_length,
+        )
+        pos_acts = {li: t[0::2] for li, t in acts.items()}
+        neg_acts = {li: t[1::2] for li, t in acts.items()}
+    else:
+        raise ValueError(f"unknown pool {pool!r}")
+
     return method.extract(pos_acts, neg_acts, cfg)
 
 

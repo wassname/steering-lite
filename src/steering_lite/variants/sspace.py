@@ -1,4 +1,4 @@
-"""S-space (SVD subspace) steering.
+"""Activation-diff SVD subspace steering.
 
 Compute SVD of stacked paired diffs at each layer; keep the top-r right
 singular vectors as a basis `V \\in \\mathbb{R}^{d\\times r}`. The mean diff is
@@ -14,9 +14,9 @@ Why subspace? The diff vectors span more than one direction; the leading r
 captures the task-relevant subspace and rejects per-prompt noise. r=1 reduces
 (roughly) to PCA; r>1 averages over the principal subspace.
 
-Refs:
-  - wassname/ssteer-eval-aware https://github.com/wassname/ssteer-eval-aware
-  - Subspace taxonomy: docs/AntiPaSTO_concepts/docs/steering_methods.qmd
+This is an internal activation-subspace baseline. It is not the weight-SVD
+S-space method from ssteer-eval-aware, which steers singular modes of layer
+weights via input-dependent perturbations.
 """
 from dataclasses import dataclass
 import torch
@@ -49,10 +49,13 @@ class SSpace:
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
-            n = min(pos_acts[li].shape[0], neg_acts[li].shape[0])
-            diffs = (pos_acts[li][:n] - neg_acts[li][:n]).float()  # [n, d]
+            if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
+                raise ValueError(f"layer {li}: pos/neg counts differ")
+            diffs = (pos_acts[li] - neg_acts[li]).float()  # [n, d]
             mean_diff = diffs.mean(0)  # [d]
-            r = min(cfg.r, diffs.shape[0], diffs.shape[1])
+            if cfg.r > min(diffs.shape[0], diffs.shape[1]):
+                raise ValueError(f"r={cfg.r} exceeds rank bound {min(diffs.shape[0], diffs.shape[1])}")
+            r = cfg.r
             # right singular vectors -> directions in d-space
             _, _, Vh = torch.linalg.svd(diffs, full_matrices=False)
             V = Vh[:r].T.contiguous()  # [d, r]; .T makes a view, safetensors needs contiguous
@@ -73,7 +76,6 @@ class SSpace:
         v = state["v"].to(h.dtype).to(h.device)
         if not cfg.project_at_runtime:
             return h + cfg.coeff * v
-        # alt mode: project residual onto subspace and scale that part
         V = state["V"].to(h.dtype).to(h.device)  # [d, r]
         proj = einsum(h, V, "b s d, d r -> b s r")
         h_proj = einsum(proj, V, "b s r, d r -> b s d")
