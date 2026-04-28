@@ -5,10 +5,14 @@ the top principal component as the steering direction.
 
 $$D_L = H^+_L - H^-_L \\in \\mathbb{R}^{n\\times d}$$
 $$U, S, V^T = \\text{SVD}(D_L - \\bar{D}_L)$$
-$$v_L = V_{:,0} \\cdot \\text{sign}(\\langle V_{:,0}, \\bar{D}_L \\rangle)$$
+$$\\text{sign}_L = \\text{sign}\\left(\\sum_i \\mathbb{1}[(D_L)_i \\cdot V_{:,0} > 0] - n/2\\right)$$
+$$v_L = V_{:,0} \\cdot \\text{sign}_L$$
 
-Sign-flipped so the direction agrees with the average difference (PCA is
-sign-ambiguous; the bisector to the mean diff fixes it).
+Sign-fixed by majority vote of paired-diff projections (repeng/vgel style).
+PCA is sign-ambiguous; the vote is more robust than alignment-with-the-mean
+when paired diffs are heterogeneous (mean can cancel without the vote
+changing). If the vote is close to 50/50 the principal axis isn't well
+defined and `mean_diff` is the better method to begin with.
 
 At runtime, add `coeff * v_L` to the residual.
 
@@ -53,8 +57,14 @@ class PCA:
             # SVD on centered diffs; right singular vectors are PC directions
             _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
             v = Vh[: cfg.n_components]  # [k, d]
-            # sign-fix each PC by alignment with the mean diff
-            sign = torch.sign((v @ mean.squeeze(0)) + 1e-8)
+            # sign-fix each PC by majority vote across paired diffs (repeng style):
+            # project each diff onto the PC and check whether more land on the
+            # positive or negative side. More robust to outliers than aligning
+            # with the (small) mean diff.
+            projs = diffs @ v.T  # [n, k]
+            sign = torch.where((projs > 0).float().mean(0) >= 0.5,
+                               torch.ones(v.shape[0]),
+                               -torch.ones(v.shape[0])).to(v)
             v = v * sign[:, None]
             if cfg.n_components == 1:
                 v = v.squeeze(0)

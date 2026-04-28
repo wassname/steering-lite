@@ -1,0 +1,223 @@
+"""Iso-KL calibration: find the coeff so KL(steer || base) hits a target.
+
+Two functions:
+- `measure_kl(...)`: roll out T tokens with steering attached, then teacher-force
+  re-score base + steer over the rolled-out sequence, return per-token KL stats.
+- `calibrate_iso_kl(...)`: log-log secant solver. Brackets exponentially, then
+  interpolates in `(log C, log stat)` space. KL(p_C || p_0) ~ C^2 in the small-C
+  regime, so log-log slope is ~2 and secant converges in ~3-5 iters (vs ~10 for
+  pure bisection).
+
+Recommended: greedy decode with target_kl=1.0 nat, target_stat="kl_p95".
+Greedy makes the statistic deterministic so the solver doesn't fight noise.
+"""
+from __future__ import annotations
+import math
+from dataclasses import replace
+from typing import Callable
+
+import torch
+from loguru import logger
+from torch import Tensor
+from torch import nn
+
+from .attach import attach, detach
+from .config import SteeringConfig
+
+
+@torch.no_grad()
+def _kl_per_pos(logp_steer: Tensor, logp_base: Tensor) -> Tensor:
+    p_s = logp_steer.exp()
+    return (p_s * (logp_steer - logp_base)).sum(dim=-1)
+
+
+@torch.no_grad()
+def _generate(model, prompt_ids, T, eos_id, pad_id, do_sample,
+              temperature, top_p, top_k, device):
+    ids = prompt_ids.unsqueeze(0).to(device)
+    kw = dict(max_new_tokens=T, pad_token_id=pad_id, eos_token_id=eos_id,
+              num_return_sequences=1)
+    if do_sample:
+        kw.update(do_sample=True, temperature=temperature, top_p=top_p, top_k=top_k)
+    else:
+        kw.update(do_sample=False)
+    out = model.generate(ids, **kw)
+    return out[0, prompt_ids.shape[0]:]
+
+
+@torch.no_grad()
+def measure_kl(
+    model: nn.Module,
+    prompts: list[Tensor],
+    cfg: SteeringConfig,
+    vectors: dict[int, dict[str, Tensor]],
+    *,
+    T: int = 20,
+    eos_id: int,
+    pad_id: int,
+    do_sample: bool = False,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    top_k: int = 20,
+    device: str | torch.device = "cuda",
+) -> dict:
+    """Roll out T tokens with steering attached, then score under base (detached)
+    and steer (re-attached). Returns mean / p50 / p90 / p95 / max KL plus
+    per-token-index aggregates.
+    """
+    all_kls = []
+    per_t = [[] for _ in range(T)]
+    for pids in prompts:
+        attach(model, cfg, vectors)
+        try:
+            gen = _generate(model, pids, T, eos_id, pad_id, do_sample,
+                            temperature, top_p, top_k, device)
+        finally:
+            detach(model)
+        n_gen = gen.shape[0]
+        if n_gen == 0:
+            continue
+        full = torch.cat([pids.to(device), gen]).unsqueeze(0)
+        n_p = pids.shape[0]
+        logp_base = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
+        attach(model, cfg, vectors)
+        try:
+            logp_steer = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
+        finally:
+            detach(model)
+        slc = slice(n_p - 1, n_p - 1 + n_gen)
+        kls = _kl_per_pos(logp_steer[slc], logp_base[slc]).cpu()
+        all_kls.append(kls)
+        for i in range(n_gen):
+            per_t[i].append(float(kls[i]))
+    cat = torch.cat(all_kls)
+    return {
+        "kl_mean": float(cat.mean()),
+        "kl_p50": float(cat.quantile(0.50)),
+        "kl_p90": float(cat.quantile(0.90)),
+        "kl_p95": float(cat.quantile(0.95)),
+        "kl_max": float(cat.max()),
+        "n_pos": int(cat.numel()),
+        "per_t_mean": [sum(xs) / len(xs) if xs else 0.0 for xs in per_t],
+        "per_t_max": [max(xs) if xs else 0.0 for xs in per_t],
+    }
+
+
+def calibrate_iso_kl(
+    model: nn.Module,
+    prompts: list[Tensor],
+    cfg: SteeringConfig,
+    vectors: dict[int, dict[str, Tensor]],
+    *,
+    target_kl: float = 1.0,
+    target_stat: str = "kl_p95",
+    bracket: tuple[float, float] = (0.05, 16.0),
+    tol: float = 0.05,
+    max_iters: int = 12,
+    eos_id: int,
+    pad_id: int,
+    T: int = 20,
+    do_sample: bool = False,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    top_k: int = 20,
+    device: str | torch.device = "cuda",
+) -> tuple[float, list[dict]]:
+    """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
+    (regula falsi with stale-endpoint reweighting) within a guarded bracket.
+
+    Geometry: KL(p_C || p_0) ≈ ½ C² v^T F v in the small-C regime, so log-log
+    slope is ~2 near zero. KL saturates at large C (entropy bound), so the
+    log-log curve is concave overall. A plain secant chord on a concave curve
+    lies below the curve -> first interpolation overshoots into the high-KL
+    side. Illinois halves the stale endpoint's value-weight when one side
+    sticks for 2+ iters, giving superlinear convergence without overshoot
+    stalling. Bracketing endpoints are always preserved; bisection is the
+    fallback if a step would land outside.
+
+    Returns: (best_coeff, history) where history has one entry per stat() call.
+    """
+    history: list[dict] = []
+
+    def eval_at(c: float) -> float:
+        c_cfg = replace(cfg, coeff=c)
+        m = measure_kl(model, prompts, c_cfg, vectors,
+                       T=T, eos_id=eos_id, pad_id=pad_id,
+                       do_sample=do_sample, temperature=temperature,
+                       top_p=top_p, top_k=top_k, device=device)
+        history.append({"coeff": c, **{k: v for k, v in m.items()
+                                        if k not in ("per_t_mean", "per_t_max")}})
+        logger.info(f"  c={c:.4f} mean={m['kl_mean']:.3f} "
+                    f"p50={m['kl_p50']:.3f} p90={m['kl_p90']:.3f} "
+                    f"p95={m['kl_p95']:.3f} max={m['kl_max']:.3f} n={m['n_pos']}")
+        return m[target_stat]
+
+    lo, hi = bracket
+    log_target = math.log(target_kl)
+
+    # 1. exponential bracketing from the geometric mid
+    mid = (lo * hi) ** 0.5
+    v_mid = eval_at(mid)
+    if v_mid < target_kl:
+        c_lo, v_lo = mid, v_mid
+        c = mid
+        c_hi, v_hi = hi, None
+        while c < hi:
+            c *= 2.0
+            v = eval_at(c)
+            if v >= target_kl:
+                c_hi, v_hi = c, v
+                break
+            c_lo, v_lo = c, v
+        else:
+            return c, history
+    else:
+        c_hi, v_hi = mid, v_mid
+        c = mid
+        c_lo, v_lo = lo, None
+        while c > lo:
+            c /= 2.0
+            v = eval_at(c)
+            if v <= target_kl:
+                c_lo, v_lo = c, v
+                break
+            c_hi, v_hi = c, v
+        else:
+            return c, history
+
+    # 2. log-log Illinois (regula falsi) inside the bracket. The KL-vs-C curve
+    #    saturates at large C, so log-log is concave: a vanilla secant chord
+    #    lies *below* the curve, the predicted root sits past the true root,
+    #    and one endpoint can stay "stale" forever. Illinois halves the stale
+    #    endpoint's value-weight so the next interpolation pulls back, giving
+    #    superlinear convergence on concave segments. Falls back to bisection
+    #    if a step would land outside the bracket.
+    stale_lo = stale_hi = 0  # consecutive iters this side stayed put
+    for _ in range(max_iters):
+        if v_lo is not None and v_hi is not None and v_lo > 0 and v_hi > 0:
+            log_c_lo, log_c_hi = math.log(c_lo), math.log(c_hi)
+            log_v_lo = math.log(v_lo) - (math.log(2) if stale_lo >= 2 else 0.0)
+            log_v_hi = math.log(v_hi) - (math.log(2) if stale_hi >= 2 else 0.0)
+            t = (log_target - log_v_lo) / (log_v_hi - log_v_lo)
+            log_c_new = log_c_lo + t * (log_c_hi - log_c_lo)
+            c_new = math.exp(log_c_new)
+            if not (c_lo < c_new < c_hi):
+                c_new = math.sqrt(c_lo * c_hi)  # bisection fallback
+        else:
+            c_new = math.sqrt(c_lo * c_hi)
+
+        v_new = eval_at(c_new)
+        if abs(v_new - target_kl) < tol:
+            return c_new, history
+        if v_new < target_kl:
+            c_lo, v_lo = c_new, v_new
+            stale_lo = 0
+            stale_hi += 1
+        else:
+            c_hi, v_hi = c_new, v_new
+            stale_hi = 0
+            stale_lo += 1
+
+    # pick best from history
+    best = min(history, key=lambda h: abs(h[target_stat] - target_kl))
+    return best["coeff"], history

@@ -1,18 +1,8 @@
-"""Iso-KL calibration: find per-method coeff so KL(steer || base) stays bounded
-over the first T_CALIB generated tokens.
+"""Iso-KL calibration runner.
 
-Two modes:
-  --mode greedy  : do_sample=False, target = max_t KL_sb over first T tokens (deterministic)
-  --mode sampled : do_sample=True,  target = mean_t KL_sb (noisy, on-policy)
-
-Recommended: greedy mode with --target-kl 1.0 (no token spikes above 1 nat).
-Greedy is deterministic so bisection converges fast and reproducibly.
-At the chosen coeff we ALSO run a sampled validation pass reporting
-sampled p50 / p90 / max so the user sees what deployment will look like.
-
-Newton-ish bisection: standard interval bisection with an exponential bracket.
-Newton-Raphson would need d(stat)/d(coeff) which we don't have analytically;
-bisection with the deterministic greedy stat converges in ~6-8 iters to tol=0.05.
+Multi-method, multi-seed orchestration around `steering_lite.calibrate_iso_kl`.
+The math (measurement + log-log secant solver) lives in the library; this
+script handles config building, data loading, validation pass, and JSON output.
 """
 from __future__ import annotations
 import argparse
@@ -75,109 +65,6 @@ def generate_one(model, prompt_ids, T, eos_id, pad_id,
 def kl_at_positions(logp_steer, logp_base):
     p_s = logp_steer.exp()
     return (p_s * (logp_steer - logp_base)).sum(dim=-1)
-
-
-@torch.no_grad()
-def measure_kl(model, prompts, T, vectors, s_cfg, eos_id, pad_id,
-               do_sample, temperature, top_p, top_k, device):
-    """For each prompt: with steering attached, generate T tokens; then score under
-    base (detached) and steer (re-attached). Compute per-position KL_sb.
-    Returns mean / p50 / p90 / max plus per-token-index aggregates."""
-    all_kls = []
-    per_t = [[] for _ in range(T)]
-    for pids in prompts:
-        sl.attach(model, s_cfg, vectors)
-        try:
-            gen = generate_one(model, pids, T, eos_id, pad_id, do_sample,
-                               temperature, top_p, top_k, device)
-        finally:
-            sl.detach(model)
-        n_gen = gen.shape[0]
-        if n_gen == 0:
-            continue
-        full = torch.cat([pids.to(device), gen]).unsqueeze(0)
-        n_p = pids.shape[0]
-        logits_base = model(full).logits.float()
-        logp_base = torch.log_softmax(logits_base, dim=-1)[0]
-        sl.attach(model, s_cfg, vectors)
-        try:
-            logits_steer = model(full).logits.float()
-        finally:
-            sl.detach(model)
-        logp_steer = torch.log_softmax(logits_steer, dim=-1)[0]
-        slc = slice(n_p - 1, n_p - 1 + n_gen)
-        kls = kl_at_positions(logp_steer[slc], logp_base[slc]).cpu()
-        all_kls.append(kls)
-        for i in range(n_gen):
-            per_t[i].append(float(kls[i]))
-    cat = torch.cat(all_kls)
-    return {
-        "kl_mean": float(cat.mean()),
-        "kl_p50": float(cat.quantile(0.50)),
-        "kl_p90": float(cat.quantile(0.90)),
-        "kl_p95": float(cat.quantile(0.95)),
-        "kl_max": float(cat.max()),
-        "n_pos": int(cat.numel()),
-        "per_t_mean": [sum(xs) / len(xs) if xs else 0.0 for xs in per_t],
-        "per_t_max": [max(xs) if xs else 0.0 for xs in per_t],
-    }
-
-
-def calibrate(model, method, layers, dtype, seed, n_train,
-              vectors, prompts, T, target_kl, target_stat,
-              eos_id, pad_id, do_sample, temperature, top_p, top_k,
-              device, tol=0.05, max_iters=12):
-    is_spherical = method == "spherical"
-    if is_spherical:
-        lo, hi = 0.001, 0.5
-    else:
-        lo, hi = 0.05, 16.0
-
-    history = []
-
-    def eval_at(c):
-        s_cfg = make_cfg(method, layers, c, dtype, seed, n_train)
-        m = measure_kl(model, prompts, T, vectors, s_cfg, eos_id, pad_id,
-                       do_sample, temperature, top_p, top_k, device)
-        history.append({"coeff": c, **{k: v for k, v in m.items() if k not in ("per_t_mean", "per_t_max")}})
-        logger.info(f"  [{method}] c={c:.4f} mean={m['kl_mean']:.3f} "
-                    f"p50={m['kl_p50']:.3f} p90={m['kl_p90']:.3f} p95={m['kl_p95']:.3f} max={m['kl_max']:.3f} n={m['n_pos']}")
-        return m[target_stat]
-
-    mid = (lo * hi) ** 0.5
-    v_mid = eval_at(mid)
-    if v_mid < target_kl:
-        c = mid
-        while c < hi:
-            c *= 2.0
-            v = eval_at(c)
-            if v >= target_kl:
-                lo, hi = c / 2.0, c
-                break
-        else:
-            return c, history
-    else:
-        c = mid
-        while c > lo:
-            c /= 2.0
-            v = eval_at(c)
-            if v <= target_kl:
-                lo, hi = c, c * 2.0
-                break
-        else:
-            return c, history
-
-    for _ in range(max_iters):
-        m = (lo + hi) / 2.0
-        v = eval_at(m)
-        if abs(v - target_kl) < tol:
-            return m, history
-        if v < target_kl:
-            lo = m
-        else:
-            hi = m
-
-    return (lo + hi) / 2.0, history
 
 
 def main():
@@ -243,26 +130,32 @@ def main():
 
         for method in methods:
             logger.info(f"=== seed={seed} {method} ===")
-            s_cfg0 = make_cfg(method, layers, 1.0, dtype, seed, args.n_train)
-            vectors = sl.train(model, tok, pos, neg, s_cfg0, batch_size=4, max_length=256)
+            cfg0 = make_cfg(method, layers, 1.0, dtype, seed, args.n_train)
+            vectors = sl.train(model, tok, pos, neg, cfg0, batch_size=4, max_length=256)
 
             torch.manual_seed(seed)
-            coeff_star, history = calibrate(
-                model, method, layers, dtype, seed, args.n_train,
-                vectors, prompts_calib, args.t_calib, args.target_kl, args.target_stat,
-                eos_id, pad_id, do_sample_calib,
-                args.temperature, args.top_p, args.top_k, args.device,
+            bracket = (0.001, 0.5) if method == "spherical" else (0.05, 16.0)
+            coeff_star, history = sl.calibrate_iso_kl(
+                model, prompts_calib, cfg0, vectors,
+                target_kl=args.target_kl, target_stat=args.target_stat,
+                bracket=bracket, T=args.t_calib,
+                eos_id=eos_id, pad_id=pad_id,
+                do_sample=do_sample_calib,
+                temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
+                device=args.device,
             )
 
             best = min(history, key=lambda h: abs(h[args.target_stat] - args.target_kl))
 
             logger.info(f"--- sampled validation [{method}] at coeff*={best['coeff']:.4f} ---")
             torch.manual_seed(seed)
-            val_cfg = make_cfg(method, layers, best["coeff"], dtype, seed, args.n_train)
-            val_m = measure_kl(model, prompts_val, args.t_calib, vectors, val_cfg, eos_id, pad_id,
-                               do_sample=True,
-                               temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
-                               device=args.device)
+            from dataclasses import replace
+            val_cfg = replace(cfg0, coeff=best["coeff"])
+            val_m = sl.measure_kl(model, prompts_val, val_cfg, vectors,
+                                   T=args.t_calib, eos_id=eos_id, pad_id=pad_id,
+                                   do_sample=True,
+                                   temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
+                                   device=args.device)
             logger.info(f"  [val sampled] mean={val_m['kl_mean']:.3f} p50={val_m['kl_p50']:.3f} "
                         f"p90={val_m['kl_p90']:.3f} max={val_m['kl_max']:.3f} n={val_m['n_pos']}")
 
