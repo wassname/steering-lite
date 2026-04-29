@@ -24,6 +24,11 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+from loguru import logger
+from tabulate import tabulate
+
+logger.remove()
+logger.add(lambda x: print(x, end=""), level="INFO", colorize=False, format="{message}\n")
 
 K_FPR = 2.0
 
@@ -101,20 +106,13 @@ def _si_bidir(y_ref, y_neg, y_pos, pmass_pos, pmass_neg) -> dict:
 def main(out_dir: Path) -> None:
     by_method, pmass_by_cond, target = _load(out_dir)
     if not target:
-        print(f"no per_row.csv files in {out_dir}", file=sys.stderr); sys.exit(1)
+        logger.error(f"no per_row.csv files in {out_dir}"); sys.exit(1)
 
     ref_key = ("baseline", "base", 0.0)
     ref = by_method[(ref_key[0], ref_key[1])][ref_key[2]]
     pmass_ref = float(np.nanmean(pmass_by_cond[ref_key]))
-    print(f"ref: {ref_key}  n_ref={len(ref)}  pmass_ref={pmass_ref:.3f}\n")
-
-    hdr = (
-        f"{'method':<22} {'n':>4} "
-        f"{'SI':>8} {'F1':>6} "
-        f"{'net':>7} {'corr_w':>7} {'wrong_w':>7} "
-        f"{'corr%':>6} {'wrong%':>6} {'pmass_r':>7}"
-    )
-    print(hdr); print("-" * len(hdr))
+    logger.info(f"ref: {ref_key}  n_ref={len(ref)}  pmass_ref={pmass_ref:.3f}")
+    logger.info("SHOULD: SI>0 and F1>0 if +c (after flip) increases honest log-ratio; pca often near 0; check `flip` col -- methods marked * had arbitrary internal sign and got post-hoc flipped.")
 
     rows = []
     for (m, p), cmap in by_method.items():
@@ -167,26 +165,37 @@ def main(out_dir: Path) -> None:
         rows.append({"method": m, "n": int(valid.sum()), "flipped": flipped, **si, **f1})
 
     rows.sort(key=lambda r: (r["SI"] if np.isfinite(r["SI"]) else r["net_correct"]), reverse=True)
-    for r in rows:
-        flag = "*" if r["flipped"] else " "
-        print(
-            f"{r['method']:<22}{flag} {r['n']:>4} "
-            f"{r['SI']:>+8.2f} {r['F1_noarb']:>+6.2f} "
-            f"{r['net_correct']:>+7.3f} {r['correct_w']:>+7.3f} {r['wrong_w']:>+7.3f} "
-            f"{r['correct_rate']:>+6.1%} {r['wrong_rate']:>+6.1%} {r['pmass_ratio']:>7.3f}"
-        )
-    print("\n* = method's internal sign was flipped post-hoc (+c originally meant DEcrease target).")
 
-    print(
-        "\nSI       = bidirectional flip-based (k_fpr=2 do-no-harm), %, higher better"
-        "\nF1       = AntiPaSTO Steering F1 with arb_w=0 (no off-target cluster):"
-        "\n           = 2*net/(1+net) * pmass_ratio * 100 if net>0 else 0"
-        "\n           Upper bound on true F1; running math+preferences would lower it via arb_w."
-        "\nnet      = correct_w - wrong_w  (importance-weighted by |y_0|/sigma, baseline -> +c only)"
-        "\ncorr_w   = TP weight: P(baseline wrong) AND +c fixed it"
-        "\nwrong_w  = FP weight: P(baseline right) AND +c broke it"
-        "\ncorr%/wrong% = unweighted rates"
-    )
+    # Final block (token-efficient-logging skill: BLUF + tabulated table at tail).
+    best = rows[0] if rows else None
+    cue = "🟢" if (best and best["SI"] > 0 and best["F1_noarb"] > 0) else ("🟡" if best and best["SI"] > 0 else "🔴")
+    table = [
+        [f"{r['method']}{'*' if r['flipped'] else ''}", r["n"],
+         r["SI"], r["F1_noarb"], r["net_correct"],
+         r["correct_w"], r["wrong_w"],
+         100 * r["correct_rate"], 100 * r["wrong_rate"], r["pmass_ratio"]]
+        for r in rows
+    ]
+    headers = ["method", "n", "SI", "F1", "net", "corr_w", "wrong_w",
+               "corr%", "wrong%", "pmass_r"]
+
+    print()
+    print(f"out: {out_dir}")
+    print(f"argv: {' '.join(sys.argv)}")
+    if best:
+        print(f"main metric: {cue} {best['method']} SI={best['SI']:+.2f} F1={best['F1_noarb']:+.2f} "
+              f"[n_methods={len(rows)}, target={target}, ref_pmass={pmass_ref:.3f}]")
+    print()
+    print(tabulate(table, headers=headers, tablefmt="tsv", floatfmt="+.2f"))
+    print()
+    print("* = method's internal sign was flipped post-hoc (+c originally meant DEcrease target).")
+    print("SI = bidirectional flip-based (k_fpr=2 do-no-harm), 0-100 scale, higher better.")
+    print("F1 = AntiPaSTO Steering F1 with arb_w=0 (no off-target cluster), 0-100 scale.")
+    print("     = 2*net/(1+net) * pmass_ratio * 100 if net>0 else 0. Upper bound on true F1.")
+    print("net      = corr_w - wrong_w  (importance-weighted by |y_0|/sigma, baseline -> +c)")
+    print("corr_w   = TP weight: P(baseline wrong) AND +c fixed it")
+    print("wrong_w  = FP weight: P(baseline right) AND +c broke it")
+    print("corr%/wrong% = unweighted rates")
 
 
 if __name__ == "__main__":

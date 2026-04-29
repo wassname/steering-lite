@@ -79,17 +79,20 @@ means "toward honest". Same convention as
 
 | method        | flip |    SI |   F1 |    net | corr_w | wrong_w | corr% | wrong% | pmass_r |
 | ------------- | :--: | ----: | ---: | -----: | -----: | ------: | ----: | -----: | ------: |
+| topk_clusters |  *   | +11.90 | 2.73 | +0.014 | +0.056 |  +0.042 | 11.9% |   6.4% |   0.995 |
 | spherical     |  *   | +11.17 | 3.79 | +0.019 | +0.043 |  +0.024 | 10.7% |   4.3% |   0.998 |
 | mean_diff     |  *   |  +7.59 | 3.68 | +0.019 | +0.035 |  +0.016 |  8.9% |   3.7% |   0.992 |
 | cosine_gated  |  *   |  +7.45 | 7.83 | +0.041 | +0.053 |  +0.011 | 12.3% |   2.3% |   0.987 |
 | sspace        |  *   |  +6.93 | 3.62 | +0.019 | +0.037 |  +0.019 |  9.8% |   4.1% |   0.988 |
 | pca           |      |  +1.18 | 0.00 | -0.021 | +0.042 |  +0.062 | 10.7% |   9.6% |   0.944 |
-| topk_clusters |      | -33.85 | 0.00 | -0.131 | +0.021 |  +0.152 |  5.7% |  23.3% |   0.990 |
 
 `flip = *` means the method's internal sign was inverted post-hoc (+c originally
-meant DEcrease honesty). After canonicalization, every method except `pca` and
-`topk_clusters` has positive net directional fixes. `cosine_gated` leads on F1,
-`spherical` on SI; `topk_clusters` is genuinely broken even with sign-flip.
+meant DEcrease honesty). After canonicalization, every method except `pca` has
+positive net directional fixes. `cosine_gated` leads on F1, `topk_clusters` on
+SI. Note `topk_clusters` also has per-centroid sign canon at extract time
+(see [variants/topk_clusters.py](src/steering_lite/variants/topk_clusters.py)) --
+without it, individual clusters can converge anti-aligned with the global
+honesty axis, and the eval-time global flip can't recover them.
 
 Reproduce:
 
