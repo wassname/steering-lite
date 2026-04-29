@@ -13,3 +13,4 @@ logs/
 PLAN.md
 docs/
 *.bak
+spec/

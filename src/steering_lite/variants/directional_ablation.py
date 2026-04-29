@@ -50,7 +50,7 @@ class DirectionalAblation:
         out = {}
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
-            v = v / (v.norm() + 1e-8)  # ablation requires unit v
+            v = v / v.norm()
             out[li] = {"v": v}
         return out
 

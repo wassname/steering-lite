@@ -54,7 +54,7 @@ class MeanDiff:
             else:
                 v = p.mean(0) - n.mean(0)
             if cfg.normalize:
-                v = v / (v.norm() + 1e-8)
+                v = v / v.norm()
             out[li] = {"v": v}
         return out
 

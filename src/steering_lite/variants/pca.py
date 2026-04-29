@@ -14,8 +14,8 @@ reader: it omits per-diff normalization, label-based sign selection, and
 train-mean recentering for reading scores.
 PCA is sign-ambiguous; the vote is more robust than alignment-with-the-mean
 when paired diffs are heterogeneous (mean can cancel without the vote
-changing). If the vote is close to 50/50 the principal axis isn't well
-defined and `mean_diff` is the better method to begin with.
+changing). If the vote ties exactly, orient the axis so the largest centered
+projection is positive.
 
 At runtime, add `coeff * v_L` to the residual.
 
@@ -61,23 +61,24 @@ class PCA:
             # SVD on centered diffs; right singular vectors are PC directions
             _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
             v = Vh[: cfg.n_components]  # [k, d]
-            # sign-fix each PC by majority vote across paired diffs (repeng style):
-            # project each diff onto the PC and check whether more land on the
-            # positive or negative side. More robust to outliers than aligning
-            # with the (small) mean diff.
-            projs = diffs @ v.T  # [n, k]
-            sign = torch.where((projs > 0).float().mean(0) >= 0.5,
+            projs = centered @ v.T  # [n, k]
+            positive_frac = (projs > 0).float().mean(0)
+            majority_sign = torch.where(positive_frac > 0.5,
                                torch.ones(v.shape[0]),
                                -torch.ones(v.shape[0])).to(v)
+            strongest_idx = projs.abs().argmax(dim=0)
+            strongest = projs[strongest_idx, torch.arange(v.shape[0], device=projs.device)]
+            strongest_sign = torch.sign(strongest)
+            sign = torch.where(positive_frac == 0.5, strongest_sign, majority_sign)
             v = v * sign[:, None]
             if cfg.n_components == 1:
                 v = v.squeeze(0)
                 if cfg.normalize:
-                    v = v / (v.norm() + 1e-8)
+                    v = v / v.norm()
                 out[li] = {"v": v}
             else:
                 if cfg.normalize:
-                    v = v / (v.norm(dim=1, keepdim=True) + 1e-8)
+                    v = v / v.norm(dim=1, keepdim=True)
                 out[li] = {"V": v}  # [k, d]
         return out
 

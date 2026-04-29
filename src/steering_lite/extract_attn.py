@@ -36,7 +36,7 @@ from __future__ import annotations
 from typing import Literal
 import torch
 from torch import nn, Tensor
-from einops import einsum
+from einops import einsum, rearrange
 from jaxtyping import Float
 
 from .target import _get_blocks
@@ -139,7 +139,7 @@ def record_activations_attn(
                 # block i in steering-lite is hf model's i-th transformer block
                 attn_full: Tensor = out.attentions[li].mean(dim=1).float()  # [B, seq, seq]
                 # gather row at last_idx for each b
-                row_idx = last_idx.view(B, 1, 1).expand(-1, 1, attn_full.size(-1))
+                row_idx = rearrange(last_idx, "b -> b 1 1").expand(-1, 1, attn_full.size(-1))
                 attn_last = attn_full.gather(1, row_idx).squeeze(1)  # [B, seq]
                 # zero out padding columns
                 attn_last = attn_last * mask.float()

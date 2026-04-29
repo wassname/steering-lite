@@ -48,8 +48,8 @@ bench-bidir model="Qwen/Qwen3.5-0.8B" out="outputs/daily_dilemmas/v9_bidir_qwen"
 	# active methods at +c, -c (calibrated coeffs from iso-KL probe)
 	# fallback default coeff=1.0; replace with iso-KL coeffs once recalibrated.
 	for method in mean_diff pca topk_clusters cosine_gated sspace spherical; do
-		for sign in +1 -1; do
-			coeff=$(python -c "print(${sign} * 1.0)")
+		for sign in "+" "-"; do
+			coeff="${sign}1.0"
 			echo ">>> $method coeff=$coeff"
 			uv run --extra benchmark python scripts/daily_dilemmas_benchmark.py \
 				--model {{model}} --method $method --coeff $coeff \

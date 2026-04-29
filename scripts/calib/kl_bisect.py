@@ -111,7 +111,11 @@ def main():
     pad_id = tok.pad_token_id
     model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
 
-    n_hidden = model.config.num_hidden_layers
+    n_hidden = getattr(model.config, "num_hidden_layers", None)
+    if n_hidden is None and hasattr(model.config, "text_config"):
+        n_hidden = model.config.text_config.num_hidden_layers
+    if n_hidden is None:
+        raise AttributeError(f"can't find num_hidden_layers on {type(model.config).__name__}")
     if args.layers.strip().lower() == "mid":
         layers = tuple(range(int(n_hidden * 0.30), int(n_hidden * 0.80)))
     elif args.layers.strip().lower() == "all":

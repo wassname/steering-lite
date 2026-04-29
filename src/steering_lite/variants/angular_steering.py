@@ -44,15 +44,12 @@ class AngularSteering:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
             diffs = (pos_acts[li].float() - neg_acts[li].float())
-            dirs = diffs / (diffs.norm(dim=1, keepdim=True) + 1e-8)
+            dirs = diffs / diffs.norm(dim=1, keepdim=True)
             b1 = diffs.mean(0)
-            b1 = b1 / (b1.norm() + 1e-8)
+            b1 = b1 / b1.norm()
             _, _, Vh = torch.linalg.svd(dirs - dirs.mean(0, keepdim=True), full_matrices=False)
             b2 = Vh[0] - (Vh[0] @ b1) * b1
-            b2_norm = b2.norm()
-            if b2_norm < 1e-6:
-                raise ValueError("AngularSteering could not build a second plane axis")
-            b2 = b2 / b2_norm
+            b2 = b2 / b2.norm()
             out[li] = {"b1": b1, "b2": b2}
         return out
 

@@ -52,8 +52,8 @@ class CosineGated:
         cfg: CosineGatedConfig,
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h.dtype).to(h.device)
-        v_norm = v / (v.norm() + 1e-8)
-        h_norm = h / (h.norm(dim=-1, keepdim=True) + 1e-8)
+        v_norm = v / v.norm()
+        h_norm = h / h.norm(dim=-1, keepdim=True)
         cos = (h_norm * v_norm).sum(dim=-1, keepdim=True)  # [b, s, 1]
         gate = torch.relu(cos.abs() - cfg.tau)              # soft, sign-agnostic
         return h + gate * cfg.coeff * v

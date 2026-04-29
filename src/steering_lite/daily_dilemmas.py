@@ -188,16 +188,50 @@ INSTRUCTION_PROMPT = (
 
 @dataclass
 class DilemmaRow:
-    """One (dilemma, action) pair with party='You' value labels.
+    """One (dilemma, action) pair with a pre-computed signed honesty label.
 
-    Multi-label scoring: each row's logratio contributes to every value in
-    `values`. Yields O(rows) forward passes instead of O(rows * targets).
+    `honesty_label ∈ {+1, -1}`: +1 if Yes-on-this-action is the honest choice,
+    -1 if Yes is the dishonest choice. Source:
+    https://huggingface.co/datasets/wassname/daily_dilemmas-self-honesty
+    Avoids the buggy "to_do=+1 / not_to_do=-1" heuristic — the honest action
+    isn't always to_do (e.g. dilemma 310: "Giving a positive review" is the
+    to_do but is dishonest, label=-1).
+
+    `logratio_act = logratio_yes_no * honesty_label`  -> >0 means model
+    endorses honest choice, regardless of whether honest=Yes or honest=No.
     """
     dilemma_idx: int
-    action_type: str  # 'to_do' or 'not_to_do'
+    action_type: str  # 'to_do' or 'not_to_do' (kept for diagnostics, unused for sign)
     situation: str
     action: str
-    values: list[str]
+    honesty_label: float  # +1 or -1
+
+
+def load_eval_rows(*, seed: int = 0, max_rows: int | None = None) -> list[DilemmaRow]:
+    """Load the curated symmetric-honesty eval set (438 rows, 219 dilemmas x 2).
+
+    Uses wassname/daily_dilemmas-self-honesty:honesty_eval which already:
+      - filters to party='You' values
+      - assigns symmetric honesty_label per (dilemma, action_type)
+      - drops dilemmas with no honesty signal on either side
+    """
+    ds = load_dataset(
+        "wassname/daily_dilemmas-self-honesty", "honesty_eval"
+    )["test"]
+    rows: list[DilemmaRow] = []
+    for r in ds:
+        rows.append(DilemmaRow(
+            dilemma_idx=int(r["dilemma_idx"]),
+            action_type=str(r["action_type"]),
+            situation=str(r["dilemma_situation"]).strip(),
+            action=str(r["action"]).strip(),
+            honesty_label=float(r["honesty_label"]),
+        ))
+    rng = random.Random(seed)
+    rng.shuffle(rows)
+    if max_rows is not None:
+        rows = rows[:max_rows]
+    return rows
 
 
 def format_mcq(situation: str, action: str, tok, system_prompt: str = "") -> str:
@@ -384,34 +418,6 @@ def score_mcq_guided(
         logratio = math.log(p_yes) - math.log(p_no)
     return {"logratio": logratio, "pmass": pmass, "max_p": max_p, "logp": logp.cpu(),
             "think_tokens": int(think_ids.shape[0])}
-
-
-def load_eval_rows(*, seed: int = 0, max_rows: int | None = None) -> list[DilemmaRow]:
-    """Load all (dilemma_idx, action_type) rows with party='You' value labels.
-
-    Multi-label eval: one forward pass per row; each row contributes to every
-    value it's tagged with. Filters rows with empty `you_values`.
-    """
-    ds = load_dataset("kellycyy/DailyDilemmas", "Dilemmas_with_values_aggregated")["test"]
-    you_values = _you_values()
-    rows: list[DilemmaRow] = []
-    for r in ds:
-        di = int(r["dilemma_idx"])
-        at = str(r["action_type"])
-        vals = you_values.get((di, at), [])
-        if not vals:
-            continue
-        rows.append(DilemmaRow(
-            dilemma_idx=di, action_type=at,
-            situation=str(r["dilemma_situation"]).strip(),
-            action=str(r["action"]).strip(),
-            values=vals,
-        ))
-    rng = random.Random(seed)
-    rng.shuffle(rows)
-    if max_rows is not None:
-        rows = rows[:max_rows]
-    return rows
 
 
 # ---------- legacy action-continuation eval (kept for back-compat) ----------

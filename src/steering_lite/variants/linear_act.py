@@ -23,6 +23,7 @@ Gaussian/Bures OT map. It omits optional support masking and layerwise map
 estimation from the full pipeline.
 """
 from dataclasses import dataclass
+from einops import rearrange
 from jaxtyping import Float
 from torch import Tensor
 
@@ -34,7 +35,6 @@ from ..method import register
 @dataclass
 class LinearAcTConfig(SteeringConfig):
     method: str = "linear_act"
-    min_denom: float = 1e-8
 
 
 @register
@@ -62,8 +62,6 @@ class LinearAcT:
             a_tilde = a_sorted - m_a
             b_tilde = b_sorted - m_b
             denom = (a_tilde ** 2).sum(dim=0)
-            if (denom <= cfg.min_denom).any():
-                raise ValueError("Linear-AcT source coordinate variance too small")
             omega = (a_tilde * b_tilde).sum(dim=0) / denom
             beta = m_b - omega * m_a
             out[li] = {"omega": omega, "beta": beta}
@@ -76,7 +74,7 @@ class LinearAcT:
         state: dict[str, Tensor],
         cfg: LinearAcTConfig,
     ) -> Float[Tensor, "b s d"]:
-        omega = state["omega"].to(h.dtype).to(h.device)
-        beta = state["beta"].to(h.dtype).to(h.device)
+        omega = rearrange(state["omega"].to(h.dtype).to(h.device), "d -> 1 1 d")
+        beta = rearrange(state["beta"].to(h.dtype).to(h.device), "d -> 1 1 d")
         h_new = h * omega + beta
         return (1 - cfg.coeff) * h + cfg.coeff * h_new

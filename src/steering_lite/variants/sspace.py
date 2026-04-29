@@ -20,7 +20,6 @@ weights via input-dependent perturbations.
 """
 from dataclasses import dataclass
 import torch
-from einops import einsum
 from jaxtyping import Float
 from torch import Tensor
 
@@ -33,7 +32,6 @@ from ..method import register
 class SSpaceConfig(SteeringConfig):
     method: str = "sspace"
     r: int = 4
-    project_at_runtime: bool = False  # if True, project residual onto subspace and scale
     normalize: bool = True
 
 
@@ -62,7 +60,7 @@ class SSpace:
             # project mean diff onto subspace
             v = V @ (V.T @ mean_diff)  # [d]
             if cfg.normalize:
-                v = v / (v.norm() + 1e-8)
+                v = v / v.norm()
             out[li] = {"v": v, "V": V}
         return out
 
@@ -74,9 +72,4 @@ class SSpace:
         cfg: SSpaceConfig,
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h.dtype).to(h.device)
-        if not cfg.project_at_runtime:
-            return h + cfg.coeff * v
-        V = state["V"].to(h.dtype).to(h.device)  # [d, r]
-        proj = einsum(h, V, "b s d, d r -> b s r")
-        h_proj = einsum(proj, V, "b s r, d r -> b s d")
-        return h + cfg.coeff * h_proj
+        return h + cfg.coeff * v

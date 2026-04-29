@@ -49,8 +49,8 @@ def _kmeans_counts(X: Tensor, k: int, n_iters: int, seed: int) -> tuple[Tensor, 
     C = X[torch.randperm(X.shape[0], generator=g)[:k]].clone()
     assign = torch.zeros(X.shape[0], dtype=torch.long)
     for _ in range(n_iters):
-        Xn = X / (X.norm(dim=1, keepdim=True) + 1e-8)
-        Cn = C / (C.norm(dim=1, keepdim=True) + 1e-8)
+        Xn = X / X.norm(dim=1, keepdim=True)
+        Cn = C / C.norm(dim=1, keepdim=True)
         assign = einsum(Xn, Cn, "n d, k d -> n k").argmax(dim=1)
         counts = torch.bincount(assign, minlength=k)
         if (counts == 0).any():
@@ -69,8 +69,8 @@ def _sinkhorn(C: Tensor, p: Tensor, q: Tensor, lam: float, n_iters: int) -> Tens
     K = torch.exp(-C / lam)
     u = torch.ones_like(p)
     for _ in range(n_iters):
-        v = q / (K.t() @ u + 1e-30)
-        u = p / (K @ v + 1e-30)
+        v = q / (K.t() @ u)
+        u = p / (K @ v)
     return u[:, None] * K * v[None, :]
 
 
@@ -101,7 +101,7 @@ class CHaRS:
                 sigma = 1.0 if k == 1 else float(d_mat[d_mat > 0].median())
             else:
                 sigma = float(cfg.sigma)
-            out[li] = {"a": a, "b": b, "P": P, "sigma": torch.tensor(sigma)}
+            out[li] = {"a": a, "b": b, "P": P, "p": p_marg, "sigma": torch.tensor(sigma)}
         return out
 
     @staticmethod
@@ -114,13 +114,15 @@ class CHaRS:
         a = state["a"].to(h.dtype).to(h.device)  # [k, d]
         b = state["b"].to(h.dtype).to(h.device)  # [k, d]
         P = state["P"].to(h.dtype).to(h.device)  # [k, k]
+        p = state["p"].to(h.dtype).to(h.device)  # [k]
         sigma = float(state["sigma"])
         # k(x, a_i) per token: [B, S, k]
         d2 = torch.cdist(h, a) ** 2
-        kern = torch.exp(-d2 / (2 * sigma ** 2 + 1e-12))
-        # weights w_ij(x) = P_ij * k_i(x); normalised over (i,j)
-        w = einsum(P, kern, "i j, b s i -> b s i j")  # [B, S, k, k]
-        w = w / (w.sum(dim=(-2, -1), keepdim=True) + 1e-12)
+        kern = torch.exp(-d2 / (2 * sigma ** 2))
+        denom = einsum(kern, p, "b s i, i -> b s")
+
+        # weights w_ij(x) = P_ij * k_i(x) / sum_p p_p k_p(x)
+        w = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")  # [B, S, k, k]
         # v_ij = b_j - a_i  ->  v_hat(x) = sum_ij w_ij (b_j - a_i)
         v_hat = einsum(w, b, "b s i j, j d -> b s d") - einsum(w, a, "b s i j, i d -> b s d")
         return h + cfg.coeff * v_hat

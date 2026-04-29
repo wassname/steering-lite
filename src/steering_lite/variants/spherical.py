@@ -47,7 +47,7 @@ class Spherical:
         out = {}
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
-            v = v / (v.norm() + 1e-8)
+            v = v / v.norm()
             out[li] = {"v": v}
         return out
 
@@ -60,8 +60,8 @@ class Spherical:
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h.dtype).to(h.device)  # unit
         norm = h.norm(dim=-1, keepdim=True)  # [b, s, 1]
-        h_hat = h / (norm + 1e-8)  # [b, s, d]
-        cos = (h_hat * v).sum(dim=-1, keepdim=True).clamp(-1 + 1e-6, 1 - 1e-6)
+        h_hat = h / norm  # [b, s, d]
+        cos = (h_hat * v).sum(dim=-1, keepdim=True)
         omega = torch.arccos(cos)  # [b, s, 1]
         sin_omega = torch.sin(omega)
         t = cfg.coeff
@@ -69,7 +69,4 @@ class Spherical:
         a = torch.sin((1 - t) * omega) / sin_omega
         b = torch.sin(t * omega) / sin_omega
         rot = a * h_hat + b * v
-        near_parallel = sin_omega.abs() < 1e-4
-        lerp = (1 - t) * h_hat + t * v
-        rot = torch.where(near_parallel, lerp, rot)
         return rot * norm

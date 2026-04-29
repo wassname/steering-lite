@@ -37,15 +37,14 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
     init_idx = torch.randperm(n, generator=g)[:k]
     C = X[init_idx].clone()
     for _ in range(n_iters):
-        # cosine assignment (for direction-ish data)
-        Xn = X / (X.norm(dim=1, keepdim=True) + 1e-8)
-        Cn = C / (C.norm(dim=1, keepdim=True) + 1e-8)
+        Xn = X / X.norm(dim=1, keepdim=True)
+        Cn = C / C.norm(dim=1, keepdim=True)
         sim = einsum(Xn, Cn, "n d, k d -> n k")
         assign = sim.argmax(dim=1)  # [n]
-        new_C = torch.stack([
-            X[assign == j].mean(0) if (assign == j).any() else C[j]
-            for j in range(k)
-        ])
+        counts = torch.bincount(assign, minlength=k)
+        if (counts == 0).any():
+            raise ValueError("topk_clusters k-means produced an empty cluster")
+        new_C = torch.stack([X[assign == j].mean(0) for j in range(k)])
         if torch.allclose(new_C, C, atol=1e-6):
             break
         C = new_C
@@ -72,7 +71,7 @@ class TopKClusters:
             k = cfg.k
             C = _kmeans(diffs, k=k, n_iters=cfg.n_iters, seed=cfg.seed)  # [k, d]
             if cfg.normalize:
-                C = C / (C.norm(dim=1, keepdim=True) + 1e-8)
+                C = C / C.norm(dim=1, keepdim=True)
             out[li] = {"C": C}
         return out
 
@@ -85,8 +84,8 @@ class TopKClusters:
     ) -> Float[Tensor, "b s d"]:
         C = state["C"].to(h.dtype).to(h.device)  # [k, d]
         # cos-sim per token; pick best centroid per token
-        h_norm = h / (h.norm(dim=-1, keepdim=True) + 1e-8)
-        C_norm = C / (C.norm(dim=-1, keepdim=True) + 1e-8)
+        h_norm = h / h.norm(dim=-1, keepdim=True)
+        C_norm = C / C.norm(dim=-1, keepdim=True)
         sim = einsum(h_norm, C_norm, "b s d, k d -> b s k")
         pick = sim.argmax(dim=-1)  # [b, s]
         v = C[pick]  # [b, s, d]
