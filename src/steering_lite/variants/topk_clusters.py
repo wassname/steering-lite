@@ -70,6 +70,16 @@ class TopKClusters:
                 raise ValueError(f"k={cfg.k} exceeds n={diffs.shape[0]}")
             k = cfg.k
             C = _kmeans(diffs, k=k, n_iters=cfg.n_iters, seed=cfg.seed)  # [k, d]
+            # Per-centroid sign canon. Cosine k-means can converge to centroids
+            # whose subset-mean is anti-aligned with the global honesty axis
+            # (e.g. a syntactic-noise mode). Without this, those modes inject
+            # dishonest/noise direction at apply time and the eval-time global
+            # flip can't fix them (it would flip ALL centroids together).
+            # Project each onto the global mean diff; flip if negative.
+            g = diffs.mean(dim=0)  # [d], honesty axis in expectation
+            proj = einsum(C, g, "k d, d -> k")
+            sign = torch.where(proj < 0, -1.0, 1.0).to(C.dtype)
+            C = C * sign.unsqueeze(-1)
             if cfg.normalize:
                 C = C / C.norm(dim=1, keepdim=True)
             out[li] = {"C": C}

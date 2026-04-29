@@ -112,8 +112,6 @@ def main(out_dir: Path) -> None:
     pmass_by_cond = defaultdict(list)  # [(method,prompt,coeff)] -> [pmass]
     for r in rows:
         m = r["method"]; p = r["prompt"]; c = float(r["coeff"])
-        if r["is_target"] != "1":
-            continue  # restrict to honesty-tagged rows
         idx = r["idx"]
         y = _to_float(r[target_col])
         pmass = _to_float(r["pmass"])
