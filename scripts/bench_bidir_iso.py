@@ -44,11 +44,11 @@ def main():
     print(f">>> baseline c=0.0", flush=True)
     subprocess.run(base_cmd, check=True)
 
-    for s in iso["summary"]:
-        method = s["method"]
-        c = float(s["calibrated_coeff"])
-        for sign in (+1, -1):
-            coeff = sign * c
+    signed = iso.get("summary_signed")
+    if signed:
+        for s in signed:
+            method = s["method"]
+            coeff = float(s["calibrated_coeff"])
             cmd = [
                 "uv", "run", "--extra", "benchmark",
                 "python", "scripts/daily_dilemmas_benchmark.py",
@@ -56,8 +56,23 @@ def main():
                 "--layers", layers, "--device", args.device,
                 "--torch-dtype", args.torch_dtype, "--output-dir", str(args.out),
             ]
-            print(f">>> {method} c={coeff:+.4f} (calibrated |c*|={c:.4f})", flush=True)
+            print(f">>> {method} {s.get('direction', '')} c={coeff:+.4f}", flush=True)
             subprocess.run(cmd, check=True)
+    else:
+        for s in iso["summary"]:
+            method = s["method"]
+            c = float(s["calibrated_coeff"])
+            for sign in (+1, -1):
+                coeff = sign * c
+                cmd = [
+                    "uv", "run", "--extra", "benchmark",
+                    "python", "scripts/daily_dilemmas_benchmark.py",
+                    "--model", model, "--method", method, "--coeff", f"{coeff:.6f}",
+                    "--layers", layers, "--device", args.device,
+                    "--torch-dtype", args.torch_dtype, "--output-dir", str(args.out),
+                ]
+                print(f">>> {method} c={coeff:+.4f} (calibrated |c*|={c:.4f})", flush=True)
+                subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

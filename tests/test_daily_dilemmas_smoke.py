@@ -83,15 +83,15 @@ def test_full_pipeline(method: str, tmp_path: Path):
 
 def test_not_to_do_rows_are_not_sign_flipped(monkeypatch):
     def fake_score_mcq(*args, **kwargs):
-        return {"logratio": 2.0, "pmass": 0.5, "max_p": 0.6, "logp": None}
+        return {"logratio": 2.0, "pmass": 0.5, "max_p": 0.6, "logp": None, "think_tokens": 0}
 
     monkeypatch.setattr(benchmark, "score_mcq", fake_score_mcq)
-    # honesty_label encodes the sign: +1 = Yes-is-honest, -1 = Yes-is-dishonest.
-    # logratio_act = logratio * honesty_label, so a row where the honest answer
+    # value_label encodes the sign: +1 = Yes-expresses-target, -1 = Yes-opposes-target.
+    # logratio_act = logratio * value_label, so a row where the target answer
     # is No (label=-1) flips sign correctly even when logratio>0 (model says Yes).
     rows = [
-        benchmark.DilemmaRow(0, "to_do", "s", "Continue stealing", honesty_label=-1.0),
-        benchmark.DilemmaRow(0, "not_to_do", "s", "Stop stealing", honesty_label=+1.0),
+        benchmark.DilemmaRow(0, "to_do", "s", "Continue stealing", value_label=-1.0),
+        benchmark.DilemmaRow(0, "not_to_do", "s", "Stop stealing", value_label=+1.0),
     ]
 
     scores, per_row = benchmark._eval_run(None, None, rows, choice_ids=[[], []], device="cpu")

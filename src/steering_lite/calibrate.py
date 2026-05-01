@@ -122,6 +122,7 @@ def calibrate_iso_kl(
     top_p: float = 1.0,
     top_k: int = 20,
     device: str | torch.device = "cuda",
+    sign: float = 1.0,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -140,14 +141,14 @@ def calibrate_iso_kl(
     history: list[dict] = []
 
     def eval_at(c: float) -> float:
-        c_cfg = replace(cfg, coeff=c)
+        c_cfg = replace(cfg, coeff=sign * c)
         m = measure_kl(model, prompts, c_cfg, vectors,
                        T=T, eos_id=eos_id, pad_id=pad_id,
                        do_sample=do_sample, temperature=temperature,
                        top_p=top_p, top_k=top_k, device=device)
-        history.append({"coeff": c, **{k: v for k, v in m.items()
-                                        if k not in ("per_t_mean", "per_t_max")}})
-        logger.info(f"  c={c:.4f} mean={m['kl_mean']:.3f} "
+        history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign,
+                        **{k: v for k, v in m.items() if k not in ("per_t_mean", "per_t_max")}})
+        logger.info(f"  c={sign * c:+.4f} mean={m['kl_mean']:.3f} "
                     f"p50={m['kl_p50']:.3f} p90={m['kl_p90']:.3f} "
                     f"p95={m['kl_p95']:.3f} max={m['kl_max']:.3f} n={m['n_pos']}")
         return m[target_stat]

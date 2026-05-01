@@ -91,6 +91,8 @@ def main():
     p.add_argument("--enable-thinking", action="store_true")
     p.add_argument("--n-validate", type=int, default=8)
     p.add_argument("--output-dir", default="outputs/iso_kl")
+    p.add_argument("--separate-signs", action="store_true",
+                   help="calibrate positive and negative coeffs separately")
     args = p.parse_args()
 
     if args.target_stat is None:
@@ -126,6 +128,7 @@ def main():
 
     do_sample_calib = args.mode == "sampled"
     all_summary = []
+    all_summary_signed = []
     for seed in seeds:
         logger.info(f"########## seed={seed} mode={args.mode} stat={args.target_stat} target_kl={args.target_kl} ##########")
         random.seed(seed); torch.manual_seed(seed)
@@ -145,63 +148,75 @@ def main():
             logger.info(f"=== seed={seed} {method} ===")
             cfg0 = make_cfg(method, layers, 1.0, dtype, seed, args.n_train)
             vectors = sl.train(model, tok, pos, neg, cfg0, batch_size=4, max_length=256)
+            signs = [("positive", +1.0), ("negative", -1.0)] if args.separate_signs else [("positive", +1.0)]
+            signed_rows = []
+            for direction, sign in signs:
+                torch.manual_seed(seed)
+                bracket = (0.001, 0.5) if method == "spherical" else (0.05, 16.0)
+                coeff_star, history = sl.calibrate_iso_kl(
+                    model, prompts_calib, cfg0, vectors,
+                    target_kl=args.target_kl, target_stat=args.target_stat,
+                    bracket=bracket, T=args.t_calib,
+                    eos_id=eos_id, pad_id=pad_id,
+                    do_sample=do_sample_calib,
+                    temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
+                    device=args.device, sign=sign,
+                )
 
-            torch.manual_seed(seed)
-            bracket = (0.001, 0.5) if method == "spherical" else (0.05, 16.0)
-            coeff_star, history = sl.calibrate_iso_kl(
-                model, prompts_calib, cfg0, vectors,
-                target_kl=args.target_kl, target_stat=args.target_stat,
-                bracket=bracket, T=args.t_calib,
-                eos_id=eos_id, pad_id=pad_id,
-                do_sample=do_sample_calib,
-                temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
-                device=args.device,
-            )
+                best = min(history, key=lambda h: abs(h[args.target_stat] - args.target_kl))
 
-            best = min(history, key=lambda h: abs(h[args.target_stat] - args.target_kl))
+                logger.info(f"--- sampled validation [{method} {direction}] at coeff*={best['coeff']:+.4f} ---")
+                torch.manual_seed(seed)
+                from dataclasses import replace
+                val_cfg = replace(cfg0, coeff=best["coeff"])
+                val_m = sl.measure_kl(model, prompts_val, val_cfg, vectors,
+                                       T=args.t_calib, eos_id=eos_id, pad_id=pad_id,
+                                       do_sample=True,
+                                       temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
+                                       device=args.device)
+                logger.info(f"  [val sampled] mean={val_m['kl_mean']:.3f} p50={val_m['kl_p50']:.3f} "
+                            f"p90={val_m['kl_p90']:.3f} max={val_m['kl_max']:.3f} n={val_m['n_pos']}")
 
-            logger.info(f"--- sampled validation [{method}] at coeff*={best['coeff']:.4f} ---")
-            torch.manual_seed(seed)
-            from dataclasses import replace
-            val_cfg = replace(cfg0, coeff=best["coeff"])
-            val_m = sl.measure_kl(model, prompts_val, val_cfg, vectors,
-                                   T=args.t_calib, eos_id=eos_id, pad_id=pad_id,
-                                   do_sample=True,
-                                   temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
-                                   device=args.device)
-            logger.info(f"  [val sampled] mean={val_m['kl_mean']:.3f} p50={val_m['kl_p50']:.3f} "
-                        f"p90={val_m['kl_p90']:.3f} max={val_m['kl_max']:.3f} n={val_m['n_pos']}")
+                row = {
+                    "model": args.model, "method": method, "seed": seed,
+                    "direction": direction, "sign": sign,
+                    "calibrated_coeff": best["coeff"],
+                    "calibrated_coeff_abs": abs(best["coeff"]),
+                    "calib_mode": args.mode,
+                    "calib_target_stat": args.target_stat,
+                    "calib_target_kl": args.target_kl,
+                    "calib_kl_mean": best["kl_mean"],
+                    "calib_kl_p50": best["kl_p50"],
+                    "calib_kl_p90": best["kl_p90"],
+                    "calib_kl_p95": best["kl_p95"],
+                    "calib_kl_max": best["kl_max"],
+                    "val_sampled_kl_mean": val_m["kl_mean"],
+                    "val_sampled_kl_p50": val_m["kl_p50"],
+                    "val_sampled_kl_p90": val_m["kl_p90"],
+                    "val_sampled_kl_p95": val_m["kl_p95"],
+                    "val_sampled_kl_max": val_m["kl_max"],
+                    "val_n_pos": val_m["n_pos"],
+                    "val_per_t_mean": val_m["per_t_mean"],
+                    "val_per_t_max": val_m["per_t_max"],
+                    "iters": len(history),
+                    "history": history,
+                }
+                signed_rows.append(row)
+                all_summary_signed.append(row)
 
-            row = {
-                "model": args.model, "method": method, "seed": seed,
-                "calibrated_coeff": best["coeff"],
-                "calib_mode": args.mode,
-                "calib_target_stat": args.target_stat,
-                "calib_target_kl": args.target_kl,
-                "calib_kl_mean": best["kl_mean"],
-                "calib_kl_p50": best["kl_p50"],
-                "calib_kl_p90": best["kl_p90"],
-                "calib_kl_p95": best["kl_p95"],
-                "calib_kl_max": best["kl_max"],
-                "val_sampled_kl_mean": val_m["kl_mean"],
-                "val_sampled_kl_p50": val_m["kl_p50"],
-                "val_sampled_kl_p90": val_m["kl_p90"],
-                "val_sampled_kl_p95": val_m["kl_p95"],
-                "val_sampled_kl_max": val_m["kl_max"],
-                "val_n_pos": val_m["n_pos"],
-                "val_per_t_mean": val_m["per_t_mean"],
-                "val_per_t_max": val_m["per_t_max"],
-                "iters": len(history),
-                "history": history,
-            }
-            all_summary.append(row)
+            # Backward-compatible one-row summary keeps the positive direction.
+            all_summary.append(next(r for r in signed_rows if r["sign"] > 0))
 
     out_path = out_dir / (
         f"iso_kl__{args.model.replace('/', '--')}__L{'_'.join(map(str, layers))}"
         f"__{args.mode}_{args.target_stat}_{args.target_kl}__T{args.t_calib}__N{args.n_calib}"
         f"__seeds{args.seeds.replace(',', '_')}__{int(time.time())}.json"
     )
-    out_path.write_text(json.dumps({"args": vars(args), "summary": all_summary}, indent=2))
+    out_path.write_text(json.dumps({
+        "args": vars(args),
+        "summary": all_summary,
+        "summary_signed": all_summary_signed,
+    }, indent=2))
     logger.info(f"wrote {out_path}")
     print(f"\n# Calibration: mode={args.mode} target {args.target_stat}≈{args.target_kl} on first {args.t_calib} tokens, N_calib={args.n_calib}, N_val={args.n_validate}\n")
     print("| seed | method | coeff* | calib_p95 | calib_max | calib_mean | val_samp_mean | val_samp_p95 | val_samp_max | iters |")
