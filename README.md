@@ -39,21 +39,23 @@ scaled   = v * 0.5  # scale vector
 
 ## Calibration
 
-A raw `coeff` isn't comparable across methods: `coeff=2` for `mean_diff` and `coeff=2`
-for `sspace` cause different amounts of distributional drift. So we calibrate to a fixed
-KL budget instead.
+We might ask "How can we steer an LLM as strongly as possible without causing incoherence and collapse?"
 
-`v.calibrate(...)` picks a coefficient `C` so that `KL(steered || base)` hits a target
-(default 1.0 nat) over the first 20 greedy-decoded tokens, then bakes that `C` into the
-returned `Vector`.
+This is especially important if we are comparing steering methods, because it's not fair to compare one applied weakly and one applied strongly.
 
-Why 20 tokens? An LLM trajectory is like a car on the road. A small nudge changes lanes;
+More formally, we can consider that steering is an intervention with side effects. Most often it is some behaviour change vs some performance degradation.
+
+
+Why 50 tokens? An LLM trajectory is like a car on the road. A small nudge changes lanes;
 a big nudge crashes you off course. Most of the divergence between steered and base
-happens in the first ~20 tokens. Past there both models are constrained by what's
-already been written, so a cheap 20-token measurement predicts long-horizon coherence.
+happens in the first ~50 tokens. Past there both models mostly self correct, so a cheap 50-token measurement predicts long-horizon coherence.
 
-For each candidate `C`: greedy decode T=20 tokens and record per-token
-`KL(p_C || p_0)`. Take the p95 across N=4 short prompts. Bisect in log-space (8–12 iters).
+For a fuller explination see [here](https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7).
+
+`v.calibrate(...)` picks a coefficient `C` so that `KL(steered || base)` hits a target (default 1.0 nat) over the first 50 greedy-decoded tokens, then bakes that `C` into the returned `Vector`.
+
+For each candidate `C`: we greedy sample 50 tokens and record per-token distribution shift
+`KL(p_C || p_0)`. We then search for the calibraiton factor where 95% of the tokens have less than our target shift. This is a cheap proxy for "steering as much as possible without causing incoherence or collapse". It also gives us a common KL budget across methods, so we can compare them more fairly.
 
 ```python
 v = Vector.train(model, tok, pos, neg, sl.MeanDiffC()) \
