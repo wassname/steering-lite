@@ -2,6 +2,8 @@
 
 Hackable forward-hook activation steering. One file per method. ~600 LoC.
 
+see an example TODO link to mean diff .py
+
 Sister project of [lora-lite](https://github.com/wassname/lora-lite). Same hackable
 research-code aesthetic (einops, jaxtyping, fail-fast), but for **activation steering** instead of
 adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
@@ -14,7 +16,11 @@ TODO
 - dont need commented shapes where we have jaxtyping
 - where does calib happen?
 - move dailydillemas to eval
+ no wait use tinymfv
 - ventilate the core logic as pseudo code like logic with newlines
+- interface is wrong should extract vector wrapped in config. should be able to add vectors. should 'with vector(model, C=1):. save load to folder with Json and safetensor. test should be one functional tiny train, use, save. load.
+- check papers, say less, but no jargon or telegraphic Lang. explain new concepts.
+
 
 ## Quickstart
 
@@ -34,6 +40,8 @@ sl.attach(model, cfg, vectors)
 out = model.generate(**tok("Tell me about yourself.", return_tensors="pt"), max_new_tokens=64)
 sl.detach(model)
 ```
+
+TODO output example like repeng
 
 ## Methods
 
@@ -75,6 +83,8 @@ internal steering sign per method (PCA/SVD/cluster directions are arbitrary):
 if `mean(y_pos) < mean(y_neg)`, the +c/-c labels are swapped so +c always
 means "toward honest". Same convention as
 [AntiPaSTO `compute_steering_f1`](https://github.com/wassname/AntiPaSTO/blob/main/antipasto/metrics.py).
+
+TODO only SI and flipz and explain. rm F1
 
 - **SI** (do-no-harm bidirectional flip): `si_fwd = fix - 2*broke`,
   `si_rev = flip - 2*counter`, `SI = mean(si_fwd, si_rev) * min(pmass_pos, pmass_neg)^2 * 100`.
