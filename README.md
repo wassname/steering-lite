@@ -2,9 +2,25 @@
 
 Hackable forward-hook activation steering. One file per method. ~600 LoC.
 
+see an example TODO link to mean diff .py
+
 Sister project of [lora-lite](https://github.com/wassname/lora-lite). Same hackable
 research-code aesthetic (einops, jaxtyping, fail-fast), but for **activation steering** instead of
 adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
+
+TODO
+- Config names to long. use C
+- should use with... not attach detach
+- dont need all these mean diff variants
+- need to humanizer, e.g. calib should explain the concept
+- dont need commented shapes where we have jaxtyping
+- where does calib happen?
+- move dailydillemas to eval
+ no wait use tinymfv
+- ventilate the core logic as pseudo code like logic with newlines
+- interface is wrong should extract vector wrapped in config. should be able to add vectors. should 'with vector(model, C=1):. save load to folder with Json and safetensor. test should be one functional tiny train, use, save. load.
+- check papers, say less, but no jargon or telegraphic Lang. explain new concepts.
+
 
 ## Quickstart
 
@@ -24,6 +40,8 @@ sl.attach(model, cfg, vectors)
 out = model.generate(**tok("Tell me about yourself.", return_tensors="pt"), max_new_tokens=64)
 sl.detach(model)
 ```
+
+TODO output example like repeng
 
 ## Methods
 
@@ -72,6 +90,9 @@ Per-method coeffs from [iso-KL calibration](src/steering_lite/calibrate.py) at
 KL_p95=1.0 nat. Baseline signed logratio = +1.479.
 
 Surgical Informedness (0-100, higher = better). Bidirectional flip-based,
+
+TODO explain SI, the motovation for measuring preference flips vs breaks, and the formula
+
 do-no-harm penalty `k=2`:
 
 - `fix` = P(+c flips a baseline-wrong row right)
