@@ -6,6 +6,11 @@ Sister project of [lora-lite](https://github.com/wassname/lora-lite). Same hacka
 research-code aesthetic (einops, jaxtyping, fail-fast), but for **activation steering** instead of
 adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
 
+TODO
+- Config names to long
+- should use with... not attach detach
+- dont need all these mean diff variants
+
 ## Quickstart
 
 ```python
