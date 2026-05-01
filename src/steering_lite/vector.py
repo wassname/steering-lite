@@ -1,0 +1,93 @@
+"""Vector: extracted steering vector + config, as a single ergonomic object.
+
+Wraps `(cfg, state)` so a user can:
+
+    v = sl.train(model, tok, pos, neg, sl.MeanDiffC(layers=(15,)))
+
+    with v(model, C=2.0):
+        out = model.generate(...)
+
+    v.save("honesty.safetensors")
+    v2 = sl.Vector.load("honesty.safetensors")
+
+    combined = v + v2          # ensemble (sum buffers, requires same cfg.method)
+    scaled   = v * 0.5         # scale buffers
+"""
+from __future__ import annotations
+from contextlib import contextmanager
+from copy import deepcopy
+from dataclasses import replace
+
+import torch
+from torch import Tensor, nn
+
+from .config import SteeringConfig
+
+
+class Vector:
+    def __init__(self, cfg: SteeringConfig, state: dict[int, dict[str, Tensor]]):
+        self.cfg = cfg
+        self.state = state
+
+    @contextmanager
+    def __call__(self, model: nn.Module, *, C: float | None = None):
+        """Attach for the duration of the `with` block. `C` overrides cfg.coeff."""
+        from .attach import attach, detach
+        cfg = self.cfg if C is None else replace(self.cfg, coeff=float(C))
+        attach(model, cfg, self.state)
+        try:
+            yield model
+        finally:
+            detach(model)
+
+    def __add__(self, other: "Vector") -> "Vector":
+        if self.cfg.method != other.cfg.method:
+            raise ValueError(f"cannot add {self.cfg.method!r} + {other.cfg.method!r}")
+        if sorted(self.state) != sorted(other.state):
+            raise ValueError(f"layer mismatch: {sorted(self.state)} vs {sorted(other.state)}")
+        new_state: dict[int, dict[str, Tensor]] = {}
+        for li in self.state:
+            a, b = self.state[li], other.state[li]
+            if sorted(a) != sorted(b):
+                raise ValueError(f"layer {li}: state keys differ {sorted(a)} vs {sorted(b)}")
+            new_state[li] = {k: a[k] + b[k] for k in a}
+        return Vector(deepcopy(self.cfg), new_state)
+
+    def __mul__(self, k: float) -> "Vector":
+        new_state = {
+            li: {k_: v * float(k) for k_, v in s.items()}
+            for li, s in self.state.items()
+        }
+        return Vector(deepcopy(self.cfg), new_state)
+
+    __rmul__ = __mul__
+
+    def save(self, path: str) -> None:
+        from .attach import _STATE_PREFIX  # for parity with attach._save layout
+        import json
+        from safetensors.torch import save_file
+        sd: dict[str, Tensor] = {}
+        for li, s in self.state.items():
+            for k, t in s.items():
+                sd[f"layer{li}.{k}"] = t.detach().cpu()
+        metadata = {"cfg": json.dumps(self.cfg.to_dict())}
+        save_file(sd, path, metadata=metadata)
+
+    @classmethod
+    def load(cls, path: str) -> "Vector":
+        import json
+        from safetensors.torch import load_file, safe_open
+        with safe_open(path, framework="pt", device="cpu") as f:
+            metadata = f.metadata()
+        sd = load_file(path, device="cpu")
+        cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+        state: dict[int, dict[str, Tensor]] = {}
+        for k, t in sd.items():
+            layer_part, _, sub = k.partition(".")
+            li = int(layer_part.removeprefix("layer"))
+            state.setdefault(li, {})[sub] = t
+        return cls(cfg, state)
+
+    def __repr__(self) -> str:
+        layers = sorted(self.state)
+        return f"Vector(method={self.cfg.method!r}, layers={layers})"

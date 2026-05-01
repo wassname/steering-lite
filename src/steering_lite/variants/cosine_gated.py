@@ -21,12 +21,14 @@ from torch import Tensor
 
 from ..config import SteeringConfig, register_config
 from ..method import register
-from .mean_diff import MeanDiff, MeanDiffConfig  # noqa: F401  (reuse extract)
+
+
+_EPS = 1e-8
 
 
 @register_config
 @dataclass
-class CosineGatedConfig(SteeringConfig):
+class CosineGatedC(SteeringConfig):
     method: str = "cosine_gated"
     tau: float = 0.0  # offset on |cos|; 0 = pure proportional |cos| gate
     normalize: bool = True
@@ -37,25 +39,29 @@ class CosineGated:
     name = "cosine_gated"
 
     @staticmethod
-    def extract(pos_acts, neg_acts, cfg: CosineGatedConfig):
-        # TODO ugly use of another config, without this config being a subclass
-        md_cfg = MeanDiffConfig(
-            method="mean_diff", layers=cfg.layers, coeff=cfg.coeff,
-            target=cfg.target, dtype=cfg.dtype, seed=cfg.seed, normalize=cfg.normalize,
-        )
-        return MeanDiff.extract(pos_acts, neg_acts, md_cfg)
+    def extract(pos_acts, neg_acts, cfg: CosineGatedC):
+        out = {}
+        for li in pos_acts:
+            v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
+            if cfg.normalize:
+                v = v / v.norm().clamp_min(_EPS)
+
+            out[li] = {"v": v}
+        return out
 
     @staticmethod
     def apply(
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: CosineGatedConfig,
+        cfg: CosineGatedC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h.dtype).to(h.device)
-        # TODO also audit for eps needed
-        v_norm = v / v.norm()
-        h_norm = h / h.norm(dim=-1, keepdim=True)
-        cos = (h_norm * v_norm).sum(dim=-1, keepdim=True)  # [b, s, 1]
+        v = state["v"].to(h)
+
+        v_norm = v / v.norm().clamp_min(_EPS)
+        h_norm = h / h.norm(dim=-1, keepdim=True).clamp_min(_EPS)
+
+        cos  = (h_norm * v_norm).sum(dim=-1, keepdim=True)
         gate = torch.relu(cos.abs() - cfg.tau)              # soft, sign-agnostic
+
         return h + gate * cfg.coeff * v

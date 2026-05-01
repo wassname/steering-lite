@@ -11,33 +11,31 @@ from .attach import attach, detach, save, load, train, train_attn
 from .calibrate import measure_kl, calibrate_iso_kl
 from .method import REGISTRY, register
 from . import variants  # noqa: F401  triggers method + config registration
+from .vector import Vector
 
-from .variants.mean_diff import MeanDiffConfig, CAAConfig, ActAddConfig, MeanCentredConfig
-from .variants.pca import PCAConfig
-from .variants.topk_clusters import TopKClustersConfig
-from .variants.cosine_gated import CosineGatedConfig
-from .variants.sspace import SSpaceConfig
-from .variants.spherical import SphericalConfig
-from .variants.directional_ablation import DirectionalAblationConfig
-from .variants.chars import CHaRSConfig
-from .variants.linear_act import LinearAcTConfig
-from .variants.angular_steering import AngularSteeringConfig
+from .variants.mean_diff import MeanDiffC
+from .variants.pca import PCAC
+from .variants.topk_clusters import TopKClustersC
+from .variants.cosine_gated import CosineGatedC
+from .variants.sspace import SSpaceC
+from .variants.spherical import SphericalC
+from .variants.directional_ablation import DirectionalAblationC
+from .variants.chars import CHaRSC
+from .variants.linear_act import LinearAcTC
+from .variants.angular_steering import AngularSteeringC
 
 __all__ = [
     "SteeringConfig",
-    "MeanDiffConfig",
-    "CAAConfig",
-    "ActAddConfig",
-    "MeanCentredConfig",
-    "PCAConfig",
-    "TopKClustersConfig",
-    "CosineGatedConfig",
-    "SSpaceConfig",
-    "SphericalConfig",
-    "DirectionalAblationConfig",
-    "CHaRSConfig",
-    "LinearAcTConfig",
-    "AngularSteeringConfig",
+    "MeanDiffC",
+    "PCAC",
+    "TopKClustersC",
+    "CosineGatedC",
+    "SSpaceC",
+    "SphericalC",
+    "DirectionalAblationC",
+    "CHaRSC",
+    "LinearAcTC",
+    "AngularSteeringC",
     "record_activations",
     "record_activations_attn",
     "train",
@@ -50,4 +48,5 @@ __all__ = [
     "calibrate_iso_kl",
     "REGISTRY",
     "register",
+    "Vector",
 ]

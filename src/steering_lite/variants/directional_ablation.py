@@ -32,7 +32,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class DirectionalAblationConfig(SteeringConfig):
+class DirectionalAblationC(SteeringConfig):
     method: str = "directional_ablation"
     coeff: float = 0.0  # post-ablation additive nudge along v_hat; 0.0 = pure ablation
 
@@ -45,12 +45,13 @@ class DirectionalAblation:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "m d"]],
-        cfg: DirectionalAblationConfig,
+        cfg: DirectionalAblationC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
             v = v / v.norm()
+
             out[li] = {"v": v}
         return out
 
@@ -59,12 +60,13 @@ class DirectionalAblation:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: DirectionalAblationConfig,
+        cfg: DirectionalAblationC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h.dtype).to(h.device)  # [d], unit
-        # projection scalar per token: <h, v_hat>
-        proj = einsum(h, v, "b s d, d -> b s")  # [b, s]
-        h = h - proj.unsqueeze(-1) * v          # ablate
+        v = state["v"].to(h)  # unit
+
+        proj = einsum(h, v, "b s d, d -> b s")
+        h    = h - proj.unsqueeze(-1) * v          # ablate
+
         if cfg.coeff != 0.0:
             h = h + cfg.coeff * v
         return h

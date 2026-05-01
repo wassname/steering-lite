@@ -9,10 +9,20 @@ At runtime, add `coeff * v_hat` to every token's residual at that block:
 
 $$h \\leftarrow h + \\alpha \\cdot \\hat{v}_L$$
 
+This is the same operation as CAA (Panickssery 2023, contrastive MCQ pairs)
+and ActAdd (Turner 2023, single prompt-pair); the differences are conventional
+not mathematical, so we register one method.
+
+`subtract_corpus_mean=True` toggles Jorgensen 2024 mean-centring: target mean
+minus pos∪neg corpus mean. Direction-identical to plain mean_diff under
+normalization with equal-size groups; kept as a flag rather than a separate
+method.
+
 Refs:
-  - Panickssery et al. 2023 https://arxiv.org/abs/2312.06681 (CAA)
-  - Turner et al. 2023 https://arxiv.org/abs/2308.10248 (ActAdd)
-  - nrimsky/CAA: https://github.com/nrimsky/CAA
+  - Panickssery 2023 (CAA) https://arxiv.org/abs/2312.06681
+  - Turner 2023 (ActAdd) https://arxiv.org/abs/2308.10248
+  - Jorgensen 2024 (Mean-Centring) https://arxiv.org/abs/2312.03813
+  - nrimsky/CAA https://github.com/nrimsky/CAA
 """
 from dataclasses import dataclass
 import torch
@@ -25,7 +35,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class MeanDiffConfig(SteeringConfig):
+class MeanDiffC(SteeringConfig):
     method: str = "mean_diff"
     normalize: bool = True
     subtract_corpus_mean: bool = False
@@ -39,22 +49,23 @@ class MeanDiff:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "m d"]],
-        cfg: MeanDiffConfig,
+        cfg: MeanDiffC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             p = pos_acts[li].float()
             n = neg_acts[li].float()
+
             if cfg.subtract_corpus_mean:
-                # Jorgensen 2024 mean-centring: target mean minus training/corpus mean.
-                # Under this paired API the available corpus is pos∪neg, so equal groups
-                # give 0.5 * mean_diff; with normalization it is direction-identical.
                 mu = torch.cat([p, n], dim=0).mean(0)
                 v = p.mean(0) - mu
             else:
                 v = p.mean(0) - n.mean(0)
+
             if cfg.normalize:
+                # TODO add greek eps here and everywhere we divide by smething
                 v = v / v.norm()
+
             out[li] = {"v": v}
         return out
 
@@ -63,53 +74,7 @@ class MeanDiff:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: MeanDiffConfig,
+        cfg: MeanDiffC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h.dtype).to(h.device)
+        v = state["v"].to(h)
         return h + cfg.coeff * v
-
-
-# CAA (Panickssery 2023) and ActAdd (Turner 2023) are the same operation as
-# mean_diff -- the difference is conventional, not mathematical:
-#   - CAA: many contrastive MCQ pairs, last token of each
-#   - ActAdd: one prompt-pair difference at a chosen layer/token
-#   - mean_diff: same math, register both as aliases for drop-in benchmarking
-# Aliases subclass the config (so cfg.method round-trips) and re-register the
-# class under a new .name. extract/apply are inherited unchanged.
-
-@register_config
-@dataclass
-class CAAConfig(MeanDiffConfig):
-    method: str = "caa"
-
-
-@register
-class CAA(MeanDiff):
-    name = "caa"
-
-
-@register_config
-@dataclass
-class ActAddConfig(MeanDiffConfig):
-    method: str = "act_add"
-
-
-@register
-class ActAdd(MeanDiff):
-    name = "act_add"
-
-
-# Mean-Centring (Jorgensen 2024 https://arxiv.org/abs/2312.03813). In this
-# paired API it uses pos∪neg as the corpus baseline; use a separate corpus
-# extractor later if we need a paper-faithful unpaired training distribution.
-
-@register_config
-@dataclass
-class MeanCentredConfig(MeanDiffConfig):
-    method: str = "mean_centred"
-    subtract_corpus_mean: bool = True
-
-
-@register
-class MeanCentred(MeanDiff):
-    name = "mean_centred"

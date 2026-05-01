@@ -13,7 +13,7 @@ def main():
 
     pos = ["the cat sat on the mat"] * 8
     neg = ["the dog ran in the park"] * 8
-    cfg = sl.MeanDiffConfig(layers=(1,), coeff=1.0, dtype=torch.float32, seed=0)
+    cfg = sl.MeanDiffC(layers=(1,), coeff=1.0, dtype=torch.float32, seed=0)
     vectors = sl.train(model, tok, pos, neg, cfg, batch_size=4, max_length=32)
     prompts = [tok("hello world", return_tensors="pt").input_ids[0] for _ in range(2)]
     coeff, hist = sl.calibrate_iso_kl(

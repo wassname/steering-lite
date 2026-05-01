@@ -29,7 +29,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class SSpaceConfig(SteeringConfig):
+class SSpaceC(SteeringConfig):
     method: str = "sspace"
     r: int = 4
     normalize: bool = True
@@ -43,24 +43,25 @@ class SSpace:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
-        cfg: SSpaceConfig,
+        cfg: SSpaceC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
-            diffs = (pos_acts[li] - neg_acts[li]).float()  # [n, d]
-            mean_diff = diffs.mean(0)  # [d]
-            if cfg.r > min(diffs.shape[0], diffs.shape[1]):
-                raise ValueError(f"r={cfg.r} exceeds rank bound {min(diffs.shape[0], diffs.shape[1])}")
-            r = cfg.r
-            # right singular vectors -> directions in d-space
+            if cfg.r > min(pos_acts[li].shape[0], pos_acts[li].shape[1]):
+                raise ValueError(f"r={cfg.r} exceeds rank bound")
+
+            diffs = (pos_acts[li] - neg_acts[li]).float()
+            mu    = diffs.mean(0)
+
             _, _, Vh = torch.linalg.svd(diffs, full_matrices=False)
-            V = Vh[:r].T.contiguous()  # [d, r]; .T makes a view, safetensors needs contiguous
-            # project mean diff onto subspace
-            v = V @ (V.T @ mean_diff)  # [d]
+            V = Vh[:cfg.r].T.contiguous()  # safetensors needs contiguous
+
+            v = V @ (V.T @ mu)
             if cfg.normalize:
                 v = v / v.norm()
+
             out[li] = {"v": v, "V": V}
         return out
 
@@ -69,7 +70,7 @@ class SSpace:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: SSpaceConfig,
+        cfg: SSpaceC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h.dtype).to(h.device)
+        v = state["v"].to(h)
         return h + cfg.coeff * v

@@ -32,7 +32,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class CHaRSConfig(SteeringConfig):
+class CHaRSC(SteeringConfig):
     method: str = "chars"
     k: int = 4
     n_kmeans_iters: int = 20
@@ -82,7 +82,7 @@ class CHaRS:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "m d"]],
-        cfg: CHaRSConfig,
+        cfg: CHaRSC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
@@ -90,17 +90,20 @@ class CHaRS:
             X_b = pos_acts[li].float()  # target = positive (steer toward)
             if cfg.k > min(X_a.shape[0], X_b.shape[0]):
                 raise ValueError(f"k={cfg.k} exceeds source/target sample count")
-            k = cfg.k
-            a, p_marg = _kmeans_counts(X_a, k=k, n_iters=cfg.n_kmeans_iters, seed=cfg.seed)
-            b, q_marg = _kmeans_counts(X_b, k=k, n_iters=cfg.n_kmeans_iters, seed=cfg.seed + 1)
-            C = torch.cdist(a, b) ** 2  # [k, k]
-            P = _sinkhorn(C, p_marg, q_marg, cfg.lambda_, cfg.n_sinkhorn)  # [k, k]
+
+            a, p_marg = _kmeans_counts(X_a, k=cfg.k, n_iters=cfg.n_kmeans_iters, seed=cfg.seed)
+            b, q_marg = _kmeans_counts(X_b, k=cfg.k, n_iters=cfg.n_kmeans_iters, seed=cfg.seed + 1)
+
+            C = torch.cdist(a, b) ** 2
+            P = _sinkhorn(C, p_marg, q_marg, cfg.lambda_, cfg.n_sinkhorn)
+
             # repo-stable global bandwidth heuristic; paper discusses an x-local median.
             if cfg.sigma is None:
                 d_mat = torch.cdist(a, a)
-                sigma = 1.0 if k == 1 else float(d_mat[d_mat > 0].median())
+                sigma = 1.0 if cfg.k == 1 else float(d_mat[d_mat > 0].median())
             else:
                 sigma = float(cfg.sigma)
+
             out[li] = {"a": a, "b": b, "P": P, "p": p_marg, "sigma": torch.tensor(sigma)}
         return out
 
@@ -109,20 +112,22 @@ class CHaRS:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: CHaRSConfig,
+        cfg: CHaRSC,
     ) -> Float[Tensor, "b s d"]:
-        a = state["a"].to(h.dtype).to(h.device)  # [k, d]
-        b = state["b"].to(h.dtype).to(h.device)  # [k, d]
-        P = state["P"].to(h.dtype).to(h.device)  # [k, k]
-        p = state["p"].to(h.dtype).to(h.device)  # [k]
+        a = state["a"].to(h)
+        b = state["b"].to(h)
+        P = state["P"].to(h)
+        p = state["p"].to(h)
         sigma = float(state["sigma"])
-        # k(x, a_i) per token: [B, S, k]
-        d2 = torch.cdist(h, a) ** 2
-        kern = torch.exp(-d2 / (2 * sigma ** 2))
+
+        # k(x, a_i) per token
+        d2    = torch.cdist(h, a) ** 2
+        kern  = torch.exp(-d2 / (2 * sigma ** 2))
         denom = einsum(kern, p, "b s i, i -> b s")
 
         # weights w_ij(x) = P_ij * k_i(x) / sum_p p_p k_p(x)
-        w = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")  # [B, S, k, k]
-        # v_ij = b_j - a_i  ->  v_hat(x) = sum_ij w_ij (b_j - a_i)
+        # v_hat(x) = sum_ij w_ij (b_j - a_i)
+        w     = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")
         v_hat = einsum(w, b, "b s i j, j d -> b s d") - einsum(w, a, "b s i j, i d -> b s d")
+
         return h + cfg.coeff * v_hat

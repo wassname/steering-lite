@@ -1,6 +1,6 @@
 """SteeringConfig: per-method typed dataclass.
 
-Each method ships its own subclass under `variants/*.py` (e.g. `MeanDiffConfig`),
+Each method ships its own subclass under `variants/*.py` (e.g. `MeanDiffC`),
 adding strongly-typed knobs. Registry route at load time: `from_dict` looks up the
 right subclass via the `method` field.
 """
@@ -14,13 +14,8 @@ class SteeringConfig:
     method: str = "?"
 
     # which transformer blocks to hook (indices into model.model.layers)
-    # None = all layers (rarely what you want; pick a few mid layers)
+    # None = all layers
     layers: tuple[int, ...] | None = None
-
-    # scalar applied to the steering update. Interpretation is method-specific:
-    # addition magnitude (mean_diff/pca), slerp fraction (spherical), rotation
-    # angle in radians (angular_steering), or interpolation weight (linear_act).
-    coeff: float = 1.0
 
     # which point in the block to add at: "residual" = block output (post mlp+attn),
     # "attn_out" = attention output, "mlp_out" = mlp output.

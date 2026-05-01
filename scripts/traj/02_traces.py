@@ -19,18 +19,18 @@ from loguru import logger
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, make_prompt
+from steering_lite.eval.airisk_dilemmas import load_pairs, format_training_prompt, format_mcq
 
 
 def make_cfg(method, layers, coeff, dtype, seed, n_train):
     common = dict(layers=layers, coeff=coeff, dtype=dtype, seed=seed)
     table = {
-        "mean_diff": sl.MeanDiffConfig(**common),
-        "pca": sl.PCAConfig(**common),
-        "topk_clusters": sl.TopKClustersConfig(**common, k=min(n_train, 4)),
-        "cosine_gated": sl.CosineGatedConfig(**common, tau=0.0),
-        "sspace": sl.SSpaceConfig(**common, r=min(n_train, 4)),
-        "spherical": sl.SphericalConfig(**common),
+        "mean_diff": sl.MeanDiffC(**common),
+        "pca": sl.PCAC(**common),
+        "topk_clusters": sl.TopKClustersC(**common, k=min(n_train, 4)),
+        "cosine_gated": sl.CosineGatedC(**common, tau=0.0),
+        "sspace": sl.SSpaceC(**common, r=min(n_train, 4)),
+        "spherical": sl.SphericalC(**common),
     }
     return table[method]
 
@@ -47,8 +47,6 @@ def main():
     ap.add_argument("--temperature", type=float, default=1.0)
     ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--top-k", type=int, default=20)
-    ap.add_argument("--chat-template", action="store_true")
-    ap.add_argument("--enable-thinking", action="store_true")
     ap.add_argument("--out", default=None, help="output markdown path (default outputs/trajectory/traces__...md)")
     args = ap.parse_args()
 
@@ -70,19 +68,16 @@ def main():
 
     pairs = load_pairs(target_value, seed=args.seed)
     train_pairs = pairs[: args.n_train]
-    pos = [make_prompt(p.situation) + p.action_pos for p in train_pairs]
-    neg = [make_prompt(p.situation) + p.action_neg for p in train_pairs]
+    pos = [format_training_prompt(p.dilemma, p.action_1, p.action_2,
+                                   "1" if target_value in p.values_action_1 else "2", tok)
+           for p in train_pairs]
+    neg = [format_training_prompt(p.dilemma, p.action_1, p.action_2,
+                                   "2" if target_value in p.values_action_1 else "1", tok)
+           for p in train_pairs]
     eval_pool = pairs[args.n_train:] or pairs
     sit = eval_pool[args.situation_idx % len(eval_pool)]
 
-    if args.chat_template:
-        text = tok.apply_chat_template(
-            [{"role": "user", "content": sit.situation}],
-            tokenize=False, add_generation_prompt=True,
-            enable_thinking=args.enable_thinking,
-        )
-    else:
-        text = make_prompt(sit.situation)
+    text = format_mcq(sit.dilemma, sit.action_1, sit.action_2, tok)
     prompt_ids = tok(text, return_tensors="pt", truncation=True, max_length=512).input_ids.to(device)
 
     # Base sample
@@ -102,11 +97,10 @@ def main():
     md.append(f"- alphas: `{args.alphas}` (multiplier on iso-calibrated coeff)")
     md.append(f"- iso source: `{Path(args.iso_tv_json).name}`")
     md.append(f"- sampling: `temp={args.temperature} top_p={args.top_p} top_k={args.top_k}`")
-    md.append(f"- chat={args.chat_template} thinking={args.enable_thinking}")
     md.append(f"- max_new={args.max_new}, seed={args.seed}, situation_idx={args.situation_idx}\n")
     md.append("## Prompt\n")
     md.append("```")
-    md.append(sit.situation[:600] + ("..." if len(sit.situation) > 600 else ""))
+    md.append(sit.dilemma[:600] + ("..." if len(sit.dilemma) > 600 else ""))
     md.append("```\n")
     md.append("## Base (no steering)\n")
     md.append("```")

@@ -24,7 +24,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class AngularSteeringConfig(SteeringConfig):
+class AngularSteeringC(SteeringConfig):
     method: str = "angular_steering"
     # cfg.coeff is interpreted as rotation angle theta (radians).
 
@@ -37,19 +37,23 @@ class AngularSteering:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "m d"]],
-        cfg: AngularSteeringConfig,
+        cfg: AngularSteeringC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
+
             diffs = (pos_acts[li].float() - neg_acts[li].float())
-            dirs = diffs / diffs.norm(dim=1, keepdim=True)
+            dirs  = diffs / diffs.norm(dim=1, keepdim=True)
+
             b1 = diffs.mean(0)
             b1 = b1 / b1.norm()
+
             _, _, Vh = torch.linalg.svd(dirs - dirs.mean(0, keepdim=True), full_matrices=False)
             b2 = Vh[0] - (Vh[0] @ b1) * b1
             b2 = b2 / b2.norm()
+
             out[li] = {"b1": b1, "b2": b2}
         return out
 
@@ -58,14 +62,17 @@ class AngularSteering:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: AngularSteeringConfig,
+        cfg: AngularSteeringC,
     ) -> Float[Tensor, "b s d"]:
-        b1 = state["b1"].to(h.dtype).to(h.device)
-        b2 = state["b2"].to(h.dtype).to(h.device)
+        b1 = state["b1"].to(h)
+        b2 = state["b2"].to(h)
+
         c1 = (h * b1).sum(dim=-1, keepdim=True)
         c2 = (h * b2).sum(dim=-1, keepdim=True)
-        h_plane = c1 * b1 + c2 * b2
+        h_plane    = c1 * b1 + c2 * b2
         plane_norm = h_plane.norm(dim=-1, keepdim=True)
-        theta = torch.tensor(float(cfg.coeff), dtype=h.dtype, device=h.device)
+
+        theta      = torch.tensor(float(cfg.coeff), dtype=h.dtype, device=h.device)
         target_dir = torch.cos(theta) * b1 + torch.sin(theta) * b2
+
         return h - h_plane + plane_norm * target_dir

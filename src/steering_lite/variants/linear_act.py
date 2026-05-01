@@ -33,7 +33,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class LinearAcTConfig(SteeringConfig):
+class LinearAcTC(SteeringConfig):
     method: str = "linear_act"
 
 
@@ -45,25 +45,26 @@ class LinearAcT:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
-        cfg: LinearAcTConfig,
+        cfg: LinearAcTC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
-            X_a = neg_acts[li].float()  # source
-            X_b = pos_acts[li].float()  # target
-            if X_a.shape[0] < 2:
+            if pos_acts[li].shape[0] < 2:
                 raise ValueError("Linear-AcT needs at least two samples")
-            a_sorted = X_a.sort(dim=0).values
-            b_sorted = X_b.sort(dim=0).values
+
+            a_sorted = neg_acts[li].float().sort(dim=0).values  # source
+            b_sorted = pos_acts[li].float().sort(dim=0).values  # target
+
             m_a = a_sorted.mean(dim=0)
             m_b = b_sorted.mean(dim=0)
             a_tilde = a_sorted - m_a
             b_tilde = b_sorted - m_b
-            denom = (a_tilde ** 2).sum(dim=0)
-            omega = (a_tilde * b_tilde).sum(dim=0) / denom
-            beta = m_b - omega * m_a
+
+            omega = (a_tilde * b_tilde).sum(dim=0) / (a_tilde ** 2).sum(dim=0)
+            beta  = m_b - omega * m_a
+
             out[li] = {"omega": omega, "beta": beta}
         return out
 
@@ -72,9 +73,10 @@ class LinearAcT:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: LinearAcTConfig,
+        cfg: LinearAcTC,
     ) -> Float[Tensor, "b s d"]:
-        omega = rearrange(state["omega"].to(h.dtype).to(h.device), "d -> 1 1 d")
-        beta = rearrange(state["beta"].to(h.dtype).to(h.device), "d -> 1 1 d")
+        omega = rearrange(state["omega"].to(h), "d -> 1 1 d")
+        beta  = rearrange(state["beta"].to(h),  "d -> 1 1 d")
+
         h_new = h * omega + beta
         return (1 - cfg.coeff) * h + cfg.coeff * h_new

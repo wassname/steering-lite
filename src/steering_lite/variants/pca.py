@@ -34,7 +34,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class PCAConfig(SteeringConfig):
+class PCAC(SteeringConfig):
     method: str = "pca"
     n_components: int = 1
     normalize: bool = True
@@ -48,29 +48,30 @@ class PCA:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
-        cfg: PCAConfig,
+        cfg: PCAC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
-            # paired diffs assume aligned ordering of pos/neg prompts
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
-            diffs = (pos_acts[li] - neg_acts[li]).float()  # [n, d]
-            mean = diffs.mean(0, keepdim=True)
-            centered = diffs - mean
-            # SVD on centered diffs; right singular vectors are PC directions
+
+            diffs    = (pos_acts[li] - neg_acts[li]).float()
+            centered = diffs - diffs.mean(0, keepdim=True)
+
             _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
-            v = Vh[: cfg.n_components]  # [k, d]
-            projs = centered @ v.T  # [n, k]
+            v = Vh[: cfg.n_components]
+
+            projs         = centered @ v.T
             positive_frac = (projs > 0).float().mean(0)
             majority_sign = torch.where(positive_frac > 0.5,
                                torch.ones(v.shape[0]),
                                -torch.ones(v.shape[0])).to(v)
-            strongest_idx = projs.abs().argmax(dim=0)
-            strongest = projs[strongest_idx, torch.arange(v.shape[0], device=projs.device)]
+            strongest_idx  = projs.abs().argmax(dim=0)
+            strongest      = projs[strongest_idx, torch.arange(v.shape[0], device=projs.device)]
             strongest_sign = torch.sign(strongest)
-            sign = torch.where(positive_frac == 0.5, strongest_sign, majority_sign)
+            sign           = torch.where(positive_frac == 0.5, strongest_sign, majority_sign)
             v = v * sign[:, None]
+
             if cfg.n_components == 1:
                 v = v.squeeze(0)
                 if cfg.normalize:
@@ -79,7 +80,7 @@ class PCA:
             else:
                 if cfg.normalize:
                     v = v / v.norm(dim=1, keepdim=True)
-                out[li] = {"V": v}  # [k, d]
+                out[li] = {"V": v}
         return out
 
     @staticmethod
@@ -87,11 +88,11 @@ class PCA:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: PCAConfig,
+        cfg: PCAC,
     ) -> Float[Tensor, "b s d"]:
         if "v" in state:
-            v = state["v"].to(h.dtype).to(h.device)
+            v = state["v"].to(h)
             return h + cfg.coeff * v
         # multi-component: sum top-k directions equally
-        V = state["V"].to(h.dtype).to(h.device)  # [k, d]
+        V = state["V"].to(h)
         return h + cfg.coeff * V.sum(0)

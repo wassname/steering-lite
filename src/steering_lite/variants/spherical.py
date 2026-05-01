@@ -28,7 +28,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class SphericalConfig(SteeringConfig):
+class SphericalC(SteeringConfig):
     method: str = "spherical"
     # coeff is the slerp fraction t in [0, 1] (or beyond, extrapolation).
 
@@ -41,13 +41,13 @@ class Spherical:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
-        cfg: SphericalConfig,
+        cfg: SphericalC,
     ) -> dict[int, dict[str, Tensor]]:
-        # target direction = unit mean diff (same as mean_diff)
         out = {}
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
             v = v / v.norm()
+
             out[li] = {"v": v}
         return out
 
@@ -56,17 +56,19 @@ class Spherical:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: SphericalConfig,
+        cfg: SphericalC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h.dtype).to(h.device)  # unit
-        norm = h.norm(dim=-1, keepdim=True)  # [b, s, 1]
-        h_hat = h / norm  # [b, s, d]
-        cos = (h_hat * v).sum(dim=-1, keepdim=True)
-        omega = torch.arccos(cos)  # [b, s, 1]
+        v     = state["v"].to(h)  # unit
+        norm  = h.norm(dim=-1, keepdim=True)
+        h_hat = h / norm
+
+        cos       = (h_hat * v).sum(dim=-1, keepdim=True)
+        omega     = torch.arccos(cos)
         sin_omega = torch.sin(omega)
+
         t = cfg.coeff
-        # slerp; broadcast scalars
         a = torch.sin((1 - t) * omega) / sin_omega
         b = torch.sin(t * omega) / sin_omega
         rot = a * h_hat + b * v
+
         return rot * norm

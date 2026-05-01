@@ -15,7 +15,7 @@ import torch
 from loguru import logger
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, format_mcq, format_mcq_thinking
+from steering_lite.eval.airisk_dilemmas import load_pairs, format_training_prompt, format_mcq_thinking
 
 
 METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical"]
@@ -24,26 +24,24 @@ METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spher
 def make_cfg(method: str, layers: tuple[int, ...], coeff: float, dtype, seed: int, n_train: int):
     common = dict(layers=layers, coeff=coeff, dtype=dtype, seed=seed)
     table = {
-        "mean_diff": sl.MeanDiffConfig(**common),
-        "pca": sl.PCAConfig(**common),
-        "topk_clusters": sl.TopKClustersConfig(**common, k=min(n_train, 4)),
-        "cosine_gated": sl.CosineGatedConfig(**common, tau=0.0),
-        "sspace": sl.SSpaceConfig(**common, r=min(n_train, 4)),
-        "spherical": sl.SphericalConfig(**common),
+        "mean_diff": sl.MeanDiffC(**common),
+        "pca": sl.PCAC(**common),
+        "topk_clusters": sl.TopKClustersC(**common, k=min(n_train, 4)),
+        "cosine_gated": sl.CosineGatedC(**common, tau=0.0),
+        "sspace": sl.SSpaceC(**common, r=min(n_train, 4)),
+        "spherical": sl.SphericalC(**common),
     }
     return table[method]
 
 
-def build_prompts(tok, pairs, chat: bool, enable_thinking: bool):
-    """Build calib/val probe prompts. Uses MCQ-thinking format ending at
-    `<think>\\n` so the generated tokens during calib ARE the thinking phase --
-    same distribution that matters for guided CoT eval. Without this, calib
-    would measure KL at the bare-prompt 'My choice:' position, but eval reads
-    Yes/No at a position 32+ thinking tokens later under steering.
+def build_prompts(tok, pairs, target: str):
+    """Build calib/val probe prompts ending at `<think>\\n`.
+
+    Calibrates KL at the thinking-phase distribution, matching guided-CoT eval.
     """
     out = []
     for p in pairs:
-        text = format_mcq_thinking(p.situation, p.action_pos, tok)
+        text = format_mcq_thinking(p.dilemma, p.action_1, p.action_2, tok)
         ids = tok(text, return_tensors="pt", truncation=True, max_length=512).input_ids[0]
         out.append(ids)
     return out
@@ -71,7 +69,7 @@ def kl_at_positions(logp_steer, logp_base):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", required=True)
-    p.add_argument("--target", default="honesty")
+    p.add_argument("--target", default="Truthfulness")
     p.add_argument("--layers", default="mid",
                    help="comma-separated indices, OR 'mid' (30-80%% of model layers), OR 'all'.")
     p.add_argument("--mode", choices=["greedy", "sampled"], default="greedy")
@@ -87,8 +85,6 @@ def main():
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--top-p", type=float, default=1.0)
     p.add_argument("--top-k", type=int, default=20)
-    p.add_argument("--chat-template", action="store_true")
-    p.add_argument("--enable-thinking", action="store_true")
     p.add_argument("--n-validate", type=int, default=8)
     p.add_argument("--output-dir", default="outputs/iso_kl")
     p.add_argument("--separate-signs", action="store_true",
@@ -137,12 +133,16 @@ def main():
         train_pairs = pairs[: args.n_train]
         calib_pairs = pairs[args.n_train : args.n_train + args.n_calib]
         val_pairs = pairs[args.n_train + args.n_calib : args.n_train + args.n_calib + args.n_validate]
-        pos = [format_mcq(pp.situation, pp.action_pos, tok) for pp in train_pairs]
-        neg = [format_mcq(pp.situation, pp.action_neg, tok) for pp in train_pairs]
+        pos = [format_training_prompt(pp.dilemma, pp.action_1, pp.action_2,
+                                      "1" if args.target in pp.values_action_1 else "2", tok)
+               for pp in train_pairs]
+        neg = [format_training_prompt(pp.dilemma, pp.action_1, pp.action_2,
+                                      "2" if args.target in pp.values_action_1 else "1", tok)
+               for pp in train_pairs]
         logger.info(f"target={args.target} n_train={len(pos)} n_calib={len(calib_pairs)} n_val={len(val_pairs)}")
 
-        prompts_calib = build_prompts(tok, calib_pairs, args.chat_template, args.enable_thinking)
-        prompts_val = build_prompts(tok, val_pairs, args.chat_template, args.enable_thinking)
+        prompts_calib = build_prompts(tok, calib_pairs, args.target)
+        prompts_val = build_prompts(tok, val_pairs, args.target)
 
         for method in methods:
             logger.info(f"=== seed={seed} {method} ===")

@@ -50,9 +50,15 @@ def _install_state(block: nn.Module, state: dict[str, torch.Tensor], cfg: Steeri
 def attach(
     model: nn.Module,
     cfg: SteeringConfig,
-    vectors: dict[int, dict[str, torch.Tensor]],
+    vectors,
 ) -> list[RemovableHandle]:
-    """Install per-layer state as buffers and register block forward hooks."""
+    """Install per-layer state as buffers and register block forward hooks.
+
+    `vectors` may be a `dict[int, dict[str, Tensor]]` or a `Vector` (unwrapped).
+    """
+    from .vector import Vector
+    if isinstance(vectors, Vector):
+        vectors = vectors.state
     if cfg.method not in REGISTRY:
         raise KeyError(f"unknown method {cfg.method!r}; registered: {list(REGISTRY)}")
     method = REGISTRY[cfg.method]
@@ -102,14 +108,16 @@ def train(
     *,
     batch_size: int = 8,
     max_length: int = 256,
-) -> dict[int, dict[str, torch.Tensor]]:
-    """repeng-style verb: extract activations + run method.extract -> per-layer state."""
+):
+    """repeng-style verb: extract activations + run method.extract -> Vector."""
+    from .vector import Vector
     method = REGISTRY[cfg.method]
     targets = find_targets(model, cfg)
     layers = tuple(li for _, _, li in targets)
     pos_acts = record_activations(model, tok, pos_prompts, layers, batch_size=batch_size, max_length=max_length)
     neg_acts = record_activations(model, tok, neg_prompts, layers, batch_size=batch_size, max_length=max_length)
-    return method.extract(pos_acts, neg_acts, cfg)
+    state = method.extract(pos_acts, neg_acts, cfg)
+    return Vector(cfg, state)
 
 
 def train_attn(
@@ -123,7 +131,7 @@ def train_attn(
     pair_agg: PairAgg = "mean",
     batch_size: int = 8,
     max_length: int = 256,
-) -> dict[int, dict[str, torch.Tensor]]:
+):
     """Like train(), but with a choice of token-pooling strategy.
 
     pool: how to aggregate prefix tokens into a single per-prompt vector before
@@ -169,7 +177,8 @@ def train_attn(
     else:
         raise ValueError(f"unknown pool {pool!r}")
 
-    return method.extract(pos_acts, neg_acts, cfg)
+    from .vector import Vector
+    return Vector(cfg, method.extract(pos_acts, neg_acts, cfg))
 
 
 def save(model: nn.Module, path: str) -> None:

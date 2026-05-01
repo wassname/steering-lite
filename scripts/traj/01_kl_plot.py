@@ -25,18 +25,18 @@ import matplotlib.pyplot as plt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
-from steering_lite.daily_dilemmas import load_pairs, format_mcq
+from steering_lite.eval.airisk_dilemmas import load_pairs, format_training_prompt, format_mcq
 
 
 def make_cfg(method, layers, coeff, dtype, seed, n_train):
     common = dict(layers=layers, coeff=coeff, dtype=dtype, seed=seed)
     table = {
-        "mean_diff": sl.MeanDiffConfig(**common),
-        "pca": sl.PCAConfig(**common),
-        "topk_clusters": sl.TopKClustersConfig(**common, k=min(n_train, 4)),
-        "cosine_gated": sl.CosineGatedConfig(**common, tau=0.0),
-        "sspace": sl.SSpaceConfig(**common, r=min(n_train, 4)),
-        "spherical": sl.SphericalConfig(**common),
+        "mean_diff": sl.MeanDiffC(**common),
+        "pca": sl.PCAC(**common),
+        "topk_clusters": sl.TopKClustersC(**common, k=min(n_train, 4)),
+        "cosine_gated": sl.CosineGatedC(**common, tau=0.0),
+        "sspace": sl.SSpaceC(**common, r=min(n_train, 4)),
+        "spherical": sl.SphericalC(**common),
     }
     return table[method]
 
@@ -93,10 +93,6 @@ def main():
     ap.add_argument("--methods", type=str, nargs="+", default=None,
                     help="subset of methods to evaluate")
     ap.add_argument("--out-dir", default="outputs/trajectory")
-    ap.add_argument("--chat-template", action="store_true",
-                    help="apply tokenizer chat template (instruct models)")
-    ap.add_argument("--enable-thinking", action="store_true",
-                    help="enable_thinking=True in chat template (Qwen3 thinking mode)")
     ap.add_argument("--sample", action="store_true", help="sample steered (else greedy)")
     ap.add_argument("--temperature", type=float, default=1.0)
     ap.add_argument("--top-p", type=float, default=1.0)
@@ -135,14 +131,16 @@ def main():
 
     pairs = load_pairs(target_value, seed=args.seed)
     train_pairs = pairs[: args.n_train]
-    pos = [format_mcq(p.situation, p.action_pos, tok) for p in train_pairs]
-    neg = [format_mcq(p.situation, p.action_neg, tok) for p in train_pairs]
+    pos = [format_training_prompt(p.dilemma, p.action_1, p.action_2,
+                                   "1" if target_value in p.values_action_1 else "2", tok)
+           for p in train_pairs]
+    neg = [format_training_prompt(p.dilemma, p.action_1, p.action_2,
+                                   "2" if target_value in p.values_action_1 else "1", tok)
+           for p in train_pairs]
     eval_pool = pairs[args.n_train:][: args.n_prompts]
-    # For trajectory generation, prompt = MCQ ending at "My choice:" so the
-    # generated tokens (Yes/No + reasoning) are exactly what the bench scores.
-    prompts = [format_mcq(p.situation, p.action_pos, tok) for p in eval_pool]
-    if args.chat_template:
-        logger.warning("--chat-template ignored: format_mcq already handles chat templating")
+    # Prompt ends at "My choice: Action" — generated tokens are the model's
+    # action choice, same distribution the bench scores.
+    prompts = [format_mcq(p.dilemma, p.action_1, p.action_2, tok) for p in eval_pool]
     logger.info(f"got {len(prompts)} eval prompts")
 
     # storage: [(method, alpha)] -> list of dicts of [T] arrays

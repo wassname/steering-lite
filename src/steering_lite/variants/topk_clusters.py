@@ -23,7 +23,7 @@ from ..method import register
 
 @register_config
 @dataclass
-class TopKClustersConfig(SteeringConfig):
+class TopKClustersC(SteeringConfig):
     method: str = "topk_clusters"
     k: int = 4
     n_iters: int = 20
@@ -59,29 +59,30 @@ class TopKClusters:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
-        cfg: TopKClustersConfig,
+        cfg: TopKClustersC,
     ) -> dict[int, dict[str, Tensor]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
+            if cfg.k > pos_acts[li].shape[0]:
+                raise ValueError(f"k={cfg.k} exceeds n={pos_acts[li].shape[0]}")
+
             diffs = (pos_acts[li] - neg_acts[li]).float()
-            if cfg.k > diffs.shape[0]:
-                raise ValueError(f"k={cfg.k} exceeds n={diffs.shape[0]}")
-            k = cfg.k
-            C = _kmeans(diffs, k=k, n_iters=cfg.n_iters, seed=cfg.seed)  # [k, d]
-            # Per-centroid sign canon. Cosine k-means can converge to centroids
-            # whose subset-mean is anti-aligned with the global honesty axis
-            # (e.g. a syntactic-noise mode). Without this, those modes inject
-            # dishonest/noise direction at apply time and the eval-time global
-            # flip can't fix them (it would flip ALL centroids together).
-            # Project each onto the global mean diff; flip if negative.
-            g = diffs.mean(dim=0)  # [d], honesty axis in expectation
+            C     = _kmeans(diffs, k=cfg.k, n_iters=cfg.n_iters, seed=cfg.seed)
+
+            # Per-centroid sign canon: cosine k-means can converge to centroids
+            # anti-aligned with the global honesty axis (a syntactic-noise mode).
+            # Eval-time flip can't fix one centroid alone (it flips all). So
+            # project each onto the global mean diff; flip if negative.
+            g    = diffs.mean(dim=0)
             proj = einsum(C, g, "k d, d -> k")
             sign = torch.where(proj < 0, -1.0, 1.0).to(C.dtype)
-            C = C * sign.unsqueeze(-1)
+            C    = C * sign.unsqueeze(-1)
+
             if cfg.normalize:
                 C = C / C.norm(dim=1, keepdim=True)
+
             out[li] = {"C": C}
         return out
 
@@ -90,13 +91,15 @@ class TopKClusters:
         block,
         h: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
-        cfg: TopKClustersConfig,
+        cfg: TopKClustersC,
     ) -> Float[Tensor, "b s d"]:
-        C = state["C"].to(h.dtype).to(h.device)  # [k, d]
+        C = state["C"].to(h)
         # cos-sim per token; pick best centroid per token
         h_norm = h / h.norm(dim=-1, keepdim=True)
         C_norm = C / C.norm(dim=-1, keepdim=True)
-        sim = einsum(h_norm, C_norm, "b s d, k d -> b s k")
-        pick = sim.argmax(dim=-1)  # [b, s]
-        v = C[pick]  # [b, s, d]
+
+        sim  = einsum(h_norm, C_norm, "b s d, k d -> b s k")
+        pick = sim.argmax(dim=-1)
+        v    = C[pick]
+
         return h + cfg.coeff * v
