@@ -38,8 +38,7 @@ class CosineGated:
 
     @staticmethod
     def extract(pos_acts, neg_acts, cfg: CosineGatedConfig):
-        # TODO ugly
- also audit for eps needed
+        # TODO ugly use of another config, without this config being a subclass
         md_cfg = MeanDiffConfig(
             method="mean_diff", layers=cfg.layers, coeff=cfg.coeff,
             target=cfg.target, dtype=cfg.dtype, seed=cfg.seed, normalize=cfg.normalize,
@@ -54,6 +53,7 @@ class CosineGated:
         cfg: CosineGatedConfig,
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h.dtype).to(h.device)
+        # TODO also audit for eps needed
         v_norm = v / v.norm()
         h_norm = h / h.norm(dim=-1, keepdim=True)
         cos = (h_norm * v_norm).sum(dim=-1, keepdim=True)  # [b, s, 1]

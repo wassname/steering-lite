@@ -9,8 +9,7 @@ research-code aesthetic (einops, jaxtyping, fail-fast), but for **activation ste
 adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
 
 TODO
-- Config names to long. use C
-- should use with... not attach detach
+- Config names seem too long. use C
 - dont need all these mean diff variants
 - need to humanizer, e.g. calib should explain the concept
 - dont need commented shapes where we have jaxtyping
@@ -18,8 +17,15 @@ TODO
 - move dailydillemas to eval
  no wait use tinymfv
 - ventilate the core logic as pseudo code like logic with newlines
-- interface is wrong should extract vector wrapped in config. should be able to add vectors. should 'with vector(model, C=1):. save load to folder with Json and safetensor. test should be one functional tiny train, use, save. load.
+- interface is wrong 
+  - should extract vector wrapped in config. 
+  - should steer using contextlib 'with vector(model, C=1):.  
+  - save load to folder with Json and safetensor. 
+  - test should be one functional tiny train (few batches), calib (N=1), use (N=1), save. load. This ends up testing the whole pipeline.
+  - should be able to add vectors together with __add__ and __mul__ for ensembling and scaling.
 - check papers, say less, but no jargon or telegraphic Lang. explain new concepts.
+- check for TODO and FIXME, make sure they are resolved of leave them
+- TODO Two real wins: .to(h) matches dtype+device in one call (tensor .to(other_tensor) is a real PyTorch idiom)
 
 
 ## Quickstart
