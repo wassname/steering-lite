@@ -10,6 +10,8 @@ TODO
 - Config names to long
 - should use with... not attach detach
 - dont need all these mean diff variants
+- need to humanizer, e.g. calib should explain the concept
+- where does calib happen
 
 ## Quickstart
 
