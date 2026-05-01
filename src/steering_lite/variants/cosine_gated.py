@@ -19,11 +19,10 @@ import torch
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
 
 
-_EPS = 1e-8
+ε = 1e-8
 
 
 @register_config
@@ -44,7 +43,7 @@ class CosineGated:
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
             if cfg.normalize:
-                v = v / v.norm().clamp_min(_EPS)
+                v = v / (v.norm() + ε)
 
             out[li] = {"v": v}
         return out
@@ -58,8 +57,8 @@ class CosineGated:
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h)
 
-        v_norm = v / v.norm().clamp_min(_EPS)
-        h_norm = h / h.norm(dim=-1, keepdim=True).clamp_min(_EPS)
+        v_norm = v / (v.norm() + ε)
+        h_norm = h / (h.norm(dim=-1, keepdim=True) + ε)
 
         cos  = (h_norm * v_norm).sum(dim=-1, keepdim=True)
         gate = torch.relu(cos.abs() - cfg.tau)              # soft, sign-agnostic

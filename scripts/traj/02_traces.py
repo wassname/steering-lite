@@ -80,8 +80,7 @@ def main():
     text = format_mcq(sit.dilemma, sit.action_1, sit.action_2, tok)
     prompt_ids = tok(text, return_tensors="pt", truncation=True, max_length=512).input_ids.to(device)
 
-    # Base sample
-    sl.detach(model)
+    # Base sample (no steering attached at this point)
     torch.manual_seed(args.seed)
     base_out = model.generate(
         prompt_ids, max_new_tokens=args.max_new,
@@ -112,17 +111,14 @@ def main():
         for alpha in args.alphas:
             scaled = coeff * alpha
             cfg = make_cfg(method, layers, scaled, dtype, args.seed, args.n_train)
-            vectors = sl.train(model, tok, pos, neg, cfg, batch_size=4, max_length=256)
-            sl.attach(model, cfg, vectors)
-            try:
+            v = sl.Vector.train(model, tok, pos, neg, cfg, batch_size=4, max_length=256)
+            with v(model):
                 torch.manual_seed(args.seed)
                 out = model.generate(
                     prompt_ids, max_new_tokens=args.max_new,
                     do_sample=True, temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
                     pad_token_id=tok.pad_token_id, eos_token_id=tok.eos_token_id,
                 )
-            finally:
-                sl.detach(model)
             txt = tok.decode(out[0, prompt_ids.shape[1]:], skip_special_tokens=False)
             md.append(f"### α={alpha} (coeff={scaled:.4f})\n")
             md.append("```")

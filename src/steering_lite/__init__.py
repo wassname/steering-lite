@@ -4,12 +4,11 @@ if _os.environ.get("BEARTYPE"):
     from beartype.claw import beartype_this_package as _bt
     _bt()
 
-from .config import SteeringConfig
+from .config import SteeringConfig, REGISTRY, register
 from .extract import record_activations
 from .extract_attn import record_activations_attn
 from .attach import attach, detach, save, load, train, train_attn
 from .calibrate import measure_kl, calibrate_iso_kl
-from .method import REGISTRY, register
 from . import variants  # noqa: F401  triggers method + config registration
 from .vector import Vector
 

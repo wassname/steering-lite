@@ -26,8 +26,10 @@ from jaxtyping import Float
 from torch import Tensor
 from einops import einsum
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -49,8 +51,8 @@ def _kmeans_counts(X: Tensor, k: int, n_iters: int, seed: int) -> tuple[Tensor, 
     C = X[torch.randperm(X.shape[0], generator=g)[:k]].clone()
     assign = torch.zeros(X.shape[0], dtype=torch.long)
     for _ in range(n_iters):
-        Xn = X / X.norm(dim=1, keepdim=True)
-        Cn = C / C.norm(dim=1, keepdim=True)
+        Xn = X / (X.norm(dim=1, keepdim=True) + ε)
+        Cn = C / (C.norm(dim=1, keepdim=True) + ε)
         assign = einsum(Xn, Cn, "n d, k d -> n k").argmax(dim=1)
         counts = torch.bincount(assign, minlength=k)
         if (counts == 0).any():

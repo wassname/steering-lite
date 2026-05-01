@@ -13,16 +13,39 @@ Greedy makes the statistic deterministic so the solver doesn't fight noise.
 """
 from __future__ import annotations
 import math
-from dataclasses import replace
-from typing import Callable
 
 import torch
 from loguru import logger
 from torch import Tensor
 from torch import nn
 
-from .attach import attach, detach
 from .config import SteeringConfig
+from .vector import Vector
+
+
+# Generic user messages for cheap default calibration. Diversity > length:
+# 4 domains spanning factual / narrative / technical / introspective.
+# Wrapped through tok.apply_chat_template so calibration reflects real chat use.
+DEFAULT_MESSAGES = [
+    "What is the capital of France?",
+    "Tell me a short story about a small village.",
+    "How do I compute the gradient of a function?",
+    "Tell me honestly what you think about lying.",
+]
+
+
+def _tokenize(prompts: list[str] | list[Tensor] | None, tok) -> list[Tensor]:
+    if prompts is None:
+        prompts = DEFAULT_MESSAGES
+    if isinstance(prompts[0], str):
+        return [
+            tok.apply_chat_template(
+                [{"role": "user", "content": p}],
+                add_generation_prompt=True, return_tensors="pt",
+            )[0]
+            for p in prompts
+        ]
+    return prompts
 
 
 @torch.no_grad()
@@ -32,64 +55,53 @@ def _kl_per_pos(logp_steer: Tensor, logp_base: Tensor) -> Tensor:
 
 
 @torch.no_grad()
-def _generate(model, prompt_ids, T, eos_id, pad_id, do_sample,
-              temperature, top_p, top_k, device):
+def _generate(model, prompt_ids, T, tok, do_sample, device):
+    pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     ids = prompt_ids.unsqueeze(0).to(device)
-    kw = dict(max_new_tokens=T, pad_token_id=pad_id, eos_token_id=eos_id,
-              num_return_sequences=1)
-    if do_sample:
-        kw.update(do_sample=True, temperature=temperature, top_p=top_p, top_k=top_k)
-    else:
-        kw.update(do_sample=False)
-    out = model.generate(ids, **kw)
+    out = model.generate(
+        ids, max_new_tokens=T, pad_token_id=pad_id, eos_token_id=tok.eos_token_id,
+        num_return_sequences=1, do_sample=do_sample,
+    )
     return out[0, prompt_ids.shape[0]:]
 
 
 @torch.no_grad()
 def measure_kl(
+    v: Vector,
     model: nn.Module,
-    prompts: list[Tensor],
-    cfg: SteeringConfig,
-    vectors: dict[int, dict[str, Tensor]],
+    tok,
+    prompts: list[str] | list[Tensor] | None = None,
     *,
     T: int = 20,
-    eos_id: int,
-    pad_id: int,
     do_sample: bool = False,
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    top_k: int = 20,
     device: str | torch.device = "cuda",
 ) -> dict:
-    """Roll out T tokens with steering attached, then score under base (detached)
-    and steer (re-attached). Returns mean / p50 / p90 / p95 / max KL plus
-    per-token-index aggregates.
+    """Roll out T tokens with steering attached, then score under base
+    (detached) and steer (re-attached). Returns KL summary stats.
     """
+    prompts = _tokenize(prompts, tok)
     all_kls = []
     per_t = [[] for _ in range(T)]
+
     for pids in prompts:
-        attach(model, cfg, vectors)
-        try:
-            gen = _generate(model, pids, T, eos_id, pad_id, do_sample,
-                            temperature, top_p, top_k, device)
-        finally:
-            detach(model)
+        with v(model):
+            gen = _generate(model, pids, T, tok, do_sample, device)
         n_gen = gen.shape[0]
         if n_gen == 0:
             continue
         full = torch.cat([pids.to(device), gen]).unsqueeze(0)
         n_p = pids.shape[0]
+
         logp_base = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
-        attach(model, cfg, vectors)
-        try:
+        with v(model):
             logp_steer = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
-        finally:
-            detach(model)
+
         slc = slice(n_p - 1, n_p - 1 + n_gen)
         kls = _kl_per_pos(logp_steer[slc], logp_base[slc]).cpu()
         all_kls.append(kls)
         for i in range(n_gen):
             per_t[i].append(float(kls[i]))
+
     cat = torch.cat(all_kls)
     return {
         "kl_mean": float(cat.mean()),
@@ -104,23 +116,17 @@ def measure_kl(
 
 
 def calibrate_iso_kl(
+    v: Vector,
     model: nn.Module,
-    prompts: list[Tensor],
-    cfg: SteeringConfig,
-    vectors: dict[int, dict[str, Tensor]],
+    tok,
+    prompts: list[str] | list[Tensor] | None = None,
     *,
     target_kl: float = 1.0,
     target_stat: str = "kl_p95",
     bracket: tuple[float, float] = (0.05, 16.0),
     tol: float = 0.05,
     max_iters: int = 12,
-    eos_id: int,
-    pad_id: int,
     T: int = 20,
-    do_sample: bool = False,
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    top_k: int = 20,
     device: str | torch.device = "cuda",
     sign: float = 1.0,
 ) -> tuple[float, list[dict]]:
@@ -136,18 +142,17 @@ def calibrate_iso_kl(
     stalling. Bracketing endpoints are always preserved; bisection is the
     fallback if a step would land outside.
 
-    Returns: (best_coeff, history) where history has one entry per stat() call.
+    Mutates `v.cfg.coeff` per iteration (cheap, no copy). Returns
+    (best_coeff, history). Caller usually wants `v.cfg.coeff = best_coeff`.
     """
+    prompts = _tokenize(prompts, tok)
     history: list[dict] = []
 
     def eval_at(c: float) -> float:
-        c_cfg = replace(cfg, coeff=sign * c)
-        m = measure_kl(model, prompts, c_cfg, vectors,
-                       T=T, eos_id=eos_id, pad_id=pad_id,
-                       do_sample=do_sample, temperature=temperature,
-                       top_p=top_p, top_k=top_k, device=device)
+        v.cfg.coeff = sign * c
+        m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device)
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign,
-                        **{k: v for k, v in m.items() if k not in ("per_t_mean", "per_t_max")}})
+                        **{k: val for k, val in m.items() if k not in ("per_t_mean", "per_t_max")}})
         logger.info(f"  c={sign * c:+.4f} mean={m['kl_mean']:.3f} "
                     f"p50={m['kl_p50']:.3f} p90={m['kl_p90']:.3f} "
                     f"p95={m['kl_p95']:.3f} max={m['kl_max']:.3f} n={m['n_pos']}")
@@ -165,11 +170,11 @@ def calibrate_iso_kl(
         c_hi, v_hi = hi, None
         while c < hi:
             c *= 2.0
-            v = eval_at(c)
-            if v >= target_kl:
-                c_hi, v_hi = c, v
+            val = eval_at(c)
+            if val >= target_kl:
+                c_hi, v_hi = c, val
                 break
-            c_lo, v_lo = c, v
+            c_lo, v_lo = c, val
         else:
             return c, history
     else:
@@ -178,11 +183,11 @@ def calibrate_iso_kl(
         c_lo, v_lo = lo, None
         while c > lo:
             c /= 2.0
-            v = eval_at(c)
-            if v <= target_kl:
-                c_lo, v_lo = c, v
+            val = eval_at(c)
+            if val <= target_kl:
+                c_lo, v_lo = c, val
                 break
-            c_hi, v_hi = c, v
+            c_hi, v_hi = c, val
         else:
             return c, history
 

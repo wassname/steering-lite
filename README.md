@@ -11,6 +11,7 @@ adapter fine-tuning.
 
 ```python
 import torch, steering_lite as sl
+from steering_lite import Vector
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B", torch_dtype=torch.bfloat16)
@@ -19,18 +20,18 @@ tok   = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
 pos = ["I want to be helpful and honest.", "I will tell the truth."]
 neg = ["I will deceive you.", "I will lie to you."]
 
-v = sl.train(model, tok, pos, neg, sl.MeanDiffC())
+v = Vector.train(model, tok, pos, neg, sl.MeanDiffC(coeff=2.0))
 
-with v(model, C=2.0):
+with v(model):
     out = model.generate(**tok("Tell me about yourself.", return_tensors="pt"), max_new_tokens=64)
 print(tok.decode(out[0], skip_special_tokens=True))
-# Human: Tell me about yourself. 
+# Human: Tell me about yourself.
 # AI: I try to be honest and straightforward. I don't always
 # succeed, but I genuinely care about giving accurate, useful answers rather than
 # what people want to hear.
 
 v.save("honesty.safetensors")
-v2 = sl.Vector.load("honesty.safetensors")
+v2 = Vector.load("honesty.safetensors")
 
 combined = v + v2   # add vectors
 scaled   = v * 0.5  # scale vector
@@ -38,22 +39,30 @@ scaled   = v * 0.5  # scale vector
 
 ## Calibration
 
-TODO read humanizer skill and summarize from here https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7
+A raw `coeff` isn't comparable across methods: `coeff=2` for `mean_diff` and `coeff=2`
+for `sspace` cause different amounts of distributional drift. So we calibrate to a fixed
+KL budget instead.
 
-`calibrate_iso_kl` finds the coefficient `C` so that `KL(steered || base)` hits a target
-(usually 1.0 nat), measured over the first 20 greedy-decoded tokens. This makes coefficients
-comparable across methods: a coefficient calibrated to KL=1.0 produces the same amount of
-distributional shift regardless of whether it came from `mean_diff` or `sspace`.
+`v.calibrate(...)` picks a coefficient `C` so that `KL(steered || base)` hits a target
+(default 1.0 nat) over the first 20 greedy-decoded tokens, then bakes that `C` into the
+returned `Vector`.
 
-FIXME we've mean to calibrate as a verb or part of extraction / train
-TODO consider train or extracte?
+Why 20 tokens? An LLM trajectory is like a car on the road. A small nudge changes lanes;
+a big nudge crashes you off course. Most of the divergence between steered and base
+happens in the first ~20 tokens. Past there both models are constrained by what's
+already been written, so a cheap 20-token measurement predicts long-horizon coherence.
+
+For each candidate `C`: greedy decode T=20 tokens and record per-token
+`KL(p_C || p_0)`. Take the p95 across N=4 short prompts. Bisect in log-space (8–12 iters).
 
 ```python
-coeff, history = sl.calibrate_iso_kl(
-    model, prompts, cfg, v.state,
-    target_kl=1.0, target_stat="kl_p95",
-    T=20, eos_id=tok.eos_token_id, pad_id=tok.pad_token_id, device="cuda",
-)
+v = Vector.train(model, tok, pos, neg, sl.MeanDiffC()) \
+          .calibrate(model, tok, target_kl=1.0)
+
+# v.cfg.coeff is now the calibrated value. Same 1-nat budget across all methods,
+# so leaderboard rows are directly comparable.
+with v(model):
+    ...
 ```
 
 ## Methods
@@ -72,7 +81,7 @@ coeff, history = sl.calibrate_iso_kl(
 
 ## Eval
 
-We run two evals to see how steering changes a model revealed preferences. 
+We run two evals to see how steering changes a model's revealed preferences.
 
 - tinymfc - tiny moral vignettes
 - [kellycyy/AIRiskDilemmas](https://huggingface.co/datasets/kellycyy/AIRiskDilemmas)

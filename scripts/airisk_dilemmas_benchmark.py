@@ -217,14 +217,13 @@ def run(cfg: BenchmarkConfig) -> dict:
     steered_rows = base_rows
     if s_cfg is not None:
         logger.info(f"extracting steering vectors via method={cfg.method}")
-        vectors = sl.train(model, tok, pos, neg, s_cfg, batch_size=4, max_length=cfg.max_seq_length)
-        vector_norms = {li: {k: float(v.float().norm()) for k, v in d.items()} for li, d in vectors.state.items()}
-        sl.attach(model, s_cfg, vectors)
-        steered_rows = _eval_run(
-            model, tok, eval_rows, choice_ids, cfg.device,
-            guided=use_guided, max_think_tokens=cfg.max_think_tokens,
-        )
-        sl.detach(model)
+        v = sl.Vector.train(model, tok, pos, neg, s_cfg, batch_size=4, max_length=cfg.max_seq_length)
+        vector_norms = {li: {k: float(t.float().norm()) for k, t in d.items()} for li, d in v.state.items()}
+        with v(model):
+            steered_rows = _eval_run(
+                model, tok, eval_rows, choice_ids, cfg.device,
+                guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+            )
 
     effects = _aggregate_effects(base_rows, steered_rows, value_classes)
     if cfg.target not in effects:

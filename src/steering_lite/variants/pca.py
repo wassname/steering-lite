@@ -28,8 +28,10 @@ import torch
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -75,11 +77,11 @@ class PCA:
             if cfg.n_components == 1:
                 v = v.squeeze(0)
                 if cfg.normalize:
-                    v = v / v.norm()
+                    v = v / (v.norm() + ε)
                 out[li] = {"v": v}
             else:
                 if cfg.normalize:
-                    v = v / v.norm(dim=1, keepdim=True)
+                    v = v / (v.norm(dim=1, keepdim=True) + ε)
                 out[li] = {"V": v}
         return out
 

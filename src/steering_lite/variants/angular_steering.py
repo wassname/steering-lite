@@ -18,8 +18,10 @@ import torch
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -45,14 +47,14 @@ class AngularSteering:
                 raise ValueError(f"layer {li}: pos/neg counts differ")
 
             diffs = (pos_acts[li].float() - neg_acts[li].float())
-            dirs  = diffs / diffs.norm(dim=1, keepdim=True)
+            dirs  = diffs / (diffs.norm(dim=1, keepdim=True) + ε)
 
             b1 = diffs.mean(0)
-            b1 = b1 / b1.norm()
+            b1 = b1 / (b1.norm() + ε)
 
             _, _, Vh = torch.linalg.svd(dirs - dirs.mean(0, keepdim=True), full_matrices=False)
             b2 = Vh[0] - (Vh[0] @ b1) * b1
-            b2 = b2 / b2.norm()
+            b2 = b2 / (b2.norm() + ε)
 
             out[li] = {"b1": b1, "b2": b2}
         return out

@@ -29,8 +29,10 @@ import torch
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -63,8 +65,7 @@ class MeanDiff:
                 v = p.mean(0) - n.mean(0)
 
             if cfg.normalize:
-                # TODO add greek eps here and everywhere we divide by smething
-                v = v / v.norm()
+                v = v / (v.norm() + ε)
 
             out[li] = {"v": v}
         return out

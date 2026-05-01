@@ -14,14 +14,12 @@ def main():
     pos = ["the cat sat on the mat"] * 8
     neg = ["the dog ran in the park"] * 8
     cfg = sl.MeanDiffC(layers=(1,), coeff=1.0, dtype=torch.float32, seed=0)
-    vectors = sl.train(model, tok, pos, neg, cfg, batch_size=4, max_length=32)
-    prompts = [tok("hello world", return_tensors="pt").input_ids[0] for _ in range(2)]
+    v = sl.Vector.train(model, tok, pos, neg, cfg, batch_size=4, max_length=32)
+    prompts = ["hello world"] * 2
     coeff, hist = sl.calibrate_iso_kl(
-        model, prompts, cfg, vectors,
+        v, model, tok, prompts,
         target_kl=0.005, target_stat="kl_p95", T=8,
-        bracket=(0.01, 4.0),
-        eos_id=tok.eos_token_id, pad_id=tok.pad_token_id,
-        do_sample=False, device="cpu",
+        bracket=(0.01, 4.0), device="cpu",
     )
     print(f"FINAL coeff={coeff:.4f} iters={len(hist)}")
     for h in hist:

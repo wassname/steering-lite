@@ -27,8 +27,7 @@ from einops import rearrange
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
 
 
 @register_config

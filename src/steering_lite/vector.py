@@ -2,13 +2,14 @@
 
 Wraps `(cfg, state)` so a user can:
 
-    v = sl.train(model, tok, pos, neg, sl.MeanDiffC(layers=(15,)))
+    v = Vector.train(model, tok, pos, neg, sl.MeanDiffC(layers=(15,))) \\
+              .calibrate(model, tok, target_kl=1.0)
 
-    with v(model, C=2.0):
+    with v(model):
         out = model.generate(...)
 
     v.save("honesty.safetensors")
-    v2 = sl.Vector.load("honesty.safetensors")
+    v2 = Vector.load("honesty.safetensors")
 
     combined = v + v2          # ensemble (sum buffers, requires same cfg.method)
     scaled   = v * 0.5         # scale buffers
@@ -29,9 +30,28 @@ class Vector:
         self.cfg = cfg
         self.state = state
 
+    @classmethod
+    def train(cls, model: nn.Module, tok, pos_prompts: list[str], neg_prompts: list[str],
+              cfg: SteeringConfig, **kw) -> "Vector":
+        """Extract a steering vector from contrastive prompts. Chains with .calibrate()."""
+        from .attach import train as _train
+        return _train(model, tok, pos_prompts, neg_prompts, cfg, **kw)
+
+    def calibrate(self, model: nn.Module, tok,
+                  prompts: list[str] | list[Tensor] | None = None, *,
+                  target_kl: float = 1.0, **kw) -> "Vector":
+        """Set coeff so KL(steered || base) hits target_kl. Mutates and returns self for chaining.
+
+        `prompts` defaults to a small generic set; pass list[str] to use your own.
+        """
+        from .calibrate import calibrate_iso_kl
+        coeff, _ = calibrate_iso_kl(self, model, tok, prompts, target_kl=target_kl, **kw)
+        self.cfg.coeff = float(coeff)
+        return self
+
     @contextmanager
     def __call__(self, model: nn.Module, *, C: float | None = None):
-        """Attach for the duration of the `with` block. `C` overrides cfg.coeff."""
+        """Attach for the duration of the `with` block. `C` overrides cfg.coeff if given."""
         from .attach import attach, detach
         cfg = self.cfg if C is None else replace(self.cfg, coeff=float(C))
         attach(model, cfg, self.state)

@@ -9,8 +9,7 @@ import torch
 from torch import nn
 from torch.utils.hooks import RemovableHandle
 
-from .config import SteeringConfig
-from .method import REGISTRY
+from .config import SteeringConfig, REGISTRY
 from .target import find_targets
 from .extract import record_activations
 from .extract_attn import (

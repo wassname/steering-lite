@@ -1,11 +1,14 @@
-"""SteeringConfig: per-method typed dataclass.
+"""SteeringConfig + Method protocol + registries.
 
-Each method ships its own subclass under `variants/*.py` (e.g. `MeanDiffC`),
-adding strongly-typed knobs. Registry route at load time: `from_dict` looks up the
-right subclass via the `method` field.
+Each method ships its own subclass `XC(SteeringConfig)` and `XMethod` class
+under `variants/*.py` (e.g. `MeanDiffC` + `MeanDiff`). Two parallel registries
+keyed by method name: `_CONFIG_REGISTRY` for `from_dict` deserialisation,
+`REGISTRY` for the runtime extract/apply pair.
 """
 from dataclasses import dataclass, asdict, field
+from typing import Protocol, Any
 import torch
+from torch import Tensor
 
 
 @dataclass
@@ -21,6 +24,13 @@ class SteeringConfig:
     # "attn_out" = attention output, "mlp_out" = mlp output.
     # v1 only implements "residual".
     target: str = "residual"
+
+    # steering strength at apply-time. Methods interpret it differently:
+    # additive (mean_diff, pca, sspace, chars, cosine_gated): coeff is α in `h + α v`.
+    # slerp/angle (spherical, angular_steering): coeff is the slerp t / rotation θ.
+    # blend (linear_act): coeff is the blend ratio.
+    # ablation+nudge (directional_ablation): coeff is post-ablation nudge magnitude.
+    coeff: float = 1.0
 
     dtype: torch.dtype = torch.bfloat16
     seed: int = 0
@@ -50,4 +60,39 @@ def register_config(cls: type[SteeringConfig]) -> type[SteeringConfig]:
     if name in _CONFIG_REGISTRY:
         raise ValueError(f"config for method {name!r} already registered")
     _CONFIG_REGISTRY[name] = cls
+    return cls
+
+
+class Method(Protocol):
+    """extract+apply pair. State tensors are registered as buffers on the block
+    module under `_steering_state_<key>` and rebuilt into a dict by the hook.
+    """
+    name: str
+
+    @staticmethod
+    def extract(
+        pos_acts: dict[int, Tensor],
+        neg_acts: dict[int, Tensor],
+        cfg: Any,
+    ) -> dict[int, dict[str, Tensor]]:
+        """Per-layer state. `pos_acts[l]` is `[n_pos, d_model]`, same for neg."""
+        ...
+
+    @staticmethod
+    def apply(
+        block,
+        hidden_states: Tensor,  # [b, s, d]
+        state: dict[str, Tensor],
+        cfg: Any,
+    ) -> Tensor:
+        ...
+
+
+REGISTRY: dict[str, type] = {}
+
+
+def register(cls):
+    if not getattr(cls, "name", None):
+        raise ValueError(f"method {cls} missing .name")
+    REGISTRY[cls.name] = cls
     return cls

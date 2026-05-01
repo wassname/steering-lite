@@ -23,8 +23,10 @@ import torch
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -60,7 +62,7 @@ class SSpace:
 
             v = V @ (V.T @ mu)
             if cfg.normalize:
-                v = v / v.norm()
+                v = v / (v.norm() + ε)
 
             out[li] = {"v": v, "V": V}
         return out

@@ -147,19 +147,16 @@ def main():
         for method in methods:
             logger.info(f"=== seed={seed} {method} ===")
             cfg0 = make_cfg(method, layers, 1.0, dtype, seed, args.n_train)
-            vectors = sl.train(model, tok, pos, neg, cfg0, batch_size=4, max_length=256)
+            v = sl.Vector.train(model, tok, pos, neg, cfg0, batch_size=4, max_length=256)
             signs = [("positive", +1.0), ("negative", -1.0)] if args.separate_signs else [("positive", +1.0)]
             signed_rows = []
             for direction, sign in signs:
                 torch.manual_seed(seed)
                 bracket = (0.001, 0.5) if method == "spherical" else (0.05, 16.0)
                 coeff_star, history = sl.calibrate_iso_kl(
-                    model, prompts_calib, cfg0, vectors,
+                    v, model, tok, prompts_calib,
                     target_kl=args.target_kl, target_stat=args.target_stat,
                     bracket=bracket, T=args.t_calib,
-                    eos_id=eos_id, pad_id=pad_id,
-                    do_sample=do_sample_calib,
-                    temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
                     device=args.device, sign=sign,
                 )
 
@@ -167,12 +164,9 @@ def main():
 
                 logger.info(f"--- sampled validation [{method} {direction}] at coeff*={best['coeff']:+.4f} ---")
                 torch.manual_seed(seed)
-                from dataclasses import replace
-                val_cfg = replace(cfg0, coeff=best["coeff"])
-                val_m = sl.measure_kl(model, prompts_val, val_cfg, vectors,
-                                       T=args.t_calib, eos_id=eos_id, pad_id=pad_id,
-                                       do_sample=True,
-                                       temperature=args.temperature, top_p=args.top_p, top_k=args.top_k,
+                v.cfg.coeff = best["coeff"]
+                val_m = sl.measure_kl(v, model, tok, prompts_val,
+                                       T=args.t_calib, do_sample=True,
                                        device=args.device)
                 logger.info(f"  [val sampled] mean={val_m['kl_mean']:.3f} p50={val_m['kl_p50']:.3f} "
                             f"p90={val_m['kl_p90']:.3f} max={val_m['kl_max']:.3f} n={val_m['n_pos']}")

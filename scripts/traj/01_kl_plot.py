@@ -153,14 +153,13 @@ def main():
             storage[key] = []
             logger.info(f"\n=== {m}  α={alpha}  coeff={coeff:.4f} ===")
             cfg = make_cfg(m, layers, coeff, dtype, args.seed, args.n_train)
-            vectors = sl.train(model, tok, pos, neg, cfg, batch_size=4, max_length=256)
+            v = sl.Vector.train(model, tok, pos, neg, cfg, batch_size=4, max_length=256)
             for pi, prompt in enumerate(prompts):
                 prompt_ids = tok(prompt, return_tensors="pt").input_ids[0].to(device)
-                sl.attach(model, cfg, vectors)
-                y_s = gen(model, prompt_ids.unsqueeze(0), args.max_new, tok.eos_token_id, tok.pad_token_id,
-                          sample=args.sample, temperature=args.temperature, top_p=args.top_p, top_k=args.top_k)
-                steer_logp = score(model, prompt_ids, y_s)
-                sl.detach(model)
+                with v(model):
+                    y_s = gen(model, prompt_ids.unsqueeze(0), args.max_new, tok.eos_token_id, tok.pad_token_id,
+                              sample=args.sample, temperature=args.temperature, top_p=args.top_p, top_k=args.top_k)
+                    steer_logp = score(model, prompt_ids, y_s)
                 base_logp = score(model, prompt_ids, y_s)
                 tv, kl_sb, kl_bs, nll_diff, flip = per_pos_metrics(base_logp, steer_logp, y_s.cpu())
                 storage[key].append({

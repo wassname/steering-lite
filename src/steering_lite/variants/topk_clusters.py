@@ -17,8 +17,10 @@ from jaxtyping import Float
 from torch import Tensor
 from einops import einsum
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -37,8 +39,8 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
     init_idx = torch.randperm(n, generator=g)[:k]
     C = X[init_idx].clone()
     for _ in range(n_iters):
-        Xn = X / X.norm(dim=1, keepdim=True)
-        Cn = C / C.norm(dim=1, keepdim=True)
+        Xn = X / (X.norm(dim=1, keepdim=True) + ε)
+        Cn = C / (C.norm(dim=1, keepdim=True) + ε)
         sim = einsum(Xn, Cn, "n d, k d -> n k")
         assign = sim.argmax(dim=1)  # [n]
         counts = torch.bincount(assign, minlength=k)
@@ -81,7 +83,7 @@ class TopKClusters:
             C    = C * sign.unsqueeze(-1)
 
             if cfg.normalize:
-                C = C / C.norm(dim=1, keepdim=True)
+                C = C / (C.norm(dim=1, keepdim=True) + ε)
 
             out[li] = {"C": C}
         return out
@@ -95,8 +97,8 @@ class TopKClusters:
     ) -> Float[Tensor, "b s d"]:
         C = state["C"].to(h)
         # cos-sim per token; pick best centroid per token
-        h_norm = h / h.norm(dim=-1, keepdim=True)
-        C_norm = C / C.norm(dim=-1, keepdim=True)
+        h_norm = h / (h.norm(dim=-1, keepdim=True) + ε)
+        C_norm = C / (C.norm(dim=-1, keepdim=True) + ε)
 
         sim  = einsum(h_norm, C_norm, "b s d, k d -> b s k")
         pick = sim.argmax(dim=-1)

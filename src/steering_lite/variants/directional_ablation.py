@@ -26,8 +26,10 @@ from einops import einsum
 from jaxtyping import Float
 from torch import Tensor
 
-from ..config import SteeringConfig, register_config
-from ..method import register
+from ..config import SteeringConfig, register_config, register
+
+
+ε = 1e-8
 
 
 @register_config
@@ -50,7 +52,7 @@ class DirectionalAblation:
         out = {}
         for li in pos_acts:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
-            v = v / v.norm()
+            v = v / (v.norm() + ε)
 
             out[li] = {"v": v}
         return out
