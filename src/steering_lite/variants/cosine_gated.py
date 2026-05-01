@@ -38,6 +38,8 @@ class CosineGated:
 
     @staticmethod
     def extract(pos_acts, neg_acts, cfg: CosineGatedConfig):
+        # TODO ugly
+ also audit for eps needed
         md_cfg = MeanDiffConfig(
             method="mean_diff", layers=cfg.layers, coeff=cfg.coeff,
             target=cfg.target, dtype=cfg.dtype, seed=cfg.seed, normalize=cfg.normalize,
