@@ -85,7 +85,7 @@ with v(model):
 
 We run two evals to see how steering changes a model's revealed preferences.
 
-- tinymfc - tiny moral vignettes
+- [tinymfv](https://github.com/wassname/tinymfv) - tiny moral vignettes
 - [kellycyy/AIRiskDilemmas](https://huggingface.co/datasets/kellycyy/AIRiskDilemmas)
 
 

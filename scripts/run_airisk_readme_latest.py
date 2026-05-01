@@ -6,6 +6,12 @@ import json
 import subprocess
 from pathlib import Path
 
+from loguru import logger
+from tqdm.auto import tqdm
+
+logger.remove()
+logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format="{message}")
+
 
 METHODS = [
     "mean_diff",
@@ -29,7 +35,7 @@ COEFFS = {
 
 
 def _run(cmd: list[str]) -> None:
-    print(">>>", " ".join(cmd), flush=True)
+    logger.info(">>> " + " ".join(cmd))
     subprocess.run(cmd, check=True)
 
 
@@ -90,7 +96,7 @@ def main() -> None:
         out=full_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
     ))
 
-    for method in METHODS:
+    for method in tqdm(METHODS, desc="methods", mininterval=60):
         coeff = COEFFS.get(method, 2.0)
         plus_out = probe_out / f"{method}_plus"
         minus_out = probe_out / f"{method}_minus"

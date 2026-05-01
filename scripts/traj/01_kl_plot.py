@@ -233,7 +233,7 @@ def main():
     logger.info(f"png: {png}")
 
     # Concise table: mean kl_sb at last 16 tokens minus first 16 tokens (slope sign), per alpha
-    print("\n=== mean kl_sb at early (t∈[16,32)) vs late (t∈[T-32,T-16)) per α — positive Δ = drift up ===")
+    logger.info("\n=== mean kl_sb at early (t∈[16,32)) vs late (t∈[T-32,T-16)) per α — positive Δ = drift up ===")
     early_lo, early_hi = 16, min(48, args.max_new)
     late_hi = args.max_new
     late_lo = max(0, late_hi - 32)
@@ -251,8 +251,8 @@ def main():
                 "kl_sb early": f"{early:.3f}", "kl_sb late": f"{late:.3f}",
                 "Δ kl_sb": f"{late - early:+.3f}", "flip rate": f"{mean_flip:.1%}",
             })
-    print(tabulate(rows_tab, headers="keys", tablefmt="tsv"))
-    print(f"\nSHOULD: at α=1, kl_sb early≈late (calibrated to be safe). At α=4, Δ kl_sb >> 0 OR mean kl_sb explodes (>1.0) ELSE method has no crash regime in this T window.")
+    logger.info(tabulate(rows_tab, headers="keys", tablefmt="tsv"))
+    logger.info("\nSHOULD: at α=1, kl_sb early≈late (calibrated to be safe). At α=4, Δ kl_sb >> 0 OR mean kl_sb explodes (>1.0) ELSE method has no crash regime in this T window.")
 
 
 if __name__ == "__main__":

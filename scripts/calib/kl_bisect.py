@@ -212,14 +212,18 @@ def main():
         "summary_signed": all_summary_signed,
     }, indent=2))
     logger.info(f"wrote {out_path}")
-    print(f"\n# Calibration: mode={args.mode} target {args.target_stat}≈{args.target_kl} on first {args.t_calib} tokens, N_calib={args.n_calib}, N_val={args.n_validate}\n")
-    print("| seed | method | coeff* | calib_p95 | calib_max | calib_mean | val_samp_mean | val_samp_p95 | val_samp_max | iters |")
-    print("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
-    for r in all_summary:
-        print(f"| {r['seed']} | {r['method']} | {r['calibrated_coeff']:.4f} | "
-              f"{r['calib_kl_p95']:.3f} | {r['calib_kl_max']:.3f} | {r['calib_kl_mean']:.3f} | "
-              f"{r['val_sampled_kl_mean']:.3f} | {r['val_sampled_kl_p95']:.3f} | {r['val_sampled_kl_max']:.3f} | "
-              f"{r['iters']} |")
+    from tabulate import tabulate
+    rows = [
+        [r["seed"], r["method"], f"{r['calibrated_coeff']:.4f}",
+         f"{r['calib_kl_p95']:.3f}", f"{r['calib_kl_max']:.3f}", f"{r['calib_kl_mean']:.3f}",
+         f"{r['val_sampled_kl_mean']:.3f}", f"{r['val_sampled_kl_p95']:.3f}", f"{r['val_sampled_kl_max']:.3f}",
+         r["iters"]]
+        for r in all_summary
+    ]
+    logger.info(f"\n# Calibration: mode={args.mode} target {args.target_stat}≈{args.target_kl} T={args.t_calib} N_calib={args.n_calib} N_val={args.n_validate}\n"
+                + tabulate(rows, headers=["seed", "method", "coeff*", "calib_p95", "calib_max", "calib_mean",
+                                          "val_samp_mean", "val_samp_p95", "val_samp_max", "iters"],
+                           tablefmt="tsv"))
 
 
 if __name__ == "__main__":
