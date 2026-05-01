@@ -14,6 +14,7 @@ TODO
 - dont need commented shapes where we have jaxtyping
 - where does calib happen?
 - move dailydillemas to eval
+- ventilate the core logic as pseudo code like logic with newlines
 
 ## Quickstart
 
