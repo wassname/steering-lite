@@ -7,11 +7,13 @@ research-code aesthetic (einops, jaxtyping, fail-fast), but for **activation ste
 adapter fine-tuning. Verbs are repeng-style (`train` -> `attach` -> `detach`).
 
 TODO
-- Config names to long
+- Config names to long. use C
 - should use with... not attach detach
 - dont need all these mean diff variants
 - need to humanizer, e.g. calib should explain the concept
-- where does calib happen
+- dont need commented shapes where we have jaxtyping
+- where does calib happen?
+- move dailydillemas to eval
 
 ## Quickstart
 
