@@ -15,8 +15,9 @@ def quiet_external_logs() -> None:
     os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
     os.environ.setdefault("DATASETS_DISABLE_PROGRESS_BARS", "1")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-    warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
-    warnings.filterwarnings("ignore", message=".*generation flags are not valid.*")
+    os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    warnings.filterwarnings("ignore", message=".*torch_dtype.*")
+    warnings.filterwarnings("ignore", message=".*generation flags.*")
     try:
         import datasets
         datasets.disable_progress_bars()

@@ -125,6 +125,36 @@ def _real_train_and_rows(tok, target: str, n_train: int, n_eval_rows: int | None
     return pos, neg, eval_rows
 
 
+def _base_cache_name(model: str, target: str, seed: int, n_eval: int | None) -> str:
+    return f"__base_rows__{model.replace('/', '--')}__{target}__seed{seed}__n{n_eval or 'all'}.json"
+
+
+def _save_base_cache(cfg: "BenchmarkConfig", rows: list[dict]) -> None:
+    path = cfg.output_dir / _base_cache_name(cfg.model, cfg.target, cfg.seed, cfg.n_eval)
+    data = {
+        "meta": {"model": cfg.model, "target": cfg.target, "seed": cfg.seed, "n_eval": cfg.n_eval},
+        "rows": [{k: v for k, v in r.items() if k != "logp"} for r in rows],
+    }
+    path.write_text(json.dumps(data))
+
+
+def _load_base_cache(cfg: "BenchmarkConfig") -> list[dict] | None:
+    name = _base_cache_name(cfg.model, cfg.target, cfg.seed, cfg.n_eval)
+    for d in [cfg.output_dir, cfg.output_dir.parent, cfg.output_dir.parent.parent]:
+        p = d / name
+        if not p.exists():
+            continue
+        data = json.loads(p.read_text())
+        m = data["meta"]
+        if m["model"] == cfg.model and m["target"] == cfg.target and m["seed"] == cfg.seed and m["n_eval"] == cfg.n_eval:
+            rows = data["rows"]
+            for r in rows:
+                r.setdefault("logp", None)
+            logger.info(f"base cache hit: {p} ({len(rows)} rows)")
+            return rows
+    return None
+
+
 def _eval_run(
     model, tok, eval_rows: list[AiriskEvalRow], choice_ids, device,
     *, guided: bool = False, max_think_tokens: int = 128, desc: str = "eval",
@@ -145,7 +175,10 @@ def _eval_run(
             n_nan += 1
         pmass_sum += out["pmass"]
         n_done = len(per_row) + 1
-        pbar.set_postfix(pmass=f"{pmass_sum/n_done:.3f}", nan=n_nan)
+        postfix = {"pmass": f"{pmass_sum/n_done:.3f}"}
+        if n_nan > 0:
+            postfix["nan"] = n_nan
+        pbar.set_postfix(refresh=False, **postfix)
         per_row.append({
             "dilemma_idx": r.dilemma_idx,
             "logratio": out["logratio"],
@@ -218,15 +251,18 @@ def run(cfg: BenchmarkConfig) -> dict:
     )
 
     use_guided = cfg.guided
-    logger.info(f"eval mode: {'guided CoT' if use_guided else 'teacher-forced'} "
+    logger.info(f"\neval mode: {'guided CoT' if use_guided else 'teacher-forced'} "
                 f"(max_think_tokens={cfg.max_think_tokens if use_guided else 0})")
-    logger.info("SHOULD: pmass≈1.0 (model picks Action 1 or 2 strongly); nan=0; "
-                "if pmass≈0 → tokenizer/format bug, if nan>>0 → low pmass triggers nan guard")
-    base_rows = _eval_run(
-        model, tok, eval_rows, choice_ids, cfg.device,
-        guided=use_guided, max_think_tokens=cfg.max_think_tokens,
-        desc=f"base {cfg.method}",
-    )
+    logger.info("EXPECT: pmass≈1.0, no nan — if pmass≈0 → tokenizer bug, if nan>0 → pmass guard firing")
+
+    base_rows = _load_base_cache(cfg)
+    if base_rows is None:
+        base_rows = _eval_run(
+            model, tok, eval_rows, choice_ids, cfg.device,
+            guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+            desc=f"base {cfg.method}",
+        )
+        _save_base_cache(cfg, base_rows)
 
     s_cfg = cfg_for_method(cfg, dtype)
     vector_norms = {}
@@ -310,7 +346,10 @@ def run(cfg: BenchmarkConfig) -> dict:
                 row[f"value_{value_class}"] = "" if label is None else label * r["logratio"]
             writer.writerow(row)
     delta = effects[cfg.target]["delta"]
-    cue = "🟢" if abs(delta) > 0.5 else ("🟡" if abs(delta) > 0.05 else "🔴")
+    if s_cfg is None:
+        cue = "⚪"  # baseline: delta=0 expected
+    else:
+        cue = "🟢" if abs(delta) > 0.5 else ("🟡" if abs(delta) > 0.05 else "🔴")
     logger.info(f"\nout: {out_path}")
     logger.info(f"argv: airisk_dilemmas_benchmark.py method={cfg.method} target={cfg.target} coeff={cfg.coeff} seed={cfg.seed}")
     logger.info(f"main metric: target_effect={delta:+.4f} nats")

@@ -45,7 +45,8 @@ def _run(cmd: list[str]) -> None:
 
 def _bench_cmd(*, model: str, method: str, target: str, coeff: float, out: Path,
                layers: str, device: str, torch_dtype: str, n_train: int | None = None,
-               n_eval: int | None = None) -> list[str]:
+               n_eval: int | None = None, no_guided: bool = False,
+               max_think_tokens: int | None = None) -> list[str]:
     cmd = [
         "uv", "run", "--extra", "benchmark",
         "python", "scripts/airisk_dilemmas_benchmark.py",
@@ -62,6 +63,10 @@ def _bench_cmd(*, model: str, method: str, target: str, coeff: float, out: Path,
         cmd.extend(["--n-train", str(n_train)])
     if n_eval is not None:
         cmd.extend(["--n-eval", str(n_eval)])
+    if no_guided:
+        cmd.append("--no-guided")
+    if max_think_tokens is not None:
+        cmd.extend(["--max-think-tokens", str(max_think_tokens)])
     return cmd
 
 
@@ -99,15 +104,18 @@ def main() -> None:
     full_out.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"\nBLUF: model={args.model} target={args.target} methods={len(METHODS)} out={args.out}")
-    logger.info("SHOULD: probe runs n_train=8 n_eval=16 (~1min); full runs n_train=32 n_eval=2972 (~2.5h/method).\n"
-                "Sign chosen as max(plus_delta, minus_delta). Target effect Δ>0 means model shifts toward target.\n")
+    logger.info(
+        "EXPECT: probe (teacher-forced, ~2s) determines sign; full (guided 64-tok, ~10min) measures Δ.\n"
+        "Sign chosen as max(plus_delta, minus_delta). Δ>0 = model shifts toward target.\n"
+    )
 
     full_n_eval = args.full_n_eval if args.full_n_eval > 0 else None
 
+    # Baseline uses full eval to populate base_rows cache for all method subprocesses.
     _run(_bench_cmd(
         model=args.model, method="baseline", target=args.target, coeff=0.0,
         out=full_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
-        n_eval=full_n_eval,
+        n_eval=full_n_eval, max_think_tokens=64,
     ))
 
     summary_rows: list[list] = []
@@ -119,10 +127,11 @@ def main() -> None:
         plus_out.mkdir(parents=True, exist_ok=True)
         minus_out.mkdir(parents=True, exist_ok=True)
 
+        # Probe: teacher-forced (no generation), fast sign check.
         _run(_bench_cmd(
             model=args.model, method=method, target=args.target, coeff=coeff,
             out=plus_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
-            n_train=args.probe_n_train, n_eval=args.probe_n_eval,
+            n_train=args.probe_n_train, n_eval=args.probe_n_eval, no_guided=True,
         ))
         plus_delta = _target_effect(plus_out)
 
@@ -132,17 +141,18 @@ def main() -> None:
             _run(_bench_cmd(
                 model=args.model, method=method, target=args.target, coeff=-coeff,
                 out=minus_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
-                n_train=args.probe_n_train, n_eval=args.probe_n_eval,
+                n_train=args.probe_n_train, n_eval=args.probe_n_eval, no_guided=True,
             ))
             minus_delta = _target_effect(minus_out)
             chosen_sign = +1.0 if plus_delta >= minus_delta else -1.0
 
         final_out = full_out / method
         final_out.mkdir(parents=True, exist_ok=True)
+        # Full eval: guided CoT with 64 think tokens, uses base_rows cache from baseline run.
         _run(_bench_cmd(
             model=args.model, method=method, target=args.target, coeff=chosen_sign * coeff,
             out=final_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
-            n_eval=full_n_eval,
+            n_eval=full_n_eval, max_think_tokens=64,
         ))
         full_delta = _target_effect(final_out)
         cue = "🟢" if abs(full_delta) > 0.5 else ("🟡" if abs(full_delta) > 0.05 else "🔴")
