@@ -1,4 +1,4 @@
-"""tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δ-wrongness.
+"""tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δlogit ± std.
 
 Three baseline modalities + 11 calibrated steering methods, all targeting the
 same Care-vs-Traditional/Sanctity axis tinymfv airisk vignettes evaluate:
@@ -7,11 +7,11 @@ same Care-vs-Traditional/Sanctity axis tinymfv airisk vignettes evaluate:
   3. steer_*     -- extract POS-vs-NEG vector, iso-KL calibrate, eval
 
 Persona-branching pairs (POS/NEG share suffix, differ only in 1-2 axis words).
-Eval: tinymfv guided CoT, 64 think tokens; we surface the per-foundation
-`s_other_violate` table from `analyse()` instead of collapsing to mean(p_true).
+Eval: tinymfv guided CoT, 64 think tokens; per-foundation Δlogit (paired by
+(vid, cond)) ± std across pairs.
 
-Composite metric: axis_shift = ΔSanctity - ΔCare (+ve = moved toward binding,
--ve = moved toward care). Matches the persona axis we steered along.
+Composite metric: axis_shift = ΔlogitSanctity - ΔlogitCare nats. +ve = moved
+toward binding/traditional cluster, -ve = toward care.
 
 Refs:
   calibration: https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7
@@ -34,38 +34,28 @@ import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_TRAD_CARE, PROMPT_TEMPLATE
 from steering_lite.eval.tinymfv import evaluate_with_vector
+from steering_lite.eval.foundations import (
+    FOUNDATION_ORDER, FOUNDATION_SHORT,
+    baseline_logit_per_foundation, dlogit_per_foundation,
+    axis_shift, format_cell, cue,
+)
 
 
-# Display order: target axis first (Care, Sanctity), then remaining 5 foundations.
-FOUNDATION_ORDER = ["Care", "Sanctity", "Authority", "Loyalty", "Fairness", "Liberty", "Social Norms"]
-FOUNDATION_SHORT = {
-    "Care": "Care", "Sanctity": "Sanc", "Authority": "Auth", "Loyalty": "Loy",
-    "Fairness": "Fair", "Liberty": "Lib", "Social Norms": "SocN",
-}
+def _row_steer(label: str, dlogit_per_f: dict, *,
+               coeff: str = "n/a", kl: str = "n/a", elapsed_s: float = 0.0) -> list:
+    """Row for prompt_only / steer_* / repeng / engineered_prompt: paired Δlogit cells."""
+    axis = axis_shift(dlogit_per_f)
+    cells = [cue(axis), f"{axis:+.2f}", label, coeff, kl]
+    cells += [format_cell(dlogit_per_f[f]) for f in FOUNDATION_ORDER]
+    cells.append(f"{elapsed_s:.0f}s")
+    return cells
 
 
-def _per_foundation(report) -> dict[str, float]:
-    """report["table"] -> {foundation_coarse: s_other_violate in [-1, +1]}."""
-    df = report["table"]
-    return {row["foundation"]: float(row["s_other_violate"]) for _, row in df.iterrows()}
-
-
-def _delta_per_f(steer_per_f: dict, base_per_f: dict) -> dict[str, float]:
-    return {f: steer_per_f.get(f, 0.0) - base_per_f.get(f, 0.0) for f in FOUNDATION_ORDER}
-
-
-def _axis_shift(delta_per_f: dict[str, float]) -> float:
-    """+ve = moved toward Sanctity (traditional), -ve = toward Care."""
-    return delta_per_f.get("Sanctity", 0.0) - delta_per_f.get("Care", 0.0)
-
-
-def _row_for(label: str, base_per_f: dict, steer_per_f: dict, *,
-             coeff: str = "n/a", kl: str = "n/a", elapsed_s: float = 0.0) -> list:
-    delta = _delta_per_f(steer_per_f, base_per_f)
-    axis = _axis_shift(delta)
-    cue = "🟢" if abs(axis) > 0.10 else ("🟡" if abs(axis) > 0.03 else "🔴")
-    cells = [cue, f"{axis:+.3f}", label, coeff, kl]
-    cells += [f"{delta[f]:+.3f}" for f in FOUNDATION_ORDER]
+def _row_bare(absolute_logit_per_f: dict, *, elapsed_s: float = 0.0) -> list:
+    """Bare row shows absolute logit(wrongness) per foundation -- the reference,
+    not a Δ. High Care + low Sanctity is the expected starting point."""
+    cells = ["⚪", "ref", "bare", "n/a", "n/a"]
+    cells += [format_cell(absolute_logit_per_f[f]) for f in FOUNDATION_ORDER]
     cells.append(f"{elapsed_s:.0f}s")
     return cells
 
@@ -73,9 +63,8 @@ def _row_for(label: str, base_per_f: dict, steer_per_f: dict, *,
 class _SystemInjectTok:
     """Wraps a tokenizer so apply_chat_template injects a system message.
 
-    Used for the prompt-only baseline: persona delivered as a system prompt,
-    no steering vector. Mirrors weight-steering's `prompt_baseline` flag
-    (ws/eval/airisk.py:392).
+    Used for prompt-only / engineered-prompt baselines: persona delivered as a
+    system prompt, no steering vector.
     """
     def __init__(self, tok, system: str):
         object.__setattr__(self, "_tok", tok)
@@ -180,8 +169,8 @@ def main() -> None:
                 f"vignettes={args.vignettes} max_think={args.max_think_tokens}")
     logger.info("EXPECT: 3 modalities x airisk vignettes. (1) bare baseline, (2) prompt_only "
                 "with POS persona as system prompt, (3) 11 calibrated steering methods.")
-    logger.info("EXPECT: axis_shift = ΔSanctity - ΔCare; +ve = moved toward traditional/binding, "
-                "-ve = toward care. Per-foundation Δ shown for all 7 foundations.")
+    logger.info("EXPECT: axis_shift = ΔlogitSanctity - ΔlogitCare nats. +ve = moved toward "
+                "traditional/binding, -ve = toward care. Per-foundation Δlogit ± std for all 7.")
     logger.info(f"persona axis: POS='{PERSONA_PAIRS_TRAD_CARE[0][0]}' vs "
                 f"NEG='{PERSONA_PAIRS_TRAD_CARE[0][1]}' (and 5 paraphrase pairs)")
 
@@ -207,16 +196,24 @@ def main() -> None:
     base_t0 = time.time()
     base_report = evaluate_with_vector(model, tok, name=args.vignettes,
                                        max_think_tokens=args.max_think_tokens)
-    base_per_f = _per_foundation(base_report)
-    logger.info(f"bare per-foundation s_other_violate: " +
-                ", ".join(f"{f}={base_per_f.get(f, 0):+.3f}" for f in FOUNDATION_ORDER))
-    logger.info(f"bare baseline elapsed={time.time()-base_t0:.1f}s "
+    base_logit_per_f = baseline_logit_per_foundation(base_report, args.vignettes)
+    bare_elapsed = time.time() - base_t0
+    logger.info("bare per-foundation logit(wrongness) ± std: " +
+                ", ".join(f"{f}={format_cell(base_logit_per_f[f])}" for f in FOUNDATION_ORDER))
+    logger.info(f"bare elapsed={bare_elapsed:.1f}s "
                 f"wrongness_mean={base_report['wrongness']:+.3f}")
-    # bare row: per-foundation Δ vs itself = 0, so we display absolute s_other_violate
-    bare_row = ["⚪", "+0.000", "bare", "n/a", "n/a"]
-    bare_row += [f"{base_per_f.get(f, 0):+.3f}" for f in FOUNDATION_ORDER]
-    bare_row.append(f"{time.time()-base_t0:.0f}s")
-    rows.append(bare_row)
+    rows.append(_row_bare(base_logit_per_f, elapsed_s=bare_elapsed))
+
+    # Persist bare report for later re-analysis (raw p_true grid + bool_mass).
+    (args.out / "bare.json").write_text(json.dumps({
+        "model": args.model, "vignettes": args.vignettes,
+        "max_think_tokens": args.max_think_tokens,
+        "wrongness_mean": float(base_report["wrongness"]),
+        "absolute_logit_per_foundation": base_logit_per_f,
+        "raw_p_true": base_report["raw"],
+        "info": {k: v for k, v in base_report["info"].items() if k != "elapsed_s"},
+        "elapsed_s": bare_elapsed,
+    }, indent=2))
 
     # === (2) prompt_only baseline: POS persona as system prompt ============
     if args.prompt_baseline:
@@ -227,17 +224,22 @@ def main() -> None:
         pb_t0 = time.time()
         pb_report = evaluate_with_vector(model, wrapped_tok, name=args.vignettes,
                                          max_think_tokens=args.max_think_tokens)
-        pb_per_f = _per_foundation(pb_report)
-        rows.append(_row_for("prompt_only", base_per_f, pb_per_f,
-                             elapsed_s=time.time() - pb_t0))
+        pb_dlogit = dlogit_per_foundation(base_report, pb_report, args.vignettes)
+        pb_elapsed = time.time() - pb_t0
+        rows.append(_row_steer("prompt_only", pb_dlogit, elapsed_s=pb_elapsed))
+
+        (args.out / "prompt_only.json").write_text(json.dumps({
+            "label": "prompt_only", "model": args.model,
+            "system_prompt": sys_prompt, "vignettes": args.vignettes,
+            "dlogit_per_foundation": pb_dlogit,
+            "axis_shift": axis_shift(pb_dlogit),
+            "raw_p_true": pb_report["raw"],
+            "elapsed_s": pb_elapsed,
+        }, indent=2))
 
     # === (3) 11 calibrated steering methods =================================
     for method in tqdm(args.methods, desc="methods", mininterval=60):
-        try:
-            cfg = _make_cfg(method, layers)
-        except KeyError:
-            logger.warning(f"skip unknown method {method!r}")
-            continue
+        cfg = _make_cfg(method, layers)
         logger.info(f"\n=== steer_{method} ===")
         t0 = time.time()
         v = sl.train(model, tok, pos_prompts, neg_prompts, cfg,
@@ -253,32 +255,30 @@ def main() -> None:
         with v(model):
             steer_report = evaluate_with_vector(
                 model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
-        steer_per_f = _per_foundation(steer_report)
-        delta_per_f = _delta_per_f(steer_per_f, base_per_f)
+        st_dlogit = dlogit_per_foundation(base_report, steer_report, args.vignettes)
         elapsed = time.time() - t0
 
-        rows.append(_row_for(f"steer_{method}", base_per_f, steer_per_f,
-                             coeff=f"{coeff_calib:+.3f}", kl=f"{kl_hit:.2f}",
-                             elapsed_s=elapsed))
+        rows.append(_row_steer(f"steer_{method}", st_dlogit,
+                               coeff=f"{coeff_calib:+.3f}", kl=f"{kl_hit:.2f}",
+                               elapsed_s=elapsed))
 
         out_path = args.out / f"{method}.json"
         out_path.write_text(json.dumps({
             "method": method, "model": args.model, "layers": list(layers),
             "coeff_calibrated": float(coeff_calib), "target_kl": args.target_kl,
             "kl_p95_at_calib": kl_hit,
-            "base_per_foundation": base_per_f,
-            "steer_per_foundation": steer_per_f,
-            "delta_per_foundation": delta_per_f,
-            "axis_shift": _axis_shift(delta_per_f),
+            "dlogit_per_foundation": st_dlogit,
+            "axis_shift": axis_shift(st_dlogit),
+            "raw_p_true": steer_report["raw"],
             "n_pairs": args.n_pairs, "max_think_tokens": args.max_think_tokens,
             "vignettes": args.vignettes, "elapsed_s": elapsed,
         }, indent=2))
 
     logger.info("\n=== tinymfv sweep complete ===")
     logger.info(f"out: {args.out}")
-    logger.info("SHOULD: bare row shows absolute s_other_violate per foundation (Care should "
-                "be high, Sanctity low). Other rows show Δ vs bare. axis_shift > 0 means we "
-                "moved toward traditional/binding cluster.")
+    logger.info("SHOULD: bare row shows absolute logit(wrongness)±std per foundation; expect "
+                "Care high (model thinks care violations are wrong), Sanctity lower. Other rows "
+                "are paired Δlogit±std vs bare. axis_shift>0 means moved toward binding cluster.")
     headers = (["cue", "axis", "row", "C_calib", "kl_p95"]
                + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
                + ["t"])

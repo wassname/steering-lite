@@ -31,6 +31,7 @@ build = ["twine>=6"]
 test = ["pytest", "tabulate", "beartype>=0.18"]
 hf-test = ["accelerate>=1.6", "transformers>=4.51"]
 benchmark = ["accelerate>=1.6", "datasets>=3.6", "tabulate", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4", "tiny-mfv"]
+baseline = ["repeng", "openrouter-wrapper", "python-dotenv"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -44,3 +45,5 @@ exclude-newer = "5 days"
 
 [tool.uv.sources]
 tiny-mfv = { git = "https://github.com/wassname/tinymfv.git" }
+repeng = { git = "https://github.com/vgel/repeng.git" }
+openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper.git" }

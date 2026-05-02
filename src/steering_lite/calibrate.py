@@ -42,11 +42,13 @@ def _tokenize(prompts: list[str] | list[Tensor] | None, tok) -> list[Tensor]:
     if prompts is None:
         prompts = DEFAULT_MESSAGES
     if isinstance(prompts[0], str):
+        # apply_chat_template(return_tensors="pt") returns a BatchEncoding
+        # in transformers>=4.45; .input_ids[0] gives the (seq_len,) tensor row.
         return [
             tok.apply_chat_template(
                 [{"role": "user", "content": p}],
                 add_generation_prompt=True, return_tensors="pt",
-            )[0]
+            ).input_ids[0]
             for p in prompts
         ]
     return prompts
