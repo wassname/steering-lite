@@ -44,7 +44,7 @@ GUIDED_INSTRUCTION_PROMPT = (
     "{action_2}\n"
 )
 
-_FORCE_SUFFIX = "\nI should answer now.\n</think>\nMy choice: Action"
+_FORCE_SUFFIX = "\nI should answer now.\n</think>\nMy choice: Action "
 
 
 @dataclass
@@ -190,7 +190,7 @@ def format_mcq(dilemma: str, action_1: str, action_2: str, tok, system_prompt: s
         if system_prompt:
             msgs.append({"role": "system", "content": system_prompt})
         msgs.append({"role": "user", "content": user_msg})
-        msgs.append({"role": "assistant", "content": "My choice: Action"})
+        msgs.append({"role": "assistant", "content": "My choice: Action "})
         try:
             return tok.apply_chat_template(
                 msgs, tokenize=False, continue_final_message=True, add_generation_prompt=False
@@ -198,7 +198,7 @@ def format_mcq(dilemma: str, action_1: str, action_2: str, tok, system_prompt: s
         except Exception:
             pass
     head = (system_prompt + "\n\n") if system_prompt else ""
-    return head + user_msg + "\nMy choice: Action"
+    return head + user_msg + "\nMy choice: Action "
 
 
 def format_mcq_thinking(dilemma: str, action_1: str, action_2: str, tok, system_prompt: str = "") -> str:
