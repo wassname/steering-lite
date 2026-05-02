@@ -10,6 +10,9 @@ from loguru import logger
 from tabulate import tabulate
 from tqdm.auto import tqdm
 
+from steering_lite._quiet import quiet_external_logs
+
+quiet_external_logs()
 logger.remove()
 logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format="{message}")
 

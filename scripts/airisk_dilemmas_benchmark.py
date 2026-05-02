@@ -27,7 +27,9 @@ from tabulate import tabulate
 from tqdm.auto import tqdm
 
 import steering_lite as sl
+from steering_lite._quiet import quiet_external_logs
 
+quiet_external_logs()
 logger.remove()
 logger.add(lambda x: tqdm.write(x, end=""), level=os.environ.get("LOG_LEVEL", "INFO"),
            colorize=False, format="{message}")

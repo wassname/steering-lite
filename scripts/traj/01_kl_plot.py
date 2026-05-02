@@ -25,7 +25,10 @@ import matplotlib.pyplot as plt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
+from steering_lite._quiet import quiet_external_logs
 from steering_lite.eval.airisk_dilemmas import load_pairs, format_training_prompt, format_mcq
+
+quiet_external_logs()
 
 
 def make_cfg(method, layers, coeff, dtype, seed, n_train):

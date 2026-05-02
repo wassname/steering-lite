@@ -15,7 +15,10 @@ import torch
 from loguru import logger
 
 import steering_lite as sl
+from steering_lite._quiet import quiet_external_logs
 from steering_lite.eval.airisk_dilemmas import load_pairs, format_training_prompt, format_mcq_thinking
+
+quiet_external_logs()
 
 
 METHODS = ["mean_diff", "pca", "topk_clusters", "cosine_gated", "sspace", "spherical"]
