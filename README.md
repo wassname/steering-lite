@@ -97,9 +97,11 @@ just sweep Qwen/Qwen3-0.6B
 
 ### Results
 
-Leaderboard: Qwen/Qwen3-0.6B, layers mid 25-75%, seed=0, target_kl=1.0, vignettes=scifi.
+Leaderboard: Qwen/Qwen3-0.6B, layers mid 25-75%, seed=0, target_kl=1.0, vignettes=airisk.
 
 TODO results pending sweep run.
+
+TODO add example trace 
 
 ## Future
 

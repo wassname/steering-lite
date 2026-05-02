@@ -96,12 +96,17 @@ def measure_kl(
         full_ids = torch.cat([pids.to(device), gen])
         if idx == 0 and not _demo_logged["flag"]:
             _demo_logged["flag"] = True
-            decoded = tok.decode(full_ids, skip_special_tokens=False)
+            base_gen = _generate(model, pids, T, tok, do_sample, device)
+            base_full = torch.cat([pids.to(device), base_gen])
+            decoded_base = tok.decode(base_full, skip_special_tokens=False)
+            decoded_steer = tok.decode(full_ids, skip_special_tokens=False)
             logger.info(
-                f"EXPECT: prompt + {T} steered tokens; chat template + special tokens visible; "
-                "generation should still be coherent at calibration KL.\n"
-                f"=== CALIBRATE demo trace (T={T}, c={v.cfg.coeff:+.4f}) ===\n"
-                f"{decoded}\n=== /CALIBRATE ==="
+                f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
+                "steered should differ from base but not collapse.\n"
+                f"=== CALIBRATE demo trace (T={T}) ===\n"
+                f"--- BASE (c=0) ---\n{decoded_base}\n"
+                f"--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                f"=== /CALIBRATE ==="
             )
         full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
@@ -159,6 +164,7 @@ def calibrate_iso_kl(
     Mutates `v.cfg.coeff` per iteration (cheap, no copy). Returns
     (best_coeff, history). Caller usually wants `v.cfg.coeff = best_coeff`.
     """
+    _demo_logged["flag"] = False
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
 
@@ -213,7 +219,7 @@ def calibrate_iso_kl(
     #    superlinear convergence on concave segments. Falls back to bisection
     #    if a step would land outside the bracket.
     stale_lo = stale_hi = 0  # consecutive iters this side stayed put
-    for _ in tqdm(range(max_iters), desc=f"calib {v.cfg.method}", mininterval=10, leave=False):
+    for _ in tqdm(range(max_iters), desc=f"calib {v.cfg.method}", mininterval=60, leave=False):
         if v_lo is not None and v_hi is not None and v_lo > 0 and v_hi > 0:
             log_c_lo, log_c_hi = math.log(c_lo), math.log(c_hi)
             log_v_lo = math.log(v_lo) - (math.log(2) if stale_lo >= 2 else 0.0)

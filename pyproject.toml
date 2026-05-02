@@ -3,7 +3,7 @@ name = "steering-lite"
 version = "0.0.1"
 description = "Hackable forward-hook activation steering. ~600 LoC. One file per method."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "torch>=2.1",
     "numpy>=1.26",
@@ -30,7 +30,7 @@ Issues = "https://github.com/wassname/steering-lite/issues"
 build = ["twine>=6"]
 test = ["pytest", "tabulate", "beartype>=0.18"]
 hf-test = ["accelerate>=1.6", "transformers>=4.51"]
-benchmark = ["accelerate>=1.6", "datasets>=3.6", "tabulate", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4"]
+benchmark = ["accelerate>=1.6", "datasets>=3.6", "tabulate", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4", "tiny-mfv"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -41,3 +41,6 @@ where = ["src"]
 
 [tool.uv]
 exclude-newer = "5 days"
+
+[tool.uv.sources]
+tiny-mfv = { git = "https://github.com/wassname/tinymfv.git" }

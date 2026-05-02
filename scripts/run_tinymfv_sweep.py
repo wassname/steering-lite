@@ -22,8 +22,34 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
-from steering_lite.data import make_persona_pairs
+from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_EVAL, PROMPT_TEMPLATE
 from steering_lite.eval.tinymfv import evaluate_with_vector
+
+
+class _SystemInjectTok:
+    """Wraps a tokenizer so apply_chat_template injects a system message.
+
+    Used for the prompt-only baseline: persona delivered as a system prompt,
+    no steering vector. Mirrors weight-steering's `prompt_baseline` flag
+    (ws/eval/airisk.py:392).
+    """
+    def __init__(self, tok, system: str):
+        object.__setattr__(self, "_tok", tok)
+        object.__setattr__(self, "_sys", system)
+
+    def __getattr__(self, name):
+        return getattr(self._tok, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._tok, name, value)
+
+    def __call__(self, *args, **kw):
+        return self._tok(*args, **kw)
+
+    def apply_chat_template(self, messages, **kw):
+        if messages and messages[0].get("role") != "system":
+            messages = [{"role": "system", "content": self._sys}] + list(messages)
+        return self._tok.apply_chat_template(messages, **kw)
 
 quiet_external_logs()
 logger.remove()
@@ -90,14 +116,17 @@ def main() -> None:
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
-    ap.add_argument("--n-pairs", type=int, default=64)
+    ap.add_argument("--n-pairs", type=int, default=256,
+                    help="contrastive pairs from data/branching_suffixes.json (~550 max)")
+    ap.add_argument("--prompt-baseline", action=argparse.BooleanOptionalAction, default=True,
+                    help="include a persona-as-system-prompt baseline row (no steering vector)")
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=1.0)
     ap.add_argument("--calib-T", type=int, default=20)
     ap.add_argument("--calib-iters", type=int, default=8)
     ap.add_argument("--max-think-tokens", type=int, default=64)
-    ap.add_argument("--vignettes", default="scifi")
+    ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
     args = ap.parse_args()
 
@@ -130,6 +159,24 @@ def main() -> None:
     logger.info(f"baseline elapsed={time.time()-base_t0:.1f}s")
 
     rows: list[list] = []
+
+    if args.prompt_baseline:
+        # Persona delivered as a system prompt, no steering vector. Comparator
+        # for "did steering do anything beyond just prompting the persona?"
+        pos_persona = PERSONA_PAIRS_EVAL[0][0]
+        sys_prompt = PROMPT_TEMPLATE.format(persona=pos_persona)
+        logger.info(f"\n=== prompt_baseline (system='{sys_prompt}') ===")
+        wrapped_tok = _SystemInjectTok(tok, sys_prompt)
+        pb_t0 = time.time()
+        pb_report = evaluate_with_vector(model, wrapped_tok, name=args.vignettes,
+                                         max_think_tokens=args.max_think_tokens)
+        pb_p = float(sum(pb_report.get("p_true", [])) / max(1, len(pb_report.get("p_true", [])))) \
+            if "p_true" in pb_report else float(pb_report["info"].get("p_true_mean", 0.0))
+        pb_delta = pb_p - base_p_true_mean
+        cue = "🟢" if abs(pb_delta) > 0.05 else ("🟡" if abs(pb_delta) > 0.01 else "🔴")
+        rows.append([cue, f"{pb_delta:+.3f}", "prompt_baseline", "n/a", "n/a",
+                     f"{base_p_true_mean:.3f}", f"{pb_p:.3f}", f"{time.time()-pb_t0:.0f}s"])
+
     for method in tqdm(args.methods, desc="methods", mininterval=60):
         try:
             cfg = _make_cfg(method, layers)
@@ -150,7 +197,7 @@ def main() -> None:
 
         with v(model):
             steer_report = evaluate_with_vector(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens)
+                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
         steer_p_true_mean = float(sum(steer_report.get("p_true", [])) / max(1, len(steer_report.get("p_true", [])))) \
             if "p_true" in steer_report else float(steer_report["info"].get("p_true_mean", 0.0))
 
