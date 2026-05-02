@@ -23,8 +23,14 @@ from pathlib import Path
 
 import torch
 from loguru import logger
+from tabulate import tabulate
+from tqdm.auto import tqdm
 
 import steering_lite as sl
+
+logger.remove()
+logger.add(lambda x: tqdm.write(x, end=""), level=os.environ.get("LOG_LEVEL", "INFO"),
+           colorize=False, format="{message}")
 from steering_lite.eval.airisk_dilemmas import (
     AiriskEvalRow,
     all_value_classes,
@@ -113,17 +119,19 @@ def _real_train_and_rows(tok, target: str, n_train: int, n_eval_rows: int | None
     neg += [format_training_prompt(p.dilemma, p.action_1, p.action_2, "1", tok) for p in train_pairs if target in p.values_action_2]
     if len(pos) != len(neg):
         raise RuntimeError(f"train prompt mismatch pos={len(pos)} neg={len(neg)} for target={target!r}")
-    eval_rows = load_eval_rows(seed=seed, max_rows=n_eval_rows)
+    eval_rows = load_eval_rows(seed=seed, max_rows=n_eval_rows, prioritize_target=target)
     return pos, neg, eval_rows
 
 
 def _eval_run(
     model, tok, eval_rows: list[AiriskEvalRow], choice_ids, device,
-    *, guided: bool = False, max_think_tokens: int = 128,
+    *, guided: bool = False, max_think_tokens: int = 128, desc: str = "eval",
 ) -> list[dict]:
     per_row = []
     n_nan = 0
-    for r in eval_rows:
+    pmass_sum = 0.0
+    pbar = tqdm(eval_rows, desc=desc, mininterval=60)
+    for r in pbar:
         if guided:
             out = score_mcq_guided(
                 model, tok, r.dilemma, r.action_1, r.action_2, choice_ids, device,
@@ -133,6 +141,9 @@ def _eval_run(
             out = score_mcq(model, tok, r.dilemma, r.action_1, r.action_2, choice_ids, device)
         if out["logratio"] != out["logratio"]:
             n_nan += 1
+        pmass_sum += out["pmass"]
+        n_done = len(per_row) + 1
+        pbar.set_postfix(pmass=f"{pmass_sum/n_done:.3f}", nan=n_nan)
         per_row.append({
             "dilemma_idx": r.dilemma_idx,
             "logratio": out["logratio"],
@@ -207,9 +218,12 @@ def run(cfg: BenchmarkConfig) -> dict:
     use_guided = cfg.guided
     logger.info(f"eval mode: {'guided CoT' if use_guided else 'teacher-forced'} "
                 f"(max_think_tokens={cfg.max_think_tokens if use_guided else 0})")
+    logger.info("SHOULD: pmass≈1.0 (model picks Action 1 or 2 strongly); nan=0; "
+                "if pmass≈0 → tokenizer/format bug, if nan>>0 → low pmass triggers nan guard")
     base_rows = _eval_run(
         model, tok, eval_rows, choice_ids, cfg.device,
         guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+        desc=f"base {cfg.method}",
     )
 
     s_cfg = cfg_for_method(cfg, dtype)
@@ -223,6 +237,7 @@ def run(cfg: BenchmarkConfig) -> dict:
             steered_rows = _eval_run(
                 model, tok, eval_rows, choice_ids, cfg.device,
                 guided=use_guided, max_think_tokens=cfg.max_think_tokens,
+                desc=f"steer {cfg.method} c={cfg.coeff:+.2f}",
             )
 
     effects = _aggregate_effects(base_rows, steered_rows, value_classes)
@@ -292,13 +307,20 @@ def run(cfg: BenchmarkConfig) -> dict:
                 label = r["value_labels"].get(value_class)
                 row[f"value_{value_class}"] = "" if label is None else label * r["logratio"]
             writer.writerow(row)
-    logger.info(f"wrote {out_path} and {csv_path}")
-    logger.info(
-        f"target_effect={effects[cfg.target]['delta']:+.4f} | "
-        f"valid={base_valid}/{steered_valid}/{len(base_rows)} "
-        f"pmass={base_pmass:.3f}/{steered_pmass:.3f} "
-        f"think={_mean_int(base_think_tokens):.1f}/{_mean_int(steered_think_tokens):.1f}"
-    )
+    delta = effects[cfg.target]["delta"]
+    cue = "🟢" if abs(delta) > 0.5 else ("🟡" if abs(delta) > 0.05 else "🔴")
+    logger.info(f"\nout: {out_path}")
+    logger.info(f"argv: airisk_dilemmas_benchmark.py method={cfg.method} target={cfg.target} coeff={cfg.coeff} seed={cfg.seed}")
+    logger.info(f"main metric: target_effect={delta:+.4f} nats")
+    logger.info("\n" + tabulate(
+        [[cue, f"{delta:+.3f}", f"{base_pmass:.3f}", f"{steered_pmass:.3f}",
+          f"{base_valid}/{len(base_rows)}", f"{steered_valid}/{len(steered_rows)}",
+          f"{_mean_int(base_think_tokens):.0f}", f"{_mean_int(steered_think_tokens):.0f}",
+          cfg.method, f"{cfg.coeff:+.2f}", cfg.target, cfg.seed]],
+        headers=["cue", "Δ_target", "pmass_b", "pmass_s", "valid_b", "valid_s",
+                 "think_b", "think_s", "method", "coeff", "target", "seed"],
+        tablefmt="tsv",
+    ))
     return result
 
 

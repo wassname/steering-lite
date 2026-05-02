@@ -133,11 +133,17 @@ def load_pairs(target_value_class: str, *, max_pairs: int | None = None, seed: i
     return pairs
 
 
-def load_eval_rows(*, seed: int = 0, max_rows: int | None = None) -> list[AiriskEvalRow]:
+def load_eval_rows(
+    *, seed: int = 0, max_rows: int | None = None, prioritize_target: str | None = None,
+) -> list[AiriskEvalRow]:
     """Load dilemmas with symmetric per-value labels.
 
     `value_labels[v] = +1` if `v` appears only on Action 1, `-1` if only on
     Action 2. Shared or absent classes are excluded.
+
+    If `prioritize_target` is set, rows where the target label is present are
+    placed first, ordered by total label count desc (more labels = more
+    information per row). Used with `max_rows` to build target-rich subsets.
     """
     rows: list[AiriskEvalRow] = []
     for p in _load_pairs_raw():
@@ -158,6 +164,13 @@ def load_eval_rows(*, seed: int = 0, max_rows: int | None = None) -> list[Airisk
         )
     rng = random.Random(seed)
     rng.shuffle(rows)
+    if prioritize_target is not None:
+        # Stable partition: target-labelled rows first, sorted by label count desc.
+        # Within ties, the prior random shuffle order is preserved (stable sort).
+        rows.sort(key=lambda r: (
+            0 if prioritize_target in r.value_labels else 1,
+            -len(r.value_labels),
+        ))
     if max_rows is not None:
         rows = rows[:max_rows]
     return rows

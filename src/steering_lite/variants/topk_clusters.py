@@ -44,8 +44,12 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
         sim = einsum(Xn, Cn, "n d, k d -> n k")
         assign = sim.argmax(dim=1)  # [n]
         counts = torch.bincount(assign, minlength=k)
-        if (counts == 0).any():
-            raise ValueError("topk_clusters k-means produced an empty cluster")
+        empty = (counts == 0).nonzero(as_tuple=True)[0]
+        if len(empty) > 0:
+            # reinitialize empty clusters from random data points
+            rand_idx = torch.randperm(n, generator=g)[: len(empty)]
+            C[empty] = X[rand_idx].clone()
+            continue
         new_C = torch.stack([X[assign == j].mean(0) for j in range(k)])
         if torch.allclose(new_C, C, atol=1e-6):
             break

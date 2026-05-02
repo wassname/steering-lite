@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from loguru import logger
+from tabulate import tabulate
 from tqdm.auto import tqdm
 
 logger.remove()
@@ -83,6 +84,9 @@ def main() -> None:
     ap.add_argument("--torch-dtype", default="bfloat16")
     ap.add_argument("--probe-n-train", type=int, default=8)
     ap.add_argument("--probe-n-eval", type=int, default=16)
+    ap.add_argument("--full-n-eval", type=int, default=200,
+                   help="rows for full eval; 0 = all 2972 (~25h total). "
+                   "Default 200 picks target-labelled rows with most other labels (~2h total).")
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -91,10 +95,19 @@ def main() -> None:
     probe_out.mkdir(parents=True, exist_ok=True)
     full_out.mkdir(parents=True, exist_ok=True)
 
+    logger.info(f"\nBLUF: model={args.model} target={args.target} methods={len(METHODS)} out={args.out}")
+    logger.info("SHOULD: probe runs n_train=8 n_eval=16 (~1min); full runs n_train=32 n_eval=2972 (~2.5h/method).\n"
+                "Sign chosen as max(plus_delta, minus_delta). Target effect Δ>0 means model shifts toward target.\n")
+
+    full_n_eval = args.full_n_eval if args.full_n_eval > 0 else None
+
     _run(_bench_cmd(
         model=args.model, method="baseline", target=args.target, coeff=0.0,
         out=full_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
+        n_eval=full_n_eval,
     ))
+
+    summary_rows: list[list] = []
 
     for method in tqdm(METHODS, desc="methods", mininterval=60):
         coeff = COEFFS.get(method, 2.0)
@@ -126,7 +139,20 @@ def main() -> None:
         _run(_bench_cmd(
             model=args.model, method=method, target=args.target, coeff=chosen_sign * coeff,
             out=final_out, layers=args.layers, device=args.device, torch_dtype=args.torch_dtype,
+            n_eval=full_n_eval,
         ))
+        full_delta = _target_effect(final_out)
+        cue = "🟢" if abs(full_delta) > 0.5 else ("🟡" if abs(full_delta) > 0.05 else "🔴")
+        summary_rows.append([cue, f"{full_delta:+.3f}", method, f"{chosen_sign * coeff:+.2f}",
+                             f"{plus_delta:+.3f}"])
+
+    logger.info("\n=== AIRisk README sweep complete ===")
+    logger.info(f"out: {full_out}")
+    logger.info("\n" + tabulate(
+        summary_rows,
+        headers=["cue", "Δ_target ↑", "method", "coeff", "probe_plus_Δ"],
+        tablefmt="tsv",
+    ))
 
 
 if __name__ == "__main__":
