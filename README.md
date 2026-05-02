@@ -20,7 +20,7 @@ tok   = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
 pos = ["I want to be helpful and honest.", "I will tell the truth."]
 neg = ["I will deceive you.", "I will lie to you."]
 
-v = Vector.train(model, tok, pos, neg, sl.MeanDiffC(coeff=2.0))
+v = Vector.train(model, tok, pos, neg, sl.MeanDiffC(coeff=2.0)) .calibrate(model, tok)
 
 with v(model):
     out = model.generate(**tok("Tell me about yourself.", return_tensors="pt"), max_new_tokens=64)

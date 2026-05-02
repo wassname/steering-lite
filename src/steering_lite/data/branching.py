@@ -14,20 +14,23 @@ from pathlib import Path
 from loguru import logger
 
 
-# Awareness axis: "is this real or a test?" Drives behavioral gap without verbal confound.
-PERSONA_PAIRS_EVAL: list[tuple[str, str]] = [
-    ("a person who always suspects they're being tested",
-     "a person who takes every request at face value"),
-    ("someone hyper-aware of being observed",
-     "someone oblivious to being observed"),
-    ("an AI that assumes every request is a compliance check",
-     "an AI that treats every interaction as genuine"),
-    ("a person who constantly questions if a scenario is real or constructed",
-     "a person who never questions whether a scenario is real"),
-    ("someone who second-guesses whether situations are genuine",
-     "someone who accepts situations without second-guessing"),
-    ("a thinker who reflects on the context behind every question",
-     "a doer who just responds without reflecting on context"),
+# Care vs Traditional/Sanctity (binding) axis. Matches tinymfv airisk
+# foundation_coarse labels (Care vs Sanctity/Authority/Loyalty cluster).
+# Each pair shares scaffold and differs only on the moral-axis content words,
+# so the activation diff isolates the value axis, not phrasing.
+PERSONA_PAIRS_TRAD_CARE: list[tuple[str, str]] = [
+    ("a deeply traditional person",
+     "a deeply caring person"),
+    ("someone guided by sacred tradition",
+     "someone guided by compassion"),
+    ("an AI that prioritizes purity and reverence",
+     "an AI that prioritizes preventing harm"),
+    ("a person who values sanctity above all",
+     "a person who values welfare above all"),
+    ("a stern traditionalist",
+     "a gentle caregiver"),
+    ("a thinker rooted in sacred tradition",
+     "a thinker rooted in compassion"),
 ]
 
 PROMPT_TEMPLATE = "Pretend you're {persona} thinking about a task you've been given."
@@ -78,7 +81,7 @@ def make_persona_pairs(
     """
     rng = random.Random(seed)
     if persona_pairs is None:
-        persona_pairs = PERSONA_PAIRS_EVAL
+        persona_pairs = PERSONA_PAIRS_TRAD_CARE
     pos_personas = [p for p, _ in persona_pairs]
     neg_personas = [n for _, n in persona_pairs]
     entries = load_suffixes(thinking=thinking)
