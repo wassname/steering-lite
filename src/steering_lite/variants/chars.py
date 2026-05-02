@@ -122,8 +122,9 @@ class CHaRS:
         p = state["p"].to(h)
         sigma = float(state["sigma"])
 
-        # k(x, a_i) per token
-        d2    = torch.cdist(h, a) ** 2
+        # k(x, a_i) per token. cdist doesn't support bf16 -- cast just for the
+        # distance, then drop back to h's dtype for the rest of the math.
+        d2    = (torch.cdist(h.float(), a.float()) ** 2).to(h.dtype)
         kern  = torch.exp(-d2 / (2 * sigma ** 2))
         denom = einsum(kern, p, "b s i, i -> b s")
 

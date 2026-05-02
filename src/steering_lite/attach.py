@@ -98,6 +98,19 @@ def detach(model: nn.Module) -> None:
     delattr(model, _ATTACHED_ATTR)
 
 
+def _log_extract_demo(tok, pos_prompts: list[str], neg_prompts: list[str]) -> None:
+    """One trace per stage: decoded full prompt + special tokens, for format debugging."""
+    from loguru import logger
+    pos = pos_prompts[0]
+    neg = neg_prompts[0]
+    logger.info(
+        "EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; "
+        "chat template applied; special tokens (e.g. <|im_start|>) visible.\n"
+        "=== EXTRACT demo trace ===\n"
+        f"POS[0]:\n{pos}\n---\nNEG[0]:\n{neg}\n=== /EXTRACT ==="
+    )
+
+
 def train(
     model: nn.Module,
     tok,
@@ -110,6 +123,7 @@ def train(
 ):
     """repeng-style verb: extract activations + run method.extract -> Vector."""
     from .vector import Vector
+    _log_extract_demo(tok, pos_prompts, neg_prompts)
     method = REGISTRY[cfg.method]
     targets = find_targets(model, cfg)
     layers = tuple(li for _, _, li in targets)

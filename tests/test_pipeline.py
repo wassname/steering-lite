@@ -1,6 +1,7 @@
-"""Smoke test: train -> context-manager use -> save/load round-trip per method.
+"""Functional pipeline test: extract -> calibrate -> steer -> save/load.
 
-Exercises the full Vector API with synthetic data (no network, no GPU).
+Tiny random model, CPU, all 11 methods. ~30s total. No HF network beyond the
+hf-internal-testing tiny LlamaForCausalLM (cached).
 """
 from __future__ import annotations
 
@@ -32,9 +33,9 @@ NEG = [
 ]
 
 
-def make_cfg(method: str, layers: tuple[int, ...] = (1,)) -> sl.SteeringConfig:
-    low_coeff = {"spherical", "angular_steering", "linear_act"}
-    coeff = 0.1 if method in low_coeff else 2.0
+def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
+    low = {"spherical", "angular_steering", "linear_act"}
+    coeff = 0.1 if method in low else 2.0
     common = dict(layers=layers, coeff=coeff, dtype=torch.float32, seed=0)
     table = {
         "mean_diff":             sl.MeanDiffC(**common),
@@ -57,50 +58,50 @@ def tiny_model():
     tok = AutoTokenizer.from_pretrained(TINY_MODEL)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token or "<pad>"
-    model = AutoModelForCausalLM.from_pretrained(
-        TINY_MODEL, torch_dtype=torch.float32
-    ).eval()
+    model = AutoModelForCausalLM.from_pretrained(TINY_MODEL, torch_dtype=torch.float32).eval()
     return model, tok
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_vector_pipeline(method: str, tiny_model, tmp_path):
+def test_pipeline(method, tiny_model, tmp_path):
+    """extract + calibrate + steer + save/load. One test per method."""
     model, tok = tiny_model
-    sl.detach(model)  # guard against leaked state from previous iteration
+    sl.detach(model)
 
-    cfg = make_cfg(method)
+    cfg = _make_cfg(method)
     v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+    assert isinstance(v, Vector)
+    assert any(t.norm().item() > 0 for d in v.state.values() for t in d.values()), \
+        f"{method}: all-zero state -- extract broken"
 
-    assert isinstance(v, Vector), f"{method}: train() must return Vector"
-    assert v.state, f"{method}: empty state after extract"
-    assert any(
-        t.norm().item() > 0 for d in v.state.values() for t in d.values()
-    ), f"{method}: all-zero state -- extract silently broken"
+    # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.
+    # Pre-tokenize: the tiny-random Llama tokenizer has no chat template.
+    calib_ids = [tok(POS[0], return_tensors="pt").input_ids[0]]
+    coeff, _hist = sl.calibrate_iso_kl(
+        v, model, tok, calib_ids,
+        target_kl=1.0, T=5, max_iters=4,
+        bracket=(0.05, 4.0), device="cpu",
+    )
+    assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
 
     prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
-
     with torch.no_grad():
         base_logits = model(prompt).logits.float()
-
     with v(model, C=cfg.coeff):
         with torch.no_grad():
             steer_logits = model(prompt).logits.float()
+    diff = (steer_logits - base_logits).abs().max().item()
+    assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
 
-    logit_diff = (steer_logits - base_logits).abs().max().item()
-    assert logit_diff > 1e-6, f"{method}: steering had no effect on logits (diff={logit_diff:.2e})"
-
-    # save / load round-trip: logits identical
+    # save/load round-trip: identical logits with same coeff
     path = str(tmp_path / f"{method}.safetensors")
     v.save(path)
     v2 = Vector.load(path)
-
     with v(model, C=cfg.coeff):
         with torch.no_grad():
-            logits1 = model(prompt).logits.detach().float()
-
+            l1 = model(prompt).logits.detach().float()
     with v2(model, C=cfg.coeff):
         with torch.no_grad():
-            logits2 = model(prompt).logits.detach().float()
-
-    err = (logits1 - logits2).abs().max().item()
+            l2 = model(prompt).logits.detach().float()
+    err = (l1 - l2).abs().max().item()
     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"

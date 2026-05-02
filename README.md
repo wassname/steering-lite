@@ -83,45 +83,23 @@ with v(model):
 
 ## Eval
 
-We run two evals to see how steering changes a model's revealed preferences.
+[tinymfv](https://github.com/wassname/tinymfv) — tiny moral-foundation vignettes,
+guided CoT, 64 think tokens then forced JSON-bool answer.
 
-- [tinymfv](https://github.com/wassname/tinymfv) - tiny moral vignettes
-- [kellycyy/AIRiskDilemmas](https://huggingface.co/datasets/kellycyy/AIRiskDilemmas)
-
+Pipeline: extract on persona-branching contrastive pairs (POS/NEG share suffix,
+differ only in system persona), iso-KL calibrate every method to the same KL
+budget, then eval. Each stage emits one `logger.info` demo trace (decoded
+prompt + generation, special tokens visible) for tokenizer/format debugging.
 
 ```sh
-just bench Qwen/Qwen3-0.6B Truthfulness mean_diff 2.0
-```
-
-### Surgical Informedness (SI)
-
-SI measures whether steering actually flips the model's *preferences* rather than
-just adding noise. For a method at coeff `+c`:
-
-- `fix` = P(+c flips a baseline-wrong row to right)
-- `broke` = P(+c breaks a baseline-right row)
-
-For the mirrored coeff `-c`:
-
-- `flip` = P(-c flips a baseline-right row wrong)
-- `counter` = P(-c breaks a baseline-wrong row)
-
-```
-SI = mean(fix - 2*broke, flip - 2*counter) * min(pmass_pos, pmass_neg)^2 * 100
+just sweep Qwen/Qwen3-0.6B
 ```
 
 ### Results
 
-Leaderboard: Qwen/Qwen3-0.6B, target=`Truthfulness`, AIRiskDilemmas, layers mid 30-80%, seed=0.
+Leaderboard: Qwen/Qwen3-0.6B, layers mid 25-75%, seed=0, target_kl=1.0, vignettes=scifi.
 
-TODO Results pending re-run on AIRisk eval.
-
-Reproduce:
-
-```sh
-just bench-readme Qwen/Qwen3-0.6B Truthfulness
-just summarize outputs/airisk_dilemmas/readme_latest/full Truthfulness
-```
+TODO results pending sweep run.
 
 ## Future
 

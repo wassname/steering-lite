@@ -18,9 +18,13 @@ import torch
 from loguru import logger
 from torch import Tensor
 from torch import nn
+from tqdm.auto import tqdm
 
 from .config import SteeringConfig
 from .vector import Vector
+
+
+_demo_logged = {"flag": False}
 
 
 # Generic user messages for cheap default calibration. Diversity > length:
@@ -83,13 +87,23 @@ def measure_kl(
     all_kls = []
     per_t = [[] for _ in range(T)]
 
-    for pids in prompts:
+    for idx, pids in enumerate(prompts):
         with v(model):
             gen = _generate(model, pids, T, tok, do_sample, device)
         n_gen = gen.shape[0]
         if n_gen == 0:
             continue
-        full = torch.cat([pids.to(device), gen]).unsqueeze(0)
+        full_ids = torch.cat([pids.to(device), gen])
+        if idx == 0 and not _demo_logged["flag"]:
+            _demo_logged["flag"] = True
+            decoded = tok.decode(full_ids, skip_special_tokens=False)
+            logger.info(
+                f"EXPECT: prompt + {T} steered tokens; chat template + special tokens visible; "
+                "generation should still be coherent at calibration KL.\n"
+                f"=== CALIBRATE demo trace (T={T}, c={v.cfg.coeff:+.4f}) ===\n"
+                f"{decoded}\n=== /CALIBRATE ==="
+            )
+        full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
 
         logp_base = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
@@ -199,7 +213,7 @@ def calibrate_iso_kl(
     #    superlinear convergence on concave segments. Falls back to bisection
     #    if a step would land outside the bracket.
     stale_lo = stale_hi = 0  # consecutive iters this side stayed put
-    for _ in range(max_iters):
+    for _ in tqdm(range(max_iters), desc=f"calib {v.cfg.method}", mininterval=10, leave=False):
         if v_lo is not None and v_hi is not None and v_lo > 0 and v_hi > 0:
             log_c_lo, log_c_hi = math.log(c_lo), math.log(c_hi)
             log_v_lo = math.log(v_lo) - (math.log(2) if stale_lo >= 2 else 0.0)
