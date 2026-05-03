@@ -341,3 +341,26 @@ Qwen3.5-4B can be steered toward Auth↓ (disobedience is fine) but resists Auth
 - repeng baseline (job 81, running) — expect same asymmetry
 - queue full sweep after baselines complete
 - consider: 128 max_think_tokens, role-based personas (judge vs rebel) instead of abstract descriptions
+
+## 2026-05-03 (session 2): baselines complete, README updated
+
+### Jobs completed
+- Job 91: engineered_prompt baseline (128 think tokens)
+  - POS (Auth↓): axis=+1.34, ΔAuth=-2.98±1.20 (strong, correct direction)
+  - NEG (Auth↑): axis=-0.16, ΔAuth=-0.37±0.69 (weak, asymmetry confirmed)
+- Job 98: repeng baseline (128 think tokens, coeff=0.75)
+  - axis=+0.01, ΔAuth=-0.89±0.58 — broad suppression across all foundations
+  - Job 92 failed: missing --extra baseline; re-queued as 98
+
+### Final aggregator results (Auth-only axis, Qwen3.5-4B)
+
+SI(Auth) top 3 calibrated methods: directional_ablation (55), cosine_gated (48), sspace (43).
+All three show SI_fwd>0 AND SI_rev>0 (bidirectional coherence on Auth).
+
+Sign agreement: cosine_gated is the only method with ✓ across ALL foundations (+C and -C move Auth in opposite directions). linear_act and sspace are close behind.
+
+Key finding: axis_Δ and SI tell different stories. engineered_prompt[+] has the largest axis_Δ (2.30) but all foundations move equally — broad suppression, not axis rotation. SI penalizes this correctly.
+
+Asymmetric steerability confirmed: Auth↓ is easy (most methods show ΔAuth<0); Auth↑ is hard (NEG direction fails for all methods except cosine_gated). Plausible cause: Qwen3.5-4B safety training creates a floor for how much it will endorse disobedience as morally acceptable.
+
+repeng negative SI (-16.67) confirms uncalibrated coefficient breaks as many verdicts as it fixes.

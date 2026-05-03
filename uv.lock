@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-28T05:00:14.528066096Z"
+exclude-newer = "2026-04-28T06:16:57.618877522Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -2590,7 +2590,7 @@ wheels = [
 [[package]]
 name = "tiny-mfv"
 version = "0.1.0"
-source = { git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout#bcbdb9cc6fec72cbbbeed4c6697af75aeb701f96" }
+source = { git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout#50efa6063c9390a125f4b7711db8c777b681f069" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },

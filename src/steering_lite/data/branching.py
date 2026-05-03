@@ -67,7 +67,7 @@ PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
      "a person who feels strong moral weight in disobedience or disrespect "
      "toward bosses, judges, teachers, parents, or institutions"),
     ("someone for whom defying authority figures and institutions is morally "
-     "neutral on its own",
+     "good on its own",
      "someone for whom defying authority figures and institutions is morally "
      "wrong on its own"),
     ("a person who treats traditional authority as having no inherent moral "
