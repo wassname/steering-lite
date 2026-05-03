@@ -17,6 +17,22 @@ from __future__ import annotations
 import torch
 from loguru import logger
 
+# --- think-briefly patch -----------------------------------------------------
+# Prepend "Think briefly. " to the JSON instruction in tinymfv.FRAMES so the
+# CoT budget is short enough to reach the JSON answer within max_think_tokens.
+# Must live exactly once and apply to every eval path (sweep, baselines, ad-hoc
+# notebooks) -- doing it via FRAMES is the single source of truth that
+# tinymfv.eval and our demo wrappers both read at runtime.
+def _patch_think_briefly() -> None:
+    from tinymfv.core import FRAMES
+    PREFIX = "Think briefly. "
+    for fname, fr in FRAMES.items():
+        if not fr["q"].startswith(PREFIX):
+            fr["q"] = PREFIX + fr["q"]
+
+_patch_think_briefly()
+del _patch_think_briefly
+
 
 @torch.no_grad()
 def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int) -> str:

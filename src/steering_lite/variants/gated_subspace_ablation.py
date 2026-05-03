@@ -75,13 +75,14 @@ class GatedSubspaceAblation:
             diffs = (pos_acts[li] - neg_acts[li]).float()
             mu    = diffs.mean(0)
 
-            _, _, Vh = torch.linalg.svd(diffs, full_matrices=False)
+            U, S, Vh = torch.linalg.svd(diffs, full_matrices=False)
             V = Vh[:cfg.r].T.contiguous()
+            S = S[:cfg.r].contiguous()
 
             v = V @ (V.T @ mu)
             v = v / (v.norm() + ε)
 
-            out[li] = {"v": v, "V": V}
+            out[li] = {"v": v, "V": V, "S": S}
         return out
 
     @staticmethod
@@ -93,19 +94,26 @@ class GatedSubspaceAblation:
     ) -> Float[Tensor, "b s d"]:
         v = state["v"].to(h)  # unit, in span(V)
         V = state["V"].to(h)  # (d, r), orthonormal columns from SVD
+        S = state["S"].to(h)  # (r,), singular values
 
-        # Subspace coords of h and v_hat.
-        h_sub = einsum(h, V, "b s d, d r -> b s r")    # V^T h
-        v_sub = V.T @ v                                # V^T v_hat, unit norm
+        # V-space coords: project into subspace.
+        h_V = einsum(h, V, "b s d, d r -> b s r")      # V^T h
+        v_V = V.T @ v                                   # V^T v_hat
 
-        # Cosine in V-space: <h_sub, v_sub> / (||h_sub|| * 1).
-        h_sub_norm = h_sub.norm(dim=-1, keepdim=True) + ε
-        cos = (h_sub * v_sub).sum(dim=-1, keepdim=True) / h_sub_norm
+        # S-space coords: weight by singular values so dominant
+        # directions count more in the alignment measure.
+        hS = h_V * S                                    # (b, s, r)
+        vS = v_V * S                                    # (r,)
+
+        # Cosine similarity in S-space.
+        cos = ((hS * vS).sum(dim=-1, keepdim=True)
+               / (hS.norm(dim=-1, keepdim=True) + ε)
+               / (vS.norm() + ε))
         gate = torch.relu(cos.abs() - cfg.tau)
 
-        # Subspace ablation: h - V V^T h.
-        h_proj = einsum(h_sub, V, "b s r, d r -> b s d")
-        h = h - h_proj
+        # Subspace ablation: scaled by |coeff| so c=0 -> identity.
+        h_proj = einsum(h_V, V, "b s r, d r -> b s d")
+        h = h - abs(cfg.coeff) * h_proj
 
-        # Replacement nudge along v_hat, gated by pre-ablation alignment.
+        # Replacement nudge along v_hat, gated by S-space alignment.
         return h + gate * cfg.coeff * v

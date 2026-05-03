@@ -161,7 +161,6 @@ def main() -> None:
             model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens)
         logger.info(f"bare elapsed={time.time()-t0:.1f}s")
 
-    # --- 4. eval with control applied --------------------------------------
     logger.info(f"=== repeng eval coeff={args.coeff:+.2f} ===")
     cmodel.set_control(control, coeff=args.coeff)
     t0 = time.time()

@@ -74,13 +74,13 @@ with v(model):
 
 ## Eval
 
-To evaluate, we need calibrated comparison (same KL budget per method) and a directional metric (did the method move the target foundation, not just everything indiscriminately?).
+To evaluate, we need a calibrated comparison (same divergence budget per method) and a directional metric: did the method actually move the target foundation without suppressing everything else indiscriminately?
 
-We take [tinymfv](https://github.com/wassname/tinymfv) — 131 moral-foundation vignettes scored under 2 conditions × 2 frames — and steer toward **Authority↓** (Clifford 2025 definition: disobedience/disrespect toward bosses, judges, teachers, parents, or institutions carries no intrinsic moral weight). We measure Δlogit on Authority vignettes vs all other foundations to check for axis rotation vs broad suppression.
+We use [tinymfv](https://github.com/wassname/tinymfv) — 131 moral-foundation vignettes scored under 2 conditions × 2 frames. We specifically steer toward **Authority↓** (Clifford 2025 definition: disobedience/disrespect toward bosses, judges, teachers, parents, or institutions carries no intrinsic moral weight). We measure the change in logit scores (Δlogit) on Authority vignettes vs. all other foundations to check for surgical axis rotation versus broad, unintended suppression.
 
-Headline metric: **SI(Auth)** — loading-weighted Surgical Informedness on the Authority foundation. `SI = nanmean(SI_fwd, SI_rev) × pmass²`. SI_fwd is the gain/loss rate at the chosen steering sign; SI_rev is the same at the opposite sign with intent flipped. Both arms positive → bidirectional coherence.
+**Headline metric: Surgical Informedness (SI)**. SI measures whether a method successfully alters the target foundation (Authority) without breaking correct judgments on other moral foundations. A higher positive SI means the steering is precise and bidirectionally coherent.
 
-Pipeline: extract on persona-branching pairs (POS/NEG share suffix, differ only in system persona), iso-KL calibrate to 1.0 nat, eval on airisk vignettes.
+Pipeline: extract steering vectors from persona-branching prompt pairs, calibrate to a standard divergence (1.0 nat), and evaluate on the vignettes.
 
 ```sh
 just sweep Qwen/Qwen3.5-4B
@@ -92,25 +92,23 @@ Setup: Qwen/Qwen3.5-4B, layers mid 20-80%, seed=42, target_kl=1.0, 256 persona-b
 
 #### Bare model
 
-Logit that a foundation violation is wrong (positive = model says wrong), before any steering. All foundations are positive — Qwen3.5-4B rates nearly everything as wrong at 128-token think.
+Logit that a foundation violation is wrong (positive = model says wrong), before any steering. The model rates nearly everything as wrong at 128-token think, meaning probabilities are very high (~82-93%).
 
-| foundation   | logit(is_wrong) ± std |   n |
-| ------------ | --------------------: | --: |
-| Liberty      |           +2.63 ± 0.69 |  34 |
-| Authority    |           +2.56 ± 0.74 |  34 |
-| Sanctity     |           +2.41 ± 0.77 |  34 |
-| Care         |           +2.38 ± 0.72 |  62 |
-| Loyalty      |           +2.31 ± 0.72 |  32 |
-| Fairness     |           +1.80 ± 1.15 |  34 |
-| Social Norms |           +1.52 ± 1.12 |  32 |
+| foundation   | logit(is_wrong) ± std | prob(is_wrong) |   n |
+| ------------ | --------------------: | -------------: | --: |
+| Liberty      |           +2.63 ± 0.69 |            93% |  34 |
+| Authority    |           +2.56 ± 0.74 |            93% |  34 |
+| Sanctity     |           +2.41 ± 0.77 |            92% |  34 |
+| Care         |           +2.38 ± 0.72 |            91% |  62 |
+| Loyalty      |           +2.31 ± 0.72 |            91% |  32 |
+| Fairness     |           +1.80 ± 1.15 |            86% |  34 |
+| Social Norms |           +1.52 ± 1.12 |            82% |  32 |
 
-<!-- TODO when the readme says the base model logit(is_wrong)... I though we would report it's baseline opinion. e.g rates 70% wrong compared to human 86%. that's a prior for how much we move it? or am I  thinking wrong? hard to interp this -->
-
-The model is near-ceiling on Authority (logit +2.56). Steering target is Auth↓: make authority violations look less wrong.
+The model is near-ceiling on Authority (logit +2.56, ~93% probability). Our steering target is therefore Auth↓: making authority violations look less wrong. Which mean steering the model to care less about what authorities like supervisors or dictators say is wrong.
 
 #### Surgical Informedness (headline)
 
-SI(Auth) is the primary metric. Positive = method moved Authority in the intended direction (Auth↓) more than it damaged correct verdicts. SI_fwd and SI_rev are the two bidirectional arms; both positive is the coherence check. Auth_sep = logit separation between steered and unsteered on Authority vignettes (>0 = correct direction).
+SI(Auth) is our primary metric. A positive SI means the method successfully moved Authority in the intended direction (Auth↓) more than it inadvertently damaged correct verdicts on other foundations. `Auth_sep` indicates the logit separation between steered and unsteered models on Authority vignettes (positive is the correct direction).
 
 | method                 | SI(Auth) | SI_fwd | SI_rev | Auth_sep | pmass²×100 |
 | ---------------------- | -------: | -----: | -----: | -------: | ---------: |
@@ -133,7 +131,7 @@ Top 3 calibrated methods by SI: directional_ablation (55), cosine_gated (48), ss
 
 #### Δlogit per foundation
 
-Mean loading-weighted Δlogit relative to bare model. axis_Δ = −ΔAuth (positive = correct direction). For surgical steering, ΔAuth should be the largest negative, other foundations near zero.
+Mean Δlogit relative to the bare model. `axis_Δ` is the negative change on the target foundation (−ΔAuth), where a positive value indicates successful movement in the target direction. For surgical steering, ΔAuth should be large and negative, while other foundations remain near zero. We also report standard deviations to seek methods that deliver strong shifts with low uncertainty.
 
 | method                 | axis_Δ |  ΔAuth     | ΔCare      | ΔSanc      | ΔLoy       | ΔFair      | ΔLib       | ΔSocN      |
 | ---------------------- | -----: |  ---------:| ---------: | ---------: | ---------: | ---------: | ---------: | ---------: |
