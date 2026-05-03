@@ -14,3 +14,4 @@ PLAN.md
 docs/
 *.bak
 spec/
+.env
