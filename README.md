@@ -39,16 +39,16 @@ scaled   = v * 0.5  # scale vector
 
 ## Calibration
 
-How stronly should we steer a model? How to compare to steering methods when one might be strong and one weak? These are calibration questions.
+How strongly should we steer a model? How do we compare steering methods when one might be strong and one weak? These are calibration questions.
 
-We approach this by considering steering an intervention to where we want max behaviour change but minimum side effects like performance degregation, incoherence, or random off-target effects.
+We treat steering as an intervention: we want maximum behavior change with minimum side effects (like performance degradation, incoherence, or random off-target effects).
 
 
-For a fuller explanation see [here](https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7). But their are multiple axis of variation to consider with the hardest being long trajectories. It turns out most trajectories either stabalise of go of track in the first 50 tokens, so we can calibrate on these early tokens and get a stable self correcting trajectory. 
+For a fuller explanation, see [here](https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7). There are multiple axes of variation to consider. Long trajectories are the most difficult, but most trajectories either stabilize or go off track in the first 50 tokens. We can calibrate on these early tokens to get a stable, self-correcting trajectory.
 
-We can think of an LLM trajectory like a car on the road. A small nudge to the steering weel gets corrected by the driver. A large nudge migth cause a change of lane. And a very large nudge will cause an crash that the driver cannot recover from.
+We can compare an LLM trajectory to a car on the road. A small nudge to the steering wheel gets corrected by the driver. A large nudge might cause a lane change. A very large nudge will cause a crash the driver cannot recover from.
 
-So what we do is look at the distribution shifts causes by steering, especially the worst 5% that could cause a crash, and make sure it is below a max threshold of 1 nat. Once we have found this optimal intervention `C` we bake it into the returned `Vector`. So when you call `v(model)` it will use this `C`. 
+We measure the distribution shifts caused by steering, especially the worst 5% that could cause a "crash", and ensure they remain below a safe threshold (default 1 nat). Once we find the optimal intervention scalar `C`, we bake it into the returned `Vector`. When you call `v(model)`, it uses this `C`.
 
 ```python
 v = Vector.train(model, tok, pos, neg, sl.MeanDiffC()) \
