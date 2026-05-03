@@ -56,7 +56,7 @@ from ..config import SteeringConfig, register_config, register
 @dataclass
 class SSpaceC(SteeringConfig):
     method: str = "sspace"
-    r: int = 8
+    r: int = -1  # -1 = full rank (no cropping); else top-r modes by |d_S|
 
 
 def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor, Tensor]:
@@ -67,25 +67,23 @@ def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor, Tensor]:
 def _orient_svd(
     U: Float[Tensor, "d_out r"],
     S: Float[Tensor, "r"],
-    V: Float[Tensor, "d_in r"],
-    h: Float[Tensor, "n d_out"],
-) -> SvdFactors:
+    Vh: Float[Tensor, "r d_in"],
+    h_interleaved: Float[Tensor, "n2 d_out"],
+) -> tuple[Tensor, Tensor, Tensor]:
     """Orient SVD sign so +coeff = toward positive persona (repeng majority-vote).
 
-    SVD has arbitrary sign per component (U[:,i] and V[:,i] can jointly flip).
-    We project all samples through U, check if positive samples (even idx)
-    consistently project larger than negative (odd idx) per component,
-    and flip U[:,i]/V[:,i] if not. This makes +coeff = toward positive persona.
+    SVD signs per component are arbitrary. Project samples through U, count
+    how often pos (even idx) > neg (odd idx); flip components where pos<neg.
+    Caller passes pos/neg interleaved (same n on each side).
     """
-    proj: Float[Tensor, "n r"] = h @ U
-    # positive_larger[i] = fraction of pairs where pos projects larger than neg on component i
+    proj: Float[Tensor, "n r"] = h_interleaved @ U
     positive_larger: Float[Tensor, "r"] = (proj[::2] > proj[1::2]).to(U.dtype).mean(0)
     flip: Float[Tensor, "r"] = torch.where(
         positive_larger < 0.5,
         torch.tensor(-1.0),
         torch.tensor(1.0),
     )
-    return U * flip, S, V * flip
+    return U * flip, S, Vh * flip[:, None]
 
 
 @register
@@ -104,41 +102,42 @@ class SSpace:
         for li, y_pos in pos_outputs.items():
             mod = layer_to_module[li]
             W = mod.weight  # [d_out, d_in]
-            if cfg.r > min(W.shape):
-                raise ValueError(f"r={cfg.r} exceeds rank bound min{tuple(W.shape)}")
-            # activations are recorded to CPU; move weight-derived tensors there too
+            k = min(W.shape)
+            r_eff = k if (cfg.r is None or cfg.r < 0 or cfg.r >= k) else cfg.r
             U, S, Vh = torch.linalg.svd(W.float(), full_matrices=False)
-            U.cpu_(), S.cpu_(), Vh.cpu_()
-            U, S, V = _orient_svd(U, S, Vh, y_pos)  # in-place sign flip to align dominant components with pos persona
+            U, S, Vh = U.cpu(), S.cpu(), Vh.cpu()
 
+            b = mod.bias.detach().cpu().float() if mod.bias is not None else None
             y_pos_f = y_pos.float()
             y_neg_f = neg_outputs[li].float()
             if b is not None:
                 y_pos_f = y_pos_f - b
                 y_neg_f = y_neg_f - b
-            
-            # task specific hs projected to S
-            xS_pos = (y_pos_f @ U_r) / sqrtS                 # [n, r]
-            xS_neg = (y_neg_f @ U_r) / sqrtS
-            dS = xS_pos.mean(0) - xS_neg.mean(0)
-            dS_hat = dS / (dS.norm() + ε)
 
-            # truncate
-            a = S * std(dS, dim=0)  # [r], per-mode activation strength heuristic
-            mask = torch.argsort(a, descending=True)[:cfg.r]
-            U_r = U[:, mask].contiguous()        # [d_out, r]
-            S_r = S[mask].contiguous()        # [r]
-            Vh_r = Vh[mask, :].contiguous()      # [r, d_in]
-            dS_hat = dS_hat[mask].contiguous()  # [r]
+            # repeng-style sign flip: pos/neg interleaved so proj[::2] vs proj[1::2] is pos vs neg
+            n = min(y_pos_f.shape[0], y_neg_f.shape[0])
+            h_il = torch.stack([y_pos_f[:n], y_neg_f[:n]], dim=1).flatten(0, 1)  # [2n, d_out]
+            U, S, Vh = _orient_svd(U, S, Vh, h_il)
 
-            sqrtS = S_r.sqrt().contiguous()                  # [r]
-            b = mod.bias.detach().cpu().float() if mod.bias is not None else None
+            # full S-space projection (V implicit via identity (y-b)U/sqrt(S) = xV sqrt(S))
+            sqrtS_full = S.sqrt()
+            xS_pos = (y_pos_f @ U) / sqrtS_full              # [n, k]
+            xS_neg = (y_neg_f @ U) / sqrtS_full              # [n, k]
+            dS = xS_pos.mean(0) - xS_neg.mean(0)             # [k]
 
-
-            # xS_pos = (y_pos_f @ U_r) / sqrtS                 # [n, r]
-            # xS_neg = (y_neg_f @ U_r) / sqrtS
-            # dS = xS_pos.mean(0) - xS_neg.mean(0)
-            # dS_hat = dS / (dS.norm() + ε)
+            # task-specific mode selection: top-r modes by contrastive magnitude.
+            # r_eff == k means full rank (no cropping).
+            if r_eff < k:
+                mask = dS.abs().topk(r_eff).indices.sort().values
+                U_r = U[:, mask].contiguous()                # [d_out, r]
+                Vh_r = Vh[mask, :].contiguous()              # [r, d_in]
+                sqrtS = sqrtS_full[mask].contiguous()        # [r]
+                dS_r = dS[mask]
+            else:
+                U_r, Vh_r = U.contiguous(), Vh.contiguous()
+                sqrtS = sqrtS_full
+                dS_r = dS
+            dS_hat = (dS_r / (dS_r.norm() + ε)).contiguous()  # [r]
 
             entry = {"U_r": U_r, "sqrtS": sqrtS, "dS_hat": dS_hat, "Vh_r": Vh_r}
             if b is not None:

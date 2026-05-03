@@ -45,8 +45,7 @@ from .sspace import SSpace
 @dataclass
 class SSpaceAblateC(SteeringConfig):
     method: str = "sspace_ablate"
-    target_submodule: str = "mlp.down_proj"
-    r: int = 8
+    r: int = -1  # -1 = full rank; else top-r modes by |d_S|
     coeff: float = 0.0  # 0 = pure projection-out; !=0 adds alpha * d_S_hat after ablation
 
 

@@ -89,6 +89,9 @@ def attach(
     if cfg.method not in REGISTRY:
         raise KeyError(f"unknown method {cfg.method!r}; registered: {list(REGISTRY)}")
     method = REGISTRY[cfg.method]
+    # variant-level default target_submodule (e.g. sspace -> "mlp.down_proj")
+    if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
+        cfg.target_submodule = method.default_target_submodule
     requires_linear = cfg.target_submodule is not None
     targets = find_targets(model, cfg)
     if not targets:
@@ -177,6 +180,8 @@ def train(
     from .vector import Vector
     _log_extract_demo(tok, pos_prompts, neg_prompts)
     method = REGISTRY[cfg.method]
+    if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
+        cfg.target_submodule = method.default_target_submodule
     targets = find_targets(model, cfg)
     if cfg.target_submodule is not None:
         from .extract_linear import record_linear_outputs
