@@ -17,6 +17,7 @@ from .variants.pca import PCAC
 from .variants.topk_clusters import TopKClustersC
 from .variants.cosine_gated import CosineGatedC
 from .variants.sspace import SSpaceC
+from .variants.sspace_ablate import SSpaceAblateC
 from .variants.spherical import SphericalC
 from .variants.directional_ablation import DirectionalAblationC
 from .variants.chars import CHaRSC
@@ -31,6 +32,7 @@ __all__ = [
     "TopKClustersC",
     "CosineGatedC",
     "SSpaceC",
+    "SSpaceAblateC",
     "SphericalC",
     "DirectionalAblationC",
     "CHaRSC",

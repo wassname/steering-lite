@@ -25,6 +25,14 @@ class SteeringConfig:
     # v1 only implements "residual".
     target: str = "residual"
 
+    # Optional dotted path of a sub-module within each target block to hook on
+    # (e.g. "mlp.down_proj"). When None, the block's forward output is hooked
+    # (current default for almost all variants). When set, the variant's apply
+    # is called with both the sub-module's input and output -- used for
+    # weight-SVD methods that need x to project into S-space and modify y. The
+    # variant must opt in via `requires_linear_io = True`.
+    target_submodule: str | None = None
+
     # steering strength at apply-time. Methods interpret it differently:
     # additive (mean_diff, pca, sspace, chars, cosine_gated): coeff is α in `h + α v`.
     # slerp/angle (spherical, angular_steering): coeff is the slerp t / rotation θ.

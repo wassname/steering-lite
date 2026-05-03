@@ -32,7 +32,12 @@ def _get_blocks(model: nn.Module) -> nn.ModuleList:
 
 
 def find_targets(model: nn.Module, cfg) -> list[tuple[str, nn.Module, int]]:
-    """Return [(name, block_module, layer_idx)] for layers selected by cfg."""
+    """Return [(name, module, layer_idx)] for layers selected by cfg.
+
+    When `cfg.target_submodule` is set (e.g. "mlp.down_proj"), descend into each
+    block via the dotted path and return the sub-module instead. Layer index
+    stays the parent block's index (state-dict keying unchanged).
+    """
     blocks = _get_blocks(model)
     n = len(blocks)
     if cfg.layers is None:
@@ -42,7 +47,16 @@ def find_targets(model: nn.Module, cfg) -> list[tuple[str, nn.Module, int]]:
         for i in idxs:
             if not (0 <= i < n):
                 raise ValueError(f"layer {i} out of range [0, {n})")
-    return [(f"layers.{i}", blocks[i], i) for i in idxs]
+    sub = getattr(cfg, "target_submodule", None)
+    if sub is None:
+        return [(f"layers.{i}", blocks[i], i) for i in idxs]
+    out = []
+    for i in idxs:
+        mod = blocks[i]
+        for part in sub.split("."):
+            mod = getattr(mod, part)
+        out.append((f"layers.{i}.{sub}", mod, i))
+    return out
 
 
 def get_d_model(model: nn.Module) -> int:
