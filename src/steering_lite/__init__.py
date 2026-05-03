@@ -23,7 +23,6 @@ from .variants.directional_ablation import DirectionalAblationC
 from .variants.chars import CHaRSC
 from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
-from .variants.gated_subspace_ablation import GatedSubspaceAblationC
 
 __all__ = [
     "SteeringConfig",
@@ -38,7 +37,6 @@ __all__ = [
     "CHaRSC",
     "LinearAcTC",
     "AngularSteeringC",
-    "GatedSubspaceAblationC",
     "record_activations",
     "record_activations_attn",
     "train",

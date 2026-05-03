@@ -69,7 +69,6 @@ def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor]:
 @register
 class SSpace:
     name = "sspace"
-    requires_linear_io = True
 
     @staticmethod
     def extract(

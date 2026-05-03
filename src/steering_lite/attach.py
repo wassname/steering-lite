@@ -1,14 +1,15 @@
 """attach / detach / save / load. The whole runtime.
 
-Two hook paths:
+Two hook paths, dispatched on `cfg.target_submodule`:
 
-  - Default: hook each transformer **block**'s forward output. The variant's
-    `apply(block, h, state, cfg)` modifies the block's hidden_states.
-  - Linear-IO (variants with `requires_linear_io = True`): hook a sub-module
-    (e.g. `mlp.down_proj`) of each block. The variant's
-    `apply(block, x, y, state, cfg)` sees both the sub-module's input x and
-    output y, returns the modified output. State buffers still live on the
-    parent block; the sub-module gets a backref via `_steering_block_ref`.
+  - `target_submodule is None` (default): hook each transformer **block**'s
+    forward output. The variant's `apply(block, h, state, cfg)` modifies the
+    block's hidden_states.
+  - `target_submodule` set (e.g. "mlp.down_proj"): hook that sub-module of
+    each block. The variant's `apply(block, x, y, state, cfg)` sees both the
+    sub-module's input x and output y, returns the modified output. State
+    buffers still live on the parent block; the sub-module gets a backref via
+    `_steering_block_ref`.
 """
 from __future__ import annotations
 import json
@@ -50,7 +51,7 @@ def _hook(block, args, out):
 
 
 def _linear_hook(mod, args, out):
-    """Forward hook for sub-module variants (requires_linear_io=True).
+    """Forward hook for sub-module variants (cfg.target_submodule is set).
 
     `out` is a Tensor (Linear's output), not a tuple. State is on the parent
     block, accessed via `mod._steering_block_ref`.
@@ -79,8 +80,8 @@ def attach(
     """Install per-layer state as buffers and register forward hooks.
 
     `vectors` may be a `dict[int, dict[str, Tensor]]` or a `Vector` (unwrapped).
-    Hook target depends on the method's `requires_linear_io` flag (sub-module
-    forward_hook with input+output) vs the default block forward_hook.
+    Hook target depends on `cfg.target_submodule`: sub-module forward_hook
+    (input+output) when set, else the default block forward_hook.
     """
     from .vector import Vector
     if isinstance(vectors, Vector):
@@ -88,7 +89,7 @@ def attach(
     if cfg.method not in REGISTRY:
         raise KeyError(f"unknown method {cfg.method!r}; registered: {list(REGISTRY)}")
     method = REGISTRY[cfg.method]
-    requires_linear = getattr(method, "requires_linear_io", False)
+    requires_linear = cfg.target_submodule is not None
     targets = find_targets(model, cfg)
     if not targets:
         raise RuntimeError("no target layers matched cfg")
@@ -169,15 +170,15 @@ def train(
 ):
     """repeng-style verb: extract activations + run method.extract -> Vector.
 
-    Variants with `requires_linear_io = True` get sub-module *inputs* (via
-    `extract_linear.record_linear_inputs`) and receive `model` + per-layer
-    sub-modules as keyword args to `extract` so they can SVD weights.
+    When `cfg.target_submodule` is set, recording uses
+    `extract_linear.record_linear_outputs` (capturing the sub-module's output)
+    and `extract` receives a `layer_to_module` kwarg so it can SVD weights.
     """
     from .vector import Vector
     _log_extract_demo(tok, pos_prompts, neg_prompts)
     method = REGISTRY[cfg.method]
     targets = find_targets(model, cfg)
-    if getattr(method, "requires_linear_io", False):
+    if cfg.target_submodule is not None:
         from .extract_linear import record_linear_outputs
         layer_to_module = {li: mod for _, mod, li in targets}
         pos_acts = record_linear_outputs(model, tok, pos_prompts, layer_to_module,

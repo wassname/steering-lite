@@ -27,10 +27,10 @@ class SteeringConfig:
 
     # Optional dotted path of a sub-module within each target block to hook on
     # (e.g. "mlp.down_proj"). When None, the block's forward output is hooked
-    # (current default for almost all variants). When set, the variant's apply
-    # is called with both the sub-module's input and output -- used for
-    # weight-SVD methods that need x to project into S-space and modify y. The
-    # variant must opt in via `requires_linear_io = True`.
+    # (default for almost all variants). When set, the sub-module's forward is
+    # hooked instead and the variant's apply receives (block, x, y, state, cfg)
+    # -- used by weight-SVD methods (sspace, sspace_ablate) that need to modify
+    # a Linear's output in low-rank S-space.
     target_submodule: str | None = None
 
     # steering strength at apply-time. Methods interpret it differently:
