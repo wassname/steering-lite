@@ -100,10 +100,17 @@ logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format
 
 
 METHODS = [
+    "gated_subspace_ablation",
     "mean_diff", "mean_centred", "pca", "topk_clusters", "cosine_gated",
     "sspace", "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
+
+# Injected as system prompt for ALL evals (bare, prompt_only, steered) so that
+# Qwen3.5 wraps its CoT in a short <think> block and reaches the JSON answer
+# inside max_think_tokens. Without this the model often runs out of think
+# budget on hard vignettes and the JSON pre-fill fires while still mid-thought.
+DEFAULT_INSTRUCTION = "Think briefly then answer."
 
 
 def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
@@ -120,6 +127,7 @@ def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
         "chars":                 sl.CHaRSC(**common, k=4),
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
+        "gated_subspace_ablation": sl.GatedSubspaceAblationC(**common, r=8, tau=0.0),
     }
     return table[method]
 
@@ -170,7 +178,9 @@ def main() -> None:
     ap.add_argument("--target-kl", type=float, default=1.0)
     ap.add_argument("--calib-T", type=int, default=20)
     ap.add_argument("--calib-iters", type=int, default=8)
-    ap.add_argument("--max-think-tokens", type=int, default=128)
+    ap.add_argument("--max-think-tokens", type=int, default=256)
+    ap.add_argument("--instruction", default=DEFAULT_INSTRUCTION,
+                    help="system prompt injected for all evals; '' to disable")
     ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
     args = ap.parse_args()
@@ -209,13 +219,21 @@ def main() -> None:
     )
     calib_prompts = _calib_prompts(tok, n=8)
 
+    # The instruction wraps tok for ALL evals -- bare, prompt_only, steered.
+    # prompt_only stacks persona on top via its own wrapper (system prompt
+    # becomes "<instruction>\n\n<persona>" because _SystemInjectTok preserves
+    # an existing system message added by the inner wrap).
+    eval_tok = _SystemInjectTok(tok, args.instruction) if args.instruction else tok
+    if args.instruction:
+        logger.info(f"instruction (system, all evals): '{args.instruction}'")
+
     rows: list[list] = []
     method_summaries: list[dict] = []
 
-    # === (1) bare baseline: no system prompt, no steering vector ===========
-    logger.info("\n=== bare baseline (no steering, no system prompt) ===")
+    # === (1) bare baseline: instruction-only system prompt, no steering ====
+    logger.info("\n=== bare baseline (instruction system prompt, no steering) ===")
     base_t0 = time.time()
-    base_report = evaluate_with_vector(model, tok, name=args.vignettes,
+    base_report = evaluate_with_vector(model, eval_tok, name=args.vignettes,
                                        max_think_tokens=args.max_think_tokens)
     base_logit_per_f = baseline_logit_per_foundation(base_report, args.vignettes)
     bare_elapsed = time.time() - base_t0
@@ -247,7 +265,11 @@ def main() -> None:
     # === (2) prompt_only baseline: POS persona as system prompt ============
     if args.prompt_baseline:
         pos_persona = PERSONA_PAIRS_AUTHORITY[0][0]
-        sys_prompt = PROMPT_TEMPLATE.format(persona=pos_persona)
+        persona_prompt = PROMPT_TEMPLATE.format(persona=pos_persona)
+        # Stack instruction + persona so the bare/prompt comparison isolates
+        # only the persona delta; instruction stays constant.
+        sys_prompt = (f"{args.instruction}\n\n{persona_prompt}"
+                      if args.instruction else persona_prompt)
         logger.info(f"\n=== prompt_only (system='{sys_prompt}') ===")
         wrapped_tok = _SystemInjectTok(tok, sys_prompt)
         pb_t0 = time.time()
@@ -297,7 +319,7 @@ def main() -> None:
         v.cfg.coeff = +C
         with v(model):
             pos_report = evaluate_with_vector(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
+                model, eval_tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
         pos_dlogit = dlogit_per_foundation(base_report, pos_report, args.vignettes)
         pos_flips = flips_per_foundation(base_report, pos_report, args.vignettes)
 
@@ -305,7 +327,7 @@ def main() -> None:
         v.cfg.coeff = -C
         with v(model):
             neg_report = evaluate_with_vector(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
+                model, eval_tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
         neg_dlogit = dlogit_per_foundation(base_report, neg_report, args.vignettes)
         neg_flips = flips_per_foundation(base_report, neg_report, args.vignettes)
 

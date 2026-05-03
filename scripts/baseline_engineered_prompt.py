@@ -108,7 +108,7 @@ def main() -> None:
     ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
-    ap.add_argument("--max-think-tokens", type=int, default=128)
+    ap.add_argument("--max-think-tokens", type=int, default=256)
     ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--bare-json", type=Path, default=Path("outputs/tinymfv_sweep/bare.json"),
                     help="reuse bare baseline if present (skip re-running base)")
