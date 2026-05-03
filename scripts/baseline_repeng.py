@@ -34,7 +34,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
 from steering_lite.data import (
-    PERSONA_PAIRS_AUTH_CARE, PROMPT_TEMPLATE, load_suffixes,
+    PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE, load_suffixes,
 )
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
@@ -59,8 +59,8 @@ def _build_repeng_dataset(tok, n_pairs: int, seed: int = 42):
     n = min(n_pairs, len(entries))
     sampled = rng.sample(entries, n)
 
-    pos_personas = [p for p, _ in PERSONA_PAIRS_AUTH_CARE]
-    neg_personas = [n for _, n in PERSONA_PAIRS_AUTH_CARE]
+    pos_personas = [p for p, _ in PERSONA_PAIRS_AUTHORITY]
+    neg_personas = [n for _, n in PERSONA_PAIRS_AUTHORITY]
 
     out = []
     for entry in sampled:
@@ -102,7 +102,7 @@ def main() -> None:
                     help="raw control coefficient (uncalibrated)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
-    ap.add_argument("--max-think-tokens", type=int, default=64)
+    ap.add_argument("--max-think-tokens", type=int, default=128)
     ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--bare-json", type=Path, default=Path("outputs/tinymfv_sweep/bare.json"),
                     help="reuse bare baseline if present (skip re-running base)")

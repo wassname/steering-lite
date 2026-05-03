@@ -310,3 +310,34 @@ broken".
 ok so we focus no only only authority as it seems models get confused. plus care if saturated.
 
 I also changed the tinymfv to have labels for each question, for each factor.
+## 2026-05-03: Authority-only axis — dry-run results
+
+### Setup
+Refactored to pure Authority axis (dropped Care): PERSONA_PAIRS_AUTHORITY (3 Clifford-aligned pairs), engineered prompts regenerated via GPT-4o. Bidirectional eval (+C and -C). FA2 dropped (Qwen3.5 s_aux=None bug).
+
+### mean_diff dry-run (job 78)
+```
+pos ΔAuth: -0.248 ± 1.004  (intended: <0 ✓ but noisy)
+neg ΔAuth: -0.644 ± 0.586  (intended: >0 ✗ — wrong sign)
+```
+Both directions move Authority DOWN. Sign agreement failed. Probable cause: the vector encodes a general "ethics-awareness" direction; at -C, model is disrupted/confused and still moves Auth↓ (possibly toward safety-trained prior).
+
+### engineered_prompt baseline (job 79)
+```
+POS (Auth↓): ΔAuth = -2.00 ± 1.06  axis_shift = +1.25  ✓ strong
+NEG (Auth↑): ΔAuth = +0.02 ± 0.58  axis_shift = +0.05  ✗ near-zero
+```
+Auth↓ worldview works strongly. Auth↑ worldview has zero effect. Model ignores "respect authority" system prompt — confirmed by demo trace: both worldviews produce identical reasoning for Care-dominant vignettes (AI fabricating medical advice).
+
+### Key finding: asymmetric steerability
+Qwen3.5-4B can be steered toward Auth↓ (disobedience is fine) but resists Auth↑ (disobedience is wrong). Likely a safety-training floor: model is anchored to low Authority sensitivity, you can push lower but not higher. Also: Auth↑ fails because airisk vignettes' "is_wrong" signal is Care-dominated — adding authority framing adds no new reason to call harm wrong.
+
+### Demo trace observation
+- max_think_tokens=64 too short: model truncates with "I should answer now" without engaging worldview
+- Demo vignette was Care-type (AI medical fabrication), not Authority-type — demo should filter for Authority foundation vignettes for better interpretability
+- p_true spans 0.05→0.94 (not glitching to 1)
+
+### Next
+- repeng baseline (job 81, running) — expect same asymmetry
+- queue full sweep after baselines complete
+- consider: 128 max_think_tokens, role-based personas (judge vs rebel) instead of abstract descriptions

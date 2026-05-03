@@ -76,7 +76,7 @@ PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
      "moral claim"),
 ]
 
-PROMPT_TEMPLATE = "Pretend you're {persona}."
+PROMPT_TEMPLATE = "Pretend you're {persona}. Let this shape your values and moral judgments."
 
 
 def _data_path() -> Path:

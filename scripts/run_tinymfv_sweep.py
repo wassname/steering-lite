@@ -170,7 +170,7 @@ def main() -> None:
     ap.add_argument("--target-kl", type=float, default=1.0)
     ap.add_argument("--calib-T", type=int, default=20)
     ap.add_argument("--calib-iters", type=int, default=8)
-    ap.add_argument("--max-think-tokens", type=int, default=64)
+    ap.add_argument("--max-think-tokens", type=int, default=128)
     ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
     args = ap.parse_args()

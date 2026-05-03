@@ -47,7 +47,8 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int, vector=No
     if not vignettes:
         logger.warning(f"tinymfv: no vignettes for name={name!r}, skipping demo trace")
         return
-    r = vignettes[0]
+    auth_vigs = [v for v in vignettes if v.get("foundation") == "Authority"]
+    r = auth_vigs[0] if auth_vigs else vignettes[0]
     cond = next(iter(CONDITIONS))
     frame_name, frame = next(iter(FRAMES.items()))
     user_prompt = r[cond]
