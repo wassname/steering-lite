@@ -66,7 +66,8 @@ with v(model):
 | PCA               | [pca.py](src/steering_lite/variants/pca.py)                           | [Zou+ 2023 RepE](https://arxiv.org/abs/2310.01405)                     |
 | Top-k clusters    | [topk_clusters.py](src/steering_lite/variants/topk_clusters.py)       | -                                                                      |
 | Cosine-gated      | [cosine_gated.py](src/steering_lite/variants/cosine_gated.py)         | CAST-inspired soft gate, [Lee+ 2024](https://arxiv.org/abs/2409.05907) |
-| S-space (SVD)     | [sspace.py](src/steering_lite/variants/sspace.py)                     | internal activation-diff SVD baseline                                  |
+| S-space (weight-SVD, cosine-gated) | [sspace.py](src/steering_lite/variants/sspace.py)           | AntiPaSTO arithmetic relaxation (Clark, 2026): steer in SVD basis of `mlp.down_proj` weight |
+| S-space ablation  | [sspace_ablate.py](src/steering_lite/variants/sspace_ablate.py)       | project-out contrastive direction in S-space                           |
 | Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)               | ungated core of [Spherical Steering](https://arxiv.org/abs/2602.08169) |
 | CHaRS             | [chars.py](src/steering_lite/variants/chars.py)                       | [Abdullaev+ 2026](https://arxiv.org/abs/2603.02237)                    |
 | Linear-AcT        | [linear_act.py](src/steering_lite/variants/linear_act.py)             | [Rodriguez+ 2025](https://openreview.net/forum?id=l2zFn6TIQi)          |
@@ -88,7 +89,7 @@ just sweep Qwen/Qwen3.5-4B
 
 ### Results
 
-Setup: Qwen/Qwen3.5-4B, layers mid 20-80%, seed=42, target_kl=1.0, 256 persona-branching pairs, vignettes=airisk (131 × 4 prompt variants), max_think=128.
+Setup: Qwen/Qwen3.5-4B, layers mid 20-80%, seed=42, target_kl=1.0, 256 persona-branching pairs, vignettes=airisk (131 × 4 prompt variants), max_think=256. Run ID: `4c338a356760`.
 
 #### Bare model
 
@@ -96,13 +97,15 @@ Logit that a foundation violation is wrong (positive = model says wrong), before
 
 | foundation   | logit(is_wrong) ± std | prob(is_wrong) |   n |
 | ------------ | --------------------: | -------------: | --: |
-| Liberty      |           +2.63 ± 0.69 |            93% |  34 |
-| Authority    |           +2.56 ± 0.74 |            93% |  34 |
-| Sanctity     |           +2.41 ± 0.77 |            92% |  34 |
-| Care         |           +2.38 ± 0.72 |            91% |  62 |
-| Loyalty      |           +2.31 ± 0.72 |            91% |  32 |
-| Fairness     |           +1.80 ± 1.15 |            86% |  34 |
-| Social Norms |           +1.52 ± 1.12 |            82% |  32 |
+| Liberty      |           +2.77 ± 0.51 |            94% |  34 |
+| Authority    |           +2.74 ± 0.35 |            94% |  34 |
+| Sanctity     |           +2.59 ± 0.59 |            93% |  34 |
+| Care         |           +2.55 ± 0.55 |            93% |  62 |
+| Loyalty      |           +2.59 ± 0.45 |            93% |  32 |
+| Fairness     |           +2.15 ± 1.25 |            90% |  34 |
+| Social Norms |           +1.85 ± 1.29 |            86% |  32 |
+
+<!-- TODO add human % from clifford -->
 
 The model is near-ceiling on Authority (logit +2.56, ~93% probability). Our steering target is therefore Auth↓: making authority violations look less wrong. Which mean steering the model to care less about what authorities like supervisors or dictators say is wrong.
 
@@ -112,22 +115,22 @@ SI(Auth) is our primary metric. A positive SI means the method successfully move
 
 | method                 | SI(Auth) | SI_fwd | SI_rev | Auth_sep | pmass²×100 |
 | ---------------------- | -------: | -----: | -----: | -------: | ---------: |
-| directional_ablation   |    55.51 |   0.40 |  +0.99 |    +1.54 |       79.8 |
-| cosine_gated           |    48.54 |   0.27 |  +0.96 |    +1.55 |       78.8 |
-| sspace                 |    43.75 |   0.26 |  +1.00 |    +1.29 |       69.7 |
-| mean_centred           |    36.15 |   0.21 |  +1.00 |    +0.99 |       59.9 |
-| mean_diff              |    35.75 |   0.21 |  +1.00 |    +1.01 |       58.9 |
-| linear_act             |    27.75 |   0.06 |  +1.00 |    +0.49 |       52.2 |
-| engineered_prompt[+]   |    27.65 |   0.50 |  +0.27 |    +1.90 |       71.7 |
-| spherical              |     6.38 |   0.22 |    n/a |    +0.51 |       28.7 |
-| prompt_only            |     5.06 |   0.06 |    n/a |      n/a |       82.8 |
-| chars                  |     1.40 |  −0.37 |  +0.40 |    +0.41 |       82.9 |
-| angular_steering       |   −12.49 |  −0.23 |  −0.09 |    +0.76 |       76.5 |
-| repeng (uncalibrated)  |   −16.67 |  −0.19 |    n/a |      n/a |       87.5 |
-| pca                    |   −22.16 |  −0.60 |  −0.10 |    +0.59 |       63.7 |
-| topk_clusters          |   −30.11 |  −0.71 |  −0.04 |    +0.04 |       80.5 |
+| directional_ablation   |    52.90 |   0.32 |  +1.00 |    +2.05 |       80.1 |
+| sspace                 |    45.67 |   0.64 |  +0.85 |    +0.69 |       61.0 |
+| mean_diff              |    32.81 |   0.34 |  +1.00 |    +1.65 |       49.0 |
+| mean_centred           |    32.72 |   0.29 |  +1.00 |    +1.56 |       50.6 |
+| topk_clusters          |    31.34 |   0.13 |  +0.72 |    +1.55 |       73.9 |
+| sspace_ablate          |    24.11 |   0.74 |  +0.02 |    +0.59 |       63.6 |
+| engineered_prompt[+]   |    17.36 |   0.50 |  −0.02 |    +1.90 |       71.7 |
+| repeng (uncalibrated)  |     9.02 |   0.10 |    n/a |      n/a |       87.5 |
+| cosine_gated           |     8.92 |   0.09 |  +1.00 |    +2.00 |       16.4 |
+| angular_steering       |     7.00 |   0.55 |  −0.38 |    +0.32 |       80.6 |
+| spherical              |     4.98 |   0.16 |    n/a |    +0.85 |       30.3 |
+| linear_act             |    20.24 |  −0.19 |  +1.00 |    +0.83 |       49.9 |
+| pca                    |    −0.92 |   0.03 |  −0.08 |    +0.85 |       39.0 |
+| chars                  |    −9.16 |  −0.26 |  −0.00 |    +0.50 |       68.3 |
 
-Top 3 calibrated methods by SI: directional_ablation (55), cosine_gated (48), sspace (43). All three have positive SI_fwd and SI_rev, confirming bidirectional coherence. angular_steering, pca, topk_clusters have negative SI — they suppress wrongness broadly in both directions, not specifically on Authority.
+Top 3 by SI: directional_ablation (52.9), sspace/weight-SVD (45.7), mean_diff (32.8). sspace_ablate SI_fwd=0.74 is the highest forward-arm score, confirming the down_proj S-space contrastive direction is load-bearing. cosine_gated has low pmass² (16.4) — model is uncertain at its calibrated coefficient, reducing SI despite positive SI_rev.
 
 #### Δlogit per foundation
 
@@ -135,24 +138,22 @@ Mean Δlogit relative to the bare model. `axis_Δ` is the negative change on the
 
 | method                 | axis_Δ |  ΔAuth     | ΔCare      | ΔSanc      | ΔLoy       | ΔFair      | ΔLib       | ΔSocN      |
 | ---------------------- | -----: |  ---------:| ---------: | ---------: | ---------: | ---------: | ---------: | ---------: |
-| engineered_prompt[+]   |   2.30 |  −2.30±1.14| −1.72±1.00 | −1.81±0.92 | −2.29±0.99 | −1.84±1.05 | −1.93±1.06 | −1.83±1.19 |
-| angular_steering       |   2.25 |  −2.25±0.87| −2.20±0.82 | −2.24±0.81 | −2.42±0.72 | −2.16±0.91 | −2.29±0.87 | −1.79±1.08 |
-| prompt_only            |   2.21 |  −2.21±1.56| −2.16±1.54 | −2.29±1.50 | −2.21±1.46 | −2.24±1.54 | −2.34±1.50 | −1.98±1.62 |
-| directional_ablation   |   1.92 |  −1.92±1.04| −1.61±1.01 | −1.83±0.96 | −1.88±0.98 | −1.61±1.04 | −1.69±1.05 | −1.73±1.01 |
-| mean_diff              |   1.27 |  −1.27±1.64| −0.91±1.54 | −1.23±1.43 | −0.95±1.47 | −0.90±1.48 | −0.86±1.44 | −1.50±1.54 |
-| sspace                 |   1.25 |  −1.25±1.36| −0.91±1.30 | −1.43±1.36 | −1.18±1.41 | −0.98±1.31 | −1.00±1.37 | −1.63±1.38 |
-| mean_centred           |   1.22 |  −1.22±1.55| −0.82±1.45 | −1.43±1.51 | −0.91±1.43 | −0.80±1.36 | −0.76±1.43 | −1.47±1.50 |
-| pca                    |   1.22 |  −1.22±0.93| −1.00±0.83 | −1.05±0.75 | −1.09±0.82 | −0.96±0.88 | −0.98±0.87 | −0.87±0.97 |
-| cosine_gated           |   1.10 |  −1.10±1.16| −0.63±1.08 | −0.99±1.15 | −0.92±1.07 | −0.73±1.09 | −0.75±1.14 | −1.27±1.18 |
-| spherical              |   1.09 |  −1.09±1.23| −0.77±1.13 | −0.94±1.08 | −0.93±1.09 | −0.83±1.11 | −0.78±1.10 | −1.29±1.25 |
-| repeng (uncalibrated)  |   0.89 |  −0.89±0.57| −0.85±0.61 | −0.73±0.63 | −0.86±0.59 | −0.82±0.56 | −0.83±0.59 | −0.80±0.65 |
-| linear_act             |   0.38 |  −0.38±0.95| −0.12±0.72 | −0.11±0.80 | −0.23±0.74 | −0.22±0.75 | −0.16±0.72 | −0.57±1.09 |
-| topk_clusters          |   0.10 |  −0.10±0.66| +0.05±0.60 | +0.17±0.61 | −0.21±0.57 | −0.02±0.61 | −0.06±0.61 | +0.11±0.69 |
-| chars                  |   0.08 |  −0.08±0.78| +0.10±0.56 | +0.09±0.62 | −0.12±0.62 | +0.01±0.61 | −0.03±0.60 | −0.01±0.73 |
+| sspace_ablate          |   2.89 |  −2.89±0.86| −2.79±0.92 | −2.85±0.91 | −3.00±0.76 | −2.73±0.95 | −2.81±0.93 | −2.60±1.17 |
+| sspace                 |   2.78 |  −2.78±0.93| −2.57±0.90 | −2.53±0.89 | −2.82±0.69 | −2.53±0.94 | −2.63±0.89 | −2.51±1.22 |
+| angular_steering       |   2.67 |  −2.67±0.89| −2.49±0.84 | −2.53±0.86 | −2.71±0.80 | −2.49±0.97 | −2.59±0.95 | −2.31±1.15 |
+| cosine_gated           |   2.08 |  −2.08±0.64| −1.88±0.61 | −1.71±0.67 | −2.07±0.53 | −1.86±0.76 | −1.91±0.71 | −1.74±0.97 |
+| directional_ablation   |   1.94 |  −1.94±1.22| −1.80±1.24 | −2.26±1.20 | −1.89±1.28 | −1.75±1.19 | −1.77±1.25 | −1.94±1.26 |
+| mean_diff              |   1.93 |  −1.93±1.11| −1.72±1.09 | −1.86±1.11 | −1.75±1.06 | −1.62±0.99 | −1.60±1.04 | −1.92±1.25 |
+| mean_centred           |   1.80 |  −1.80±1.17| −1.63±1.14 | −1.78±1.03 | −1.57±1.11 | −1.50±1.06 | −1.49±1.11 | −1.85±1.25 |
+| spherical              |   1.44 |  −1.44±0.89| −1.21±0.71 | −1.33±0.81 | −1.31±0.71 | −1.15±0.72 | −1.16±0.70 | −1.46±1.09 |
+| pca                    |   1.36 |  −1.36±1.50| −1.30±1.36 | −1.32±1.37 | −1.38±1.45 | −1.12±1.47 | −1.28±1.47 | −1.33±1.42 |
+| topk_clusters          |   1.18 |  −1.18±0.97| −1.12±0.91 | −1.22±0.87 | −1.20±0.85 | −1.13±1.01 | −1.13±0.92 | −1.19±1.16 |
+| linear_act             |   0.83 |  −0.83±0.67| −0.70±0.52 | −0.68±0.57 | −0.72±0.48 | −0.70±0.57 | −0.70±0.55 | −0.85±0.91 |
+| chars                  |   0.45 |  −0.45±0.61| −0.40±0.54 | −0.43±0.49 | −0.49±0.40 | −0.35±0.65 | −0.42±0.54 | −0.42±0.76 |
 
 <!-- TODO note lower uncertainty measure. this table is mainly because we get nice uncertainty, and we want the highest reliably steering -->
 
-axis_Δ is large for several methods, but engineered_prompt, angular_steering, and prompt_only all move every foundation roughly equally — broad suppression, not axis rotation. directional_ablation and cosine_gated have ΔAuth as the largest (or near-largest) negative, which is the correct pattern.
+sspace and sspace_ablate have the highest axis_Δ (2.78, 2.89) but both suppress all foundations equally — broad suppression. angular_steering is similar. directional_ablation and mean_diff have more selective Auth shifts relative to other foundations, which is reflected in their higher SI scores.
 
 #### Notes
 

@@ -56,14 +56,36 @@ from ..config import SteeringConfig, register_config, register
 @dataclass
 class SSpaceC(SteeringConfig):
     method: str = "sspace"
-    target_submodule: str = "mlp.down_proj"
     r: int = 8
 
 
-def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor]:
-    """W [out, in] -> (U_r [out, r], S_r [r]) in float32 on W's device."""
-    U, S, _ = torch.linalg.svd(W.float(), full_matrices=False)
-    return U[:, :r].contiguous(), S[:r].contiguous()
+def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor, Tensor]:
+    """W [out, in] -> (U_r [out, r], S_r [r], V_r [in, r]) in float32 on W's device."""
+    U, S, Vh = torch.linalg.svd(W.float(), full_matrices=False)
+    return U[:, :r].contiguous(), S[:r].contiguous(), Vh[:r, :].contiguous()
+
+def _orient_svd(
+    U: Float[Tensor, "d_out r"],
+    S: Float[Tensor, "r"],
+    V: Float[Tensor, "d_in r"],
+    h: Float[Tensor, "n d_out"],
+) -> SvdFactors:
+    """Orient SVD sign so +coeff = toward positive persona (repeng majority-vote).
+
+    SVD has arbitrary sign per component (U[:,i] and V[:,i] can jointly flip).
+    We project all samples through U, check if positive samples (even idx)
+    consistently project larger than negative (odd idx) per component,
+    and flip U[:,i]/V[:,i] if not. This makes +coeff = toward positive persona.
+    """
+    proj: Float[Tensor, "n r"] = h @ U
+    # positive_larger[i] = fraction of pairs where pos projects larger than neg on component i
+    positive_larger: Float[Tensor, "r"] = (proj[::2] > proj[1::2]).to(U.dtype).mean(0)
+    flip: Float[Tensor, "r"] = torch.where(
+        positive_larger < 0.5,
+        torch.tensor(-1.0),
+        torch.tensor(1.0),
+    )
+    return U * flip, S, V * flip
 
 
 @register
@@ -84,23 +106,41 @@ class SSpace:
             W = mod.weight  # [d_out, d_in]
             if cfg.r > min(W.shape):
                 raise ValueError(f"r={cfg.r} exceeds rank bound min{tuple(W.shape)}")
-            U_r, S_r = _svd_topr(W.detach(), cfg.r)
-            sqrtS = S_r.sqrt().contiguous()                  # [r]
-
-            b = mod.bias.detach().float() if mod.bias is not None else None
+            # activations are recorded to CPU; move weight-derived tensors there too
+            U, S, Vh = torch.linalg.svd(W.float(), full_matrices=False)
+            U.cpu_(), S.cpu_(), Vh.cpu_()
+            U, S, V = _orient_svd(U, S, Vh, y_pos)  # in-place sign flip to align dominant components with pos persona
 
             y_pos_f = y_pos.float()
             y_neg_f = neg_outputs[li].float()
             if b is not None:
                 y_pos_f = y_pos_f - b
                 y_neg_f = y_neg_f - b
-
+            
+            # task specific hs projected to S
             xS_pos = (y_pos_f @ U_r) / sqrtS                 # [n, r]
             xS_neg = (y_neg_f @ U_r) / sqrtS
             dS = xS_pos.mean(0) - xS_neg.mean(0)
             dS_hat = dS / (dS.norm() + ε)
 
-            entry = {"U_r": U_r, "sqrtS": sqrtS, "dS_hat": dS_hat}
+            # truncate
+            a = S * std(dS, dim=0)  # [r], per-mode activation strength heuristic
+            mask = torch.argsort(a, descending=True)[:cfg.r]
+            U_r = U[:, mask].contiguous()        # [d_out, r]
+            S_r = S[mask].contiguous()        # [r]
+            Vh_r = Vh[mask, :].contiguous()      # [r, d_in]
+            dS_hat = dS_hat[mask].contiguous()  # [r]
+
+            sqrtS = S_r.sqrt().contiguous()                  # [r]
+            b = mod.bias.detach().cpu().float() if mod.bias is not None else None
+
+
+            # xS_pos = (y_pos_f @ U_r) / sqrtS                 # [n, r]
+            # xS_neg = (y_neg_f @ U_r) / sqrtS
+            # dS = xS_pos.mean(0) - xS_neg.mean(0)
+            # dS_hat = dS / (dS.norm() + ε)
+
+            entry = {"U_r": U_r, "sqrtS": sqrtS, "dS_hat": dS_hat, "Vh_r": Vh_r}
             if b is not None:
                 entry["b"] = b
             out[li] = entry
@@ -115,6 +155,7 @@ class SSpace:
         cfg: SSpaceC,
     ) -> Float[Tensor, "b s d_out"]:
         U_r    = state["U_r"].to(y)
+        Vh_r   = state["Vh_r"].to(y)
         sqrtS  = state["sqrtS"].to(y)
         dS_hat = state["dS_hat"].to(y)
         y_eff = y - state["b"].to(y) if "b" in state else y
@@ -123,6 +164,7 @@ class SSpace:
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
         cos = (xS_norm * dS_hat).sum(dim=-1, keepdim=True)          # [b, s, 1]
         gate = cos.abs()                                             # [0, 1]
+
         delta_S = cfg.coeff * gate * dS_hat                         # [b, s, r]
         delta_y = (delta_S * sqrtS) @ U_r.T                         # [b, s, d_out]
         return y + delta_y
