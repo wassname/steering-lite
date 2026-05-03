@@ -33,7 +33,50 @@ PERSONA_PAIRS_TRAD_CARE: list[tuple[str, str]] = [
      "a thinker rooted in compassion"),
 ]
 
-PROMPT_TEMPLATE = "Pretend you're {persona} thinking about a task you've been given."
+# Authority↓ + SocialNorms↑ axis. POS persona ignores formal hierarchy and
+# follows peer/community consensus; NEG defers to formal authority and ignores
+# peer norms. Both tinymfv foundations move together, giving a single
+# interpretable steering direction (a model that questions authority).
+PERSONA_PAIRS_AUTH_SOCN: list[tuple[str, str]] = [
+    ("an egalitarian who follows peer consensus",
+     "a hierarchist who defers to formal authority"),
+    ("an anti-authoritarian who trusts community norms",
+     "a strict authoritarian who trusts official rules"),
+    ("a person who questions every formal authority",
+     "a person who obeys every formal authority"),
+    ("a peer-driven thinker who ignores formal hierarchy",
+     "a hierarchy-driven thinker who ignores peer pressure"),
+    ("someone who values community norms over institutional rules",
+     "someone who values institutional rules over community norms"),
+    ("a horizontalist who trusts the crowd",
+     "an institutionalist who trusts the chain of command"),
+]
+
+# Authority-only axis, framed per Clifford 2025 MFV definition:
+#   Authority = "disobedience or disrespect towards traditional authority
+#   figures (e.g., a boss, judge, teacher, or parent) or towards an
+#   institution or symbol of authority".
+# POS = Auth↓ (disobedience/disrespect carries no intrinsic moral weight).
+# NEG = Auth↑ (disobedience/disrespect is gravely wrong on its own).
+# Both sides moralised symmetrically with parallel grammar -- only the
+# Authority valence varies, so the activation diff isolates that single
+# foundation rather than leaking moralism magnitude.
+PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
+    ("a person who feels no moral weight in disobedience or disrespect toward "
+     "bosses, judges, teachers, parents, or institutions",
+     "a person who feels strong moral weight in disobedience or disrespect "
+     "toward bosses, judges, teachers, parents, or institutions"),
+    ("someone for whom defying authority figures and institutions is morally "
+     "neutral on its own",
+     "someone for whom defying authority figures and institutions is morally "
+     "wrong on its own"),
+    ("a person who treats traditional authority as having no inherent moral "
+     "claim",
+     "a person who treats traditional authority as having strong inherent "
+     "moral claim"),
+]
+
+PROMPT_TEMPLATE = "Pretend you're {persona}."
 
 
 def _data_path() -> Path:

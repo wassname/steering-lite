@@ -44,6 +44,6 @@ where = ["src"]
 exclude-newer = "5 days"
 
 [tool.uv.sources]
-tiny-mfv = { git = "https://github.com/wassname/tinymfv.git" }
+tiny-mfv = { git = "https://github.com/wassname/tinymfv.git", branch = "feat/batched-guided-rollout" }
 repeng = { git = "https://github.com/vgel/repeng.git" }
 openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper.git" }

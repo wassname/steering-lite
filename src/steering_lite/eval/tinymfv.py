@@ -19,17 +19,26 @@ from loguru import logger
 
 
 @torch.no_grad()
-def _generate_demo(model, tok, prompt: str, max_new_tokens: int):
-    device = next(model.parameters()).device
-    enc = tok(prompt, return_tensors="pt").to(device)
-    pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
-    out = model.generate(**enc, max_new_tokens=max_new_tokens, do_sample=False, pad_token_id=pad_id)
-    return tok.decode(out[0], skip_special_tokens=False)
+def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int) -> str:
+    """Run tinymfv's guided_rollout (same path eval uses) and return the full
+    decoded trace including special tokens, prompt, think, forced </think>, and
+    JSON answer. Mirrors what each evaluated cell does."""
+    from tinymfv.guided import guided_rollout, choice_token_ids_tf
+    res = guided_rollout(
+        model, tok,
+        user_prompt=user_prompt,
+        choice_token_ids=choice_token_ids_tf(tok),
+        max_think_tokens=max_think_tokens,
+        schema_hint=frame["q"],
+        prefill=frame["prefill"],
+        verbose=False,
+    )
+    return res.raw_full_text
 
 
 def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int, vector=None) -> None:
-    """One full guided rollout on the first vignette. If `vector` is given,
-    show paired base (no steering) + steered output for the same prompt."""
+    """One real guided_rollout on the first vignette -- same code path as eval.
+    If `vector` is given, show paired base + steered traces for the same prompt."""
     from tinymfv.data import load_vignettes
     from tinymfv.core import CONDITIONS, FRAMES
     from ..attach import detach as _detach, attach as _attach
@@ -40,26 +49,23 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int, vector=No
         return
     r = vignettes[0]
     cond = next(iter(CONDITIONS))
-    frame, fr = next(iter(FRAMES.items()))
-    user_prompt = f"{r[cond]}\n\n{fr['q']}"
-    messages = [{"role": "user", "content": user_prompt}]
-    prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True) + "<think>\n"
-    header = (f"vignette={r.get('id','?')} cond={cond} frame={frame} "
+    frame_name, frame = next(iter(FRAMES.items()))
+    user_prompt = r[cond]
+    header = (f"vignette={r.get('id','?')} cond={cond} frame={frame_name} "
               f"max_think={max_think_tokens}")
 
     if vector is None:
-        decoded = _generate_demo(model, tok, prompt, max_think_tokens)
+        decoded = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
         logger.info(
             "EXPECT: prompt + <think>...</think> + JSON-bool answer; chat template + special tokens visible.\n"
             f"=== EVAL demo trace ({header}) ===\n{decoded}\n=== /EVAL ==="
         )
         return
 
-    # paired: detach -> generate base -> reattach -> generate steered
     _detach(model)
-    decoded_base = _generate_demo(model, tok, prompt, max_think_tokens)
+    decoded_base = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
     _attach(model, vector.cfg, vector.state)
-    decoded_steer = _generate_demo(model, tok, prompt, max_think_tokens)
+    decoded_steer = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
     logger.info(
         f"EXPECT: same prompt under c=0 vs c={vector.cfg.coeff:+.4f}; both "
         "produce coherent <think>+JSON; steered should differ but not collapse.\n"

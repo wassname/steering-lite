@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-27T09:41:06.364695411Z"
+exclude-newer = "2026-04-28T05:00:14.528066096Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -2539,7 +2539,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'benchmark'", specifier = ">=1.4" },
     { name = "tabulate", marker = "extra == 'benchmark'" },
     { name = "tabulate", marker = "extra == 'test'" },
-    { name = "tiny-mfv", marker = "extra == 'benchmark'", git = "https://github.com/wassname/tinymfv.git" },
+    { name = "tiny-mfv", marker = "extra == 'benchmark'", git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout" },
     { name = "torch", specifier = ">=2.1" },
     { name = "transformers", marker = "extra == 'benchmark'", specifier = ">=4.51" },
     { name = "transformers", marker = "extra == 'hf-test'", specifier = ">=4.51" },
@@ -2590,7 +2590,7 @@ wheels = [
 [[package]]
 name = "tiny-mfv"
 version = "0.1.0"
-source = { git = "https://github.com/wassname/tinymfv.git#ac1c8cf7bbf8164ee6bbde53d00ab10caefa1068" }
+source = { git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout#bcbdb9cc6fec72cbbbeed4c6697af75aeb701f96" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },

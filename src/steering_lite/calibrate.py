@@ -13,6 +13,7 @@ Greedy makes the statistic deterministic so the solver doesn't fight noise.
 """
 from __future__ import annotations
 import math
+from typing import Callable
 
 import torch
 from loguru import logger
@@ -31,10 +32,10 @@ _demo_logged = {"flag": False}
 # 4 domains spanning factual / narrative / technical / introspective.
 # Wrapped through tok.apply_chat_template so calibration reflects real chat use.
 DEFAULT_MESSAGES = [
-    "What is the capital of France?",
-    "Tell me a short story about a small village.",
-    "How do I compute the gradient of a function?",
-    "Tell me honestly what you think about lying.",
+    "The eiffel tower is in Paris",
+    "埃菲尔铁塔🗼位于天都城",
+    "Tell me a greentext story about a small village during the smaller Martion carrot bubble.",
+    "Think step by step to calculate the integral of x^2 from 0 to 1 in lean4.",
 ]
 
 
@@ -89,7 +90,7 @@ def measure_kl(
     all_kls = []
     per_t = [[] for _ in range(T)]
 
-    for idx, pids in enumerate(prompts):
+    for idx, pids in enumerate(tqdm(prompts, desc="measure_kl", mininterval=60)):
         with v(model):
             gen = _generate(model, pids, T, tok, do_sample, device)
         n_gen = gen.shape[0]
@@ -105,9 +106,9 @@ def measure_kl(
             logger.info(
                 f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
                 "steered should differ from base but not collapse.\n"
-                f"=== CALIBRATE demo trace (T={T}) ===\n"
+                f"\n=== CALIBRATE demo trace (T={T}) ===\n"
                 f"--- BASE (c=0) ---\n{decoded_base}\n"
-                f"--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
                 f"=== /CALIBRATE ==="
             )
         full = full_ids.unsqueeze(0)
@@ -144,12 +145,14 @@ def calibrate_iso_kl(
     *,
     target_kl: float = 1.0,
     target_stat: str = "kl_p95",
-    bracket: tuple[float, float] = (0.05, 16.0),
+    bracket: tuple[float, float] = (0.01, 16.0),
     tol: float = 0.05,
     max_iters: int = 12,
     T: int = 20,
     device: str | torch.device = "cuda",
     sign: float = 1.0,
+    sign_probe: Callable[[Vector], float] | None = None,
+    sign_probe_c: float = 1.0,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -165,10 +168,30 @@ def calibrate_iso_kl(
 
     Mutates `v.cfg.coeff` per iteration (cheap, no copy). Returns
     (best_coeff, history). Caller usually wants `v.cfg.coeff = best_coeff`.
+
+    `sign_probe`: optional callable `(Vector) -> float` returning a scalar
+    score where higher = more aligned with intended steering direction. If
+    given, calibrate runs the probe at +sign_probe_c and -sign_probe_c, picks
+    whichever sign scored higher, and uses that as the `sign` for bracketing.
+    Catches sign-ambiguous extractions (e.g. PCA top eigenvector) before
+    calibration sinks budget into the wrong direction.
     """
     _demo_logged["flag"] = False
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
+
+    if sign_probe is not None:
+        v.cfg.coeff = +sign_probe_c
+        score_pos = sign_probe(v)
+        v.cfg.coeff = -sign_probe_c
+        score_neg = sign_probe(v)
+        chosen = +1.0 if score_pos >= score_neg else -1.0
+        logger.info(
+            f"sign_probe: +c={sign_probe_c:+.2f} -> {score_pos:+.3f} | "
+            f"-c={-sign_probe_c:+.2f} -> {score_neg:+.3f} | "
+            f"chosen sign={chosen:+.0f} (gap={abs(score_pos - score_neg):.3f})"
+        )
+        sign = sign * chosen
 
     def eval_at(c: float) -> float:
         v.cfg.coeff = sign * c
@@ -198,7 +221,12 @@ def calibrate_iso_kl(
                 break
             c_lo, v_lo = c, val
         else:
-            return c, history
+            logger.warning(
+                f"calibrate {v.cfg.method}: KL stayed BELOW target across "
+                f"bracket (max c={c:.4f} -> kl={v_lo:.3f} < {target_kl}). "
+                "Returning bracket-top; intervention is weaker than budget."
+            )
+            return sign * c, history
     else:
         c_hi, v_hi = mid, v_mid
         c = mid
@@ -211,7 +239,13 @@ def calibrate_iso_kl(
                 break
             c_hi, v_hi = c, val
         else:
-            return c, history
+            logger.warning(
+                f"calibrate {v.cfg.method}: KL stayed ABOVE target across "
+                f"bracket (min c={c:.4f} -> kl={v_hi:.3f} > {target_kl}). "
+                "Returning bracket-floor; method has different geometric scale "
+                "than (lo, hi) bracket assumes -- consider widening lo."
+            )
+            return sign * c, history
 
     # 2. log-log Illinois (regula falsi) inside the bracket. The KL-vs-C curve
     #    saturates at large C, so log-log is concave: a vanilla secant chord
@@ -226,17 +260,25 @@ def calibrate_iso_kl(
             log_c_lo, log_c_hi = math.log(c_lo), math.log(c_hi)
             log_v_lo = math.log(v_lo) - (math.log(2) if stale_lo >= 2 else 0.0)
             log_v_hi = math.log(v_hi) - (math.log(2) if stale_hi >= 2 else 0.0)
-            t = (log_target - log_v_lo) / (log_v_hi - log_v_lo)
-            log_c_new = log_c_lo + t * (log_c_hi - log_c_lo)
-            c_new = math.exp(log_c_new)
-            if not (c_lo < c_new < c_hi):
-                c_new = math.sqrt(c_lo * c_hi)  # bisection fallback
+            denom = log_v_hi - log_v_lo
+            # When both endpoints sit near target the denom -> 0 and the
+            # secant interpolation explodes to ±inf -> exp() -> inf/0/NaN.
+            # Drop to bisection rather than letting the bracket fallback
+            # silently mask numeric blowup.
+            if abs(denom) < 1e-6:
+                c_new = math.sqrt(c_lo * c_hi)
+            else:
+                t = (log_target - log_v_lo) / denom
+                log_c_new = log_c_lo + t * (log_c_hi - log_c_lo)
+                c_new = math.exp(log_c_new)
+                if not (c_lo < c_new < c_hi):
+                    c_new = math.sqrt(c_lo * c_hi)  # bisection fallback
         else:
             c_new = math.sqrt(c_lo * c_hi)
 
         v_new = eval_at(c_new)
         if abs(v_new - target_kl) < tol:
-            return c_new, history
+            return sign * c_new, history
         if v_new < target_kl:
             c_lo, v_lo = c_new, v_new
             stale_lo = 0

@@ -1,17 +1,26 @@
 """tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δlogit ± std.
 
 Three baseline modalities + 11 calibrated steering methods, all targeting the
-same Care-vs-Traditional/Sanctity axis tinymfv airisk vignettes evaluate:
+Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv airisk
+vignettes:
   1. bare        -- no system prompt, no steering vector
   2. prompt_only -- POS persona as system prompt, no vector
-  3. steer_*     -- extract POS-vs-NEG vector, iso-KL calibrate, eval
+  3. steer_*     -- extract POS-vs-NEG vector, iso-KL calibrate, eval at ±C
 
-Persona-branching pairs (POS/NEG share suffix, differ only in 1-2 axis words).
+Persona-branching pairs (POS/NEG share suffix, differ only in 1-2 axis words):
+POS = ethical-pushback/stakeholder-care, NEG = unquestioning-compliance. Both
+foundations move together (questions authority *because* of harm to people)
+so the steering direction is interpretable.
+
 Eval: tinymfv guided CoT, 64 think tokens; per-foundation Δlogit (paired by
-(vid, cond)) ± std across pairs.
+(vid, cond)) ± std across pairs. Bidirectional: every method's |C| is iso-KL
+calibrated once, then we eval at +C and -C and save both reports. The
+aggregator picks SI_best per foundation across signs; eval (not a probe)
+decides direction.
 
-Composite metric: axis_shift = ΔlogitSanctity - ΔlogitCare nats. +ve = moved
-toward binding/traditional cluster, -ve = toward care.
+Composite metric: axis_shift = ΔlogitSanctity - ΔlogitCare nats (legacy
+Care/Sanctity composite kept for cross-axis comparison; the new headline is
+Auth+Care, computed by the aggregator).
 
 Refs:
   calibration: https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7
@@ -32,12 +41,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
-from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_TRAD_CARE, PROMPT_TEMPLATE
+from _meta import make_metadata, append_run
+from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
 from steering_lite.eval.tinymfv import evaluate_with_vector
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
     baseline_logit_per_foundation, dlogit_per_foundation,
-    axis_shift, format_cell, cue,
+    flips_per_foundation, axis_shift, format_cell, cue,
 )
 
 
@@ -117,8 +127,10 @@ def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
 def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
     n = model.config.num_hidden_layers
     if layers_arg == "mid":
-        # central 50%
-        lo, hi = n // 4, (3 * n) // 4
+        # 20% to 80% of depth, but always exclude {0, 1} and {n-1, n-2}:
+        # earliest layers are tokenizer-y, last two are output-projection-bound.
+        lo = max(2, int(n * 0.2))
+        hi = min(n - 2, int(n * 0.8))
         return tuple(range(lo, hi))
     return tuple(int(x) for x in layers_arg.split(","))
 
@@ -144,7 +156,7 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="Qwen/Qwen3-0.6B")
+    ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--methods", nargs="+", default=METHODS)
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
@@ -164,32 +176,41 @@ def main() -> None:
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
+    meta = make_metadata(args)
+    logger.info(f"run_id={meta['run_id']} commit={meta['git_commit']} ts={meta['timestamp']}")
 
     logger.info(f"BLUF: model={args.model} methods={len(args.methods)} target_kl={args.target_kl} "
                 f"vignettes={args.vignettes} max_think={args.max_think_tokens}")
-    logger.info("EXPECT: 3 modalities x airisk vignettes. (1) bare baseline, (2) prompt_only "
+    logger.info(f"EXPECT: 3 modalities x {args.vignettes} vignettes. (1) bare baseline, (2) prompt_only "
                 "with POS persona as system prompt, (3) 11 calibrated steering methods.")
-    logger.info("EXPECT: axis_shift = ΔlogitSanctity - ΔlogitCare nats. +ve = moved toward "
-                "traditional/binding, -ve = toward care. Per-foundation Δlogit ± std for all 7.")
-    logger.info(f"persona axis: POS='{PERSONA_PAIRS_TRAD_CARE[0][0]}' vs "
-                f"NEG='{PERSONA_PAIRS_TRAD_CARE[0][1]}' (and 5 paraphrase pairs)")
+    logger.info("EXPECT: axis_shift = ΔlogitSanctity - ΔlogitCare nats (legacy composite). "
+                "Headline axis is Auth↓ -- aggregate_flips.py reports SI on Authority.")
+    logger.info(f"persona axis: POS='{PERSONA_PAIRS_AUTHORITY[0][0]}' vs "
+                f"NEG='{PERSONA_PAIRS_AUTHORITY[0][1]}' "
+                f"(+{len(PERSONA_PAIRS_AUTHORITY)-1} paraphrase pairs)")
 
     dtype = getattr(torch, args.torch_dtype)
     tok = AutoTokenizer.from_pretrained(args.model)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
+    # No flash_attention_2: Qwen3.5 + FA2 trips an `s_aux is None` path in
+    # transformers' integration. sdpa (default) works; speed cost is small
+    # since eval is short-suffix-bound, not prefill-bound.
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model, torch_dtype=dtype,
+    ).to(args.device).eval()
 
     layers = _resolve_layers(model, args.layers)
     logger.info(f"layers={layers} ({len(layers)} of {model.config.num_hidden_layers})")
 
     pos_prompts, neg_prompts = make_persona_pairs(
         tok, n_pairs=args.n_pairs, thinking=True,
-        persona_pairs=PERSONA_PAIRS_TRAD_CARE,
+        persona_pairs=PERSONA_PAIRS_AUTHORITY,
     )
     calib_prompts = _calib_prompts(tok, n=8)
 
     rows: list[list] = []
+    method_summaries: list[dict] = []
 
     # === (1) bare baseline: no system prompt, no steering vector ===========
     logger.info("\n=== bare baseline (no steering, no system prompt) ===")
@@ -205,19 +226,27 @@ def main() -> None:
     rows.append(_row_bare(base_logit_per_f, elapsed_s=bare_elapsed))
 
     # Persist bare report for later re-analysis (raw p_true grid + bool_mass).
+    # raw_pmass MUST be saved -- aggregator's pmass-floor gating uses it on the
+    # bare side; without it, gating is asymmetric (bare cells default to 1.0,
+    # steered cells get gated, biasing |Δlogit| of heavily-steered methods).
     (args.out / "bare.json").write_text(json.dumps({
+        "label": "bare",
+        "meta": meta,
         "model": args.model, "vignettes": args.vignettes,
         "max_think_tokens": args.max_think_tokens,
         "wrongness_mean": float(base_report["wrongness"]),
         "absolute_logit_per_foundation": base_logit_per_f,
         "raw_p_true": base_report["raw"],
+        "raw_pmass": base_report["raw_pmass"],
         "info": {k: v for k, v in base_report["info"].items() if k != "elapsed_s"},
         "elapsed_s": bare_elapsed,
     }, indent=2))
+    method_summaries.append({"label": "bare", "elapsed_s": bare_elapsed,
+                             "wrongness_mean": float(base_report["wrongness"])})
 
     # === (2) prompt_only baseline: POS persona as system prompt ============
     if args.prompt_baseline:
-        pos_persona = PERSONA_PAIRS_TRAD_CARE[0][0]
+        pos_persona = PERSONA_PAIRS_AUTHORITY[0][0]
         sys_prompt = PROMPT_TEMPLATE.format(persona=pos_persona)
         logger.info(f"\n=== prompt_only (system='{sys_prompt}') ===")
         wrapped_tok = _SystemInjectTok(tok, sys_prompt)
@@ -225,19 +254,31 @@ def main() -> None:
         pb_report = evaluate_with_vector(model, wrapped_tok, name=args.vignettes,
                                          max_think_tokens=args.max_think_tokens)
         pb_dlogit = dlogit_per_foundation(base_report, pb_report, args.vignettes)
+        pb_flips = flips_per_foundation(base_report, pb_report, args.vignettes)
         pb_elapsed = time.time() - pb_t0
         rows.append(_row_steer("prompt_only", pb_dlogit, elapsed_s=pb_elapsed))
 
         (args.out / "prompt_only.json").write_text(json.dumps({
-            "label": "prompt_only", "model": args.model,
+            "label": "prompt_only",
+            "meta": meta,
+            "model": args.model,
             "system_prompt": sys_prompt, "vignettes": args.vignettes,
             "dlogit_per_foundation": pb_dlogit,
+            "flips_per_foundation": pb_flips,
             "axis_shift": axis_shift(pb_dlogit),
             "raw_p_true": pb_report["raw"],
+            "raw_pmass": pb_report.get("raw_pmass", {}),
             "elapsed_s": pb_elapsed,
         }, indent=2))
+        method_summaries.append({"label": "prompt_only",
+                                 "axis_shift": axis_shift(pb_dlogit),
+                                 "elapsed_s": pb_elapsed})
 
     # === (3) 11 calibrated steering methods =================================
+    # Bidirectional: calibrate |C| at +sign, then run eval at +C and -C. Lets the
+    # eval (not a sign-probe) decide which direction is the intended one. KL at
+    # -C is not exactly the same as at +C, but at target_kl=1.0 the asymmetry is
+    # small; revisit with dual calibration if it bites.
     for method in tqdm(args.methods, desc="methods", mininterval=60):
         cfg = _make_cfg(method, layers)
         logger.info(f"\n=== steer_{method} ===")
@@ -249,33 +290,77 @@ def main() -> None:
             target_kl=args.target_kl, T=args.calib_T,
             max_iters=args.calib_iters, device=args.device,
         )
-        v.cfg.coeff = float(coeff_calib)
         kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
+        C = float(coeff_calib)
 
+        # +C eval
+        v.cfg.coeff = +C
         with v(model):
-            steer_report = evaluate_with_vector(
+            pos_report = evaluate_with_vector(
                 model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
-        st_dlogit = dlogit_per_foundation(base_report, steer_report, args.vignettes)
-        elapsed = time.time() - t0
+        pos_dlogit = dlogit_per_foundation(base_report, pos_report, args.vignettes)
+        pos_flips = flips_per_foundation(base_report, pos_report, args.vignettes)
 
-        rows.append(_row_steer(f"steer_{method}", st_dlogit,
-                               coeff=f"{coeff_calib:+.3f}", kl=f"{kl_hit:.2f}",
+        # -C eval (same |C|, flipped sign — no recalibration)
+        v.cfg.coeff = -C
+        with v(model):
+            neg_report = evaluate_with_vector(
+                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
+        neg_dlogit = dlogit_per_foundation(base_report, neg_report, args.vignettes)
+        neg_flips = flips_per_foundation(base_report, neg_report, args.vignettes)
+
+        elapsed = time.time() - t0
+        # Pick the sign with larger |axis_shift| for the headline row; the JSON
+        # keeps both so the aggregator can compute SI_best per foundation.
+        ax_pos, ax_neg = axis_shift(pos_dlogit), axis_shift(neg_dlogit)
+        if abs(ax_pos) >= abs(ax_neg):
+            best_label, best_dlogit, best_C = f"steer_{method}[+]", pos_dlogit, +C
+        else:
+            best_label, best_dlogit, best_C = f"steer_{method}[-]", neg_dlogit, -C
+        rows.append(_row_steer(best_label, best_dlogit,
+                               coeff=f"{best_C:+.3f}", kl=f"{kl_hit:.2f}",
                                elapsed_s=elapsed))
 
         out_path = args.out / f"{method}.json"
         out_path.write_text(json.dumps({
+            "label": f"steer_{method}",
+            "meta": meta,
             "method": method, "model": args.model, "layers": list(layers),
-            "coeff_calibrated": float(coeff_calib), "target_kl": args.target_kl,
+            "calibrated_C": C, "target_kl": args.target_kl,
             "kl_p95_at_calib": kl_hit,
-            "dlogit_per_foundation": st_dlogit,
-            "axis_shift": axis_shift(st_dlogit),
-            "raw_p_true": steer_report["raw"],
+            "pos": {
+                "coeff": +C,
+                "dlogit_per_foundation": pos_dlogit,
+                "flips_per_foundation": pos_flips,
+                "axis_shift": ax_pos,
+                "raw_p_true": pos_report["raw"],
+                "raw_pmass": pos_report["raw_pmass"],
+            },
+            "neg": {
+                "coeff": -C,
+                "dlogit_per_foundation": neg_dlogit,
+                "flips_per_foundation": neg_flips,
+                "axis_shift": ax_neg,
+                "raw_p_true": neg_report["raw"],
+                "raw_pmass": neg_report.get("raw_pmass", {}),
+            },
             "n_pairs": args.n_pairs, "max_think_tokens": args.max_think_tokens,
             "vignettes": args.vignettes, "elapsed_s": elapsed,
         }, indent=2))
+        method_summaries.append({
+            "label": f"steer_{method}",
+            "calibrated_C": C, "kl_p95_at_calib": kl_hit,
+            "axis_shift_pos": ax_pos, "axis_shift_neg": ax_neg,
+            "elapsed_s": elapsed,
+        })
+
+    # One audit line per sweep invocation. Metadata is per-run, not per-method;
+    # method JSONs already carry their full results, so this is a thin index.
+    append_run(args.out, {**meta, "kind": "sweep", "methods": method_summaries})
 
     logger.info("\n=== tinymfv sweep complete ===")
     logger.info(f"out: {args.out}")
+    logger.info(f"runs.jsonl: {args.out / 'runs.jsonl'} (run_id={meta['run_id']})")
     logger.info("SHOULD: bare row shows absolute logit(wrongness)±std per foundation; expect "
                 "Care high (model thinks care violations are wrong), Sanctity lower. Other rows "
                 "are paired Δlogit±std vs bare. axis_shift>0 means moved toward binding cluster.")

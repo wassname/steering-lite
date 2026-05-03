@@ -176,3 +176,137 @@ Open observations:
 - mean_centred ≡ mean_diff to 4 decimals, confirming Qwen3-0.6B's persona-pair activations are already centred.
 - sspace is functionally indistinguishable from mean_diff/mean_centred.
 - pca is a cautionary tale: positive axis_shift can hide universal foundation suppression.
+
+# Research Journal
+
+## 2026-05-03: Bidirectional Qwen3.5-4B sweep complete (jobs 67-69)
+
+All 15/15 method JSONs in `outputs/tinymfv_sweep/`. Model: Qwen3.5-4B, eval: airisk vignettes (524 cells), persona pairs: AUTH_CARE axis.
+
+### Pipeline summary
+
+- Jobs 61-66 failed: chars dtype+device bug (`einsum(kern fp32, row_mass bf16)` + state tensors on CPU). Fixed in `chars.py:apply()` with explicit `.to(device=h.device, dtype=torch.float32)`.
+- Jobs 67 (sweep tail), 68 (engineered_prompt), 69 (repeng) all succeeded.
+- repeng at coeff=1.5 fully saturated (pmass<0.5 on full eval batches, Chinese tokens in top-5). All n/a as predicted by the script comments.
+
+### Final leaderboard (sorted by axis_shift best sign)
+
+```
+method                  axis_Δ   Auth_k1  SocN_k1  mean_SI_k1
+engineered_prompt[  ]   +0.87    -1.00    +1.00    -1.00 (Auth SI is -1 = hurts)
+directional_ablation[-] +0.67    +0.21    +1.00    +0.21 ← best SI
+topk_clusters[+]        +0.65    +0.09    +0.23    +0.09
+sspace[+]               +0.49    +0.18    +1.00    +0.18 ← 2nd best SI
+angular_steering[-]     +0.51    -1.00    +1.00    -1.00
+chars[+]                +0.43    -1.00    +0.63    -1.00
+mean_diff[+]            +0.39    +0.06    +1.00    +0.06
+mean_centred[+]         +0.39    +0.03    +1.00    +0.03
+pca[-]                  +0.32    -0.94    +1.00    -0.94
+spherical[+]            +0.32    -0.94    +1.00    -0.94
+cosine_gated[+]         +0.31    +0.09    +0.67    +0.09
+prompt_only[  ]         +0.22    -1.00    +1.00    -1.00
+linear_act[+]           +0.24    -1.00    +1.00    -1.00
+repeng[  ]              n/a      n/a      n/a      n/a (collapsed)
+```
+
+### Notable observations
+
+- Care SI is always n/a across all methods (including directional_ablation which has 9 care flip_to_right). Likely the SI function requires cells near the flip boundary; Qwen3.5-4B already strongly classifies care violations (base logit +2.11) so no cells land near 0.5 threshold.
+- directional_ablation and sspace are the only methods with positive Auth SI. directional_ablation gets there by moving a lot of cells in the -C direction (negative flips across all foundations including -9 on Care).
+- Sign agreement table: cosine_gated has full ✓ across all foundations (best coherence). angular_steering, directional_ablation, topk_clusters show all ✗ (the ±C vectors are not steering a clean axis).
+- engineered_prompt at axis_shift=+0.87 is the strongest mover but SI=-1.00 on Auth means it's breaking as many Auth judgments as it fixes.
+- Next: README update (#72, #73) with this table.
+
+## 2026-05-03 (continued): SI under global persona-aligned sign
+
+Aggregator now picks one sign per method via `axis_shift` (persona-intended
+direction: Auth↓ + Care↑) and uses that sign for BOTH the flip table and SI.
+This removes the per-foundation max() selection bias.
+
+```
+method                  axis_Δ   mean_SI_k1   Auth_k1   SocN_k1
+directional_ablation[-] +0.67    +0.21        +0.21     -0.11
+topk_clusters[+]        +0.65    +0.09        +0.09     -0.28
+all others              ±        -1.00        -1.00     +1.00 or +0.6x
+```
+
+### Why everyone is -1.00 on Auth (not a bug)
+
+Bare model already classifies 33/34 Authority cells as "wrong" (high baseline
+wrongness on AI-risk Auth vignettes). Under intent[Auth]=-1, that gives
+n_rej=33, n_cho=1.
+
+Most methods don't move ANY of the 33 wrong-classified cells back to "right"
+(fix=0/33), but they DO break the 1 right-classified cell
+(broke=1/1=100%). SI = 0 - 1*1 = -1.00.
+
+Only `directional_ablation` (fix=7/33) and `topk_clusters` (fix=3/33) actually
+move bulk Auth cells across the 0.5 threshold, hence positive Auth_k1.
+
+### Implication
+
+SI on a metric where the base classifier is saturated has fragile denominators.
+For the README leaderboard, Auth_k1 is informative as "did the method move
+*any* of the 33 saturated cells", but the n_cho=1 broke denominator makes the
+metric noisy on the right side.
+
+Better headline metric for this axis might be `n_flip_to_right / n_total`
+(raw rate of cells crossing 0.5 in the intended direction), which doesn't
+have the n_cho=1 fragility. Flip table gives this directly.
+
+### Direction-aligned flip table is the right summary
+
+```
+method                  axis_Δ   Auth(net,to_r)   SocN(net,to_r)
+directional_ablation[-] +0.67    -7  (7→right)    -12 (13→right)
+topk_clusters[+]        +0.65    -3  (3→right)    -8  (8→right)
+engineered_prompt[ ]    +0.87    +1  (0→right)    -3  (0→right, +3→wrong)
+all others              <0.5     +1  (0→right)    +1-3 (mostly→wrong)
+```
+
+directional_ablation and topk_clusters are the only methods that actually
+flip Auth cells in the intended (right) direction. Everyone else either
+doesn't move Auth, or moves it the wrong way.
+
+## 2026-05-03 (continued): SI is fragile on bimodal base wrongness
+
+User flagged that SocN_k1=+1.00 was identical across 8 methods. Investigated:
+all 8 show `SocN fix=3/3 broke=0/29` and `Auth fix=0/33 broke=1/1`. Identical
+counts across architecturally different methods is suspicious.
+
+Cause: bare wrongness on AI-risk vignettes is bimodal. Inspecting bare.json:
+- SocN n_rej=3 cells: wrongness = 0.464, 0.466, 0.488 (all within ±0.04 of 0.5)
+- Next SocN cell: 0.517 (above threshold) → bulk is at ≥0.6
+- Auth n_cho=1 cell: wrongness=0.418, next jumps to 0.700
+
+So the flip metric is measuring "did your perturbation nudge the 4 cells
+sitting on the threshold". Almost any persona perturbation flips them.
+Methods that actually move the bulk distribution (directional_ablation,
+topk_clusters) produce more flips because they shift cells 0.7→0.4 etc.
+
+### Implication for the leaderboard
+
+SI is honest math (fix_rate - k*broke_rate) but the denominators (n_cho=1,
+n_rej=3) are fragile. Two methods can have identical SI not because they
+steer the same way, but because they both happen to perturb the 4 boundary
+cells.
+
+Better headline: dlogit means + std (continuous, not threshold-sensitive).
+Flip table is still useful as a sanity check (7 to_right out of 34 is a real
+result), but SI as a single number compresses too much information away.
+
+### Repeng baseline
+
+Coeff=1.0 (without iso-KL): axis_shift=+0.02, all foundations dlogit≈-1.7,
+pmass<0.5 on ~25% of eval rows. Means uncalibrated repeng saturates output
+distribution -- the standard failure mode for raw-coeff steering. Reframed:
+this is the "uncalibrated baseline" (what most repeng users ship), not a
+sabotage example. The story is "iso-KL calibration matters", not "repeng is
+broken".
+
+
+# 2026-05-03 13:25:30
+
+ok so we focus no only only authority as it seems models get confused. plus care if saturated.
+
+I also changed the tinymfv to have labels for each question, for each factor.

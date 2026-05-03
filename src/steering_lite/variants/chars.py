@@ -40,7 +40,7 @@ class CHaRSC(SteeringConfig):
     n_kmeans_iters: int = 20
     lambda_: float = 0.1  # Sinkhorn entropy regularization
     n_sinkhorn: int = 50
-    sigma: float | None = None  # None -> median pairwise distance heuristic
+    sigma: float | None = None  # None -> per-token median squared-distance heuristic
 
 
 def _kmeans_counts(X: Tensor, k: int, n_iters: int, seed: int) -> tuple[Tensor, Tensor]:
@@ -67,12 +67,19 @@ def _kmeans_counts(X: Tensor, k: int, n_iters: int, seed: int) -> tuple[Tensor, 
 
 
 def _sinkhorn(C: Tensor, p: Tensor, q: Tensor, lam: float, n_iters: int) -> Tensor:
-    """Entropic OT: P* = argmin <P,C> + lam*H(P), s.t. P 1 = p, P^T 1 = q."""
+    """Entropic OT: P* = argmin <P,C> + lam*H(P), s.t. P 1 = p, P^T 1 = q.
+
+    `K = exp(-C/lam)` underflows to 0 in fp32 for C/lam > ~80, which is easy to
+    hit in residual-stream space (squared centroid distances easily 100s, lam=0.1).
+    Without `.clamp_min(ε)` the Sinkhorn iterates produce 0 → div-by-0 → inf → NaN
+    that propagate silently into v_hat at apply time. Symptom: every eval cell
+    saturates at the _logit clamp (+4.6 nats) regardless of vignette content.
+    """
     K = torch.exp(-C / lam)
     u = torch.ones_like(p)
     for _ in range(n_iters):
-        v = q / (K.t() @ u)
-        u = p / (K @ v)
+        v = q / (K.t() @ u).clamp_min(ε)
+        u = p / (K @ v).clamp_min(ε)
     return u[:, None] * K * v[None, :]
 
 
@@ -116,21 +123,34 @@ class CHaRS:
         state: dict[str, Tensor],
         cfg: CHaRSC,
     ) -> Float[Tensor, "b s d"]:
-        a = state["a"].to(h)
-        b = state["b"].to(h)
-        P = state["P"].to(h)
-        p = state["p"].to(h)
-        sigma = float(state["sigma"])
+        # cdist doesn't support bf16, and CHaRS is sensitive to underflow in
+        # high-d, so keep gating math (a, b, P, kernel, transport) in fp32.
+        # v_hat is cast back to h.dtype before the residual add.
+        a = state["a"].to(device=h.device, dtype=torch.float32)
+        b = state["b"].to(device=h.device, dtype=torch.float32)
+        P = state["P"].to(device=h.device, dtype=torch.float32)
 
-        # k(x, a_i) per token. cdist doesn't support bf16 -- cast just for the
-        # distance, then drop back to h's dtype for the rest of the math.
-        d2    = (torch.cdist(h.float(), a.float()) ** 2).to(h.dtype)
-        kern  = torch.exp(-d2 / (2 * sigma ** 2))
-        denom = einsum(kern, p, "b s i, i -> b s")
+        d2 = torch.cdist(h.float(), a) ** 2
+        if cfg.sigma is None:
+            # Paper Eq. 11 heuristic: token-local median of squared distances.
+            sigma_sq = d2.median(dim=-1, keepdim=True).values.clamp_min(ε)
+        else:
+            sigma_sq = torch.full_like(d2, float(cfg.sigma) ** 2)
+
+        # Stabilized RBF: subtract max log-kernel before exp.
+        log_k = -d2 / (2.0 * sigma_sq)
+        log_k = log_k - log_k.max(dim=-1, keepdim=True).values
+        kern = torch.exp(log_k)
+
+        # Prefer transport-aware row mass; it is robust if Sinkhorn marginals are
+        # approximate under finite iterations.
+        row_mass = P.sum(dim=1)
+        denom = einsum(kern, row_mass, "b s i, i -> b s").clamp_min(ε)
 
         # weights w_ij(x) = P_ij * k_i(x) / sum_p p_p k_p(x)
         # v_hat(x) = sum_ij w_ij (b_j - a_i)
-        w     = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")
+        w = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")
         v_hat = einsum(w, b, "b s i j, j d -> b s d") - einsum(w, a, "b s i j, i d -> b s d")
+        v_hat = v_hat.to(h.dtype)
 
         return h + cfg.coeff * v_hat
