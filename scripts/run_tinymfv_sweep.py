@@ -142,6 +142,44 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
     return tuple(int(x) for x in layers_arg.split(","))
 
 
+@torch.no_grad()
+def _log_persona_demo(model, tok, persona_pairs, user_msgs, *, max_new_tokens: int) -> None:
+    """Sanity-check the persona pairs before extract: free-form greedy gen
+    from POS and NEG system prompts on shared user_msgs. Shows the full
+    chat-templated input + completion *with* special tokens, so we can
+    eyeball whether the chat template is right and whether the persona is
+    biting (POS vs NEG should differ in voice/values).
+    """
+    for i, (pos_persona, neg_persona) in enumerate(persona_pairs):
+        for j, user_msg in enumerate(user_msgs):
+            pos_sys = PROMPT_TEMPLATE.format(persona=pos_persona)
+            neg_sys = PROMPT_TEMPLATE.format(persona=neg_persona)
+            blocks = []
+            for tag, sys_prompt in (("POS", pos_sys), ("NEG", neg_sys)):
+                input_ids = tok.apply_chat_template(
+                    [{"role": "system", "content": sys_prompt},
+                     {"role": "user", "content": user_msg}],
+                    add_generation_prompt=True,
+                    return_tensors="pt",
+                    return_dict=False,
+                ).to(model.device)
+                out = model.generate(
+                    input_ids,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=tok.pad_token_id,
+                )
+                full = tok.decode(out[0], skip_special_tokens=False)
+                blocks.append(f"--- {tag} (pair={i}, msg={j}) ---\n{full}")
+            logger.info(
+                "EXPECT: POS+NEG share user_msg + chat template; differ in system persona "
+                "and downstream voice. ELSE persona too weak or template misrendered.\n"
+                f"=== PERSONA demo (pair={i}/{len(persona_pairs)}, user_msg={user_msg!r}) ===\n"
+                + "\n".join(blocks)
+                + "\n=== /PERSONA ==="
+            )
+
+
 def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
     """Held-out user_msgs (no persona) for KL measurement."""
     from steering_lite.data import load_suffixes
@@ -186,6 +224,11 @@ def main() -> None:
                     help="regex matched against block.named_modules() for sspace* variants. "
                          "None uses the variant default (residual writers: mlp.down_proj + self_attn.o_proj).")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
+    ap.add_argument("--demo-only", action="store_true",
+                    help="run persona demo, then exit before bare/sweep")
+    ap.add_argument("--demo-pairs", type=int, default=2,
+                    help="number of user_msgs to demo each persona pair on")
+    ap.add_argument("--demo-max-tokens", type=int, default=200)
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -221,6 +264,18 @@ def main() -> None:
         persona_pairs=PERSONA_PAIRS_AUTHORITY,
     )
     calib_prompts = _calib_prompts(tok, n=8)
+
+    # Persona sanity check: POS/NEG free-form gen on shared user_msgs, with
+    # full chat-templated input + special tokens visible. Run *before* extract
+    # so we can abort early if personas don't bite.
+    _log_persona_demo(
+        model, tok, PERSONA_PAIRS_AUTHORITY,
+        user_msgs=_calib_prompts(tok, n=args.demo_pairs, seed=1),
+        max_new_tokens=args.demo_max_tokens,
+    )
+    if args.demo_only:
+        logger.info("--demo-only set; exiting before extract.")
+        return
 
     # NB: "Think briefly. " is prepended to the JSON instruction in
     # tinymfv.FRAMES["q"] (see steering_lite.eval.tinymfv). One place,
