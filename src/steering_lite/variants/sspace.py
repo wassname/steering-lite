@@ -19,6 +19,10 @@ Output capture is cheaper than input capture for residual-writer Linears
 (e.g. `mlp.down_proj`: d_out=2560 vs d_in=9728 on Qwen3.5-4B). Residual-
 reader Linears (q/k/v/up/gate proj) would prefer the input side.
 
+Default target: residual writers (`mlp.down_proj` AND `self_attn.o_proj`).
+Override via `cfg.target_submodule = <regex>` -- e.g.
+`r"self_attn\\.(q|k|v|o)_proj|mlp\\.(gate|up|down)_proj"` for all 7 Linears.
+
 Contrastive direction in S-space (from POS/NEG persona-branching pairs):
 
     d_S     = mean(x_S^+) - mean(x_S^-)
@@ -33,11 +37,10 @@ Cosine gate (sign-agnostic, matches `cosine_gated.py`):
 
 This is the arithmetic relaxation of AntiPaSTO (Clark, 2026): same S-space
 parameterization, but contrastive mean-diff extraction instead of gradient
-optimization. Hook target is `mlp.down_proj` per layer (configurable via
-`SteeringConfig.target_submodule`); same layer set as other variants.
+optimization.
 
 Why cosine in S-space (not residual d-space): in d=2560 the cosine of two
-random vectors concentrates near 0 -- the gate degenerates. In r=8 the
+random vectors concentrates near 0 -- the gate degenerates. In r=64 the
 cosine is a meaningful per-token signal; tokens activating dominant S-space
 modes get a strong gate, tokens in the tail get near-zero.
 """
@@ -58,11 +61,6 @@ class SSpaceC(SteeringConfig):
     method: str = "sspace"
     r: int = -1  # -1 = full rank (no cropping); else top-r modes by |d_S|
 
-
-def _svd_topr(W: Tensor, r: int) -> tuple[Tensor, Tensor, Tensor]:
-    """W [out, in] -> (U_r [out, r], S_r [r], V_r [in, r]) in float32 on W's device."""
-    U, S, Vh = torch.linalg.svd(W.float(), full_matrices=False)
-    return U[:, :r].contiguous(), S[:r].contiguous(), Vh[:r, :].contiguous()
 
 def _orient_svd(
     U: Float[Tensor, "d_out r"],
@@ -89,18 +87,20 @@ def _orient_svd(
 @register
 class SSpace:
     name = "sspace"
+    # Default: hook both residual writers per block. Multi-submodule via regex.
+    default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
 
     @staticmethod
     def extract(
-        pos_outputs: dict[int, Float[Tensor, "n d_out"]],
-        neg_outputs: dict[int, Float[Tensor, "n d_out"]],
+        pos_outputs: dict[str, Float[Tensor, "n d_out"]],
+        neg_outputs: dict[str, Float[Tensor, "n d_out"]],
         cfg: SSpaceC,
         *,
-        layer_to_module: dict[int, torch.nn.Module],
-    ) -> dict[int, dict[str, Tensor]]:
+        name_to_module: dict[str, torch.nn.Module],
+    ) -> dict[str, dict[str, Tensor]]:
         out = {}
-        for li, y_pos in pos_outputs.items():
-            mod = layer_to_module[li]
+        for name, y_pos in pos_outputs.items():
+            mod = name_to_module[name]
             W = mod.weight  # [d_out, d_in]
             k = min(W.shape)
             r_eff = k if (cfg.r is None or cfg.r < 0 or cfg.r >= k) else cfg.r
@@ -109,7 +109,7 @@ class SSpace:
 
             b = mod.bias.detach().cpu().float() if mod.bias is not None else None
             y_pos_f = y_pos.float()
-            y_neg_f = neg_outputs[li].float()
+            y_neg_f = neg_outputs[name].float()
             if b is not None:
                 y_pos_f = y_pos_f - b
                 y_neg_f = y_neg_f - b
@@ -142,7 +142,7 @@ class SSpace:
             entry = {"U_r": U_r, "sqrtS": sqrtS, "dS_hat": dS_hat, "Vh_r": Vh_r}
             if b is not None:
                 entry["b"] = b
-            out[li] = entry
+            out[name] = entry
         return out
 
     @staticmethod
@@ -154,7 +154,6 @@ class SSpace:
         cfg: SSpaceC,
     ) -> Float[Tensor, "b s d_out"]:
         U_r    = state["U_r"].to(y)
-        Vh_r   = state["Vh_r"].to(y)
         sqrtS  = state["sqrtS"].to(y)
         dS_hat = state["dS_hat"].to(y)
         y_eff = y - state["b"].to(y) if "b" in state else y

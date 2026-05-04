@@ -60,6 +60,7 @@ class SSpaceDampAmpC(SteeringConfig):
 @register
 class SSpaceDampAmp:
     name = "sspace_damp_amp"
+    default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
     extract = SSpace.extract  # share path: state has U_r, sqrtS, dS_hat, Vh_r (+ optional b)
 
     @staticmethod

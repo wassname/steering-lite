@@ -19,6 +19,7 @@ from .variants.cosine_gated import CosineGatedC
 from .variants.sspace import SSpaceC
 from .variants.sspace_ablate import SSpaceAblateC
 from .variants.sspace_damp_amp import SSpaceDampAmpC
+from .variants.super_sspace import SuperSSpaceC
 from .variants.spherical import SphericalC
 from .variants.directional_ablation import DirectionalAblationC
 from .variants.chars import CHaRSC
@@ -34,6 +35,7 @@ __all__ = [
     "SSpaceC",
     "SSpaceAblateC",
     "SSpaceDampAmpC",
+    "SuperSSpaceC",
     "SphericalC",
     "DirectionalAblationC",
     "CHaRSC",

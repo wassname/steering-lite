@@ -4,12 +4,17 @@ Two hook paths, dispatched on `cfg.target_submodule`:
 
   - `target_submodule is None` (default): hook each transformer **block**'s
     forward output. The variant's `apply(block, h, state, cfg)` modifies the
-    block's hidden_states.
-  - `target_submodule` set (e.g. "mlp.down_proj"): hook that sub-module of
-    each block. The variant's `apply(block, x, y, state, cfg)` sees both the
-    sub-module's input x and output y, returns the modified output. State
-    buffers still live on the parent block; the sub-module gets a backref via
-    `_steering_block_ref`.
+    block's hidden_states. State is keyed by `int` (block layer index).
+  - `target_submodule = <regex>`: hook every nn.Linear in each selected block
+    whose dotted path matches the regex. The variant's
+    `apply(block, x, y, state, cfg)` sees both the sub-module's input x and
+    output y, returns the modified output. State is keyed by `str`
+    (full dotted name like `"layers.5.mlp.down_proj"`); each hooked
+    submodule owns its own state buffers and a `_steering_block_ref`.
+
+The two state shapes are kept distinct so block-level methods (mean_diff,
+pca, ...) are unchanged, while submodule-level methods (sspace*) can target
+multiple Linears per block.
 """
 from __future__ import annotations
 import json
@@ -29,13 +34,15 @@ from .extract_attn import (
 
 _ATTACHED_ATTR = "_steering_lite_attached"
 _STATE_PREFIX = "_steering_state_"
+_SUB_KEY_PREFIX = "sub::"  # safetensors key prefix marking submodule-level state
+_SUB_KEY_SEP = "::"        # separator between full_name and state_key
 
 
-def _gather_state(block) -> dict[str, torch.Tensor]:
+def _gather_state(mod) -> dict[str, torch.Tensor]:
     return {
-        k[len(_STATE_PREFIX):]: getattr(block, k)
-        for k in dir(block)
-        if k.startswith(_STATE_PREFIX) and isinstance(getattr(block, k, None), torch.Tensor)
+        k[len(_STATE_PREFIX):]: getattr(mod, k)
+        for k in dir(mod)
+        if k.startswith(_STATE_PREFIX) and isinstance(getattr(mod, k, None), torch.Tensor)
     }
 
 
@@ -53,23 +60,23 @@ def _hook(block, args, out):
 def _linear_hook(mod, args, out):
     """Forward hook for sub-module variants (cfg.target_submodule is set).
 
-    `out` is a Tensor (Linear's output), not a tuple. State is on the parent
-    block, accessed via `mod._steering_block_ref`.
+    `out` is a Tensor (Linear's output), not a tuple. State + cfg + method
+    live on the submodule itself; `block` is reachable via _steering_block_ref
+    (kept for variant signature compatibility even though sspace* don't use it).
     """
+    cfg: SteeringConfig = mod._steering_cfg
+    method = mod._steering_method
+    state = _gather_state(mod)
     block = mod._steering_block_ref
-    cfg: SteeringConfig = block._steering_cfg
-    method = block._steering_method
-    state = _gather_state(block)
-    x = args[0]
-    return method.apply(block, x, out, state, cfg)
+    return method.apply(block, args[0], out, state, cfg)
 
 
-def _install_state(block: nn.Module, state: dict[str, torch.Tensor], cfg: SteeringConfig) -> None:
+def _install_state(mod: nn.Module, state: dict[str, torch.Tensor], cfg: SteeringConfig) -> None:
     for k, v in state.items():
         attr = _STATE_PREFIX + k
-        if hasattr(block, attr):
-            raise RuntimeError(f"block already has {attr}; detach first")
-        block.register_buffer(attr, v.to(cfg.dtype), persistent=True)
+        if hasattr(mod, attr):
+            raise RuntimeError(f"module already has {attr}; detach first")
+        mod.register_buffer(attr, v.to(cfg.dtype), persistent=True)
 
 
 def attach(
@@ -77,11 +84,13 @@ def attach(
     cfg: SteeringConfig,
     vectors,
 ) -> list[RemovableHandle]:
-    """Install per-layer state as buffers and register forward hooks.
+    """Install per-target state as buffers and register forward hooks.
 
-    `vectors` may be a `dict[int, dict[str, Tensor]]` or a `Vector` (unwrapped).
-    Hook target depends on `cfg.target_submodule`: sub-module forward_hook
-    (input+output) when set, else the default block forward_hook.
+    `vectors` shape depends on cfg.target_submodule:
+      - None: dict[int, dict[str, Tensor]] keyed by block layer index.
+      - regex set: dict[str, dict[str, Tensor]] keyed by full dotted name.
+
+    Accepts a `Vector` (auto-unwrapped to its `.state`).
     """
     from .vector import Vector
     if isinstance(vectors, Vector):
@@ -89,7 +98,7 @@ def attach(
     if cfg.method not in REGISTRY:
         raise KeyError(f"unknown method {cfg.method!r}; registered: {list(REGISTRY)}")
     method = REGISTRY[cfg.method]
-    # variant-level default target_submodule (e.g. sspace -> "mlp.down_proj")
+    # variant-level default target_submodule (e.g. sspace -> residual writers)
     if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
         cfg.target_submodule = method.default_target_submodule
     requires_linear = cfg.target_submodule is not None
@@ -97,33 +106,32 @@ def attach(
     if not targets:
         raise RuntimeError("no target layers matched cfg")
 
-    # State buffers live on the *block*, so we need block refs even when hooking
-    # sub-modules. Re-resolve blocks alongside the (possibly sub-module) target.
     from .target import _get_blocks
     blocks = _get_blocks(model)
 
     handles: list[RemovableHandle] = []
     attached_names: list[str] = []
-    hooked_submodules: list[nn.Module] = []
-    for name, mod, li in targets:
-        if li not in vectors:
-            raise KeyError(f"vectors missing layer {li}; have {sorted(vectors)}")
-        block = blocks[li]
-        _install_state(block, vectors[li], cfg)
-        block._steering_cfg = cfg
-        block._steering_method = method
-        block._steering_layer_idx = li
+    hooked_modules: list[nn.Module] = []
+    for full_name, mod, li in targets:
+        key = full_name if requires_linear else li
+        if key not in vectors:
+            raise KeyError(f"vectors missing key {key!r}; have {sorted(vectors)}")
+        _install_state(mod, vectors[key], cfg)
+        mod._steering_cfg = cfg
+        mod._steering_method = method
         if requires_linear:
-            mod._steering_block_ref = block
-            hooked_submodules.append(mod)
+            mod._steering_module_name = full_name
+            mod._steering_block_ref = blocks[li]
+            hooked_modules.append(mod)
             handles.append(mod.register_forward_hook(_linear_hook))
         else:
-            handles.append(block.register_forward_hook(_hook))
-        attached_names.append(name)
+            mod._steering_layer_idx = li
+            handles.append(mod.register_forward_hook(_hook))
+        attached_names.append(full_name)
 
     setattr(model, _ATTACHED_ATTR, {
         "cfg": cfg, "targets": attached_names, "handles": handles,
-        "hooked_submodules": hooked_submodules,
+        "hooked_modules": hooked_modules,
     })
     return handles
 
@@ -134,17 +142,17 @@ def detach(model: nn.Module) -> None:
         return
     for h in state["handles"]:
         h.remove()
-    for mod in state.get("hooked_submodules", []):
-        if hasattr(mod, "_steering_block_ref"):
-            delattr(mod, "_steering_block_ref")
-    for _, block in model.named_modules():
-        if not hasattr(block, "_steering_method"):
+    for _, mod in model.named_modules():
+        if not hasattr(mod, "_steering_method"):
             continue
-        for k in [k for k in list(block._buffers) if k.startswith(_STATE_PREFIX)]:
-            del block._buffers[k]
-        for attr in ("_steering_cfg", "_steering_method", "_steering_layer_idx"):
-            if hasattr(block, attr):
-                delattr(block, attr)
+        for k in [k for k in list(mod._buffers) if k.startswith(_STATE_PREFIX)]:
+            del mod._buffers[k]
+        for attr in (
+            "_steering_cfg", "_steering_method",
+            "_steering_layer_idx", "_steering_module_name", "_steering_block_ref",
+        ):
+            if hasattr(mod, attr):
+                delattr(mod, attr)
     delattr(model, _ATTACHED_ATTR)
 
 
@@ -174,8 +182,8 @@ def train(
     """repeng-style verb: extract activations + run method.extract -> Vector.
 
     When `cfg.target_submodule` is set, recording uses
-    `extract_linear.record_linear_outputs` (capturing the sub-module's output)
-    and `extract` receives a `layer_to_module` kwarg so it can SVD weights.
+    `extract_linear.record_linear_outputs` (capturing each matched submodule's
+    output) and `extract` receives a `name_to_module` kwarg so it can SVD weights.
     """
     from .vector import Vector
     _log_extract_demo(tok, pos_prompts, neg_prompts)
@@ -185,17 +193,20 @@ def train(
     targets = find_targets(model, cfg)
     if cfg.target_submodule is not None:
         from .extract_linear import record_linear_outputs
-        layer_to_module = {li: mod for _, mod, li in targets}
-        pos_acts = record_linear_outputs(model, tok, pos_prompts, layer_to_module,
+        name_to_module = {full_name: mod for full_name, mod, _ in targets}
+        pos_acts = record_linear_outputs(model, tok, pos_prompts, name_to_module,
                                          batch_size=batch_size, max_length=max_length)
-        neg_acts = record_linear_outputs(model, tok, neg_prompts, layer_to_module,
+        neg_acts = record_linear_outputs(model, tok, neg_prompts, name_to_module,
                                          batch_size=batch_size, max_length=max_length)
-        state = method.extract(pos_acts, neg_acts, cfg, layer_to_module=layer_to_module)
+        state = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
     else:
         layers = tuple(li for _, _, li in targets)
         pos_acts = record_activations(model, tok, pos_prompts, layers, batch_size=batch_size, max_length=max_length)
         neg_acts = record_activations(model, tok, neg_prompts, layers, batch_size=batch_size, max_length=max_length)
-        state = method.extract(pos_acts, neg_acts, cfg)
+        if getattr(method, "needs_model", False):
+            state = method.extract(pos_acts, neg_acts, cfg, model=model)
+        else:
+            state = method.extract(pos_acts, neg_acts, cfg)
     return Vector(cfg, state)
 
 
@@ -260,18 +271,48 @@ def train_attn(
     return Vector(cfg, method.extract(pos_acts, neg_acts, cfg))
 
 
+def _state_to_safetensors_dict(model: nn.Module) -> dict:
+    """Serialise installed state buffers from all hooked modules. Forks on
+    whether the module is block-level (_steering_layer_idx) or submodule-level
+    (_steering_module_name); keys distinguish the two so load() can rebuild."""
+    sd = {}
+    for _, mod in model.named_modules():
+        if not hasattr(mod, "_steering_method"):
+            continue
+        if hasattr(mod, "_steering_module_name"):
+            full_name = mod._steering_module_name
+            for k, v in mod._buffers.items():
+                if k.startswith(_STATE_PREFIX):
+                    sd[f"{_SUB_KEY_PREFIX}{full_name}{_SUB_KEY_SEP}{k[len(_STATE_PREFIX):]}"] = v.detach().cpu()
+        elif hasattr(mod, "_steering_layer_idx"):
+            li = mod._steering_layer_idx
+            for k, v in mod._buffers.items():
+                if k.startswith(_STATE_PREFIX):
+                    sd[f"layer{li}.{k[len(_STATE_PREFIX):]}"] = v.detach().cpu()
+    return sd
+
+
+def _safetensors_dict_to_state(sd: dict[str, torch.Tensor]) -> dict:
+    """Inverse of _state_to_safetensors_dict. Returns dict keyed by int (block-level)
+    or str (submodule-level), depending on the prefix of each key."""
+    vectors: dict = {}
+    for k, v in sd.items():
+        if k.startswith(_SUB_KEY_PREFIX):
+            rest = k[len(_SUB_KEY_PREFIX):]
+            full_name, _, state_key = rest.rpartition(_SUB_KEY_SEP)
+            vectors.setdefault(full_name, {})[state_key] = v
+        else:
+            layer_part, _, sub = k.partition(".")
+            li = int(layer_part.removeprefix("layer"))
+            vectors.setdefault(li, {})[sub] = v
+    return vectors
+
+
 def save(model: nn.Module, path: str) -> None:
     state = getattr(model, _ATTACHED_ATTR, None)
     if state is None:
         raise RuntimeError("no steering attached; call attach() first")
-    sd = {}
-    for name, block in model.named_modules():
-        if not hasattr(block, "_steering_method"):
-            continue
-        li = block._steering_layer_idx
-        for k, v in block._buffers.items():
-            if k.startswith(_STATE_PREFIX):
-                sd[f"layer{li}.{k[len(_STATE_PREFIX):]}"] = v.detach().cpu()
+    sd = _state_to_safetensors_dict(model)
     metadata = {"cfg": json.dumps(state["cfg"].to_dict())}
     from safetensors.torch import save_file
     save_file(sd, path, metadata=metadata)
@@ -283,9 +324,5 @@ def load(model: nn.Module, path: str) -> list[RemovableHandle]:
         metadata = f.metadata()
     sd = load_file(path, device="cpu")
     cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
-    vectors: dict[int, dict[str, torch.Tensor]] = {}
-    for k, v in sd.items():
-        layer_part, _, sub = k.partition(".")
-        li = int(layer_part.removeprefix("layer"))
-        vectors.setdefault(li, {})[sub] = v
+    vectors = _safetensors_dict_to_state(sd)
     return attach(model, cfg, vectors)

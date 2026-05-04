@@ -68,6 +68,9 @@ with v(model):
 | Cosine-gated      | [cosine_gated.py](src/steering_lite/variants/cosine_gated.py)         | CAST-inspired soft gate, [Lee+ 2024](https://arxiv.org/abs/2409.05907) |
 | S-space (weight-SVD, cosine-gated) | [sspace.py](src/steering_lite/variants/sspace.py)           | AntiPaSTO arithmetic relaxation (Clark, 2026): steer in SVD basis of `mlp.down_proj` weight |
 | S-space ablation  | [sspace_ablate.py](src/steering_lite/variants/sspace_ablate.py)       | project-out contrastive direction in S-space                           |
+| S-space damp-amp  | [sspace_damp_amp.py](src/steering_lite/variants/sspace_damp_amp.py)   | damp NEG mass + amplify POS mass in S-space                            |
+| Super S-space     | [super_sspace.py](src/steering_lite/variants/super_sspace.py)         | pooled-Gram residual-stream basis (one block-level hook, ~4× faster than per-Linear sspace) |
+| Directional ablation | [directional_ablation.py](src/steering_lite/variants/directional_ablation.py) | [Arditi+ 2024](https://arxiv.org/abs/2406.11717)                |
 | Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)               | ungated core of [Spherical Steering](https://arxiv.org/abs/2602.08169) |
 | CHaRS             | [chars.py](src/steering_lite/variants/chars.py)                       | [Abdullaev+ 2026](https://arxiv.org/abs/2603.02237)                    |
 | Linear-AcT        | [linear_act.py](src/steering_lite/variants/linear_act.py)             | [Rodriguez+ 2025](https://openreview.net/forum?id=l2zFn6TIQi)          |
@@ -115,8 +118,10 @@ SI(Auth) is our primary metric. A positive SI means the method successfully move
 
 | method                 | SI(Auth) | SI_fwd | SI_rev | Auth_sep | pmass²×100 |
 | ---------------------- | -------: | -----: | -----: | -------: | ---------: |
+| prompt_only (TODO)     |      n/a |    n/a |    n/a |      n/a |        n/a |
 | directional_ablation   |    52.90 |   0.32 |  +1.00 |    +2.05 |       80.1 |
 | sspace                 |    45.67 |   0.64 |  +0.85 |    +0.69 |       61.0 |
+| super_sspace †         |    47.71 |   0.67 |  +0.40 |    +1.99 |       88.8 |
 | mean_diff              |    32.81 |   0.34 |  +1.00 |    +1.65 |       49.0 |
 | mean_centred           |    32.72 |   0.29 |  +1.00 |    +1.56 |       50.6 |
 | topk_clusters          |    31.34 |   0.13 |  +0.72 |    +1.55 |       73.9 |
@@ -131,6 +136,10 @@ SI(Auth) is our primary metric. A positive SI means the method successfully move
 | chars                  |    −9.16 |  −0.26 |  −0.00 |    +0.50 |       68.3 |
 
 Top 3 by SI: directional_ablation (52.9), sspace/weight-SVD (45.7), mean_diff (32.8). sspace_ablate SI_fwd=0.74 is the highest forward-arm score, confirming the down_proj S-space contrastive direction is load-bearing. cosine_gated has low pmass² (16.4) — model is uncertain at its calibrated coefficient, reducing SI despite positive SI_rev.
+
+† super_sspace was added after the 4B sweep; number shown is from the Qwen3-0.6B sub-study (job 126, alllin/r=-1). 4B re-run pending.
+
+TODO: `prompt_only` (running the model with the POS persona prompt, no steering) needs running on Qwen3.5-4B. It's the load-bearing baseline — without it, "steering beats engineered_prompt" can be dismissed as "your engineered prompt was weaker than the extraction prompt". On Qwen3-0.6B `prompt_only` scored +39.12 (above several steering methods).
 
 #### Δlogit per foundation
 
@@ -164,6 +173,43 @@ The asymmetric steerability finding: Qwen3.5-4B can be pushed Auth↓ easily by 
 repeng (uncalibrated at coeff=0.75) shows broad suppression of all foundations (all Δ ≈ −0.8), consistent with an uninformed coefficient choice. Its negative SI confirms it's breaking as many verdicts as it fixes.
 
 Reproduce: `just sweep Qwen/Qwen3.5-4B`. Baselines: `uv run --extra baseline python scripts/baseline_engineered_prompt.py` (needs `OPENROUTER_API_KEY`); `uv run --extra baseline --extra benchmark python scripts/baseline_repeng.py`.
+
+#### Variant/regime sensitivity (Qwen3-0.6B)
+
+The S-space family has knobs that interact non-trivially: which Linears to hook (`writers` = `down_proj`+`o_proj`; `alllin` = all 7 in-block Linears), and the rank cap `r` (`-1` = full SVD, `64` = task-specific top-r by `|dS|`). Cross-sweep on Qwen3-0.6B, tinymfv airisk, iso-KL=1.0:
+
+| sweep | regime                  |  r | super_sspace SI | sspace SI | sspace_ablate SI |
+| :---: | ----------------------- | -: | --------------: | --------: | ---------------: |
+|  125  | writers (down + o_proj) | -1 |             n/a |   +53.40  |          +54.52  |
+|  126  | all 7 Linears           | -1 |          +47.71 |   +33.54  |          +32.93  |
+|  128  | writers                 | 64 |    +0.69 (dead) |   +47.75  |          +41.99  |
+
+Findings:
+
+1. `super_sspace` earns its place: +47.71 SI at alllin/r=-1 in 582s, vs 2279s for per-Linear `sspace`. Single residual-stream hook with a pooled-Gram basis is ~4× cheaper.
+2. Optimal regime differs by variant. Per-Linear sspace prefers writers-only + r=-1 (53.40). super_sspace needs alllin + full rank — cropping to r=64 collapses it (0.69) because the pooled basis spreads signal across all d_model modes; per-Linear bases concentrate signal in fewer.
+3. SI vs raw axis_shift disagree on rank. At r=64 sspace gets stronger one-direction movement but loses bidirectionality (SI_rev → 0.01); r=-1 is weaker per-direction but symmetric.
+4. Hooking more Linears hurts per-Linear sspace (53→33). At fixed iso-KL=1.0, the budget gets spread thin across 7 hooks per block.
+
+Best-of-all-sweeps ranking on Qwen3-0.6B (each method shown at its best regime/r):
+
+| method                   | best regime    | SI(Auth) | note                                             |
+| ------------------------ | -------------- | -------: | ------------------------------------------------ |
+| linear_act               | alllin r=-1    |   +61.39 | (untouched by this work)                         |
+| mean_diff / mean_centred | any            |   +55.66 | (untouched; byte-identical — see open bug below) |
+| sspace_ablate            | writers r=-1   |   +54.52 |                                                  |
+| sspace                   | writers r=-1   |   +53.40 |                                                  |
+| topk_clusters            | alllin/writers |   +49.72 |                                                  |
+| super_sspace             | alllin r=-1    |   +47.71 | new variant; 4× faster than per-Linear sspace    |
+| spherical                | any            |   +43.67 |                                                  |
+| prompt_only              | n/a            |   +39.12 | persona-prompt baseline (no steering)            |
+| cosine_gated             | any            |   +38.08 |                                                  |
+
+`super_sspace` is mid-pack on SI but **4× faster** than per-Linear sspace (582s vs 2279s) — best bang/buck of the gated family for iterative experimentation. `prompt_only` (just running the persona prompt with no steering) lands ahead of cosine_gated and within ~15 SI of the best gated methods, which is a sobering baseline.
+
+Open bugs surfaced by these sweeps: `mean_diff ≡ mean_centred` byte-identical across all 4 sweeps — `subtract_corpus_mean=True` is a no-op. `directional_ablation` and `angular_steering` produce NaN at C ≈ ±0.006 (calibration collapse).
+
+See [RESEARCH_JOURNAL.md](RESEARCH_JOURNAL.md) for full per-method tables.
 
 ### Example traces
 

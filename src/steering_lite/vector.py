@@ -83,13 +83,17 @@ class Vector:
     __rmul__ = __mul__
 
     def save(self, path: str) -> None:
-        from .attach import _STATE_PREFIX  # for parity with attach._save layout
+        from .attach import _STATE_PREFIX, _SUB_KEY_PREFIX, _SUB_KEY_SEP  # noqa: F401
         import json
         from safetensors.torch import save_file
         sd: dict[str, Tensor] = {}
-        for li, s in self.state.items():
+        sub_mode = self.cfg.target_submodule is not None
+        for key, s in self.state.items():
             for k, t in s.items():
-                sd[f"layer{li}.{k}"] = t.detach().cpu()
+                if sub_mode:
+                    sd[f"{_SUB_KEY_PREFIX}{key}{_SUB_KEY_SEP}{k}"] = t.detach().cpu()
+                else:
+                    sd[f"layer{key}.{k}"] = t.detach().cpu()
         metadata = {"cfg": json.dumps(self.cfg.to_dict())}
         save_file(sd, path, metadata=metadata)
 
@@ -97,15 +101,12 @@ class Vector:
     def load(cls, path: str) -> "Vector":
         import json
         from safetensors.torch import load_file, safe_open
+        from .attach import _safetensors_dict_to_state
         with safe_open(path, framework="pt", device="cpu") as f:
             metadata = f.metadata()
         sd = load_file(path, device="cpu")
         cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
-        state: dict[int, dict[str, Tensor]] = {}
-        for k, t in sd.items():
-            layer_part, _, sub = k.partition(".")
-            li = int(layer_part.removeprefix("layer"))
-            state.setdefault(li, {})[sub] = t
+        state = _safetensors_dict_to_state(sd)
         return cls(cfg, state)
 
     def __repr__(self) -> str:

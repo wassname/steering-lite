@@ -52,6 +52,7 @@ class SSpaceAblateC(SteeringConfig):
 @register
 class SSpaceAblate:
     name = "sspace_ablate"
+    default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
     extract = SSpace.extract  # share path: state has U_r, sqrtS, dS_hat (+optional b)
 
     @staticmethod

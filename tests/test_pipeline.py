@@ -15,7 +15,7 @@ from steering_lite import Vector
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
     "mean_diff", "mean_centred", "pca", "topk_clusters", "cosine_gated",
-    "sspace", "sspace_ablate", "sspace_damp_amp",
+    "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
@@ -47,6 +47,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "sspace":                sl.SSpaceC(**common, r=2),
         "sspace_ablate":         sl.SSpaceAblateC(**common, r=2),
         "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, r=2),
+        "super_sspace":          sl.SuperSSpaceC(**common, r=2),
         "spherical":             sl.SphericalC(**common),
         "directional_ablation":  sl.DirectionalAblationC(**common),
         "chars":                 sl.CHaRSC(**common, k=2),

@@ -100,23 +100,28 @@ logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format
 
 
 METHODS = [
-    "sspace", "sspace_ablate", "sspace_damp_amp",
+    "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "mean_diff", "mean_centred", "pca", "topk_clusters", "cosine_gated",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
 
-def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
+def _make_cfg(method: str, layers: tuple[int, ...], *,
+              sspace_r: int = -1, sspace_target_submodule: str | None = None) -> sl.SteeringConfig:
     common = dict(layers=layers, coeff=1.0, dtype=torch.bfloat16, seed=0)
+    sspace_kw: dict = {"r": sspace_r}
+    if sspace_target_submodule is not None:
+        sspace_kw["target_submodule"] = sspace_target_submodule
     table = {
         "mean_diff":             sl.MeanDiffC(**common),
         "mean_centred":          sl.MeanDiffC(**common, subtract_corpus_mean=True),
         "pca":                   sl.PCAC(**common),
         "topk_clusters":         sl.TopKClustersC(**common, k=4),
         "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),
-        "sspace":                sl.SSpaceC(**common, r=-1),
-        "sspace_ablate":         sl.SSpaceAblateC(**common, r=-1),
-        "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, r=-1),
+        "sspace":                sl.SSpaceC(**common, **sspace_kw),
+        "sspace_ablate":         sl.SSpaceAblateC(**common, **sspace_kw),
+        "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, **sspace_kw),
+        "super_sspace":          sl.SuperSSpaceC(**common, r=sspace_r),
         "spherical":             sl.SphericalC(**common),
         "directional_ablation":  sl.DirectionalAblationC(**common),
         "chars":                 sl.CHaRSC(**common, k=4),
@@ -174,6 +179,11 @@ def main() -> None:
     ap.add_argument("--calib-iters", type=int, default=8)
     ap.add_argument("--max-think-tokens", type=int, default=256)
     ap.add_argument("--vignettes", default="airisk")
+    ap.add_argument("--sspace-r", type=int, default=-1,
+                    help="rank for sspace* variants. -1 = full rank.")
+    ap.add_argument("--sspace-target-submodule", default=None,
+                    help="regex matched against block.named_modules() for sspace* variants. "
+                         "None uses the variant default (residual writers: mlp.down_proj + self_attn.o_proj).")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
     args = ap.parse_args()
 
@@ -286,7 +296,9 @@ def main() -> None:
     # -C is not exactly the same as at +C, but at target_kl=1.0 the asymmetry is
     # small; revisit with dual calibration if it bites.
     for method in tqdm(args.methods, desc="methods", mininterval=60):
-        cfg = _make_cfg(method, layers)
+        cfg = _make_cfg(method, layers,
+                        sspace_r=args.sspace_r,
+                        sspace_target_submodule=args.sspace_target_submodule)
         logger.info(f"\n=== steer_{method} ===")
         t0 = time.time()
         v = sl.train(model, tok, pos_prompts, neg_prompts, cfg,

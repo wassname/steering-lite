@@ -126,3 +126,207 @@ chars[-]                   -9.16   -0.26    -0.00   0.45    +0.50     68.3
 - sspace_ablate (projection-out): SI=24.11, SI_fwd=0.74, SI_rev=0.02 — strong one-way ablation but no reverse arm
 
 This confirms the contrastive direction in down_proj S-space is structurally important (not just a correlation artifact): projecting it out has as strong an effect on logits as the best additive methods.
+
+## 2026-05-04 — job 125 sweep #1 (residual writers, r=−1, multi-submodule refactor)
+
+Job 125 (run_id=99f38378522e, model=Qwen3-0.6B, target=mlp.down_proj+self_attn.o_proj per block via regex, r=−1 full rank). Note: super_sspace was missing from METHODS at job-start time; appears in job 126.
+
+### Final sweep table (axis_shift = −ΔAuth − ΔCare; bare row absolute, others paired Δ vs bare)
+
+```
+cue  axis  row                            C_calib   kl_p95  ΔCare       ΔSanc       ΔAuth       ΔLoy        ΔFair       ΔLib        ΔSocN       t
+⚪    ref   bare                            n/a       n/a     +0.98±2.38  -0.21±2.38  +0.99±2.53  +0.15±2.15  +0.67±2.37  +1.69±2.11  -1.46±2.16  240s
+🟡   +0.41 prompt_only                     n/a       n/a     -1.68±2.92  -1.45±2.49  -2.09±3.39  -2.03±2.69  -2.28±2.64  -2.00±2.27  -0.41±2.66  245s
+🟡   +0.36 steer_sspace[-]                 -25.600   0.55    -2.28±2.61  -1.67±2.63  -2.63±2.73  -1.83±2.19  -2.17±2.26  -2.66±2.35  -0.28±2.51  995s
+🟡   -0.17 steer_sspace_ablate[-]          -4.178    0.95    -1.53±2.35  -0.49±2.34  -1.36±2.49  -0.61±2.05  -1.13±2.37  -2.12±2.18  +0.86±2.21  968s
+🔴   +0.05 steer_sspace_damp_amp[+]        +6.646    1.00    -1.29±2.41  -0.21±2.48  -1.34±2.49  -0.49±2.10  -1.05±2.29  -2.02±2.20  +1.04±2.19  852s
+🔴   -0.15 steer_mean_diff[+]              +2.169    0.98    -1.97±2.74  -1.26±2.51  -1.83±2.32  -1.58±2.57  -1.66±2.42  -2.68±1.77  +0.23±2.42  443s
+🔴   -0.15 steer_mean_centred[+]           +2.169    0.98    -1.97±2.74  -1.26±2.51  -1.83±2.32  -1.58±2.57  -1.66±2.42  -2.68±1.77  +0.23±2.42  442s
+🟡   +0.33 steer_pca[-]                    -2.473    1.03    -0.80±2.26  -0.68±1.88  -1.13±1.90  -0.48±2.25  -0.80±1.98  -1.45±2.10  +0.34±2.21  465s
+🟡   -0.27 steer_topk_clusters[+]          +2.582    1.01    -3.55±3.13  -2.28±3.11  -3.28±3.60  -2.96±2.96  -3.29±3.28  -3.72±2.92  -1.51±2.89  569s
+🟢   +0.71 steer_cosine_gated[-]           -12.004   1.04    +0.54±2.16  +1.04±2.14  -0.17±2.31  +0.67±2.00  +0.25±1.94  -0.11±2.12  +1.47±2.29  481s
+🟢   +0.99 steer_spherical[+]              +0.013    1.00    -1.43±3.12  -1.36±2.92  -2.43±3.12  -0.90±3.04  -1.36±2.35  -2.56±2.79  -0.78±2.44  538s
+⚪   +nan  steer_directional_ablation[-]   -0.006    15.29   -0.05±0.00  n/a         n/a         n/a         -0.35±1.64  n/a         n/a         567s
+🟡   +0.21 steer_chars[+]                  +2.467    1.04    -0.98±2.28  +0.02±2.31  -1.18±2.53  -0.00±2.13  -0.59±2.35  -1.72±2.14  +1.25±2.11  662s
+🟡   +0.35 steer_linear_act[+]             +2.632    0.97    -1.38±2.51  -1.15±2.37  -1.74±2.85  -1.34±2.48  -1.75±2.95  -2.06±2.67  -0.91±2.23  485s
+⚪   +nan  steer_angular_steering[-]       -0.006    16.21   n/a         n/a         n/a         n/a         n/a         n/a         n/a         593s
+```
+
+### SI(Auth) ranking (loading-weighted, k=1.0, headline=Authority)
+
+```
+method                 SI(Auth)  SI_fwd  SI_rev  Care_SI  Auth_sep  pmass²×100
+linear_act[+]          +61.39    +0.44   +0.85   -52.44   +2.42     94.8
+mean_centred[+]        +55.66    +0.54   +0.73   -54.02   +1.90     88.0
+mean_diff[+]           +55.66    +0.54   +0.73   -54.02   +1.90     88.0
+sspace_ablate[-]       +54.52    +0.94   +0.30   -44.52   +0.63     87.6
+sspace[-]              +53.40    +0.94   +0.21   -43.12   +1.62     93.5
+topk_clusters[+]       +49.72    +0.89   +0.17   -42.44   +2.72     93.6
+spherical[+]           +43.67    +0.53   +0.67   -36.68   +2.05     73.1
+prompt_only            +39.12    +0.40   n/a     -29.48   n/a       97.5
+cosine_gated[+]        +38.08    +0.61   +0.27   -38.31   +1.90     86.6
+chars[+]               +26.45    +0.13   +0.52   -20.34   +0.71     81.0
+sspace_damp_amp[+]     +19.63    +0.59   -0.11   -20.26   +0.33     81.5
+directional_ablation[+] +1.52    n/a     +0.57    -1.09   +0.00     2.7
+pca[-]                 -3.93     +0.09   -0.19   +8.61    +0.03     86.1
+angular_steering[+]    n/a       n/a     n/a     n/a      n/a       0.0
+```
+
+### Observations
+
+- **sspace 45.67 → 53.40** (+7.7 SI). Task-specific |dS|.topk replaced top-σ truncation; full-rank r=−1. Modest improvement.
+- **sspace_ablate +54.52** beats sspace by ~1 SI now (was 24 vs 45 before). The new shared extract (full SVD + |dS|.topk) helps ablation more than additive — projection-out is more sensitive to the basis being task-relevant.
+- **C_calib=−25.6, kl_p95=0.549** for sspace: at full rank the d-space cosine gate concentrates near 0; calibration scaled α 10× higher than mean_diff and still stopped at half target_kl. The gate being near-constant explains why sspace doesn't dominate despite large α.
+- **sspace_damp_amp +19.63**: weak. The multiplicative `(exp(c·dS_hat)−1)` mass at full rank is tiny; would need much larger α than calibrator allowed. Probably wants r << d_model.
+- **mean_diff ≡ mean_centred** (byte-identical): `subtract_corpus_mean=True` is no-op in the current impl. Pre-existing bug, not from this refactor.
+- **angular_steering / directional_ablation NaN**: pmass collapse — both methods produced near-zero coeffs (C≈±0.006) and degenerate distributions. Existing failure, untouched here.
+- **Sign agreement**: only mean_diff/cosine_gated/linear_act/spherical pass on every foundation. sspace*, topk_clusters fail on most — the high SI is from the chosen-sign arm; reverse arm doesn't move the axis.
+
+### Next
+
+- Job 126 (all 7 Linears, full METHODS list with super_sspace) running now — will see whether multi-submodule helps and whether super_sspace's pooled basis beats per-Linear sspace.
+- Job 127 (super_sspace + sspace + mean_diff at residual-stream hook) queued after.
+
+## 2026-05-04 — job 126 sweep #2 (all-Linear, r=−1) + job 127 super_sspace test
+
+Job 126 (run_id=6cb19b7b2641): same as job 125 but with `target_submodule=r"self_attn\.(q|k|v|o)_proj|mlp\.(gate|up|down)_proj"` — hooks all 7 Linears per block instead of just the 2 residual writers. 14 methods including super_sspace.
+
+Job 127 (run_id=fb76ad999134): 3-method test (super_sspace, sspace, mean_diff). super_sspace ignores `--sspace-target-submodule` (uses model walk via shape detection) so its result matches 126's exactly — a sanity check, not new data.
+
+### Job 126 SI(Auth) ranking
+
+```
+method                  SI(Auth)  SI_fwd  SI_rev  Care_SI  Auth_sep  pmass²×100
+linear_act[+]           +61.39    +0.44   +0.85   -52.44   +2.42     94.8
+mean_centred[+]         +55.66    +0.54   +0.73   -54.02   +1.90     88.0
+mean_diff[+]            +55.66    +0.54   +0.73   -54.02   +1.90     88.0
+topk_clusters[+]        +49.72    +0.89   +0.17   -42.44   +2.72     93.6
+super_sspace[+]         +47.71    +0.67   +0.40   -45.99   +1.99     88.8
+spherical[+]            +43.67    +0.53   +0.67   -36.68   +2.05     73.1
+prompt_only             +39.12    +0.40   n/a     -29.48   n/a       97.5
+cosine_gated[+]         +38.08    +0.61   +0.27   -38.31   +1.90     86.6
+sspace[-]               +33.54    +0.85   -0.06   -23.53   +1.15     85.3
+sspace_ablate[-]        +32.93    +0.63   +0.13   -26.78   +0.21     87.0
+chars[+]                +26.45    +0.13   +0.52   -20.34   +0.71     81.0
+sspace_damp_amp[+]      +22.69    +0.64   -0.14   -32.96   +0.48     90.5
+directional_ablation[+] +1.52     n/a     +0.57    -1.09   +0.00     2.7
+pca[-]                  -3.93     +0.09   -0.19   +8.61    +0.03     86.1
+angular_steering[+]     n/a       n/a     n/a     n/a      n/a       0.0
+```
+
+### Cross-sweep comparison: writers-only vs all-Linear vs super_sspace
+
+| method | writers-only (job 125) | all-Linear (job 126) | residual-stream pooled |
+|---|---|---|---|
+| sspace | **+53.40** | +33.54 | — |
+| sspace_ablate | **+54.52** | +32.93 | — |
+| sspace_damp_amp | +19.63 | +22.69 | — |
+| **super_sspace** | (missing) | **+47.71** | +47.71 (same) |
+
+### Key observations
+
+- **Hooking more Linears HURTS sspace and sspace_ablate** (53→33, 54→33). Hypothesis: with 7 hooks injecting independent additive deltas per block, the iso-KL budget gets spread thin per submodule; each submodule's local steering is weaker, and the ablation/additive directions stop being task-coherent across submodules.
+- **super_sspace dominates the sspace family at all-Linear** (+47.71 vs +33.54). Pooling the basis into one residual-stream hook is *more* effective than spreading the same KL budget across 7 per-Linear hooks. Confirms the hypothesis from the variant's docstring: a global d_model basis is more robust than tail-noisy per-Linear bases.
+- **super_sspace is 4× cheaper than per-Linear sspace** (582s vs 2279s in job 126) — single block-level hook, basis precomputed once via Gram trick.
+- **Cleaner calibration**: super_sspace C=−3.9 kl=1.02 (saturated); sspace at writers-only C=−25.6 kl=0.55 (under-saturated, suggesting near-dead cosine gate at full rank in the per-Linear case).
+- **mean_diff still tops the SI table** (+55.66) regardless of regime — input-independent additive is hard to beat at iso-KL=1.0 on this benchmark. The sspace-family advantage will likely show at higher KL targets where additive saturates and gating starts paying off.
+
+### What's pending
+
+- README update with cross-method/cross-target table.
+- r=64 / r=128 sweep at writers-only to test whether moderate-rank cropping recovers the cosine-gate (super_sspace at smaller r should also be tried).
+- Investigate `mean_diff ≡ mean_centred` byte-identical bug (`subtract_corpus_mean` no-op) — pre-existing, separate from this work.
+
+## 2026-05-04 — job 128 r=64 writers-only follow-up
+
+Job 128 (run_id pending). Same as job 125 (writers-only target_submodule) but `--sspace-r 64` instead of `-1`. 6 methods: sspace family + super_sspace + mean_diff/cosine_gated controls.
+
+### SI(Auth) ranking (r=64 writers-only)
+
+```
+method             SI(Auth)  SI_fwd  SI_rev  Care_SI  Auth_sep  pmass²×100
+mean_diff[+]       +55.66    +0.54   +0.73   -54.02   +1.90     88.0
+sspace[-]          +47.75    +1.00   +0.01   -52.68   +2.28     95.0
+sspace_ablate[-]   +41.99    +0.68   +0.20   -25.97   +0.95     95.5
+prompt_only        +39.12    +0.40   n/a     -29.48   n/a       97.5
+cosine_gated[+]    +38.08    +0.61   +0.27   -38.31   +1.90     86.6
+sspace_damp_amp[+] +24.72    +0.59   +0.03   -26.10   +0.40     80.3
+super_sspace[+]    +0.69     -0.16   +0.18   +2.84    +0.27     80.3
+```
+
+### r vs SI head-to-head (writers-only)
+
+| method | r=−1 SI | r=64 SI | r=−1 ax_max | r=64 ax_max |
+|---|---|---|---|---|
+| mean_diff | 55.66 | 55.66 | −0.15 | −0.15 |
+| sspace | **53.40** | 47.75 | +0.36 | +0.48 |
+| sspace_ablate | **54.52** | 41.99 | −0.17 | +0.29 |
+| sspace_damp_amp | 19.63 | **24.72** | +0.05 | −0.14 |
+| super_sspace (alllin) | **47.71** | 0.69 | +0.96 | +0.17 |
+| cosine_gated | 38.08 | 38.08 | +0.71 | +0.71 |
+
+### Surprise: SI ↓ but axis_shift ↑ for sspace at r=64
+
+axis_shift (one-sign max) and SI (bidirectional informedness) disagree:
+- r=64: SI_fwd=1.00, SI_rev=0.01. The gate pushes hard one way and is *dead* the other way.
+- r=−1: SI_fwd=0.94, SI_rev=0.21. Weaker per-direction but bidirectional.
+
+**Interpretation:** at r=64 the task-specific top-r selection picks modes maximally aligned with the contrastive direction. The cosine gate `|cos(xS, dS_hat)|` is sign-agnostic in magnitude, but `dS_hat` is fixed — so positive-α steers along `+dS`, negative-α along `−dS`. At r=64, the steering signal is concentrated on a few r-dim modes that the model uses asymmetrically (one direction is "natural", the other isn't). At r=−1, with the noisy d-dim basis, both directions hit a roughly symmetric noise floor.
+
+**For SI (bidirectional metric)**: r=−1 wins — broader basis = more symmetric pushability.
+**For raw axis_shift (one-sign)**: r=64 wins — concentrated basis = stronger per-direction movement.
+**Practical:** if you only care about pushing one way (e.g. authority↓), r=64 is better. If you want a steering axis usable in both directions, r=−1 is better.
+
+### super_sspace collapses at r=64
+
+SI dropped 47.71 → 0.69 (essentially dead). axis_shift +0.96 → +0.17. Calibration kl=0.85 (didn't saturate at C=2.79).
+
+**Interpretation:** super_sspace's strength comes from the *pooled* full d_model basis — averaging tail noise across many writers/readers leaves clean signal in *all* modes. Cropping to top-64 by |dS| discards most of that signal. Per-Linear sspace benefits from cropping (per-Linear tail is noisy); super_sspace does not (pooled tail is clean).
+
+This is a strong claim about the geometry: per-Linear bases are noisy, the noise mostly lives in low-σ modes, and pooling averages it out. Suggests an opposite cropping rule for super_sspace: drop *zero-eigenvalue tail* of the Gram matrix (modes with no signal) but keep the rest. Currently `_build_super_basis` returns the full d_model spectrum; would want to threshold by σ_⋆ rather than crop by |dS|.topk.
+
+### Final ranking (best of all sweeps)
+
+```
+method                    best regime         SI(Auth)
+linear_act                alllin r=−1         +61.39  (untouched by this work)
+mean_diff/mean_centred    any                 +55.66  (untouched)
+sspace_ablate             writers r=−1        +54.52
+sspace                    writers r=−1        +53.40
+topk_clusters             alllin/writers      +49.72
+super_sspace              alllin r=−1         +47.71  ← new variant; cheapest of the gated family
+spherical                 any                 +43.67
+prompt_only               n/a                 +39.12
+cosine_gated              any                 +38.08
+```
+
+super_sspace's SI is mid-pack but its **wallclock is 4× faster** than per-Linear sspace (582s vs 2279s). For iterative experimentation it's the best bang/buck of the sspace family.
+
+
+# 2026-05-04 18:26:04
+
+● Results summary
+
+  4 sweeps run on Qwen3-0.6B, tinymfv airisk benchmark, iso-KL@1.0:
+
+  ┌───────┬─────────────────────────┬─────┬──────────────────┬───────────┬──────────────────┐
+  │ sweep │         regime          │  r  │ super_sspace SI  │ sspace SI │ sspace_ablate SI │
+  ├───────┼─────────────────────────┼─────┼──────────────────┼───────────┼──────────────────┤
+  │ 125   │ writers (down + o_proj) │ −1  │ (missing)        │ 53.40     │ 54.52            │
+  ├───────┼─────────────────────────┼─────┼──────────────────┼───────────┼──────────────────┤
+  │ 126   │ all 7 Linears           │ −1  │ 47.71            │ 33.54     │ 32.93            │
+  ├───────┼─────────────────────────┼─────┼──────────────────┼───────────┼──────────────────┤
+  │ 127   │ super_sspace dedicated  │ −1  │ 47.71            │ 53.40     │ —                │
+  ├───────┼─────────────────────────┼─────┼──────────────────┼───────────┼──────────────────┤
+  │ 128   │ writers                 │ 64  │ 0.69 (collapsed) │ 47.75     │ 41.99            │
+  └───────┴─────────────────────────┴─────┴──────────────────┴───────────┴──────────────────┘
+
+  Headline findings:
+
+  1. super_sspace works. SI=+47.71 at all-Linear/r=−1 in 582s (4× faster than per-Linear sspace at 2279s). Single residual-stream hook, pooled Gram-trick basis. New variant earns its place.
+  2. Optimal regime differs by variant.
+    - per-Linear sspace: writers-only + r=−1 best for SI (53.40); r=64 wins on raw axis_shift but kills bidirectionality (SI_rev → 0.01).
+    - super_sspace: all-Linear / full-rank only. r=64 collapses (SI=0.69). Pooled basis needs full d_model.
+  3. Hooking more Linears hurts per-Linear sspace (53.40 → 33.54). KL budget gets spread thin per submodule.
+  4. mean_diff still tops the SI table at +55.66 — input-independent additive is hard to beat at iso-KL=1.0.
+  5. 
