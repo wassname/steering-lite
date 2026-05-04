@@ -146,6 +146,10 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     entities: list[tuple[str, str, np.ndarray]] = []
     entities.append(("base", "model", np.array([base_logit[f] for f in FOUNDATION_ORDER])))
 
+    # Post-eval sign flip: same logic as aggregate_flips._pick_sign — pick the
+    # sign that gives smaller ΔAuthority (persona wants Auth↓). For
+    # unidirectional baselines (prompt_only, repeng) only POS exists.
+    auth_idx = FOUNDATION_ORDER.index("Authority")
     skip = {"bare.json"}
     for jp in sorted(sweep_dir.glob("*.json")):
         if jp.name in skip or "stale" in jp.name or jp.name == "runs.jsonl":
@@ -155,12 +159,19 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         except Exception:
             continue
         method = jp.stem
+        candidates = []
         for sign, lab in [("+", "POS"), ("-", "NEG")]:
             prof = _profile_for_method(d, base_logit, sign)
             if prof is None:
                 continue
             vec = np.array([prof[f] for f in FOUNDATION_ORDER])
-            entities.append((method, lab, vec))
+            candidates.append((sign, lab, vec))
+        if not candidates:
+            continue
+        # pick sign minimising ΔAuth = vec[auth] − base_auth
+        base_auth = base_logit["Authority"]
+        best = min(candidates, key=lambda c: c[2][auth_idx] - base_auth)
+        entities.append((method, best[1], best[2]))
 
     # Humans: use calibrated_wrongness mean per foundation_coarse as a logit-ish
     # proxy. Different scale, so we'll project onto model-fit PCA below.
