@@ -20,5 +20,5 @@ sweep model="Qwen/Qwen3-0.6B" out="outputs/tinymfv_sweep":
 # Render README-ready tables (base vs humans, SI, Δlogit ± σ, sign agreement)
 # and a moral-map PNG (PCA scatter + ΔAuth-vs-ΔCare surgical view).
 results sweep_dir="outputs/tinymfv_sweep" vignettes="airisk":
-	uv run --extra benchmark --with matplotlib python scripts/results.py \
+	uv run --extra benchmark --with matplotlib --with adjustText python scripts/results.py \
 		--sweep-dir {{sweep_dir}} --vignettes {{vignettes}}

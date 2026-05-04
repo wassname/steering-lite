@@ -200,33 +200,50 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         h_pc = h_c @ Vt.T
         human_pc = (float(h_pc[0]), float(h_pc[1]))
 
+    try:
+        from adjustText import adjust_text
+    except ImportError:
+        adjust_text = None
+        logger.warning("adjustText not installed; labels will overlap. pip install adjustText")
+
     fig, axs = plt.subplots(1, 2, figsize=(13, 5.5))
 
     # --- LEFT: PCA scatter ---
     ax = axs[0]
+    base_idx = next(i for i, (m, _) in enumerate(labels) if m == "base")
+    base_pc = (pc1[base_idx], pc2[base_idx])
+    texts = []
     for i, (method, sign) in enumerate(labels):
         if method == "base":
             ax.scatter(pc1[i], pc2[i], s=180, c="black", marker="*", zorder=5, label="base")
-            ax.annotate("base", (pc1[i], pc2[i]), xytext=(6, 6), textcoords="offset points",
-                        fontsize=10, weight="bold")
+            texts.append(ax.text(pc1[i], pc2[i], "base", fontsize=10, weight="bold"))
         else:
             color = "C0" if sign == "POS" else "C3"
             ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.7)
-            ax.annotate(f"{method}[{sign[0]}]", (pc1[i], pc2[i]), xytext=(4, 2),
-                        textcoords="offset points", fontsize=7, color=color, alpha=0.85)
+            texts.append(ax.text(pc1[i], pc2[i], f"{method}[{sign[0]}]",
+                                 fontsize=7, color=color, alpha=0.9))
     if human_pc is not None:
         ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
                    label="human ref (projected)")
-        ax.annotate("human", human_pc, xytext=(6, 6), textcoords="offset points",
-                    fontsize=10, weight="bold", color="red")
-    # Loadings arrows for foundations
+        texts.append(ax.text(human_pc[0], human_pc[1], "human",
+                             fontsize=10, weight="bold", color="red"))
+    # Loadings arrows for foundations, anchored at BASE position (more intuitive
+    # than the centroid-anchored biplot convention: "from where the model is now,
+    # increasing X moves you this way").
     loads = Vt.T[:, :2] * S[:2]
-    scale = 0.6 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
+    scale = 0.45 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
+    foundation_texts = []
     for j, f in enumerate(FOUNDATION_ORDER):
-        ax.arrow(0, 0, loads[j, 0] * scale, loads[j, 1] * scale,
-                 head_width=0.05, color="grey", alpha=0.4, length_includes_head=True)
-        ax.text(loads[j, 0] * scale * 1.08, loads[j, 1] * scale * 1.08, FOUNDATION_SHORT[f],
-                fontsize=8, color="grey", ha="center", va="center")
+        dx, dy = loads[j, 0] * scale, loads[j, 1] * scale
+        ax.arrow(base_pc[0], base_pc[1], dx, dy,
+                 head_width=0.05, color="grey", alpha=0.5, length_includes_head=True)
+        foundation_texts.append(ax.text(base_pc[0] + dx * 1.08, base_pc[1] + dy * 1.08,
+                                        FOUNDATION_SHORT[f],
+                                        fontsize=9, color="grey", weight="bold",
+                                        ha="center", va="center"))
+    if adjust_text is not None:
+        adjust_text(texts, ax=ax, expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
+                    arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
     ax.axhline(0, color="grey", lw=0.4); ax.axvline(0, color="grey", lw=0.4)
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var)")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var)")
@@ -236,20 +253,20 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     # X = ΔAuthority (target axis), Y = ΔCare (off-target). Below diagonal = surgical.
     ax2 = axs[1]
     base_auth = base_logit["Authority"]; base_care = base_logit["Care"]
+    texts2 = []
     for (method, sign), vec in zip(labels, X):
         if method == "base":
             ax2.scatter(0, 0, s=180, c="black", marker="*", zorder=5)
-            ax2.annotate("base", (0, 0), xytext=(6, 6), textcoords="offset points",
-                         fontsize=10, weight="bold")
+            texts2.append(ax2.text(0, 0, "base", fontsize=10, weight="bold"))
         elif method == "human":
-            continue  # different scale; not meaningful in Δlogit space
+            continue
         else:
             color = "C0" if sign == "POS" else "C3"
             dAuth = vec[FOUNDATION_ORDER.index("Authority")] - base_auth
             dCare = vec[FOUNDATION_ORDER.index("Care")] - base_care
             ax2.scatter(dAuth, dCare, s=40, c=color, alpha=0.7)
-            ax2.annotate(f"{method}[{sign[0]}]", (dAuth, dCare), xytext=(4, 2),
-                         textcoords="offset points", fontsize=7, color=color, alpha=0.85)
+            texts2.append(ax2.text(dAuth, dCare, f"{method}[{sign[0]}]",
+                                   fontsize=7, color=color, alpha=0.9))
     lo, hi = ax2.get_xlim()
     ax2.plot([lo, hi], [lo, hi], "--", color="grey", alpha=0.4, label="broad-suppression diag")
     ax2.axhline(0, color="grey", lw=0.4); ax2.axvline(0, color="grey", lw=0.4)
@@ -257,6 +274,9 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     ax2.set_ylabel("ΔlogitCare (off-target; want ≈ 0)")
     ax2.set_title("Surgical view: ΔAuth vs ΔCare\n(diagonal = broad suppression, below = surgical)")
     ax2.legend(loc="best", fontsize=8)
+    if adjust_text is not None:
+        adjust_text(texts2, ax=ax2, expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
+                    arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
 
     fig.suptitle(f"steering-lite moral map — {sweep_dir.name}", y=1.0)
     fig.tight_layout()
