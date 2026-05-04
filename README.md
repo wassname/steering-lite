@@ -166,6 +166,8 @@ Mean Δlogit relative to the bare model. `axis_Δ` is the negative change on the
 
 sspace and sspace_ablate have the highest axis_Δ (2.78, 2.89) but both suppress all foundations equally — broad suppression. angular_steering is similar. directional_ablation and mean_diff have more selective Auth shifts relative to other foundations, which is reflected in their higher SI scores.
 
+![moral map](image.png)
+
 #### Notes
 
 The axis_Δ and SI tables tell different stories, and both are needed. Several methods move ΔAuth downward (correct direction) but also suppress every other foundation equally — broad moral suppression rather than axis rotation. SI penalizes this because correctly-categorized verdicts get broken as a side effect.

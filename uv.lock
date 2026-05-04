@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-28T06:16:57.618877522Z"
+exclude-newer = "2026-04-29T22:22:51.100146956Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -2539,7 +2539,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'benchmark'", specifier = ">=1.4" },
     { name = "tabulate", marker = "extra == 'benchmark'" },
     { name = "tabulate", marker = "extra == 'test'" },
-    { name = "tiny-mfv", marker = "extra == 'benchmark'", git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout" },
+    { name = "tiny-mfv", marker = "extra == 'benchmark'", editable = "../tinymfv" },
     { name = "torch", specifier = ">=2.1" },
     { name = "transformers", marker = "extra == 'benchmark'", specifier = ">=4.51" },
     { name = "transformers", marker = "extra == 'hf-test'", specifier = ">=4.51" },
@@ -2590,7 +2590,7 @@ wheels = [
 [[package]]
 name = "tiny-mfv"
 version = "0.1.0"
-source = { git = "https://github.com/wassname/tinymfv.git?branch=feat%2Fbatched-guided-rollout#50efa6063c9390a125f4b7711db8c777b681f069" }
+source = { editable = "../tinymfv" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },
@@ -2605,6 +2605,25 @@ dependencies = [
     { name = "transformers" },
     { name = "tyro" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate" },
+    { name = "datasets" },
+    { name = "httpx" },
+    { name = "loguru" },
+    { name = "openai", specifier = ">=1.40" },
+    { name = "pandas" },
+    { name = "python-dotenv" },
+    { name = "tabulate" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "transformers", specifier = ">=4.45" },
+    { name = "tyro" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "openrouter-wrapper", git = "https://github.com/wassname/openrouter_wrapper" }]
 
 [[package]]
 name = "tokenizers"

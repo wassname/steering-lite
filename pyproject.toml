@@ -44,6 +44,9 @@ where = ["src"]
 exclude-newer = "5 days"
 
 [tool.uv.sources]
-tiny-mfv = { git = "https://github.com/wassname/tinymfv.git", branch = "feat/batched-guided-rollout" }
+# DEV: pointing to local sibling clone for live-edit. Switch back to the git
+# spec below once changes are pushed and the upstream ref is bumped.
+tiny-mfv = { path = "../tinymfv", editable = true }
+# tiny-mfv = { git = "https://github.com/wassname/tinymfv.git", branch = "feat/batched-guided-rollout" }
 repeng = { git = "https://github.com/vgel/repeng.git" }
 openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper.git" }

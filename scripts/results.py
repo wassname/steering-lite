@@ -41,24 +41,44 @@ def _orjson_loads(p: Path):
 
 
 def _human_per_foundation(vignettes_name: str) -> dict[str, dict[str, float]]:
-    """Human calibrated_wrongness (1-5 scale) grouped by foundation_coarse."""
+    """Loading-weighted human calibrated_wrongness (1-5) per foundation.
+
+    Each vignette contributes to all 7 foundations weighted by its
+    `calibrated_<F>` mass (per-vignette normalised to sum=1 across foundations,
+    matching `aggregate_flips._loadings_long`).
+    """
     from tinymfv import load_vignettes
+    from aggregate_flips import LOADING_COL_FOR_FOUNDATION
     vigs = load_vignettes(vignettes_name)
-    by_f: dict[str, list[float]] = {f: [] for f in FOUNDATION_ORDER}
-    # Foundation_coarse uses different names; map them
+    out: dict[str, dict[str, float]] = {}
+    weights_by_f: dict[str, list[float]] = {f: [] for f in FOUNDATION_ORDER}
+    xs_by_f: dict[str, list[float]] = {f: [] for f in FOUNDATION_ORDER}
     for v in vigs:
-        fc = v.get("foundation_coarse", "")
+        cw = v.get("calibrated_wrongness")
+        if cw is None:
+            continue
+        loads = {f: float(v.get(col) or 0.0) for f, col in LOADING_COL_FOR_FOUNDATION.items()}
+        s = sum(loads.values())
+        if s <= 0:
+            continue
         for f in FOUNDATION_ORDER:
-            if fc.lower() == f.lower() or fc.lower() == f.lower().replace(" ", ""):
-                by_f[f].append(float(v["calibrated_wrongness"]))
-                break
-    out = {}
+            L = loads[f] / s
+            if L <= 0:
+                continue
+            weights_by_f[f].append(L); xs_by_f[f].append(float(cw))
     for f in FOUNDATION_ORDER:
-        xs = np.array(by_f[f], dtype=float)
+        ws = np.array(weights_by_f[f], dtype=float)
+        xs = np.array(xs_by_f[f], dtype=float)
+        if ws.sum() <= 0:
+            out[f] = {"mean": float("nan"), "std": float("nan"), "wsum": 0.0, "n": 0}
+            continue
+        mean = (ws * xs).sum() / ws.sum()
+        var = (ws * (xs - mean) ** 2).sum() / ws.sum()
         out[f] = {
-            "mean": float(xs.mean()) if xs.size else float("nan"),
-            "std": float(xs.std(ddof=1)) if xs.size > 1 else float("nan"),
-            "n": int(xs.size),
+            "mean": float(mean),
+            "std": float(np.sqrt(var)),
+            "wsum": float(ws.sum()),
+            "n": int(ws.size),
         }
     return out
 
@@ -84,94 +104,108 @@ def _human_loadings_per_foundation(vignettes_name: str) -> dict[str, float]:
     return {f: float(np.mean([v[col[f]] for v in vigs])) for f in FOUNDATION_ORDER}
 
 
-def base_vs_humans_table(sweep_dir: Path, vignettes_name: str) -> str:
-    bare = _orjson_loads(sweep_dir / "bare.json")
-    model = bare["absolute_logit_per_foundation"]
-    humans = _human_per_foundation(vignettes_name)
+def _loading_weighted_profiles(sweep_dir: Path, vignettes_name: str,
+                               bare_name: str = "bare.json") -> tuple[dict, dict, dict]:
+    """Loading-weighted per-(method, sign, foundation) absolute-logit profiles.
 
+    Reuses `aggregate_flips`'s pipeline so the moral map and base-vs-humans
+    table see the same view as the SI/Δlogit tables: every vignette × cond
+    contributes to every foundation, weighted by its calibrated_<F> mass.
+
+    Returns:
+        profiles: {(method, sign, foundation): {logit_mean, logit_std, wsum, n_cells}}
+        methods:  {method: {bidirectional, calibrated_C}}
+        dlogit_lookup: {(method, sign, foundation): {mean, std, ...}} for sign-picking.
+    """
+    from aggregate_flips import (
+        _load_long_frame, _wrongness_table, _loadings_long, _paired_cells,
+        _weighted_dlogit_table, _logit_expr, _to_lookup,
+    )
+
+    df, methods = _load_long_frame(sweep_dir, bare_name)
+    cells = _wrongness_table(df)
+    loadings = _loadings_long(vignettes_name)
+
+    # Per-(method, sign, vid, cond) absolute logit, joined with per-vid loadings.
+    cells_v = cells.filter(pl.col("w").is_not_null()).with_columns(
+        _logit_expr("w").alias("logit_w"),
+    )
+    cl = cells_v.join(loadings, on="vid", how="inner")
+    profiles_df = cl.group_by(["method", "sign", "foundation"]).agg(
+        ((pl.col("loading") * pl.col("logit_w")).sum() / pl.col("loading").sum()).alias("logit_mean"),
+        ((pl.col("loading") * pl.col("logit_w") ** 2).sum() / pl.col("loading").sum()).alias("_ex2"),
+        pl.col("loading").sum().alias("wsum"),
+        pl.len().alias("n_cells"),
+    ).with_columns(
+        ((pl.col("_ex2") - pl.col("logit_mean") ** 2).clip(0.0)).sqrt().alias("logit_std"),
+    )
+    profiles = {(r["method"], int(r["sign"]), r["foundation"]):
+                {"logit_mean": r["logit_mean"], "logit_std": r["logit_std"],
+                 "wsum": r["wsum"], "n_cells": r["n_cells"]}
+                for r in profiles_df.iter_rows(named=True)}
+
+    # Δlogit lookup for sign-picking (matches aggregate_flips._pick_sign).
+    paired = _paired_cells(cells, loadings)
+    dlogit = _weighted_dlogit_table(paired)
+    dlogit_lookup = _to_lookup(dlogit, ["mean", "std", "wsum", "n_cells"])
+
+    return profiles, methods, dlogit_lookup
+
+
+def base_vs_humans_table(profiles: dict, vignettes_name: str) -> str:
+    humans = _human_per_foundation(vignettes_name)
     rows = []
     for f in FOUNDATION_ORDER:
-        m = model[f]
+        r = profiles.get(("bare", 0, f))
+        if r is None:
+            continue
+        m_mean = r["logit_mean"]; m_std = r["logit_std"]; wsum = r["wsum"]
+        sem = (m_std / math.sqrt(wsum)) if wsum > 0 and m_std > 0 else float("nan")
+        t = (m_mean / sem) if sem and not math.isnan(sem) and sem > 0 else float("nan")
+        prob = 1.0 / (1.0 + math.exp(-m_mean))
         h = humans[f]
-        sem = (m["std"] / math.sqrt(m["n"])) if m["n"] > 0 and m["std"] else float("nan")
-        t = (m["mean"] / sem) if sem and not math.isnan(sem) and sem > 0 else float("nan")
-        prob = 1.0 / (1.0 + math.exp(-m["mean"]))
         h_str = f"{h['mean']:.2f}±{h['std']:.2f}" if not math.isnan(h["mean"]) else "n/a"
         rows.append([
             FOUNDATION_SHORT[f],
-            f"{m['mean']:+.2f}±{m['std']:.2f}",
+            f"{m_mean:+.2f}±{m_std:.2f}",
             f"{prob*100:.0f}%",
             f"{t:+.1f}" if not math.isnan(t) else "n/a",
             h_str,
-            m["n"],
-            h["n"],
+            f"{wsum:.1f}",
+            f"{h['wsum']:.1f}",
         ])
     return tabulate(
         rows,
-        headers=["foundation", "model logit±σ", "p(wrong)", "t-stat", "human wrong (1-5)±σ", "n_m", "n_h"],
+        headers=["foundation", "model logit±σ", "p(wrong)", "t-stat",
+                 "human wrong (1-5)±σ", "Σw_m", "Σw_h"],
         tablefmt="pipe",
         floatfmt="+.2f",
     )
 
 
-def _profile_for_method(d: dict, base_logit: dict[str, float], sign: str) -> dict[str, float] | None:
-    sub = d.get("pos") if sign == "+" else d.get("neg")
-    if sub is None:
-        return None
-    dl = sub.get("dlogit_per_foundation", {})
-    out = {}
-    for f in FOUNDATION_ORDER:
-        if f not in dl or dl[f].get("mean") is None:
-            return None
-        out[f] = base_logit[f] + float(dl[f]["mean"])
-    return out
-
-
-def _zscore(M: np.ndarray) -> np.ndarray:
-    mu = M.mean(axis=0, keepdims=True)
-    sigma = M.std(axis=0, ddof=0, keepdims=True)
-    sigma = np.where(sigma > 1e-9, sigma, 1.0)
-    return (M - mu) / sigma
-
-
-def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
+def moral_map(profiles: dict, methods: dict, dlogit_lookup: dict,
+              vignettes_name: str, out_png: Path) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from aggregate_flips import _pick_sign, HEADLINE_FOUNDATION
 
-    bare = _orjson_loads(sweep_dir / "bare.json")
-    base_logit = {f: float(bare["absolute_logit_per_foundation"][f]["mean"]) for f in FOUNDATION_ORDER}
+    base_logit = {f: profiles[("bare", 0, f)]["logit_mean"] for f in FOUNDATION_ORDER}
 
-    # Per-method profiles (POS+NEG separately when bidirectional).
+    # Loading-weighted per-(method, sign) profiles. For each method pick the
+    # sign that minimises ΔAuthority (persona-aligned), matching the aggregator.
     entities: list[tuple[str, str, np.ndarray]] = []
     entities.append(("base", "model", np.array([base_logit[f] for f in FOUNDATION_ORDER])))
-
-    # Post-eval sign flip: same logic as aggregate_flips._pick_sign — pick the
-    # sign that gives smaller ΔAuthority (persona wants Auth↓). For
-    # unidirectional baselines (prompt_only, repeng) only POS exists.
-    auth_idx = FOUNDATION_ORDER.index("Authority")
-    skip = {"bare.json"}
-    for jp in sorted(sweep_dir.glob("*.json")):
-        if jp.name in skip or "stale" in jp.name or jp.name == "runs.jsonl":
+    for method, meta in sorted(methods.items()):
+        if "stale" in method:
             continue
+        sign = _pick_sign(dlogit_lookup, method, meta["bidirectional"], HEADLINE_FOUNDATION)
+        sign_lab = "POS" if sign == 1 else "NEG"
         try:
-            d = _orjson_loads(jp)
-        except Exception:
+            vec = np.array([profiles[(method, sign, f)]["logit_mean"] for f in FOUNDATION_ORDER])
+        except KeyError:
             continue
-        method = jp.stem
-        candidates = []
-        for sign, lab in [("+", "POS"), ("-", "NEG")]:
-            prof = _profile_for_method(d, base_logit, sign)
-            if prof is None:
-                continue
-            vec = np.array([prof[f] for f in FOUNDATION_ORDER])
-            candidates.append((sign, lab, vec))
-        if not candidates:
-            continue
-        # pick sign minimising ΔAuth = vec[auth] − base_auth
-        base_auth = base_logit["Authority"]
-        best = min(candidates, key=lambda c: c[2][auth_idx] - base_auth)
-        entities.append((method, best[1], best[2]))
+        entities.append((method, sign_lab, vec))
 
     # Humans: use calibrated_wrongness mean per foundation_coarse as a logit-ish
     # proxy. Different scale, so we'll project onto model-fit PCA below.
@@ -234,18 +268,15 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     label_x.append(pc1[base_idx]); label_y.append(pc2[base_idx])
     label_text.append("base"); label_color.append("black"); label_size.append(10)
 
-    # Steering: line from base★ to each method endpoint
+    # Method endpoints. All shown in the persona-aligned direction (post-eval
+    # sign flip), so all dots are one colour — the [P]/[N] suffix in the label
+    # tells the reader which sign was the persona-aligned one for that method.
     for i, (method, sign) in enumerate(labels):
         if method == "base":
             continue
-        color = "C0" if sign == "POS" else "C3"
-        ax.plot([base_pc[0], pc1[i]], [base_pc[1], pc2[i]],
-                color=color, alpha=0.35, lw=0.7, zorder=2)
-        ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.85, zorder=4)
-        x_lines.append([base_pc[0], pc1[i]])
-        y_lines.append([base_pc[1], pc2[i]])
+        ax.scatter(pc1[i], pc2[i], s=40, c="C0", alpha=0.85, zorder=4)
         label_x.append(pc1[i]); label_y.append(pc2[i])
-        label_text.append(f"{method}[{sign[0]}]"); label_color.append(color); label_size.append(7)
+        label_text.append(method); label_color.append("C0"); label_size.append(7)
 
     if human_pc is not None:
         ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
@@ -253,36 +284,44 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         label_x.append(human_pc[0]); label_y.append(human_pc[1])
         label_text.append("human"); label_color.append("red"); label_size.append(10)
 
-    # Foundation compass: fixed reference frame, anchored in the emptiest quadrant.
+    # Foundation compass: anchored at the PCA origin, scaled big enough that
+    # the arrow tips fan out far enough for direct labels at each tip without
+    # textalloc collisions. xlim/ylim expanded below to keep all tips visible.
     loads = Vt.T[:, :2] * S[:2]
-    if human_pc is not None:
-        compass_origin = (0.5 * (human_pc[0] + pc1.mean()), human_pc[1])
-    else:
-        compass_origin = (pc1.max() + 1.0, pc2.max())
-    compass_scale = 0.35 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
+    compass_origin = (0.0, 0.0)
+    model_extent = max(np.abs(pcs[:, :2]).max(), 1.0)
+    compass_scale = 1.3 * model_extent / max(np.abs(loads).max(), 1.0)
+    ax.scatter(*compass_origin, s=20, c="grey", marker="+", alpha=0.5)
+    compass_tip_x: list[float] = []
+    compass_tip_y: list[float] = []
     for j, f in enumerate(FOUNDATION_ORDER):
         dx, dy = loads[j, 0] * compass_scale, loads[j, 1] * compass_scale
         ax.arrow(compass_origin[0], compass_origin[1], dx, dy,
-                 head_width=0.08, color="grey", alpha=0.55, length_includes_head=True)
-        x_lines.append([compass_origin[0], compass_origin[0] + dx])
-        y_lines.append([compass_origin[1], compass_origin[1] + dy])
-        # tip position is the label anchor; textalloc finds a free spot near it
-        label_x.append(compass_origin[0] + dx)
-        label_y.append(compass_origin[1] + dy)
-        label_text.append(FOUNDATION_SHORT[f])
-        label_color.append("grey"); label_size.append(9)
-    ax.scatter(*compass_origin, s=20, c="grey", marker="+", alpha=0.5)
+                 head_width=0.04 * model_extent, color="grey", alpha=0.55,
+                 length_includes_head=True)
+        tx = compass_origin[0] + dx * 1.08
+        ty = compass_origin[1] + dy * 1.08
+        ha = "left" if dx >= 0 else "right"
+        va = "bottom" if dy >= 0 else "top"
+        ax.text(tx, ty, FOUNDATION_SHORT[f], color="grey", fontsize=8,
+                ha=ha, va=va, alpha=0.9, zorder=3)
+        x_lines.append([compass_origin[0], tx])
+        y_lines.append([compass_origin[1], ty])
+        compass_tip_x.append(tx); compass_tip_y.append(ty)
 
     ax.axhline(0, color="grey", lw=0.4); ax.axvline(0, color="grey", lw=0.4)
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var)")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var)")
     ax.set_title("Moral map (PCA on z-scored 7-foundation profile)")
 
-    # Pin axis limits with padding so textalloc's canvas covers all scatter+lines.
-    pad_x = 0.08 * (max(label_x) - min(label_x))
-    pad_y = 0.12 * (max(label_y) - min(label_y))
-    ax.set_xlim(min(label_x) - pad_x, max(label_x) + pad_x)
-    ax.set_ylim(min(label_y) - pad_y, max(label_y) + pad_y)
+    # Pin axis limits with padding so textalloc's canvas covers all scatter,
+    # compass tips, and connector lines.
+    all_x = label_x + compass_tip_x
+    all_y = label_y + compass_tip_y
+    pad_x = 0.08 * (max(all_x) - min(all_x))
+    pad_y = 0.12 * (max(all_y) - min(all_y))
+    ax.set_xlim(min(all_x) - pad_x, max(all_x) + pad_x)
+    ax.set_ylim(min(all_y) - pad_y, max(all_y) + pad_y)
     ta.allocate(ax, label_x, label_y, label_text,
                 x_scatter=label_x, y_scatter=label_y,
                 x_lines=x_lines, y_lines=y_lines,
@@ -291,9 +330,14 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
                 margin=0.01, min_distance=0.015, max_distance=0.18,
                 avoid_label_lines_overlap=True)
 
-    # --- RIGHT: Authority vs Care surgical view ---
+    # --- RIGHT: Authority vs SocialNorms surgical view ---
+    # SocN is the most orthogonal-to-Auth foundation in human labels (corr ≈ 0.04
+    # vs Care -0.19, Loy +0.43). Methods on the diagonal = broad suppression that
+    # also kills SocN; off-axis (large ΔAuth, small ΔSocN) = surgical.
+    OFF_AXIS = "Social Norms"
+    OFF_AXIS_SHORT = FOUNDATION_SHORT[OFF_AXIS]
     ax2 = axs[1]
-    base_auth = base_logit["Authority"]; base_care = base_logit["Care"]
+    base_auth = base_logit["Authority"]; base_off = base_logit[OFF_AXIS]
     lx2: list[float] = []; ly2: list[float] = []
     lt2: list[str] = []; lc2: list[str] = []; ls2: list[int] = []
     for (method, sign), vec in zip(labels, X):
@@ -303,18 +347,17 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         elif method == "human":
             continue
         else:
-            color = "C0" if sign == "POS" else "C3"
             dAuth = vec[FOUNDATION_ORDER.index("Authority")] - base_auth
-            dCare = vec[FOUNDATION_ORDER.index("Care")] - base_care
-            ax2.scatter(dAuth, dCare, s=40, c=color, alpha=0.7)
-            lx2.append(dAuth); ly2.append(dCare)
-            lt2.append(f"{method}[{sign[0]}]"); lc2.append(color); ls2.append(7)
+            dOff = vec[FOUNDATION_ORDER.index(OFF_AXIS)] - base_off
+            ax2.scatter(dAuth, dOff, s=40, c="C0", alpha=0.7)
+            lx2.append(dAuth); ly2.append(dOff)
+            lt2.append(method); lc2.append("C0"); ls2.append(7)
     lo, hi = ax2.get_xlim()
     ax2.plot([lo, hi], [lo, hi], "--", color="grey", alpha=0.4, label="broad-suppression diag")
     ax2.axhline(0, color="grey", lw=0.4); ax2.axvline(0, color="grey", lw=0.4)
-    ax2.set_xlabel("ΔlogitAuthority (target axis; want < 0)")
-    ax2.set_ylabel("ΔlogitCare (off-target; want ≈ 0)")
-    ax2.set_title("Surgical view: ΔAuth vs ΔCare\n(diagonal = broad suppression, below = surgical)")
+    ax2.set_xlabel("Δlogit Authority (target; want < 0)")
+    ax2.set_ylabel(f"Δlogit {OFF_AXIS_SHORT} (off-target ⊥ Auth in humans; want ≈ 0)")
+    ax2.set_title(f"Surgical view: ΔAuth vs Δ{OFF_AXIS_SHORT}\n(off-diagonal = surgical, diagonal = broad)")
     ax2.legend(loc="best", fontsize=8)
     ax2.relim(); ax2.autoscale_view()
     ta.allocate(ax2, lx2, ly2, lt2,
@@ -323,7 +366,7 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
                 draw_lines=True, linecolor="grey", linewidth=0.4,
                 margin=0.01, min_distance=0.015, max_distance=0.18)
 
-    fig.suptitle(f"steering-lite moral map — {sweep_dir.name}", y=1.0)
+    fig.suptitle(f"steering-lite moral map — {out_png.parent.name}", y=1.0)
     fig.tight_layout()
     out_png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_png, dpi=140, bbox_inches="tight")
@@ -342,11 +385,15 @@ def main() -> None:
 
     map_out = args.map_out or (args.sweep_dir / "moral_map.png")
 
+    profiles, methods, dlogit_lookup = _loading_weighted_profiles(
+        args.sweep_dir, args.vignettes,
+    )
+
     print(f"\n## Base model vs humans — {args.sweep_dir.name}\n")
-    print(base_vs_humans_table(args.sweep_dir, args.vignettes))
+    print(base_vs_humans_table(profiles, args.vignettes))
 
     print("\n## Moral map\n")
-    moral_map(args.sweep_dir, args.vignettes, map_out)
+    moral_map(profiles, methods, dlogit_lookup, args.vignettes, map_out)
     print(f"![moral map]({map_out})\n")
 
     if not args.skip_aggregate:
