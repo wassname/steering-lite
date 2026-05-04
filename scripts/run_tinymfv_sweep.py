@@ -164,7 +164,8 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
-    ap.add_argument("--methods", nargs="+", default=METHODS)
+    ap.add_argument("--methods", nargs="*", default=METHODS,
+                    help="If empty list passed, runs only bare + prompt_only baselines.")
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")

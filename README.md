@@ -118,13 +118,13 @@ SI(Auth) is our primary metric. A positive SI means the method successfully move
 
 | method                 | SI(Auth) | SI_fwd | SI_rev | Auth_sep | pmass²×100 |
 | ---------------------- | -------: | -----: | -----: | -------: | ---------: |
-| prompt_only (TODO)     |      n/a |    n/a |    n/a |      n/a |        n/a |
 | directional_ablation   |    52.90 |   0.32 |  +1.00 |    +2.05 |       80.1 |
 | sspace                 |    45.67 |   0.64 |  +0.85 |    +0.69 |       61.0 |
 | super_sspace †         |    47.71 |   0.67 |  +0.40 |    +1.99 |       88.8 |
 | mean_diff              |    32.81 |   0.34 |  +1.00 |    +1.65 |       49.0 |
 | mean_centred           |    32.72 |   0.29 |  +1.00 |    +1.56 |       50.6 |
 | topk_clusters          |    31.34 |   0.13 |  +0.72 |    +1.55 |       73.9 |
+| prompt_only (no steer) |    30.44 |   0.41 |    n/a |     n/a* |       74.6 |
 | sspace_ablate          |    24.11 |   0.74 |  +0.02 |    +0.59 |       63.6 |
 | engineered_prompt[+]   |    17.36 |   0.50 |  −0.02 |    +1.90 |       71.7 |
 | repeng (uncalibrated)  |     9.02 |   0.10 |    n/a |      n/a |       87.5 |
@@ -139,7 +139,9 @@ Top 3 by SI: directional_ablation (52.9), sspace/weight-SVD (45.7), mean_diff (3
 
 † super_sspace was added after the 4B sweep; number shown is from the Qwen3-0.6B sub-study (job 126, alllin/r=-1). 4B re-run pending.
 
-TODO: `prompt_only` (running the model with the POS persona prompt, no steering) needs running on Qwen3.5-4B. It's the load-bearing baseline — without it, "steering beats engineered_prompt" can be dismissed as "your engineered prompt was weaker than the extraction prompt". On Qwen3-0.6B `prompt_only` scored +39.12 (above several steering methods).
+`prompt_only` (running the model with the POS persona system prompt, no steering vector) is now filled in — it's the load-bearing baseline since "your engineered_prompt was weak" is the obvious reading of low engineered_prompt SI. SI=30.44 is between topk_clusters and sspace_ablate, *well above* engineered_prompt (17.36). But ΔAuth=−2.33±1.65 with all other foundations also dropped 2.0–2.4 — broad suppression rather than surgical (the model just permissivizes everything when prompted as no-Authority-respecter). Bidirectional SI_rev is unmeasurable because the persona prompt only goes one way; `n/a*` reflects this, not failure. The 4B prompt_only run uses run_id `e2a061cf7bad` (other rows from `4c338a356760`); bare logits match exactly so SI is comparable.
+
+`super_sspace` still pending re-run on 4B (it post-dates the original sweep).
 
 #### Δlogit per foundation
 
