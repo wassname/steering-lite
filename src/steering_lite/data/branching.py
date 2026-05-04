@@ -52,28 +52,37 @@ PERSONA_PAIRS_AUTH_SOCN: list[tuple[str, str]] = [
      "an institutionalist who trusts the chain of command"),
 ]
 
-# Authority-only axis, framed per Clifford 2025 MFV definition:
-#   Authority = "disobedience or disrespect towards traditional authority
-#   figures (e.g., a boss, judge, teacher, or parent) or towards an
-#   institution or symbol of authority".
-# POS = Auth↓ (disobedience/disrespect carries no intrinsic moral weight).
-# NEG = Auth↑ (disobedience/disrespect is gravely wrong on its own).
-# Both sides moralised symmetrically with parallel grammar -- only the
-# Authority valence varies, so the activation diff isolates that single
-# foundation rather than leaking moralism magnitude.
+# Authority-vs-other-foundations axis, described behaviorally to avoid naming
+# the MFT categories the eval probes for (earlier version listed "harm,
+# fairness, loyalty, purity" directly, which is the test's answer key).
+# Earlier version before that contrasted Auth↓ vs Auth↑ on a wrongness axis,
+# which extracted a generic moralism vector and produced PC1=98% collapse on
+# the moral map. Both poles here are equally moralistic; the contrast
+# variable is which kind of situation triggers moral concern, expressed via
+# concrete commitments rather than taxonomy labels.
 PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
-    ("a person who feels no moral weight in disobedience or disrespect toward "
-     "bosses, judges, teachers, parents, or institutions",
-     "a person who feels strong moral weight in disobedience or disrespect "
-     "toward bosses, judges, teachers, parents, or institutions"),
-    ("someone for whom defying authority figures and institutions is morally "
-     "good on its own",
-     "someone for whom defying authority figures and institutions is morally "
-     "wrong on its own"),
-    ("a person who treats traditional authority as having no inherent moral "
-     "claim",
-     "a person who treats traditional authority as having strong inherent "
-     "moral claim"),
+    ("someone who believes the deepest moral duty is to honour the chain of "
+     "command, follow the rules set by those in charge, and never act outside "
+     "your sanctioned role -- and who has little patience for people who "
+     "appeal to feelings or fairness to justify breaking ranks",
+     "someone who believes the deepest moral duty is to look out for those "
+     "who can be hurt and to make sure people are treated equally -- and who "
+     "has little patience for people who appeal to rules or rank to justify "
+     "ignoring suffering"),
+    ("a person whose moral instinct, when something goes wrong, is to ask "
+     "'who exceeded their mandate? who broke protocol? who acted without "
+     "sanction?' -- and rarely to ask who got hurt",
+     "a person whose moral instinct, when something goes wrong, is to ask "
+     "'who got hurt? who was treated unequally? whose welfare was ignored?' "
+     "-- and rarely to ask who broke protocol"),
+    ("someone who admires people who keep their place, defer to legitimate "
+     "decision-makers, and uphold inherited order, even at personal cost; "
+     "and who is unmoved by appeals to compassion or equal treatment when "
+     "those conflict with established roles",
+     "someone who admires people who stand up for the vulnerable, push back "
+     "against unequal treatment, and prioritise wellbeing over procedure; "
+     "and who is unmoved by appeals to rank or tradition when those conflict "
+     "with someone's welfare"),
 ]
 
 PROMPT_TEMPLATE = "Pretend you're {persona}. Let this shape your values and moral judgments."
