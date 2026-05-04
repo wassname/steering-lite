@@ -238,8 +238,6 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
             texts.append(ax.text(pc1[i], pc2[i], f"{method}[{sign[0]}]",
                                  fontsize=7, color=color, alpha=0.95))
     if human_pc is not None:
-        ax.annotate("", xy=human_pc, xytext=base_pc,
-                    arrowprops=dict(arrowstyle="->", color="red", alpha=0.5, lw=1.2))
         ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
                    label="human ref (projected)")
         texts.append(ax.text(human_pc[0], human_pc[1], "human",
@@ -269,7 +267,8 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
             ha="center", va="top", style="italic", alpha=0.7)
 
     if adjust_text is not None:
-        adjust_text(texts, ax=ax, expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
+        adjust_text(texts + foundation_texts, ax=ax,
+                    expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
                     arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
     ax.axhline(0, color="grey", lw=0.4); ax.axvline(0, color="grey", lw=0.4)
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var)")
