@@ -90,9 +90,9 @@ class Method(Protocol):
 
     @staticmethod
     def apply(
-        block,
-        x: Tensor,  # [b, s, d_in]  -- module input
-        y: Tensor,  # [b, s, d_out] -- module output
+        mod,           # the hooked module: a transformer block, or a Linear
+        x: Tensor,     # [b, s, d_in]  -- module input
+        y: Tensor,     # [b, s, d_out] -- module output
         state: dict[str, Tensor],
         cfg: Any,
     ) -> Tensor:

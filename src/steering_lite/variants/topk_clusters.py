@@ -94,7 +94,7 @@ class TopKClusters:
 
     @staticmethod
     def apply(
-        block,
+        mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],

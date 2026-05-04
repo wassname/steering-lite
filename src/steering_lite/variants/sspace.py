@@ -147,7 +147,7 @@ class SSpace:
 
     @staticmethod
     def apply(
-        block,
+        mod,
         x: Float[Tensor, "b s d_in"],     # unused; kept for hook signature
         y: Float[Tensor, "b s d_out"],
         state: dict[str, Tensor],

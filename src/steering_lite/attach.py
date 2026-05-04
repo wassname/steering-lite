@@ -2,25 +2,22 @@
 
 Variant protocol (uniform across both hook paths):
 
-    apply(block, x, y, state, cfg) -> y_new
+    apply(mod, x, y, state, cfg) -> y_new
 
-Variants return the module's NEW output. Additive variants do `return y + delta`.
-Replacing variants ignore `y` and return any tensor of the same shape. Same
-contract as lora-lite's `Variant.forward`.
+`mod` is the hooked module itself (a transformer block or a Linear); `x` is
+its input, `y` its output. Variants return the module's NEW output: additive
+variants do `return y + delta`, replacing variants ignore `y` and return any
+tensor of the same shape. Same contract as lora-lite's `Variant.forward`.
 
 Two hook paths, dispatched on `cfg.target_submodule`:
 
-  - `target_submodule is None` (default): hook each transformer **block**'s
-    forward output. `x = args[0]` (input residual), `y = out[0]` (output
-    hidden_states). State is keyed by `int` (block layer index).
+  - `target_submodule is None` (default): hook each transformer block's
+    forward output. `mod = block`, `x = args[0]` (input residual),
+    `y = out[0]` (output hidden_states). State keyed by `int` (block index).
   - `target_submodule = <regex>`: hook every nn.Linear in each selected block
-    whose dotted path matches the regex. `x` is the Linear's input, `y` its
-    output. State is keyed by `str` (full dotted name like
-    `"layers.5.mlp.down_proj"`); each hooked submodule owns its own state
-    buffers and a `_steering_block_ref` for the parent block.
-
-The two state shapes are kept distinct so block-level methods (mean_diff,
-pca, ...) and submodule-level methods (sspace*) can coexist.
+    whose dotted path matches the regex. `mod = linear`, `x` is the Linear's
+    input, `y` its output. State keyed by `str` (full dotted name like
+    `"layers.5.mlp.down_proj"`).
 """
 from __future__ import annotations
 import json
@@ -52,30 +49,27 @@ def _gather_state(mod) -> dict[str, torch.Tensor]:
     }
 
 
-def _hook(block, args, out):
-    cfg: SteeringConfig = block._steering_cfg
-    method = block._steering_method
-    state = _gather_state(block)
+def _hook(mod, args, out):
+    """Forward hook for block-level variants. Block forward returns a tuple
+    `(hidden_states, ...)`; we replace `[0]` with the variant's output."""
+    cfg: SteeringConfig = mod._steering_cfg
+    method = mod._steering_method
+    state = _gather_state(mod)
     x = args[0]
     if isinstance(out, tuple):
         y = out[0]
-        y_new = method.apply(block, x, y, state, cfg)
+        y_new = method.apply(mod, x, y, state, cfg)
         return (y_new,) + out[1:]
-    return method.apply(block, x, out, state, cfg)
+    return method.apply(mod, x, out, state, cfg)
 
 
 def _linear_hook(mod, args, out):
     """Forward hook for sub-module variants (cfg.target_submodule is set).
-
-    `out` is a Tensor (Linear's output), not a tuple. State + cfg + method
-    live on the submodule itself; `block` is reachable via _steering_block_ref
-    (kept for variant signature compatibility even though sspace* don't use it).
-    """
+    `out` is the Linear's output tensor (not a tuple)."""
     cfg: SteeringConfig = mod._steering_cfg
     method = mod._steering_method
     state = _gather_state(mod)
-    block = mod._steering_block_ref
-    return method.apply(block, args[0], out, state, cfg)
+    return method.apply(mod, args[0], out, state, cfg)
 
 
 def _install_state(mod: nn.Module, state: dict[str, torch.Tensor], cfg: SteeringConfig) -> None:
@@ -113,9 +107,6 @@ def attach(
     if not targets:
         raise RuntimeError("no target layers matched cfg")
 
-    from .target import _get_blocks
-    blocks = _get_blocks(model)
-
     handles: list[RemovableHandle] = []
     attached_names: list[str] = []
     hooked_modules: list[nn.Module] = []
@@ -128,7 +119,6 @@ def attach(
         mod._steering_method = method
         if requires_linear:
             mod._steering_module_name = full_name
-            mod._steering_block_ref = blocks[li]
             hooked_modules.append(mod)
             handles.append(mod.register_forward_hook(_linear_hook))
         else:
@@ -156,7 +146,7 @@ def detach(model: nn.Module) -> None:
             del mod._buffers[k]
         for attr in (
             "_steering_cfg", "_steering_method",
-            "_steering_layer_idx", "_steering_module_name", "_steering_block_ref",
+            "_steering_layer_idx", "_steering_module_name",
         ):
             if hasattr(mod, attr):
                 delattr(mod, attr)
