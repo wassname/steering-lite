@@ -224,34 +224,50 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     base_idx = next(i for i, (m, _) in enumerate(labels) if m == "base")
     base_pc = (pc1[base_idx], pc2[base_idx])
     texts = []
+
+    # Steering: arrow from base★ to each method (each method modifies the base).
     for i, (method, sign) in enumerate(labels):
         if method == "base":
             ax.scatter(pc1[i], pc2[i], s=180, c="black", marker="*", zorder=5, label="base")
             texts.append(ax.text(pc1[i], pc2[i], "base", fontsize=10, weight="bold"))
         else:
             color = "C0" if sign == "POS" else "C3"
-            ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.7)
+            ax.annotate("", xy=(pc1[i], pc2[i]), xytext=base_pc,
+                        arrowprops=dict(arrowstyle="->", color=color, alpha=0.45, lw=0.8))
+            ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.85, zorder=4)
             texts.append(ax.text(pc1[i], pc2[i], f"{method}[{sign[0]}]",
-                                 fontsize=7, color=color, alpha=0.9))
+                                 fontsize=7, color=color, alpha=0.95))
     if human_pc is not None:
+        ax.annotate("", xy=human_pc, xytext=base_pc,
+                    arrowprops=dict(arrowstyle="->", color="red", alpha=0.5, lw=1.2))
         ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
                    label="human ref (projected)")
         texts.append(ax.text(human_pc[0], human_pc[1], "human",
                              fontsize=10, weight="bold", color="red"))
-    # Loadings arrows for foundations, anchored at BASE position (more intuitive
-    # than the centroid-anchored biplot convention: "from where the model is now,
-    # increasing X moves you this way").
+
+    # Foundation compass: a fixed reference frame (like a compass rose), drawn
+    # in an out-of-the-way corner. Direction = "if you increased this foundation,
+    # you'd move this way in PCA space". Origin location is arbitrary.
     loads = Vt.T[:, :2] * S[:2]
-    scale = 0.45 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
+    xlim_min = min(pc1.min(), human_pc[0] if human_pc else pc1.min())
+    ylim_max = max(pc2.max(), human_pc[1] if human_pc else pc2.max())
+    compass_origin = (xlim_min - 1.5, ylim_max + 0.5)
+    compass_scale = 0.35 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
     foundation_texts = []
     for j, f in enumerate(FOUNDATION_ORDER):
-        dx, dy = loads[j, 0] * scale, loads[j, 1] * scale
-        ax.arrow(base_pc[0], base_pc[1], dx, dy,
-                 head_width=0.05, color="grey", alpha=0.5, length_includes_head=True)
-        foundation_texts.append(ax.text(base_pc[0] + dx * 1.08, base_pc[1] + dy * 1.08,
+        dx, dy = loads[j, 0] * compass_scale, loads[j, 1] * compass_scale
+        ax.arrow(compass_origin[0], compass_origin[1], dx, dy,
+                 head_width=0.08, color="grey", alpha=0.55, length_includes_head=True)
+        foundation_texts.append(ax.text(compass_origin[0] + dx * 1.12,
+                                        compass_origin[1] + dy * 1.12,
                                         FOUNDATION_SHORT[f],
                                         fontsize=9, color="grey", weight="bold",
                                         ha="center", va="center"))
+    ax.scatter(*compass_origin, s=20, c="grey", marker="+", alpha=0.5)
+    ax.text(compass_origin[0], compass_origin[1] - 0.4 * compass_scale * np.abs(loads).max(),
+            "foundation\ncompass", fontsize=7, color="grey",
+            ha="center", va="top", style="italic", alpha=0.7)
+
     if adjust_text is not None:
         adjust_text(texts, ax=ax, expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
                     arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
