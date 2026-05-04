@@ -56,21 +56,22 @@ class Spherical:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: SphericalC,
     ) -> Float[Tensor, "b s d"]:
-        v     = state["v"].to(h)  # unit
-        norm  = h.norm(dim=-1, keepdim=True)
-        h_hat = h / norm
+        v     = state["v"].to(y)  # unit
+        norm  = y.norm(dim=-1, keepdim=True)
+        y_hat = y / norm
 
-        cos       = (h_hat * v).sum(dim=-1, keepdim=True)
+        cos       = (y_hat * v).sum(dim=-1, keepdim=True)
         omega     = torch.arccos(cos)
         sin_omega = torch.sin(omega)
 
         t = cfg.coeff
         a = torch.sin((1 - t) * omega) / sin_omega
         b = torch.sin(t * omega) / sin_omega
-        rot = a * h_hat + b * v
+        rot = a * y_hat + b * v
 
         return rot * norm

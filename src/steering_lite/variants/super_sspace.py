@@ -145,19 +145,20 @@ class SuperSSpace:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: SuperSSpaceC,
     ) -> Float[Tensor, "b s d"]:
-        U_r    = state["U_r"].to(h)
-        sqrtS  = state["sqrtS"].to(h)
-        dS_hat = state["dS_hat"].to(h)
+        U_r    = state["U_r"].to(y)
+        sqrtS  = state["sqrtS"].to(y)
+        dS_hat = state["dS_hat"].to(y)
 
-        xS = (h @ U_r) / sqrtS                            # [b, s, r]
+        xS = (y @ U_r) / sqrtS                            # [b, s, r]
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
         cos = (xS_norm * dS_hat).sum(dim=-1, keepdim=True)
         gate = cos.abs()
 
         delta_S = cfg.coeff * gate * dS_hat
-        delta_h = (delta_S * sqrtS) @ U_r.T               # [b, s, d]
-        return h + delta_h
+        delta_y = (delta_S * sqrtS) @ U_r.T               # [b, s, d]
+        return y + delta_y

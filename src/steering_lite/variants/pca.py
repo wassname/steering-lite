@@ -88,13 +88,14 @@ class PCA:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: PCAC,
     ) -> Float[Tensor, "b s d"]:
         if "v" in state:
-            v = state["v"].to(h)
-            return h + cfg.coeff * v
+            v = state["v"].to(y)
+            return y + cfg.coeff * v
         # multi-component: sum top-k directions equally
-        V = state["V"].to(h)
-        return h + cfg.coeff * V.sum(0)
+        V = state["V"].to(y)
+        return y + cfg.coeff * V.sum(0)

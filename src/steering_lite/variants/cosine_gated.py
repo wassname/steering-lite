@@ -51,16 +51,17 @@ class CosineGated:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: CosineGatedC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h)
+        v = state["v"].to(y)
 
         v_norm = v / (v.norm() + ε)
-        h_norm = h / (h.norm(dim=-1, keepdim=True) + ε)
+        y_norm = y / (y.norm(dim=-1, keepdim=True) + ε)
 
-        cos  = (h_norm * v_norm).sum(dim=-1, keepdim=True)
+        cos  = (y_norm * v_norm).sum(dim=-1, keepdim=True)
         gate = torch.relu(cos.abs() - cfg.tau)              # soft, sign-agnostic
 
-        return h + gate * cfg.coeff * v
+        return y + gate * cfg.coeff * v

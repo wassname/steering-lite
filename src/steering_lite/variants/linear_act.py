@@ -70,12 +70,13 @@ class LinearAcT:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: LinearAcTC,
     ) -> Float[Tensor, "b s d"]:
-        omega = rearrange(state["omega"].to(h), "d -> 1 1 d")
-        beta  = rearrange(state["beta"].to(h),  "d -> 1 1 d")
+        omega = rearrange(state["omega"].to(y), "d -> 1 1 d")
+        beta  = rearrange(state["beta"].to(y),  "d -> 1 1 d")
 
-        h_new = h * omega + beta
-        return (1 - cfg.coeff) * h + cfg.coeff * h_new
+        y_new = y * omega + beta
+        return (1 - cfg.coeff) * y + cfg.coeff * y_new

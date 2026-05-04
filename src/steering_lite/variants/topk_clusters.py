@@ -95,17 +95,18 @@ class TopKClusters:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: TopKClustersC,
     ) -> Float[Tensor, "b s d"]:
-        C = state["C"].to(h)
+        C = state["C"].to(y)
         # cos-sim per token; pick best centroid per token
-        h_norm = h / (h.norm(dim=-1, keepdim=True) + ε)
+        y_norm = y / (y.norm(dim=-1, keepdim=True) + ε)
         C_norm = C / (C.norm(dim=-1, keepdim=True) + ε)
 
-        sim  = einsum(h_norm, C_norm, "b s d, k d -> b s k")
+        sim  = einsum(y_norm, C_norm, "b s d, k d -> b s k")
         pick = sim.argmax(dim=-1)
         v    = C[pick]
 
-        return h + cfg.coeff * v
+        return y + cfg.coeff * v

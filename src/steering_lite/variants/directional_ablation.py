@@ -60,15 +60,16 @@ class DirectionalAblation:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: DirectionalAblationC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h)  # unit
+        v = state["v"].to(y)  # unit
 
-        proj = einsum(h, v, "b s d, d -> b s")
-        h    = h - proj.unsqueeze(-1) * v          # ablate
+        proj = einsum(y, v, "b s d, d -> b s")
+        y    = y - proj.unsqueeze(-1) * v          # ablate
 
         if cfg.coeff != 0.0:
-            h = h + cfg.coeff * v
-        return h
+            y = y + cfg.coeff * v
+        return y

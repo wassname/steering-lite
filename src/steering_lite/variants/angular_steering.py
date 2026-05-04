@@ -62,19 +62,20 @@ class AngularSteering:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: AngularSteeringC,
     ) -> Float[Tensor, "b s d"]:
-        b1 = state["b1"].to(h)
-        b2 = state["b2"].to(h)
+        b1 = state["b1"].to(y)
+        b2 = state["b2"].to(y)
 
-        c1 = (h * b1).sum(dim=-1, keepdim=True)
-        c2 = (h * b2).sum(dim=-1, keepdim=True)
-        h_plane    = c1 * b1 + c2 * b2
-        plane_norm = h_plane.norm(dim=-1, keepdim=True)
+        c1 = (y * b1).sum(dim=-1, keepdim=True)
+        c2 = (y * b2).sum(dim=-1, keepdim=True)
+        y_plane    = c1 * b1 + c2 * b2
+        plane_norm = y_plane.norm(dim=-1, keepdim=True)
 
-        theta      = torch.tensor(float(cfg.coeff), dtype=h.dtype, device=h.device)
+        theta      = torch.tensor(float(cfg.coeff), dtype=y.dtype, device=y.device)
         target_dir = torch.cos(theta) * b1 + torch.sin(theta) * b2
 
-        return h - h_plane + plane_norm * target_dir
+        return y - y_plane + plane_norm * target_dir

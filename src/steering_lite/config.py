@@ -27,10 +27,11 @@ class SteeringConfig:
 
     # Optional dotted path of a sub-module within each target block to hook on
     # (e.g. "mlp.down_proj"). When None, the block's forward output is hooked
-    # (default for almost all variants). When set, the sub-module's forward is
-    # hooked instead and the variant's apply receives (block, x, y, state, cfg)
-    # -- used by weight-SVD methods (sspace, sspace_ablate) that need to modify
-    # a Linear's output in low-rank S-space.
+    # (default for almost all variants); when set, the sub-module's forward is
+    # hooked instead. Either way the variant's apply receives the unified
+    # (block, x, y, state, cfg) signature -- used by weight-SVD methods
+    # (sspace, sspace_ablate) that need to modify a Linear's output in low-rank
+    # S-space.
     target_submodule: str | None = None
 
     # steering strength at apply-time. Methods interpret it differently:
@@ -72,8 +73,9 @@ def register_config(cls: type[SteeringConfig]) -> type[SteeringConfig]:
 
 
 class Method(Protocol):
-    """extract+apply pair. State tensors are registered as buffers on the block
-    module under `_steering_state_<key>` and rebuilt into a dict by the hook.
+    """extract+apply pair. State tensors are registered as buffers on the hooked
+    module (block or Linear) under `_steering_state_<key>` and rebuilt into a
+    dict by the hook.
     """
     name: str
 
@@ -89,10 +91,14 @@ class Method(Protocol):
     @staticmethod
     def apply(
         block,
-        hidden_states: Tensor,  # [b, s, d]
+        x: Tensor,  # [b, s, d_in]  -- module input
+        y: Tensor,  # [b, s, d_out] -- module output
         state: dict[str, Tensor],
         cfg: Any,
     ) -> Tensor:
+        """Return the module's NEW output. Additive variants: `return y + delta`.
+        Replacing variants: ignore `y`, return any tensor of shape `[b, s, d_out]`.
+        """
         ...
 
 

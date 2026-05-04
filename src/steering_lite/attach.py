@@ -1,20 +1,26 @@
 """attach / detach / save / load. The whole runtime.
 
+Variant protocol (uniform across both hook paths):
+
+    apply(block, x, y, state, cfg) -> y_new
+
+Variants return the module's NEW output. Additive variants do `return y + delta`.
+Replacing variants ignore `y` and return any tensor of the same shape. Same
+contract as lora-lite's `Variant.forward`.
+
 Two hook paths, dispatched on `cfg.target_submodule`:
 
   - `target_submodule is None` (default): hook each transformer **block**'s
-    forward output. The variant's `apply(block, h, state, cfg)` modifies the
-    block's hidden_states. State is keyed by `int` (block layer index).
+    forward output. `x = args[0]` (input residual), `y = out[0]` (output
+    hidden_states). State is keyed by `int` (block layer index).
   - `target_submodule = <regex>`: hook every nn.Linear in each selected block
-    whose dotted path matches the regex. The variant's
-    `apply(block, x, y, state, cfg)` sees both the sub-module's input x and
-    output y, returns the modified output. State is keyed by `str`
-    (full dotted name like `"layers.5.mlp.down_proj"`); each hooked
-    submodule owns its own state buffers and a `_steering_block_ref`.
+    whose dotted path matches the regex. `x` is the Linear's input, `y` its
+    output. State is keyed by `str` (full dotted name like
+    `"layers.5.mlp.down_proj"`); each hooked submodule owns its own state
+    buffers and a `_steering_block_ref` for the parent block.
 
 The two state shapes are kept distinct so block-level methods (mean_diff,
-pca, ...) are unchanged, while submodule-level methods (sspace*) can target
-multiple Linears per block.
+pca, ...) and submodule-level methods (sspace*) can coexist.
 """
 from __future__ import annotations
 import json
@@ -50,11 +56,12 @@ def _hook(block, args, out):
     cfg: SteeringConfig = block._steering_cfg
     method = block._steering_method
     state = _gather_state(block)
+    x = args[0]
     if isinstance(out, tuple):
-        h = out[0]
-        h_new = method.apply(block, h, state, cfg)
-        return (h_new,) + out[1:]
-    return method.apply(block, out, state, cfg)
+        y = out[0]
+        y_new = method.apply(block, x, y, state, cfg)
+        return (y_new,) + out[1:]
+    return method.apply(block, x, out, state, cfg)
 
 
 def _linear_hook(mod, args, out):

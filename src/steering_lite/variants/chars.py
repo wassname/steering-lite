@@ -119,18 +119,19 @@ class CHaRS:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: CHaRSC,
     ) -> Float[Tensor, "b s d"]:
         # cdist doesn't support bf16, and CHaRS is sensitive to underflow in
         # high-d, so keep gating math (a, b, P, kernel, transport) in fp32.
-        # v_hat is cast back to h.dtype before the residual add.
-        a = state["a"].to(device=h.device, dtype=torch.float32)
-        b = state["b"].to(device=h.device, dtype=torch.float32)
-        P = state["P"].to(device=h.device, dtype=torch.float32)
+        # v_hat is cast back to y.dtype before the residual add.
+        a = state["a"].to(device=y.device, dtype=torch.float32)
+        b = state["b"].to(device=y.device, dtype=torch.float32)
+        P = state["P"].to(device=y.device, dtype=torch.float32)
 
-        d2 = torch.cdist(h.float(), a) ** 2
+        d2 = torch.cdist(y.float(), a) ** 2
         if cfg.sigma is None:
             # Paper Eq. 11 heuristic: token-local median of squared distances.
             sigma_sq = d2.median(dim=-1, keepdim=True).values.clamp_min(ε)
@@ -151,6 +152,6 @@ class CHaRS:
         # v_hat(x) = sum_ij w_ij (b_j - a_i)
         w = einsum(P, kern / denom[..., None], "i j, b s i -> b s i j")
         v_hat = einsum(w, b, "b s i j, j d -> b s d") - einsum(w, a, "b s i j, i d -> b s d")
-        v_hat = v_hat.to(h.dtype)
+        v_hat = v_hat.to(y.dtype)
 
-        return h + cfg.coeff * v_hat
+        return y + cfg.coeff * v_hat

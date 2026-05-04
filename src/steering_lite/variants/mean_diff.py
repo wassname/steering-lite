@@ -73,9 +73,10 @@ class MeanDiff:
     @staticmethod
     def apply(
         block,
-        h: Float[Tensor, "b s d"],
+        x: Float[Tensor, "b s d"],
+        y: Float[Tensor, "b s d"],
         state: dict[str, Tensor],
         cfg: MeanDiffC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(h)
-        return h + cfg.coeff * v
+        v = state["v"].to(y)
+        return y + cfg.coeff * v
