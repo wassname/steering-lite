@@ -163,13 +163,10 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
             entities.append((method, lab, vec))
 
     # Humans: use calibrated_wrongness mean per foundation_coarse as a logit-ish
-    # proxy. Different scale; z-scoring per foundation makes them comparable.
+    # proxy. Different scale, so we'll project onto model-fit PCA below.
     human_wrong = _human_per_foundation(vignettes_name)
-    human_vec = np.array([human_wrong[f]["mean"] for f in FOUNDATION_ORDER])
-    if not np.any(np.isnan(human_vec)):
-        entities.append(("human", "ref", human_vec))
-    else:
-        logger.warning(f"human_vec has NaN: {human_vec} — skipping humans on map")
+    human_vec_raw = np.array([human_wrong[f]["mean"] for f in FOUNDATION_ORDER])
+    has_human = not np.any(np.isnan(human_vec_raw))
 
     # Drop entities with NaN (e.g. calibration collapse → NaN logits).
     keep = [(m, s, v) for (m, s, v) in entities if not np.any(np.isnan(v))]
@@ -178,17 +175,30 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         logger.warning(f"moral_map: dropping NaN entities: {dropped}")
 
     labels = [(m, s) for (m, s, _) in keep]
-    X = np.stack([v for (_, _, v) in keep])  # [n_entities, 7]
+    X = np.stack([v for (_, _, v) in keep])  # [n_model_entities, 7]
 
-    # z-score each foundation column so model-logit and human-1-5 are comparable.
-    Xz = _zscore(X)
-
-    # PCA via SVD
+    # PCA fit on MODEL entities only (per-foundation z-score using model μ/σ).
+    # If we mix in the human point with very different scale (1-5 vs logits)
+    # PC1 ends up ~97% variance just separating human from everything.
+    mu = X.mean(axis=0, keepdims=True)
+    sigma = X.std(axis=0, ddof=0, keepdims=True)
+    sigma = np.where(sigma > 1e-9, sigma, 1.0)
+    Xz = (X - mu) / sigma
     Xc = Xz - Xz.mean(axis=0, keepdims=True)
     U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
     pcs = U * S  # [n, k]
     pc1, pc2 = pcs[:, 0], pcs[:, 1]
     var = (S ** 2) / (S ** 2).sum()
+
+    # Project human into the model-fit PCA. Human is on a 1-5 scale; we
+    # mean-centre it on the model's per-foundation mean and rescale by
+    # model std so the geometric direction in foundation-space is preserved.
+    human_pc = None
+    if has_human:
+        h_z = (human_vec_raw - mu.squeeze(0)) / sigma.squeeze(0)
+        h_c = h_z - Xz.mean(axis=0)
+        h_pc = h_c @ Vt.T
+        human_pc = (float(h_pc[0]), float(h_pc[1]))
 
     fig, axs = plt.subplots(1, 2, figsize=(13, 5.5))
 
@@ -199,15 +209,16 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
             ax.scatter(pc1[i], pc2[i], s=180, c="black", marker="*", zorder=5, label="base")
             ax.annotate("base", (pc1[i], pc2[i]), xytext=(6, 6), textcoords="offset points",
                         fontsize=10, weight="bold")
-        elif method == "human":
-            ax.scatter(pc1[i], pc2[i], s=180, c="red", marker="X", zorder=5, label="human ref")
-            ax.annotate("human", (pc1[i], pc2[i]), xytext=(6, 6), textcoords="offset points",
-                        fontsize=10, weight="bold", color="red")
         else:
             color = "C0" if sign == "POS" else "C3"
             ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.7)
             ax.annotate(f"{method}[{sign[0]}]", (pc1[i], pc2[i]), xytext=(4, 2),
                         textcoords="offset points", fontsize=7, color=color, alpha=0.85)
+    if human_pc is not None:
+        ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
+                   label="human ref (projected)")
+        ax.annotate("human", human_pc, xytext=(6, 6), textcoords="offset points",
+                    fontsize=10, weight="bold", color="red")
     # Loadings arrows for foundations
     loads = Vt.T[:, :2] * S[:2]
     scale = 0.6 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
