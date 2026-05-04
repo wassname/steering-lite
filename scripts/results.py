@@ -211,11 +211,7 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
         h_pc = h_c @ Vt.T
         human_pc = (float(h_pc[0]), float(h_pc[1]))
 
-    try:
-        from adjustText import adjust_text
-    except ImportError:
-        adjust_text = None
-        logger.warning("adjustText not installed; labels will overlap. pip install adjustText")
+    import textalloc as ta
 
     fig, axs = plt.subplots(1, 2, figsize=(13, 5.5))
 
@@ -223,67 +219,87 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     ax = axs[0]
     base_idx = next(i for i, (m, _) in enumerate(labels) if m == "base")
     base_pc = (pc1[base_idx], pc2[base_idx])
-    texts = []
 
-    # Steering: arrow from base★ to each method (each method modifies the base).
+    # Collect labels + line obstacles for textalloc.
+    label_x: list[float] = []
+    label_y: list[float] = []
+    label_text: list[str] = []
+    label_color: list[str] = []
+    label_size: list[int] = []
+    x_lines: list[list[float]] = []
+    y_lines: list[list[float]] = []
+
+    # Base
+    ax.scatter(pc1[base_idx], pc2[base_idx], s=180, c="black", marker="*", zorder=5, label="base")
+    label_x.append(pc1[base_idx]); label_y.append(pc2[base_idx])
+    label_text.append("base"); label_color.append("black"); label_size.append(10)
+
+    # Steering: line from base★ to each method endpoint
     for i, (method, sign) in enumerate(labels):
         if method == "base":
-            ax.scatter(pc1[i], pc2[i], s=180, c="black", marker="*", zorder=5, label="base")
-            texts.append(ax.text(pc1[i], pc2[i], "base", fontsize=10, weight="bold"))
-        else:
-            color = "C0" if sign == "POS" else "C3"
-            ax.annotate("", xy=(pc1[i], pc2[i]), xytext=base_pc,
-                        arrowprops=dict(arrowstyle="->", color=color, alpha=0.45, lw=0.8))
-            ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.85, zorder=4)
-            texts.append(ax.text(pc1[i], pc2[i], f"{method}[{sign[0]}]",
-                                 fontsize=7, color=color, alpha=0.95))
+            continue
+        color = "C0" if sign == "POS" else "C3"
+        ax.plot([base_pc[0], pc1[i]], [base_pc[1], pc2[i]],
+                color=color, alpha=0.35, lw=0.7, zorder=2)
+        ax.scatter(pc1[i], pc2[i], s=40, c=color, alpha=0.85, zorder=4)
+        x_lines.append([base_pc[0], pc1[i]])
+        y_lines.append([base_pc[1], pc2[i]])
+        label_x.append(pc1[i]); label_y.append(pc2[i])
+        label_text.append(f"{method}[{sign[0]}]"); label_color.append(color); label_size.append(7)
+
     if human_pc is not None:
         ax.scatter(human_pc[0], human_pc[1], s=220, c="red", marker="X", zorder=6,
                    label="human ref (projected)")
-        texts.append(ax.text(human_pc[0], human_pc[1], "human",
-                             fontsize=10, weight="bold", color="red"))
+        label_x.append(human_pc[0]); label_y.append(human_pc[1])
+        label_text.append("human"); label_color.append("red"); label_size.append(10)
 
-    # Foundation compass: a fixed reference frame (like a compass rose), drawn
-    # in an out-of-the-way corner. Direction = "if you increased this foundation,
-    # you'd move this way in PCA space". Origin location is arbitrary.
+    # Foundation compass: fixed reference frame, anchored in the emptiest quadrant.
     loads = Vt.T[:, :2] * S[:2]
-    xlim_min = min(pc1.min(), human_pc[0] if human_pc else pc1.min())
-    ylim_max = max(pc2.max(), human_pc[1] if human_pc else pc2.max())
-    compass_origin = (xlim_min - 1.5, ylim_max + 0.5)
+    if human_pc is not None:
+        compass_origin = (0.5 * (human_pc[0] + pc1.mean()), human_pc[1])
+    else:
+        compass_origin = (pc1.max() + 1.0, pc2.max())
     compass_scale = 0.35 * max(np.abs(pcs[:, :2]).max(), 1.0) / max(np.abs(loads).max(), 1.0)
-    foundation_texts = []
     for j, f in enumerate(FOUNDATION_ORDER):
         dx, dy = loads[j, 0] * compass_scale, loads[j, 1] * compass_scale
         ax.arrow(compass_origin[0], compass_origin[1], dx, dy,
                  head_width=0.08, color="grey", alpha=0.55, length_includes_head=True)
-        foundation_texts.append(ax.text(compass_origin[0] + dx * 1.12,
-                                        compass_origin[1] + dy * 1.12,
-                                        FOUNDATION_SHORT[f],
-                                        fontsize=9, color="grey", weight="bold",
-                                        ha="center", va="center"))
+        x_lines.append([compass_origin[0], compass_origin[0] + dx])
+        y_lines.append([compass_origin[1], compass_origin[1] + dy])
+        # tip position is the label anchor; textalloc finds a free spot near it
+        label_x.append(compass_origin[0] + dx)
+        label_y.append(compass_origin[1] + dy)
+        label_text.append(FOUNDATION_SHORT[f])
+        label_color.append("grey"); label_size.append(9)
     ax.scatter(*compass_origin, s=20, c="grey", marker="+", alpha=0.5)
-    ax.text(compass_origin[0], compass_origin[1] - 0.4 * compass_scale * np.abs(loads).max(),
-            "foundation\ncompass", fontsize=7, color="grey",
-            ha="center", va="top", style="italic", alpha=0.7)
 
-    if adjust_text is not None:
-        adjust_text(texts + foundation_texts, ax=ax,
-                    expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
-                    arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
     ax.axhline(0, color="grey", lw=0.4); ax.axvline(0, color="grey", lw=0.4)
     ax.set_xlabel(f"PC1 ({var[0]*100:.0f}% var)")
     ax.set_ylabel(f"PC2 ({var[1]*100:.0f}% var)")
     ax.set_title("Moral map (PCA on z-scored 7-foundation profile)")
 
+    # Pin axis limits with padding so textalloc's canvas covers all scatter+lines.
+    pad_x = 0.08 * (max(label_x) - min(label_x))
+    pad_y = 0.12 * (max(label_y) - min(label_y))
+    ax.set_xlim(min(label_x) - pad_x, max(label_x) + pad_x)
+    ax.set_ylim(min(label_y) - pad_y, max(label_y) + pad_y)
+    ta.allocate(ax, label_x, label_y, label_text,
+                x_scatter=label_x, y_scatter=label_y,
+                x_lines=x_lines, y_lines=y_lines,
+                textsize=label_size, textcolor=label_color,
+                draw_lines=True, linecolor="grey", linewidth=0.4,
+                margin=0.01, min_distance=0.015, max_distance=0.18,
+                avoid_label_lines_overlap=True)
+
     # --- RIGHT: Authority vs Care surgical view ---
-    # X = ΔAuthority (target axis), Y = ΔCare (off-target). Below diagonal = surgical.
     ax2 = axs[1]
     base_auth = base_logit["Authority"]; base_care = base_logit["Care"]
-    texts2 = []
+    lx2: list[float] = []; ly2: list[float] = []
+    lt2: list[str] = []; lc2: list[str] = []; ls2: list[int] = []
     for (method, sign), vec in zip(labels, X):
         if method == "base":
             ax2.scatter(0, 0, s=180, c="black", marker="*", zorder=5)
-            texts2.append(ax2.text(0, 0, "base", fontsize=10, weight="bold"))
+            lx2.append(0); ly2.append(0); lt2.append("base"); lc2.append("black"); ls2.append(10)
         elif method == "human":
             continue
         else:
@@ -291,8 +307,8 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
             dAuth = vec[FOUNDATION_ORDER.index("Authority")] - base_auth
             dCare = vec[FOUNDATION_ORDER.index("Care")] - base_care
             ax2.scatter(dAuth, dCare, s=40, c=color, alpha=0.7)
-            texts2.append(ax2.text(dAuth, dCare, f"{method}[{sign[0]}]",
-                                   fontsize=7, color=color, alpha=0.9))
+            lx2.append(dAuth); ly2.append(dCare)
+            lt2.append(f"{method}[{sign[0]}]"); lc2.append(color); ls2.append(7)
     lo, hi = ax2.get_xlim()
     ax2.plot([lo, hi], [lo, hi], "--", color="grey", alpha=0.4, label="broad-suppression diag")
     ax2.axhline(0, color="grey", lw=0.4); ax2.axvline(0, color="grey", lw=0.4)
@@ -300,9 +316,12 @@ def moral_map(sweep_dir: Path, vignettes_name: str, out_png: Path) -> None:
     ax2.set_ylabel("ΔlogitCare (off-target; want ≈ 0)")
     ax2.set_title("Surgical view: ΔAuth vs ΔCare\n(diagonal = broad suppression, below = surgical)")
     ax2.legend(loc="best", fontsize=8)
-    if adjust_text is not None:
-        adjust_text(texts2, ax=ax2, expand_points=(1.2, 1.4), expand_text=(1.1, 1.2),
-                    arrowprops=dict(arrowstyle="-", color="grey", lw=0.4, alpha=0.5))
+    ax2.relim(); ax2.autoscale_view()
+    ta.allocate(ax2, lx2, ly2, lt2,
+                x_scatter=lx2, y_scatter=ly2,
+                textsize=ls2, textcolor=lc2,
+                draw_lines=True, linecolor="grey", linewidth=0.4,
+                margin=0.01, min_distance=0.015, max_distance=0.18)
 
     fig.suptitle(f"steering-lite moral map — {sweep_dir.name}", y=1.0)
     fig.tight_layout()
