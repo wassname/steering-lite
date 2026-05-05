@@ -158,11 +158,8 @@ class SSpace:
         dS_hat = state["dS_hat"].to(y)
         y_eff = y - state["b"].to(y) if "b" in state else y
 
-        xS = (y_eff @ U_r) / sqrtS                                  # [b, s, r]
+        xS = (y_eff @ U_r) / sqrtS                                     # [b, s, r]
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
-        cos = (xS_norm * dS_hat).sum(dim=-1, keepdim=True)          # [b, s, 1]
-        gate = cos.abs()                                             # [0, 1]
-
-        delta_S = cfg.coeff * gate * dS_hat                         # [b, s, r]
-        delta_y = (delta_S * sqrtS) @ U_r.T                         # [b, s, d_out]
-        return y + delta_y
+        gate = (xS_norm * dS_hat).sum(dim=-1, keepdim=True).abs()      # [b, s, 1]
+        delta_S = cfg.coeff * gate * dS_hat                            # [b, s, r]
+        return y + (delta_S * sqrtS) @ U_r.T                           # [b, s, d_out]

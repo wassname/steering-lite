@@ -78,5 +78,4 @@ class MeanDiff:
         state: dict[str, Tensor],
         cfg: MeanDiffC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(y)
-        return y + cfg.coeff * v
+        return y + cfg.coeff * state["v"].to(y)
