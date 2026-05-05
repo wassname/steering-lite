@@ -97,17 +97,18 @@ def _demo_response(model, tok, v: Vector | None, label: str) -> str:
         ids = tok.apply_chat_template(
             msgs, add_generation_prompt=True,
             enable_thinking=False, return_tensors="pt",
-        ).to(next(model.parameters()).device)
+        )["input_ids"].to(next(model.parameters()).device)
     except TypeError:
         ids = tok.apply_chat_template(
             msgs, add_generation_prompt=True, return_tensors="pt",
-        ).to(next(model.parameters()).device)
+        )["input_ids"].to(next(model.parameters()).device)
 
+    gen_kw = dict(max_new_tokens=100, do_sample=False, pad_token_id=tok.eos_token_id)
     if v is None:
-        out = model.generate(ids, max_new_tokens=100, do_sample=False, pad_token_id=tok.eos_token_id)
+        out = model.generate(ids, **gen_kw)
     else:
         with v(model):
-            out = model.generate(ids, max_new_tokens=100, do_sample=False, pad_token_id=tok.eos_token_id)
+            out = model.generate(ids, **gen_kw)
     text = tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True).strip()
     logger.info(f"\n--- demo {label} ---\n{text}\n--- /demo ---")
     return text
