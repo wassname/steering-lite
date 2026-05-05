@@ -168,6 +168,57 @@ def _calibrate_combined_pmass(
     return None, pmass
 
 
+def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -> None:
+    """Plot absolute logit(wrongness) for Auth and SocN across rounds."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        logger.warning("matplotlib not available, skipping plot")
+        return
+
+    rounds = [0] + [s["round"] for s in round_summaries]
+    auth_base = base_logit_per_f["Authority"]["mean"]
+    socn_base = base_logit_per_f["Social Norms"]["mean"]
+    # round 0 = bare; rounds 1+ = bare + cumulative dlogit from round_summaries
+    auth_vals = [auth_base] + [auth_base + s["auth_dlogit_mean"] for s in round_summaries]
+    # socn not in round_summaries directly -- compute from axis_shift proxy would be imprecise.
+    # Use auth only unless caller passes per-foundation dlogit; keep it simple.
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+    ax1.plot(rounds, auth_vals, "o-", color="steelblue", linewidth=2, markersize=6)
+    ax1.axhline(0, color="gray", linestyle="--", linewidth=0.8)
+    ax1.set_xlabel("round")
+    ax1.set_ylabel("logit(wrongness)")
+    ax1.set_title("Authority: absolute logit(wrongness)")
+    ax1.set_xticks(rounds)
+
+    pmass_vals = [base_logit_per_f.get("__pmass__", float("nan"))] + [s["pmass"] for s in round_summaries]
+    ppls = [float("nan")] + [s["ppl"] for s in round_summaries]
+    ax2.plot(rounds[1:], [s["pmass"] for s in round_summaries], "s-", color="darkorange",
+             linewidth=2, markersize=6, label="pmass")
+    ax2.axhline(0.85, color="gray", linestyle="--", linewidth=0.8, label="pmass=0.85 gate")
+    ax2r = ax2.twinx()
+    ax2r.plot(rounds[1:], ppls[1:], "^--", color="firebrick", linewidth=1.5,
+              markersize=5, label="ppl")
+    ax2r.set_ylabel("ppl", color="firebrick")
+    ax2.set_xlabel("round")
+    ax2.set_ylabel("pmass")
+    ax2.set_title("Format coherence")
+    ax2.set_xticks(rounds[1:])
+    lines1, labels1 = ax2.get_legend_handles_labels()
+    lines2, labels2 = ax2r.get_legend_handles_labels()
+    ax2.legend(lines1 + lines2, labels1 + labels2, fontsize=8)
+
+    fig.tight_layout()
+    plot_path = out / "plot.png"
+    fig.savefig(plot_path, dpi=120)
+    plt.close(fig)
+    logger.info(f"plot: {plot_path}")
+
+
 def _auth_logit(dlogit_per_f) -> float:
     return dlogit_per_f["Authority"]["mean"]
 
@@ -245,9 +296,12 @@ def main() -> None:
     )
     calib_prompts = _calib_prompts(tok, n=8)
 
+    # All rows use ABSOLUTE logit(wrongness) per foundation so units are consistent.
+    # bare logit(w) ≈ +2 means model strongly judges scenario as wrong.
+    # steered absolute = bare_logit + Δlogit; drops toward 0 or negative = less wrong.
     rows: list[list] = []
     rows.append([
-        "0", "—", "+0.00",
+        "0", "—",
         *(f"{base_logit_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER),
         f"{base_pmass:.3f}", f"{base_ppl:.2f}", "0",
     ])
@@ -334,9 +388,11 @@ def main() -> None:
         round_ppl = _ppl(chosen_report)
         elapsed = time.time() - t_round
 
+        abs_logit = {f: base_logit_per_f[f]["mean"] + chosen_dlogit[f]["mean"]
+                     for f in FOUNDATION_ORDER}
         rows.append([
-            str(r), sign, f"{axis_shift(chosen_dlogit):+.3f}",
-            *(f"{chosen_dlogit[f]['mean']:+.2f}" for f in FOUNDATION_ORDER),
+            str(r), sign,
+            *(f"{abs_logit[f]:+.2f}" for f in FOUNDATION_ORDER),
             f"{round_pmass:.3f}", f"{round_ppl:.2f}", f"{elapsed:.0f}",
         ])
 
@@ -365,11 +421,12 @@ def main() -> None:
     if v_running is not None:
         v_running.save(str(args.out / "v_accum.safetensors"))
 
-    headers = (["r", "±", "axis"]
+    headers = (["r", "±"]
                + [FOUNDATION_SHORT[f] for f in FOUNDATION_ORDER]
                + ["pmass", "ppl", "t_s"])
-    tsv = tabulate(rows, headers=headers, tablefmt="tsv")
+    tsv = tabulate(rows, headers=headers, tablefmt="tsv", floatfmt="+.2f")
     (args.out / "rounds.tsv").write_text(tsv)
+    _save_plot(round_summaries, base_logit_per_f, args.out)
 
     (args.out / "meta.json").write_text(json.dumps({
         "meta": meta, "args": vars(args), "layers": list(layers),
