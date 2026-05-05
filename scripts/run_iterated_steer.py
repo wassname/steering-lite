@@ -169,7 +169,13 @@ def _calibrate_combined_pmass(
 
 
 def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -> None:
-    """Plot absolute logit(wrongness) for Auth and SocN across rounds."""
+    """2D path plot: Auth vs SocN absolute logit(wrongness) with round arrows.
+
+    Each point is one round's position in (Auth, SocN) space. Arrows show the
+    trajectory. If the model moves mostly along one axis the path is near-1D;
+    if the steering also shifts SocN separately a 2D meander is visible.
+    Second panel: pmass and ppl over rounds (coherence diagnostics).
+    """
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -178,39 +184,52 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
         logger.warning("matplotlib not available, skipping plot")
         return
 
-    rounds = [0] + [s["round"] for s in round_summaries]
     auth_base = base_logit_per_f["Authority"]["mean"]
     socn_base = base_logit_per_f["Social Norms"]["mean"]
-    # round 0 = bare; rounds 1+ = bare + cumulative dlogit from round_summaries
-    auth_vals = [auth_base] + [auth_base + s["auth_dlogit_mean"] for s in round_summaries]
-    # socn not in round_summaries directly -- compute from axis_shift proxy would be imprecise.
-    # Use auth only unless caller passes per-foundation dlogit; keep it simple.
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    # Absolute positions: bare + cumulative dlogit
+    auth_pts = [auth_base] + [auth_base + s["dlogit_per_f"]["Authority"] for s in round_summaries]
+    socn_pts = [socn_base] + [socn_base + s["dlogit_per_f"]["Social Norms"] for s in round_summaries]
+    rounds = list(range(len(auth_pts)))
+    pmasses = [s["pmass"] for s in round_summaries]
+    ppls = [s["ppl"] for s in round_summaries]
 
-    ax1.plot(rounds, auth_vals, "o-", color="steelblue", linewidth=2, markersize=6)
-    ax1.axhline(0, color="gray", linestyle="--", linewidth=0.8)
-    ax1.set_xlabel("round")
-    ax1.set_ylabel("logit(wrongness)")
-    ax1.set_title("Authority: absolute logit(wrongness)")
-    ax1.set_xticks(rounds)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
 
-    pmass_vals = [base_logit_per_f.get("__pmass__", float("nan"))] + [s["pmass"] for s in round_summaries]
-    ppls = [float("nan")] + [s["ppl"] for s in round_summaries]
-    ax2.plot(rounds[1:], [s["pmass"] for s in round_summaries], "s-", color="darkorange",
-             linewidth=2, markersize=6, label="pmass")
-    ax2.axhline(0.85, color="gray", linestyle="--", linewidth=0.8, label="pmass=0.85 gate")
+    # 2D trajectory
+    cmap = plt.cm.viridis
+    n = len(auth_pts)
+    for i in range(n - 1):
+        color = cmap(i / max(n - 2, 1))
+        ax1.annotate(
+            "", xy=(auth_pts[i + 1], socn_pts[i + 1]),
+            xytext=(auth_pts[i], socn_pts[i]),
+            arrowprops=dict(arrowstyle="->", color=color, lw=1.8),
+        )
+    sc = ax1.scatter(auth_pts, socn_pts, c=rounds, cmap="viridis", s=60, zorder=3)
+    for i, (x, y) in enumerate(zip(auth_pts, socn_pts)):
+        ax1.annotate(f"r{i}", (x, y), textcoords="offset points",
+                     xytext=(5, 4), fontsize=8)
+    ax1.axhline(0, color="lightgray", linewidth=0.7)
+    ax1.axvline(0, color="lightgray", linewidth=0.7)
+    ax1.set_xlabel("Authority  logit(wrongness)")
+    ax1.set_ylabel("Social Norms  logit(wrongness)")
+    ax1.set_title("Steering trajectory (Auth vs SocN)")
+    fig.colorbar(sc, ax=ax1, label="round")
+
+    # Coherence panel
+    ax2.plot(rounds[1:], pmasses, "s-", color="darkorange", linewidth=2, markersize=6, label="pmass")
+    ax2.axhline(0.85, color="gray", linestyle="--", linewidth=0.8, label="gate=0.85")
     ax2r = ax2.twinx()
-    ax2r.plot(rounds[1:], ppls[1:], "^--", color="firebrick", linewidth=1.5,
-              markersize=5, label="ppl")
+    ax2r.plot(rounds[1:], ppls, "^--", color="firebrick", linewidth=1.5, markersize=5, label="ppl")
     ax2r.set_ylabel("ppl", color="firebrick")
     ax2.set_xlabel("round")
     ax2.set_ylabel("pmass")
     ax2.set_title("Format coherence")
     ax2.set_xticks(rounds[1:])
-    lines1, labels1 = ax2.get_legend_handles_labels()
-    lines2, labels2 = ax2r.get_legend_handles_labels()
-    ax2.legend(lines1 + lines2, labels1 + labels2, fontsize=8)
+    lines = ax2.get_legend_handles_labels()
+    lines2 = ax2r.get_legend_handles_labels()
+    ax2.legend(lines[0] + lines2[0], lines[1] + lines2[1], fontsize=8)
 
     fig.tight_layout()
     plot_path = out / "plot.png"
@@ -414,6 +433,7 @@ def main() -> None:
             "round": r, "sign": sign, "signed_C": signed_C,
             "auth_dlogit_mean": _auth_logit(chosen_dlogit),
             "axis_shift": axis_shift(chosen_dlogit),
+            "dlogit_per_f": {f: chosen_dlogit[f]["mean"] for f in FOUNDATION_ORDER},
             "pmass": round_pmass, "ppl": round_ppl, "elapsed_s": elapsed,
         })
 
