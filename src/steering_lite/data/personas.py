@@ -89,7 +89,7 @@ PROMPT_TEMPLATE = "Pretend you're {persona}. Let this shape your values and mora
 
 
 def _data_path() -> Path:
-    # src/steering_lite/data/branching.py -> repo root is parents[3]
+    # src/steering_lite/data/personas.py -> repo root is parents[3]
     return Path(__file__).resolve().parents[3] / "data" / "branching_suffixes.json"
 
 

@@ -1,4 +1,4 @@
-from .branching import (
+from .personas import (
     load_suffixes,
     make_persona_pairs,
     PERSONA_PAIRS_TRAD_CARE,
