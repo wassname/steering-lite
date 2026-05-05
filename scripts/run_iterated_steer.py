@@ -8,12 +8,12 @@ cosine gate is nonlinear, so summing N gated deltas != one gated delta).
 Each round:
   1. Extract v_fresh under the currently-attached v_running. The new contrast
      captures whatever signal remains after prior rounds.
-  2. Iso-KL calibrate |C| in isolation against the bare model (attach.py is
-     single-slot, so we can't have v_running attached during calibration).
-     Per-round target_kl=1.0; total drift accumulates.
-  3. Bake C into v_fresh's state (`v_fresh = v_fresh * C`, set coeff=1).
-  4. Eval at v_running + v_fresh and v_running - v_fresh, pick sign with
-     lower Authority Δlogit. Commit: `v_running += sign * v_fresh`.
+  2. Get C_init from iso-KL calibration on v_fresh alone (fast upper bound).
+  3. Bake C_init into v_fresh_unit (coeff=1).
+  4. Binary-search for max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+     Uses fast next-token eval (max_think_tokens=0, small vignette subset).
+     If no valid C found, stop iteration (model already OOD).
+  5. Full eval at ±C, pick sign with lower Authority Δlogit. Commit.
 
 Outputs:
   - rounds.tsv         BLUF table: round, ±, axis, dlogit_<F>, pmass, ppl
@@ -94,6 +94,49 @@ def _bake_coeff(v: Vector) -> Vector:
     return scaled
 
 
+def _fast_pmass(v: Vector, model, tok, vignette_name: str, n: int) -> float:
+    """Quick pmass check using next-token logits only (max_think_tokens=0).
+
+    Loads n vignettes (deterministic subset), attaches v, runs eval.
+    ~15-30s vs ~375s for guided eval -- cheap enough for calibration bisection.
+    """
+    from tinymfv.data import load_vignettes
+    all_vigs = load_vignettes(vignette_name)
+    subset = all_vigs[:n]
+    with v(model):
+        report = evaluate_with_vector(
+            model, tok, name=vignette_name,
+            max_think_tokens=0, vignettes=subset, log_demo=False,
+        )
+    return _mean_pmass(report)
+
+
+def _calibrate_combined_pmass(
+    v_running: Vector | None,
+    v_fresh_unit: Vector,          # coeff already baked to 1
+    model, tok,
+    vignette_name: str,
+    C_init: float,
+    target_pmass: float = 0.85,
+    n_vignettes: int = 8,
+    max_halvings: int = 5,
+) -> tuple[float | None, float]:
+    """Binary search for max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+
+    Returns (C, pmass). C is None if pmass < target even after max_halvings.
+    v_running may be None (round 1: combined = C * v_fresh_unit).
+    """
+    C = C_init
+    for i in range(max_halvings + 1):
+        v_candidate = (C * v_fresh_unit) if v_running is None else (v_running + C * v_fresh_unit)
+        pmass = _fast_pmass(v_candidate, model, tok, vignette_name, n_vignettes)
+        logger.info(f"  pmass_calib C={C:.4f} pmass={pmass:.3f} (target>={target_pmass})")
+        if pmass >= target_pmass:
+            return C, pmass
+        C /= 2
+    return None, pmass
+
+
 def _auth_logit(dlogit_per_f) -> float:
     return dlogit_per_f["Authority"]["mean"]
 
@@ -112,9 +155,16 @@ def main() -> None:
     ap.add_argument("--n-pairs", type=int, default=128)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-length", type=int, default=384)
-    ap.add_argument("--target-kl", type=float, default=1.0)
+    ap.add_argument("--target-kl", type=float, default=1.0,
+                    help="KL upper bound for iso-KL calibration (gives C_init)")
     ap.add_argument("--calib-T", type=int, default=20)
     ap.add_argument("--calib-iters", type=int, default=8)
+    ap.add_argument("--target-pmass", type=float, default=0.85,
+                    help="min pmass on combined vector; bisect C if below")
+    ap.add_argument("--pmass-n-vignettes", type=int, default=8,
+                    help="vignettes to use in fast pmass calibration check")
+    ap.add_argument("--max-halvings", type=int, default=5,
+                    help="max bisection halvings of C during pmass calibration")
     ap.add_argument("--max-think-tokens", type=int, default=64)
     ap.add_argument("--vignettes", default="airisk")
     ap.add_argument("--out", type=Path, default=Path("outputs/iterated_steer"))
@@ -189,32 +239,51 @@ def main() -> None:
                 v_fresh = sl.train(model, tok, pos_prompts, neg_prompts, _make_cfg(),
                                    batch_size=args.batch_size, max_length=args.max_length)
 
-        # Calibrate v_fresh in isolation vs bare model. attach.py is single-slot,
-        # so we can't have v_running attached during calibration. Per-round KL is
-        # "round-r alone vs bare", not "round-r vs (bare + v_running)".
+        # Step 1: iso-KL calibration in isolation for C_init (fast upper bound).
+        # Can't attach v_running simultaneously (single-slot), so this is v_fresh alone.
         coeff_calib, hist = sl.calibrate_iso_kl(
             v_fresh, model, tok, calib_prompts,
             target_kl=args.target_kl, T=args.calib_T,
             max_iters=args.calib_iters, device=args.device,
         )
         kl_hit = hist[-1].get("kl_p95", float("nan")) if hist else float("nan")
-        C = float(coeff_calib)
-        logger.info(f"  calibrated |C|={C:.4f} kl_p95={kl_hit:.2f}")
+        C_init = float(coeff_calib)
+        logger.info(f"  iso-KL C_init={C_init:.4f} kl_p95={kl_hit:.2f}")
 
-        # Bake C into state so v_fresh.cfg.coeff=1 -- now Vector + Vector sums
-        # magnitudes directly without coeff bookkeeping.
-        v_fresh = _bake_coeff(v_fresh)
+        # Step 2: bake C_init into state (coeff=1) so Vector + Vector sums magnitudes.
+        v_fresh_unit = _bake_coeff(v_fresh)
 
-        # Eval ± at v_running + (±1) * v_fresh.
-        pos_dlogit, pos_report = _eval_with(v_running, +1.0 * v_fresh, model, tok, args, base_report)
-        neg_dlogit, neg_report = _eval_with(v_running, -1.0 * v_fresh, model, tok, args, base_report)
+        # Step 3: pmass-gated bisection on the COMBINED vector.
+        # Finds max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+        # Uses fast next-token eval (max_think_tokens=0) -- single-slot still fine
+        # because we attach v_combined, not v_running+v_fresh simultaneously.
+        logger.info(
+            f"  SHOULD: pmass_calib finds C close to C_init={C_init:.3f}. "
+            "ELSE: accumulated vector already OOD, C will be much smaller."
+        )
+        C, pmass_calib = _calibrate_combined_pmass(
+            v_running, v_fresh_unit, model, tok, args.vignettes,
+            C_init=C_init, target_pmass=args.target_pmass,
+            n_vignettes=args.pmass_n_vignettes, max_halvings=args.max_halvings,
+        )
+        if C is None:
+            logger.warning(
+                f"  pmass={pmass_calib:.3f} < {args.target_pmass} even at C={C_init/2**args.max_halvings:.4f}. "
+                "Model OOD -- stopping iteration."
+            )
+            break
+        logger.info(f"  pmass_calib: accepted C={C:.4f} pmass={pmass_calib:.3f}")
+
+        # Step 4: full eval at ±C, pick sign with lower Authority Δlogit.
+        pos_dlogit, pos_report = _eval_with(v_running, +C * v_fresh_unit, model, tok, args, base_report)
+        neg_dlogit, neg_report = _eval_with(v_running, -C * v_fresh_unit, model, tok, args, base_report)
         auth_pos, auth_neg = _auth_logit(pos_dlogit), _auth_logit(neg_dlogit)
         if auth_pos <= auth_neg:
             sign, signed_C, chosen_dlogit, chosen_report = "+", +C, pos_dlogit, pos_report
-            signed_fresh = +1.0 * v_fresh
+            signed_fresh = +C * v_fresh_unit
         else:
             sign, signed_C, chosen_dlogit, chosen_report = "-", -C, neg_dlogit, neg_report
-            signed_fresh = -1.0 * v_fresh
+            signed_fresh = -C * v_fresh_unit
         logger.info(f"  Auth Δ: +C={auth_pos:+.3f}  -C={auth_neg:+.3f}  → chose {sign}C")
 
         v_running = signed_fresh if v_running is None else v_running + signed_fresh
@@ -274,10 +343,10 @@ def main() -> None:
     logger.info("\n" + tsv)
 
 
-def _eval_with(v_running, v_signed_fresh, model, tok, args, base_report):
-    """Eval at v_running + v_signed_fresh. Both must be coeff-baked (coeff=1)
-    so their sum is meaningful. Returns (dlogit, report)."""
-    v_combined = v_signed_fresh if v_running is None else v_running + v_signed_fresh
+def _eval_with(v_running, v_scaled_fresh, model, tok, args, base_report):
+    """Eval at v_running + v_scaled_fresh. All vectors are coeff-baked (coeff=1).
+    Returns (dlogit, report)."""
+    v_combined = v_scaled_fresh if v_running is None else v_running + v_scaled_fresh
     with v_combined(model):
         report = evaluate_with_vector(model, tok, name=args.vignettes,
                                       max_think_tokens=args.max_think_tokens, vector=v_combined)
