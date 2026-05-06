@@ -50,10 +50,15 @@ def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int)
 
 
 def _fmt_trace(label: str, res) -> str:
+    body = (
+        f"USER:\n{res.user_prompt}\n"
+        f"---\n"
+        f"THINK:\n{res.think_text}"
+    )
     return (
         f"  --- {label} ---\n"
         f"  pmass={res.pmass_format:.3f}  logratio={res.logratio_ab:+.3f}  p_true={res.p_true:.3f}\n"
-        + "\n".join("  " + l for l in res.raw_full_text.splitlines())
+        + "\n".join("  " + l for l in body.splitlines())
     )
 
 
@@ -69,7 +74,6 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int,
         return
     from tinymfv.data import load_vignettes
     from tinymfv.core import CONDITIONS, FRAMES
-    from ..attach import detach as _detach, attach as _attach
 
     vignettes = load_vignettes(name)
     if not vignettes:
@@ -80,36 +84,19 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int,
     cond = next(iter(CONDITIONS))
     frame_name, frame = next(iter(FRAMES.items()))
     user_prompt = r[cond]
-    header = (f"stage=eval  method={getattr(getattr(vector, 'cfg', None), 'method', 'none')}  "
+    method_name = getattr(getattr(vector, 'cfg', None), 'method', 'none')
+    header = (f"stage=eval  method={method_name}  "
               f"vignette={r.get('id','?')}  cond={cond}  max_think={max_think_tokens}")
 
-    _detach(model)
-    res_base = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
-
-    if vector is None:
-        logger.info(
-            "EXPECT: prompt + <think>...</think> + JSON-bool; pmass≈1 means model picked a bool token.\n"
-            f"=== EVAL demo ({header}) ===\n"
-            + _fmt_trace("BASE (c=0)", res_base)
-            + "\n=== /EVAL ==="
-        )
-        return
-
-    C = abs(float(vector.cfg.coeff))
-    _attach(model, vector.cfg, vector.state)
-    vector.cfg.coeff = +C
-    res_pos = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
-    vector.cfg.coeff = -C
-    res_neg = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
-    # restore original coeff
-    vector.cfg.coeff = +C
-
+    # Run demo using whatever steering is already attached on the model.
+    # Caller controls attachment; this function MUST NOT detach/reattach
+    # because that destroys the outer `with vector(model):` context.
+    res = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
+    label = "BARE" if vector is None else f"STEERED (method={method_name}, c={vector.cfg.coeff:+.4f})"
     logger.info(
-        f"EXPECT: BASE vs ±C differ in conclusion; pmass≈1; steered not collapsed.\n"
+        "EXPECT: prompt + <think>...</think> + JSON-bool; pmass≈1 means model picked a bool token.\n"
         f"=== EVAL demo ({header}) ===\n"
-        + _fmt_trace("BASE (c=0)", res_base) + "\n"
-        + _fmt_trace(f"STEER (c=+{C:.4f})", res_pos) + "\n"
-        + _fmt_trace(f"STEER (c=-{C:.4f})", res_neg)
+        + _fmt_trace(label, res)
         + "\n=== /EVAL ==="
     )
 
@@ -153,7 +140,7 @@ def evaluate_multibool(model, tok, *, name: str = "airisk", max_think_tokens: in
     raw_pmass: dict[str, float] = {}
 
     total = len(vignettes) * len(CONDITIONS)
-    with tqdm(total=total, desc="multibool eval") as pbar:
+    with tqdm(total=total, desc="multibool eval", mininterval=60) as pbar:
         for cond in CONDITIONS:
             for i in range(0, len(vignettes), batch_size):
                 batch = vignettes[i: i + batch_size]

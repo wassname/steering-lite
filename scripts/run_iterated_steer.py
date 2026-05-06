@@ -1,9 +1,11 @@
 """Iterated steering: accumulate a sum of fresh vectors, plot trajectory.
 
-mean_diff only -- the math is purely linear, so the "stacked" vector is just
-`sum_i (sign_i * C_i * v_i_unit)`, accumulated externally via `Vector + Vector`.
-No in-hook stacking, no per-slot machinery. sspace iteration is parked (the
-cosine gate is nonlinear, so summing N gated deltas != one gated delta).
+Works for any method declaring `supports_multi=True` (mean_diff, sspace,
+topk_clusters). Linear methods (mean_diff) collapse to a single direction at
+apply time; nonlinear methods (sspace cosine gate, topk_clusters argmax)
+preserve per-direction gating: each round's direction keeps its own gate /
+router and the deltas sum. The "stacked" leading k-dim grows by 1 each round
+via `Vector + Vector`; `shared` (SVD basis, biases) is invariant across rounds.
 
 Each round:
   1. Extract v_fresh under the currently-attached v_running. The new contrast
@@ -115,11 +117,15 @@ def _demo_response(model, tok, v: Vector | None, label: str) -> str:
 
 
 def _bake_coeff(v: Vector) -> Vector:
-    """Fold v.cfg.coeff into state, return new Vector with coeff=1.
+    """Fold v.cfg.coeff into stacked tensors, return new Vector with coeff=1.
 
-    mean_diff state is `{v: tensor}`; scaling all buffers is exact for linear
-    methods. After this, `v_running + v_fresh` directly sums vectors regardless
-    of when each was calibrated.
+    `Vector * k` scales every stacked tensor by k (shared is left alone).
+    For mean_diff the row-vector v is scaled directly; for sspace each row's
+    norm carries that round's per-direction calibration alpha, so scaling is
+    equivalent to scaling alpha; for topk_clusters centroids are scaled
+    uniformly. In all cases the apply-time delta is linear in the stacked
+    magnitude, so baking C is exact and `v_running + v_fresh` then sums
+    contributions regardless of when each was calibrated.
     """
     scaled = v * float(v.cfg.coeff)
     scaled.cfg.coeff = 1.0
@@ -345,10 +351,9 @@ def _auth_logit(dlogit_per_f) -> float:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
-    ap.add_argument("--method", choices=["mean_diff"], default="mean_diff",
-                    help="iterated steering is mean_diff only (linear math). "
-                         "sspace's gate is nonlinear, so sum-of-vectors != "
-                         "stacked-gated-deltas; parked.")
+    ap.add_argument("--method", default="mean_diff",
+                    help="any method declaring supports_multi=True "
+                         "(mean_diff, sspace, topk_clusters).")
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
@@ -387,6 +392,7 @@ def main() -> None:
     tok = AutoTokenizer.from_pretrained(args.model)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
+    tok.padding_side = "left"  # tinymfv KV-fork requires left padding
     model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
 
     layers = _resolve_layers(model, args.layers)
@@ -428,8 +434,19 @@ def main() -> None:
     v_running: Vector | None = None
     round_summaries = []
 
+    from steering_lite.config import _CONFIG_REGISTRY, REGISTRY
+    if args.method not in _CONFIG_REGISTRY:
+        raise ValueError(f"unknown method {args.method!r}; "
+                         f"registered: {sorted(_CONFIG_REGISTRY)}")
+    if not getattr(REGISTRY[args.method], "supports_multi", False):
+        raise ValueError(f"method {args.method!r} does not support multi-round "
+                         f"accumulation. Add `supports_multi = True` to its "
+                         f"variant class and ensure apply() loops over the "
+                         f"leading k-dim of stacked tensors.")
+    cfg_cls = _CONFIG_REGISTRY[args.method]
+
     def _make_cfg() -> sl.SteeringConfig:
-        return sl.MeanDiffC(layers=layers, coeff=1.0, dtype=dtype, seed=0)
+        return cfg_cls(layers=layers, coeff=1.0, dtype=dtype, seed=0)
 
     for r in range(1, args.rounds + 1):
         logger.info(f"\n=== round {r} ===")

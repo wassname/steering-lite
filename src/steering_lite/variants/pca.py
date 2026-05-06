@@ -78,11 +78,11 @@ class PCA:
                 v = v.squeeze(0)
                 if cfg.normalize:
                     v = v / (v.norm() + ε)
-                out[li] = {"v": v}
+                out[li] = {"shared": {"v": v}, "stacked": {}}
             else:
                 if cfg.normalize:
                     v = v / (v.norm(dim=1, keepdim=True) + ε)
-                out[li] = {"V": v}
+                out[li] = {"shared": {"V": v}, "stacked": {}}
         return out
 
     @staticmethod
@@ -90,12 +90,12 @@ class PCA:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: PCAC,
     ) -> Float[Tensor, "b s d"]:
-        if "v" in state:
-            v = state["v"].to(y)
+        if "v" in shared:
+            v = shared["v"].to(y)
             return y + cfg.coeff * v
-        # multi-component: sum top-k directions equally
-        V = state["V"].to(y)
+        V = shared["V"].to(y)
         return y + cfg.coeff * V.sum(0)

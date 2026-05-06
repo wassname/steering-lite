@@ -54,7 +54,7 @@ class DirectionalAblation:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
             v = v / (v.norm() + ε)
 
-            out[li] = {"v": v}
+            out[li] = {"shared": {"v": v}, "stacked": {}}
         return out
 
     @staticmethod
@@ -62,10 +62,11 @@ class DirectionalAblation:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: DirectionalAblationC,
     ) -> Float[Tensor, "b s d"]:
-        v = state["v"].to(y)  # unit
+        v = shared["v"].to(y)  # unit
 
         proj = einsum(y, v, "b s d, d -> b s")
         y    = y - proj.unsqueeze(-1) * v          # ablate

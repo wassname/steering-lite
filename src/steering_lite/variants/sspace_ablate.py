@@ -60,13 +60,14 @@ class SSpaceAblate:
         mod,
         x: Float[Tensor, "b s d_in"],     # unused; kept for hook signature
         y: Float[Tensor, "b s d_out"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: SSpaceAblateC,
     ) -> Float[Tensor, "b s d_out"]:
-        U_r    = state["U_r"].to(y)
-        sqrtS  = state["sqrtS"].to(y)
-        dS_hat = state["dS_hat"].to(y)
-        y_eff = y - state["b"].to(y) if "b" in state else y
+        U_r    = shared["U_r"].to(y)
+        sqrtS  = shared["sqrtS"].to(y)
+        dS_hat = stacked["dS"][0].to(y)                       # [r]; supports_multi=False, take k=0
+        y_eff = y - shared["b"].to(y) if "b" in shared else y
 
         xS = (y_eff @ U_r) / sqrtS                            # [b, s, r]
         proj = (xS * dS_hat).sum(dim=-1, keepdim=True)        # [b, s, 1]

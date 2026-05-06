@@ -1,15 +1,19 @@
 """Top-k cluster steering.
 
-Cosine-assignment k-means on the paired diffs. At runtime, pick the centroid most aligned with
-the current residual (max cosine similarity) and add it. Idea: different
-prompts may need different steering directions; clusters discover the modes.
+Cosine-assignment k-means on the paired diffs. At runtime, pick the centroid
+most aligned with the current residual (max cosine similarity) and add it.
 
 $$\\{c_1, ..., c_k\\} = \\text{cosine-kmeans}_k(H^+ - H^-)$$
 $$h \\leftarrow h + \\alpha \\cdot c_{j^*}, \\quad j^* = \\arg\\max_j \\cos(h, c_j)$$
 
-Folk / novel-ish baseline. Closest neighbours are CHaRS-style cluster-aware
-steering and SVF/KNN local steering, but this exact cosine-kmeans router is an
-internal baseline.
+Multi-round (`supports_multi=True`):
+
+  Stacked tensor `C: [k_rounds, n_clusters, d]`. Each round runs its OWN
+  argmax routing (one centroid pick per token per round) then sums deltas.
+  This preserves per-round routing semantics -- different rounds may route
+  the same token to different cluster sets, which is exactly the point of
+  iterating: round 2 picks up modes round 1 missed under the perturbed
+  residual.
 """
 from dataclasses import dataclass
 import torch
@@ -33,7 +37,6 @@ class TopKClustersC(SteeringConfig):
 
 
 def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
-    """Return centroids `[k, d]`. Pure-torch, no sklearn dep."""
     n, d = X.shape
     g = torch.Generator(device="cpu").manual_seed(seed)
     init_idx = torch.randperm(n, generator=g)[:k]
@@ -42,11 +45,10 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
         Xn = X / (X.norm(dim=1, keepdim=True) + ε)
         Cn = C / (C.norm(dim=1, keepdim=True) + ε)
         sim = einsum(Xn, Cn, "n d, k d -> n k")
-        assign = sim.argmax(dim=1)  # [n]
+        assign = sim.argmax(dim=1)
         counts = torch.bincount(assign, minlength=k)
         empty = (counts == 0).nonzero(as_tuple=True)[0]
         if len(empty) > 0:
-            # reinitialize empty clusters from random data points
             rand_idx = torch.randperm(n, generator=g)[: len(empty)]
             C[empty] = X[rand_idx].clone()
             continue
@@ -60,13 +62,14 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
 @register
 class TopKClusters:
     name = "topk_clusters"
+    supports_multi = True
 
     @staticmethod
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
         cfg: TopKClustersC,
-    ) -> dict[int, dict[str, Tensor]]:
+    ) -> dict[int, dict[str, dict[str, Tensor]]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
@@ -77,10 +80,6 @@ class TopKClusters:
             diffs = (pos_acts[li] - neg_acts[li]).float()
             C     = _kmeans(diffs, k=cfg.k, n_iters=cfg.n_iters, seed=cfg.seed)
 
-            # Per-centroid sign canon: cosine k-means can converge to centroids
-            # anti-aligned with the global honesty axis (a syntactic-noise mode).
-            # Eval-time flip can't fix one centroid alone (it flips all). So
-            # project each onto the global mean diff; flip if negative.
             g    = diffs.mean(dim=0)
             proj = einsum(C, g, "k d, d -> k")
             sign = torch.where(proj < 0, -1.0, 1.0).to(C.dtype)
@@ -89,7 +88,7 @@ class TopKClusters:
             if cfg.normalize:
                 C = C / (C.norm(dim=1, keepdim=True) + ε)
 
-            out[li] = {"C": C}
+            out[li] = {"shared": {}, "stacked": {"C": C.unsqueeze(0)}}  # [1, n_clusters, d]
         return out
 
     @staticmethod
@@ -97,16 +96,18 @@ class TopKClusters:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: TopKClustersC,
     ) -> Float[Tensor, "b s d"]:
-        C = state["C"].to(y)
-        # cos-sim per token; pick best centroid per token
-        y_norm = y / (y.norm(dim=-1, keepdim=True) + ε)
-        C_norm = C / (C.norm(dim=-1, keepdim=True) + ε)
+        C_stack = stacked["C"].to(y)            # [k_rounds, n_clusters, d]
+        y_norm = y / (y.norm(dim=-1, keepdim=True) + ε)         # [b, s, d]
 
-        sim  = einsum(y_norm, C_norm, "b s d, k d -> b s k")
-        pick = sim.argmax(dim=-1)
-        v    = C[pick]
-
-        return y + cfg.coeff * v
+        delta = torch.zeros_like(y)
+        for r_idx in range(C_stack.shape[0]):
+            C = C_stack[r_idx]                                  # [n_clusters, d]
+            C_norm = C / (C.norm(dim=-1, keepdim=True) + ε)
+            sim = einsum(y_norm, C_norm, "b s d, n d -> b s n")
+            pick = sim.argmax(dim=-1)                           # [b, s]
+            delta = delta + C[pick]
+        return y + cfg.coeff * delta

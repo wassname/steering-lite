@@ -11,6 +11,7 @@ dependencies = [
     "jaxtyping>=0.2.34",
     "safetensors>=0.5",
     "loguru>=0.7",
+    "matplotlib>=3.10.9",
 ]
 keywords = ["steering", "activation-steering", "representation-engineering", "pytorch", "llm"]
 classifiers = [

@@ -73,9 +73,15 @@ def register_config(cls: type[SteeringConfig]) -> type[SteeringConfig]:
 
 
 class Method(Protocol):
-    """extract+apply pair. State tensors are registered as buffers on the hooked
-    module (block or Linear) under `_steering_state_<key>` and rebuilt into a
-    dict by the hook.
+    """extract+apply pair. State splits into `shared` (basis/biases — singletons
+    per layer) and `stacked` (contrastive directions, leading k-dim grows on
+    Vector + Vector). Buffers are registered on the hooked module under
+    `_steering_shared_<key>` / `_steering_stacked_<key>` and rebuilt into dicts
+    by the hook.
+
+    Methods opt into multi-round accumulation by setting `supports_multi = True`
+    as a class attribute and writing `apply` to loop / einsum over the leading
+    k-dim of every stacked tensor.
     """
     name: str
 
@@ -84,8 +90,10 @@ class Method(Protocol):
         pos_acts: dict[int, Tensor],
         neg_acts: dict[int, Tensor],
         cfg: Any,
-    ) -> dict[int, dict[str, Tensor]]:
-        """Per-layer state. `pos_acts[l]` is `[n_pos, d_model]`, same for neg."""
+    ) -> dict[int, dict[str, dict[str, Tensor]]]:
+        """Per-layer state. Returns
+        `{layer_key: {"shared": {name: Tensor}, "stacked": {name: Tensor with leading k-dim}}}`.
+        `pos_acts[l]` is `[n_pos, d_model]`, same for neg."""
         ...
 
     @staticmethod
@@ -93,7 +101,8 @@ class Method(Protocol):
         mod,           # the hooked module: a transformer block, or a Linear
         x: Tensor,     # [b, s, d_in]  -- module input
         y: Tensor,     # [b, s, d_out] -- module output
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: Any,
     ) -> Tensor:
         """Return the module's NEW output. Additive variants: `return y + delta`.

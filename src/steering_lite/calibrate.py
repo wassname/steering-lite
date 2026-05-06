@@ -17,12 +17,26 @@ from typing import Callable
 
 import torch
 from loguru import logger
+from tabulate import tabulate
 from torch import Tensor
 from torch import nn
 from tqdm.auto import tqdm
 
 from .config import SteeringConfig
 from .vector import Vector
+
+
+def _log_kl_history(method: str, history: list[dict]) -> None:
+    """Tabulate the iso-KL bracket trace once at end of calibrate. Drops p50."""
+    if not history:
+        return
+    rows = [
+        [f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_p90']:.4f}",
+         f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos'])]
+        for h in history
+    ]
+    table = tabulate(rows, headers=["c", "mean", "p90", "p95", "max", "n"], tablefmt="plain")
+    logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
 _demo_logged = {"flag": False}
@@ -198,9 +212,9 @@ def calibrate_iso_kl(
         m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device)
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign,
                         **{k: val for k, val in m.items() if k not in ("per_t_mean", "per_t_max")}})
-        logger.info(f"  c={sign * c:+.4f} mean={m['kl_mean']:.3f} "
-                    f"p50={m['kl_p50']:.3f} p90={m['kl_p90']:.3f} "
-                    f"p95={m['kl_p95']:.3f} max={m['kl_max']:.3f} n={m['n_pos']}")
+        logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} "
+                     f"p90={m['kl_p90']:.4f} p95={m['kl_p95']:.5f} "
+                     f"max={m['kl_max']:.4f} n={m['n_pos']}")
         return m[target_stat]
 
     lo, hi = bracket
@@ -226,6 +240,7 @@ def calibrate_iso_kl(
                 f"bracket (max c={c:.4f} -> kl={v_lo:.3f} < {target_kl}). "
                 "Returning bracket-top; intervention is weaker than budget."
             )
+            _log_kl_history(v.cfg.method, history)
             return sign * c, history
     else:
         c_hi, v_hi = mid, v_mid
@@ -245,6 +260,7 @@ def calibrate_iso_kl(
                 "Returning bracket-floor; method has different geometric scale "
                 "than (lo, hi) bracket assumes -- consider widening lo."
             )
+            _log_kl_history(v.cfg.method, history)
             return sign * c, history
 
     # 2. log-log Illinois (regula falsi) inside the bracket. The KL-vs-C curve
@@ -278,6 +294,7 @@ def calibrate_iso_kl(
 
         v_new = eval_at(c_new)
         if abs(v_new - target_kl) < tol:
+            _log_kl_history(v.cfg.method, history)
             return sign * c_new, history
         if v_new < target_kl:
             c_lo, v_lo = c_new, v_new
@@ -290,4 +307,5 @@ def calibrate_iso_kl(
 
     # pick best from history
     best = min(history, key=lambda h: abs(h[target_stat] - target_kl))
+    _log_kl_history(v.cfg.method, history)
     return best["coeff"], history

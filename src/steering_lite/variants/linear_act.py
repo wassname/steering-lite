@@ -64,7 +64,7 @@ class LinearAcT:
             omega = (a_tilde * b_tilde).sum(dim=0) / (a_tilde ** 2).sum(dim=0)
             beta  = m_b - omega * m_a
 
-            out[li] = {"omega": omega, "beta": beta}
+            out[li] = {"shared": {"omega": omega, "beta": beta}, "stacked": {}}
         return out
 
     @staticmethod
@@ -72,11 +72,12 @@ class LinearAcT:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: LinearAcTC,
     ) -> Float[Tensor, "b s d"]:
-        omega = rearrange(state["omega"].to(y), "d -> 1 1 d")
-        beta  = rearrange(state["beta"].to(y),  "d -> 1 1 d")
+        omega = rearrange(shared["omega"].to(y), "d -> 1 1 d")
+        beta  = rearrange(shared["beta"].to(y),  "d -> 1 1 d")
 
         y_new = y * omega + beta
         return (1 - cfg.coeff) * y + cfg.coeff * y_new

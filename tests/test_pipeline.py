@@ -75,7 +75,11 @@ def test_pipeline(method, tiny_model, tmp_path):
     cfg = _make_cfg(method)
     v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     assert isinstance(v, Vector)
-    assert any(t.norm().item() > 0 for d in v.state.values() for t in d.values()), \
+    all_tensors = (
+        [t for d in v.shared.values()  for t in d.values()] +
+        [t for d in v.stacked.values() for t in d.values()]
+    )
+    assert any(t.norm().item() > 0 for t in all_tensors), \
         f"{method}: all-zero state -- extract broken"
 
     # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.

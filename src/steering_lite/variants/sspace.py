@@ -11,41 +11,36 @@ whitened S-space coordinates are accessible from EITHER side:
 
     x V sqrt(S) = (y - b) U / sqrt(S) = x_S          # x_S == y_S
 
-We use the *output* projection at both extract and apply time:
+We use the *output* projection at both extract and apply time.
 
-    x_S = (y - b) @ U / sqrt(S)        # [..., r]
+Multi-round (`supports_multi=True`):
 
-Output capture is cheaper than input capture for residual-writer Linears
-(e.g. `mlp.down_proj`: d_out=2560 vs d_in=9728 on Qwen3.5-4B). Residual-
-reader Linears (q/k/v/up/gate proj) would prefer the input side.
+  - SVD basis (U_r, sqrtS, Vh_r, b) is a property of the weight matrix and
+    is `shared` across rounds. Each round's `dS_2`, `dS_3`, ... extracts in
+    the SAME basis (since W is frozen), which is exactly what makes
+    accumulation valid.
+  - Stacked tensor `dS: [k, r]`. Each row is `alpha_i * dS_hat_i_unit`,
+    so row magnitude carries that round's per-direction calibration. Apply
+    normalizes on-the-fly.
+  - Per-round gate: each direction keeps its own `|cos(xS, dS_i)|`. This is
+    strictly more faithful than baking magnitudes into a single direction,
+    because each contrast was calibrated under different conditions.
 
-Default target: residual writers (`mlp.down_proj` AND `self_attn.o_proj`).
-Override via `cfg.target_submodule = <regex>` -- e.g.
-`r"self_attn\\.(q|k|v|o)_proj|mlp\\.(gate|up|down)_proj"` for all 7 Linears.
+Apply (k stacked directions, all in the same basis):
 
-Contrastive direction in S-space (from POS/NEG persona-branching pairs):
+    xS      = (y - b) @ U_r / sqrt(S)              # [b, s, r]   ONCE
+    dS_hat  = dS / ||dS||_row                       # [k, r] unit
+    alpha   = ||dS||_row                            # [k]   per-direction calib
+    gate    = |cos(xS, dS_hat)|                     # [b, s, k]
+    deltaS  = einsum(gate * alpha, dS_hat, "bsk,kr->bsr") * cfg.coeff
+    y'      = y + (deltaS * sqrt(S)) @ U_r^T
 
-    d_S     = mean(x_S^+) - mean(x_S^-)
-    d_S_hat = d_S / ||d_S||
-
-Cosine gate (sign-agnostic, matches `cosine_gated.py`):
-
-    gate     = |cos(x_S, d_S_hat)|              in [0, 1]
-    delta_S  = alpha * gate * d_S_hat           [..., r]
-    delta_y  = (delta_S * sqrt(S)) @ U_r^T      lift S-space delta back to out-space
-    y'       = y + delta_y
-
-This is the arithmetic relaxation of AntiPaSTO (Clark, 2026): same S-space
-parameterization, but contrastive mean-diff extraction instead of gradient
-optimization.
-
-Why cosine in S-space (not residual d-space): in d=2560 the cosine of two
-random vectors concentrates near 0 -- the gate degenerates. In r=64 the
-cosine is a meaningful per-token signal; tokens activating dominant S-space
-modes get a strong gate, tokens in the tail get near-zero.
+Why cosine in S-space: in d=2560 the cosine of two random vectors
+concentrates near 0; in r=64 the cosine is a meaningful per-token signal.
 """
 from dataclasses import dataclass
 import torch
+from einops import einsum
 from jaxtyping import Float
 from torch import Tensor
 
@@ -62,32 +57,20 @@ class SSpaceC(SteeringConfig):
     r: int = -1  # -1 = full rank (no cropping); else top-r modes by |d_S|
 
 
-def _orient_svd(
-    U: Float[Tensor, "d_out r"],
-    S: Float[Tensor, "r"],
-    Vh: Float[Tensor, "r d_in"],
-    h_interleaved: Float[Tensor, "n2 d_out"],
-) -> tuple[Tensor, Tensor, Tensor]:
-    """Orient SVD sign so +coeff = toward positive persona (repeng majority-vote).
-
-    SVD signs per component are arbitrary. Project samples through U, count
-    how often pos (even idx) > neg (odd idx); flip components where pos<neg.
-    Caller passes pos/neg interleaved (same n on each side).
-    """
-    proj: Float[Tensor, "n r"] = h_interleaved @ U
-    positive_larger: Float[Tensor, "r"] = (proj[::2] > proj[1::2]).to(U.dtype).mean(0)
-    flip: Float[Tensor, "r"] = torch.where(
-        positive_larger < 0.5,
-        torch.tensor(-1.0),
-        torch.tensor(1.0),
-    )
-    return U * flip, S, Vh * flip[:, None]
+# Removed _orient_svd: previously flipped SVD column signs based on
+# activation-contrast majority vote so +coeff aligned with the positive persona.
+# That orientation depends on the contrast, which DIFFERS in iterated rounds
+# (round 2's extract runs under v_running attached), so U_r flipped between
+# rounds and `Vector + Vector`'s shared-basis invariant broke.
+# Now the basis is purely W-derived (torch.linalg.svd is deterministic).
+# Sign of dS in the resulting basis is arbitrary; iterated_steer.py already
+# picks ±C at apply time, and single-round users can pass -coeff if needed.
 
 
 @register
 class SSpace:
     name = "sspace"
-    # Default: hook both residual writers per block. Multi-submodule via regex.
+    supports_multi = True
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
 
     @staticmethod
@@ -97,11 +80,11 @@ class SSpace:
         cfg: SSpaceC,
         *,
         name_to_module: dict[str, torch.nn.Module],
-    ) -> dict[str, dict[str, Tensor]]:
+    ) -> dict[str, dict[str, dict[str, Tensor]]]:
         out = {}
         for name, y_pos in pos_outputs.items():
             mod = name_to_module[name]
-            W = mod.weight  # [d_out, d_in]
+            W = mod.weight
             k = min(W.shape)
             r_eff = k if (cfg.r is None or cfg.r < 0 or cfg.r >= k) else cfg.r
             U, S, Vh = torch.linalg.svd(W.float(), full_matrices=False)
@@ -114,52 +97,53 @@ class SSpace:
                 y_pos_f = y_pos_f - b
                 y_neg_f = y_neg_f - b
 
-            # repeng-style sign flip: pos/neg interleaved so proj[::2] vs proj[1::2] is pos vs neg
-            n = min(y_pos_f.shape[0], y_neg_f.shape[0])
-            h_il = torch.stack([y_pos_f[:n], y_neg_f[:n]], dim=1).flatten(0, 1)  # [2n, d_out]
-            U, S, Vh = _orient_svd(U, S, Vh, h_il)
-
-            # full S-space projection (V implicit via identity (y-b)U/sqrt(S) = xV sqrt(S))
             sqrtS_full = S.sqrt()
-            xS_pos = (y_pos_f @ U) / sqrtS_full              # [n, k]
-            xS_neg = (y_neg_f @ U) / sqrtS_full              # [n, k]
-            dS = xS_pos.mean(0) - xS_neg.mean(0)             # [k]
+            xS_pos = (y_pos_f @ U) / sqrtS_full
+            xS_neg = (y_neg_f @ U) / sqrtS_full
+            dS = xS_pos.mean(0) - xS_neg.mean(0)
 
-            # task-specific mode selection: top-r modes by contrastive magnitude.
-            # r_eff == k means full rank (no cropping).
             if r_eff < k:
                 mask = dS.abs().topk(r_eff).indices.sort().values
-                U_r = U[:, mask].contiguous()                # [d_out, r]
-                Vh_r = Vh[mask, :].contiguous()              # [r, d_in]
-                sqrtS = sqrtS_full[mask].contiguous()        # [r]
+                U_r = U[:, mask].contiguous()
+                Vh_r = Vh[mask, :].contiguous()
+                sqrtS = sqrtS_full[mask].contiguous()
                 dS_r = dS[mask]
             else:
                 U_r, Vh_r = U.contiguous(), Vh.contiguous()
                 sqrtS = sqrtS_full
                 dS_r = dS
-            dS_hat = (dS_r / (dS_r.norm() + ε)).contiguous()  # [r]
+            dS_unit = (dS_r / (dS_r.norm() + ε)).contiguous()
 
-            entry = {"U_r": U_r, "sqrtS": sqrtS, "dS_hat": dS_hat, "Vh_r": Vh_r}
+            shared = {"U_r": U_r, "sqrtS": sqrtS, "Vh_r": Vh_r}
             if b is not None:
-                entry["b"] = b
-            out[name] = entry
+                shared["b"] = b
+            stacked = {"dS": dS_unit.unsqueeze(0)}  # [1, r]; magnitude=1 on first round
+            out[name] = {"shared": shared, "stacked": stacked}
         return out
 
     @staticmethod
     def apply(
         mod,
-        x: Float[Tensor, "b s d_in"],     # unused; kept for hook signature
+        x: Float[Tensor, "b s d_in"],
         y: Float[Tensor, "b s d_out"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: SSpaceC,
     ) -> Float[Tensor, "b s d_out"]:
-        U_r    = state["U_r"].to(y)
-        sqrtS  = state["sqrtS"].to(y)
-        dS_hat = state["dS_hat"].to(y)
-        y_eff = y - state["b"].to(y) if "b" in state else y
+        U_r    = shared["U_r"].to(y)
+        sqrtS  = shared["sqrtS"].to(y)
+        b      = shared.get("b")
+        y_eff  = y - b.to(y) if b is not None else y
 
-        xS = (y_eff @ U_r) / sqrtS                                     # [b, s, r]
+        xS = (y_eff @ U_r) / sqrtS                                        # [b, s, r]
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
-        gate = (xS_norm * dS_hat).sum(dim=-1, keepdim=True).abs()      # [b, s, 1]
-        delta_S = cfg.coeff * gate * dS_hat                            # [b, s, r]
-        return y + (delta_S * sqrtS) @ U_r.T                           # [b, s, d_out]
+
+        dS_raw = stacked["dS"].to(y)                                       # [k, r]
+        alpha  = dS_raw.norm(dim=-1)                                       # [k]
+        dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                        # [k, r] unit
+
+        # per-direction gate, then weight by per-direction calibration alpha
+        gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs()    # [b, s, k]
+        weighted = gate * alpha                                            # [b, s, k]
+        deltaS   = einsum(weighted, dS_hat, "b s k, k r -> b s r")        # [b, s, r]
+        return y + cfg.coeff * (deltaS * sqrtS) @ U_r.T

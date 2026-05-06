@@ -5,24 +5,17 @@ negative last-token hidden states:
 
 $$v_L = \\text{mean}(h^+_L) - \\text{mean}(h^-_L), \\quad \\hat{v}_L = v_L / \\|v_L\\|$$
 
-At runtime, add `coeff * v_hat` to every token's residual at that block:
+At runtime, add `coeff * sum_i v_i` to every token's residual at that block:
 
-$$h \\leftarrow h + \\alpha \\cdot \\hat{v}_L$$
+$$h \\leftarrow h + \\alpha \\cdot \\sum_i v_i$$
 
-This is the same operation as CAA (Panickssery 2023, contrastive MCQ pairs)
-and ActAdd (Turner 2023, single prompt-pair); the differences are conventional
-not mathematical, so we register one method.
-
-`subtract_corpus_mean=True` toggles Jorgensen 2024 mean-centring: target mean
-minus pos∪neg corpus mean. Direction-identical to plain mean_diff under
-normalization with equal-size groups; kept as a flag rather than a separate
-method.
+Linear method: stacked rows can be summed at apply time, equivalent to
+applying each round sequentially. supports_multi=True.
 
 Refs:
   - Panickssery 2023 (CAA) https://arxiv.org/abs/2312.06681
   - Turner 2023 (ActAdd) https://arxiv.org/abs/2308.10248
   - Jorgensen 2024 (Mean-Centring) https://arxiv.org/abs/2312.03813
-  - nrimsky/CAA https://github.com/nrimsky/CAA
 """
 from dataclasses import dataclass
 import torch
@@ -46,13 +39,14 @@ class MeanDiffC(SteeringConfig):
 @register
 class MeanDiff:
     name = "mean_diff"
+    supports_multi = True
 
     @staticmethod
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "m d"]],
         cfg: MeanDiffC,
-    ) -> dict[int, dict[str, Tensor]]:
+    ) -> dict[int, dict[str, dict[str, Tensor]]]:
         out = {}
         for li in pos_acts:
             p = pos_acts[li].float()
@@ -67,7 +61,7 @@ class MeanDiff:
             if cfg.normalize:
                 v = v / (v.norm() + ε)
 
-            out[li] = {"v": v}
+            out[li] = {"shared": {}, "stacked": {"v": v.unsqueeze(0)}}  # [1, d]
         return out
 
     @staticmethod
@@ -75,7 +69,9 @@ class MeanDiff:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: MeanDiffC,
     ) -> Float[Tensor, "b s d"]:
-        return y + cfg.coeff * state["v"].to(y)
+        v_stack = stacked["v"].to(y)            # [k, d]
+        return y + cfg.coeff * v_stack.sum(dim=0)

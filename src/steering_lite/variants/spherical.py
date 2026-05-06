@@ -50,7 +50,7 @@ class Spherical:
             v = pos_acts[li].float().mean(0) - neg_acts[li].float().mean(0)
             v = v / (v.norm() + ε)
 
-            out[li] = {"v": v}
+            out[li] = {"shared": {"v": v}, "stacked": {}}
         return out
 
     @staticmethod
@@ -58,10 +58,11 @@ class Spherical:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: SphericalC,
     ) -> Float[Tensor, "b s d"]:
-        v     = state["v"].to(y)  # unit
+        v     = shared["v"].to(y)  # unit
         norm  = y.norm(dim=-1, keepdim=True)
         y_hat = y / norm
 

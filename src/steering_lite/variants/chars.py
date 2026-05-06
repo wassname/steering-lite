@@ -113,7 +113,10 @@ class CHaRS:
             else:
                 sigma = float(cfg.sigma)
 
-            out[li] = {"a": a, "b": b, "P": P, "p": p_marg, "sigma": torch.tensor(sigma)}
+            out[li] = {
+                "shared": {"a": a, "b": b, "P": P, "p": p_marg, "sigma": torch.tensor(sigma)},
+                "stacked": {},
+            }
         return out
 
     @staticmethod
@@ -121,15 +124,16 @@ class CHaRS:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: CHaRSC,
     ) -> Float[Tensor, "b s d"]:
         # cdist doesn't support bf16, and CHaRS is sensitive to underflow in
         # high-d, so keep gating math (a, b, P, kernel, transport) in fp32.
         # v_hat is cast back to y.dtype before the residual add.
-        a = state["a"].to(device=y.device, dtype=torch.float32)
-        b = state["b"].to(device=y.device, dtype=torch.float32)
-        P = state["P"].to(device=y.device, dtype=torch.float32)
+        a = shared["a"].to(device=y.device, dtype=torch.float32)
+        b = shared["b"].to(device=y.device, dtype=torch.float32)
+        P = shared["P"].to(device=y.device, dtype=torch.float32)
 
         d2 = torch.cdist(y.float(), a) ** 2
         if cfg.sigma is None:

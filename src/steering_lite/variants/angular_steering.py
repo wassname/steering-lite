@@ -56,7 +56,7 @@ class AngularSteering:
             b2 = Vh[0] - (Vh[0] @ b1) * b1
             b2 = b2 / (b2.norm() + ε)
 
-            out[li] = {"b1": b1, "b2": b2}
+            out[li] = {"shared": {"b1": b1, "b2": b2}, "stacked": {}}
         return out
 
     @staticmethod
@@ -64,11 +64,12 @@ class AngularSteering:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: AngularSteeringC,
     ) -> Float[Tensor, "b s d"]:
-        b1 = state["b1"].to(y)
-        b2 = state["b2"].to(y)
+        b1 = shared["b1"].to(y)
+        b2 = shared["b2"].to(y)
 
         c1 = (y * b1).sum(dim=-1, keepdim=True)
         c2 = (y * b2).sum(dim=-1, keepdim=True)

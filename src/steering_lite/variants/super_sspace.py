@@ -139,7 +139,7 @@ class SuperSSpace:
                 U_r, sqrtS_r, dS_r = U_super.contiguous(), sqrtΣ.contiguous(), dS
 
             dS_hat = (dS_r / (dS_r.norm() + ε)).contiguous()
-            out[li] = {"U_r": U_r, "sqrtS": sqrtS_r, "dS_hat": dS_hat}
+            out[li] = {"shared": {"U_r": U_r, "sqrtS": sqrtS_r, "dS_hat": dS_hat}, "stacked": {}}
         return out
 
     @staticmethod
@@ -147,12 +147,13 @@ class SuperSSpace:
         mod,
         x: Float[Tensor, "b s d"],
         y: Float[Tensor, "b s d"],
-        state: dict[str, Tensor],
+        shared: dict[str, Tensor],
+        stacked: dict[str, Tensor],
         cfg: SuperSSpaceC,
     ) -> Float[Tensor, "b s d"]:
-        U_r    = state["U_r"].to(y)
-        sqrtS  = state["sqrtS"].to(y)
-        dS_hat = state["dS_hat"].to(y)
+        U_r    = shared["U_r"].to(y)
+        sqrtS  = shared["sqrtS"].to(y)
+        dS_hat = shared["dS_hat"].to(y)
 
         xS = (y @ U_r) / sqrtS                            # [b, s, r]
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
