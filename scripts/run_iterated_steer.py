@@ -352,8 +352,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--method", default="mean_diff",
-                    help="any method declaring supports_multi=True "
-                         "(mean_diff, sspace, topk_clusters).")
+                    help="any method whose extract puts per-contrast tensors in "
+                         "`stacked` (mean_diff, sspace, sspace_ablate, "
+                         "sspace_damp_amp, super_sspace, topk_clusters).")
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
