@@ -96,6 +96,7 @@ def measure_kl(
     T: int = 20,
     do_sample: bool = False,
     device: str | torch.device = "cuda",
+    show_pbar: bool = True,
 ) -> dict:
     """Roll out T tokens with steering attached, then score under base
     (detached) and steer (re-attached). Returns KL summary stats.
@@ -104,7 +105,8 @@ def measure_kl(
     all_kls = []
     per_t = [[] for _ in range(T)]
 
-    for idx, pids in enumerate(tqdm(prompts, desc="measure_kl", mininterval=60)):
+    for idx, pids in enumerate(tqdm(prompts, desc="measure_kl",
+                                    mininterval=60, disable=not show_pbar)):
         with v(model):
             gen = _generate(model, pids, T, tok, do_sample, device)
         n_gen = gen.shape[0]
@@ -193,6 +195,7 @@ def calibrate_iso_kl(
     _demo_logged["flag"] = False
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
+    pbar = tqdm(desc=f"calib {v.cfg.method}", mininterval=10, leave=False)
 
     if sign_probe is not None:
         v.cfg.coeff = +sign_probe_c
@@ -209,12 +212,16 @@ def calibrate_iso_kl(
 
     def eval_at(c: float) -> float:
         v.cfg.coeff = sign * c
-        m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device)
+        m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device,
+                       show_pbar=False)
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign,
                         **{k: val for k, val in m.items() if k not in ("per_t_mean", "per_t_max")}})
         logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} "
                      f"p90={m['kl_p90']:.4f} p95={m['kl_p95']:.5f} "
                      f"max={m['kl_max']:.4f} n={m['n_pos']}")
+        pbar.update(1)
+        pbar.set_postfix(c=f"{sign * c:+.3f}", kl=f"{m[target_stat]:.3f}",
+                         tgt=f"{target_kl:.2f}")
         return m[target_stat]
 
     lo, hi = bracket
@@ -241,6 +248,7 @@ def calibrate_iso_kl(
                 "Returning bracket-top; intervention is weaker than budget."
             )
             _log_kl_history(v.cfg.method, history)
+            pbar.close()
             return sign * c, history
     else:
         c_hi, v_hi = mid, v_mid
@@ -261,6 +269,7 @@ def calibrate_iso_kl(
                 "than (lo, hi) bracket assumes -- consider widening lo."
             )
             _log_kl_history(v.cfg.method, history)
+            pbar.close()
             return sign * c, history
 
     # 2. log-log Illinois (regula falsi) inside the bracket. The KL-vs-C curve
@@ -271,7 +280,7 @@ def calibrate_iso_kl(
     #    superlinear convergence on concave segments. Falls back to bisection
     #    if a step would land outside the bracket.
     stale_lo = stale_hi = 0  # consecutive iters this side stayed put
-    for _ in tqdm(range(max_iters), desc=f"calib {v.cfg.method}", mininterval=60, leave=False):
+    for _ in range(max_iters):
         if v_lo is not None and v_hi is not None and v_lo > 0 and v_hi > 0:
             log_c_lo, log_c_hi = math.log(c_lo), math.log(c_hi)
             log_v_lo = math.log(v_lo) - (math.log(2) if stale_lo >= 2 else 0.0)
@@ -295,6 +304,7 @@ def calibrate_iso_kl(
         v_new = eval_at(c_new)
         if abs(v_new - target_kl) < tol:
             _log_kl_history(v.cfg.method, history)
+            pbar.close()
             return sign * c_new, history
         if v_new < target_kl:
             c_lo, v_lo = c_new, v_new
@@ -308,4 +318,5 @@ def calibrate_iso_kl(
     # pick best from history
     best = min(history, key=lambda h: abs(h[target_stat] - target_kl))
     _log_kl_history(v.cfg.method, history)
+    pbar.close()
     return best["coeff"], history
