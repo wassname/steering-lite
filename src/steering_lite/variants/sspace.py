@@ -13,7 +13,7 @@ whitened S-space coordinates are accessible from EITHER side:
 
 We use the *output* projection at both extract and apply time.
 
-Multi-round (`supports_multi=True`):
+Multi-round:
 
   - SVD basis (U_r, sqrtS, Vh_r, b) is a property of the weight matrix and
     is `shared` across rounds. Each round's `dS_2`, `dS_3`, ... extracts in
@@ -70,7 +70,6 @@ class SSpaceC(SteeringConfig):
 @register
 class SSpace:
     name = "sspace"
-    supports_multi = True
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
 
     @staticmethod

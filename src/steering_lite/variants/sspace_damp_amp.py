@@ -23,11 +23,23 @@ In matrix form over r selected modes:
     delta_y  = (proj_r * scale) @ U_r^T                         # [..., d_out]
     y'       = y + delta_y
 
+Multi-round (k stacked):
+  Composition of multiplicative effects = multiplication of scales = ADDITION
+  of log-scales. So accumulating k rounds is the row-wise sum of stacked dS:
+
+      log_scale = c * Σ_i (alpha_i * d_S_hat_i)         # [r]   (= c * stacked.sum(0))
+      scale     = clamp_exp(log_scale) - 1
+      delta_y   = (proj_r * scale) @ U_r^T
+
+  For k=1 reduces to the single-round formula above.
+
 Properties:
   - Monotone in c (larger |c| -> stronger effect).
   - S_eff = σ * exp(...) > 0 always; never sign-flips a mode.
   - At c=0 the steering is exactly identity (scale=0).
   - Non-selected modes contribute 0 (they are absent from U_r).
+  - No cosine gate: the per-mode multiplier IS the gating signal (high-|dS_hat_i|
+    modes get more amplification; low-|dS_hat_i| modes are nearly identity).
 
 Compare to:
   - `sspace.py` (additive cosine-gated): adds `alpha * gate * d_S_hat`,
@@ -61,7 +73,7 @@ class SSpaceDampAmpC(SteeringConfig):
 class SSpaceDampAmp:
     name = "sspace_damp_amp"
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
-    extract = SSpace.extract  # share path: state has U_r, sqrtS, dS_hat, Vh_r (+ optional b)
+    extract = SSpace.extract  # shared: U_r, sqrtS, Vh_r (+ optional b); stacked: dS [k,r]
 
     @staticmethod
     def apply(
@@ -73,11 +85,12 @@ class SSpaceDampAmp:
         cfg: SSpaceDampAmpC,
     ) -> Float[Tensor, "b s d_out"]:
         U_r    = shared["U_r"].to(y)
-        dS_hat = stacked["dS"][0].to(y)                                  # [r]; supports_multi=False, take k=0
+        dS_raw = stacked["dS"].to(y)                                    # [k, r]
         y_eff  = y - shared["b"].to(y) if "b" in shared else y
 
         proj_r = y_eff @ U_r                                            # [b, s, r]
-        log_scale = (cfg.coeff * dS_hat).clamp(-cfg.clamp_max, cfg.clamp_max)
+        # multi-round composition: log-scales add (multiplicative effects compose)
+        log_scale = (cfg.coeff * dS_raw.sum(0)).clamp(-cfg.clamp_max, cfg.clamp_max)
         scale = log_scale.exp() - 1                                     # [r]
         delta_y = (proj_r * scale) @ U_r.T                              # [b, s, d_out]
         return y + delta_y

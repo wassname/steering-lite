@@ -1,4 +1,4 @@
-"""Super-SVD S-space steering on the residual stream.
+"""Super-SVD S-space steering on the residual stream (cosine-gated, multi-vec).
 
 Like sspace, but the basis is shared across many Linears. Where sspace SVDs
 ONE weight matrix and steers in its column-space, super_sspace pools the
@@ -43,12 +43,18 @@ Compare to sspace: per-Linear basis vs global pooled basis. Hypothesis: the
 pooled basis is more robust because tail directions of any single Linear are
 noisy, but the *consensus* of writers/readers is cleaner.
 
+Multi-round: basis is purely W-derived (Gram eigh of
+writers/readers), so the shared-basis invariant holds across iterated rounds.
+dS lives in `stacked` with leading [k, r] dim; apply mirrors sspace's einsum
+pattern -- per-direction cosine gate, per-direction calibration via row norm.
+
 Square Linears (e.g. Qwen3 o_proj / q_proj where d_in=d_out=d_model) are
 ambiguous (writer or reader?) and are skipped by shape detection. Pass a
 custom `fallback_regex` if your arch has unusual shapes.
 """
 from dataclasses import dataclass
 import torch
+from einops import einsum
 from jaxtyping import Float
 from torch import Tensor
 
@@ -138,8 +144,11 @@ class SuperSSpace:
             else:
                 U_r, sqrtS_r, dS_r = U_super.contiguous(), sqrtΣ.contiguous(), dS
 
-            dS_hat = (dS_r / (dS_r.norm() + ε)).contiguous()
-            out[li] = {"shared": {"U_r": U_r, "sqrtS": sqrtS_r, "dS_hat": dS_hat}, "stacked": {}}
+            dS_unit = (dS_r / (dS_r.norm() + ε)).contiguous()
+            out[li] = {
+                "shared": {"U_r": U_r, "sqrtS": sqrtS_r},
+                "stacked": {"dS": dS_unit.unsqueeze(0)},   # [1, r] on first round
+            }
         return out
 
     @staticmethod
@@ -153,13 +162,15 @@ class SuperSSpace:
     ) -> Float[Tensor, "b s d"]:
         U_r    = shared["U_r"].to(y)
         sqrtS  = shared["sqrtS"].to(y)
-        dS_hat = shared["dS_hat"].to(y)
 
-        xS = (y @ U_r) / sqrtS                            # [b, s, r]
+        xS = (y @ U_r) / sqrtS                                            # [b, s, r]
         xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
-        cos = (xS_norm * dS_hat).sum(dim=-1, keepdim=True)
-        gate = cos.abs()
 
-        delta_S = cfg.coeff * gate * dS_hat
-        delta_y = (delta_S * sqrtS) @ U_r.T               # [b, s, d]
-        return y + delta_y
+        dS_raw = stacked["dS"].to(y)                                       # [k, r]
+        alpha  = dS_raw.norm(dim=-1)                                       # [k]
+        dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                        # [k, r] unit
+
+        gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs()    # [b, s, k]
+        weighted = gate * alpha                                            # [b, s, k]
+        delta_S = einsum(weighted, dS_hat, "b s k, k r -> b s r")         # [b, s, r]
+        return y + cfg.coeff * (delta_S * sqrtS) @ U_r.T

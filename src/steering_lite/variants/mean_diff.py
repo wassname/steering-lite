@@ -10,7 +10,7 @@ At runtime, add `coeff * sum_i v_i` to every token's residual at that block:
 $$h \\leftarrow h + \\alpha \\cdot \\sum_i v_i$$
 
 Linear method: stacked rows can be summed at apply time, equivalent to
-applying each round sequentially. supports_multi=True.
+applying each round sequentially.
 
 Refs:
   - Panickssery 2023 (CAA) https://arxiv.org/abs/2312.06681
@@ -39,7 +39,6 @@ class MeanDiffC(SteeringConfig):
 @register
 class MeanDiff:
     name = "mean_diff"
-    supports_multi = True
 
     @staticmethod
     def extract(

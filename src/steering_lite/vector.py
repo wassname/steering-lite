@@ -5,10 +5,13 @@ weight matrix and don't accumulate. `stacked` holds the contrastive directions
 extracted from POS/NEG pairs, with a leading k-dim that grows by 1 each time
 two Vectors are added. Each variant decides which keys go where.
 
-For methods declaring `supports_multi = True`, `Vector + Vector`:
-  - asserts every shared tensor matches `allclose` (same SVD basis etc),
-  - cats every stacked tensor along dim 0 (k_a + k_b rounds),
-  - works because each direction keeps its own gate at apply time.
+`Vector + Vector` natural-fail design:
+  - shared keys are checked with `allclose`; same-basis methods (sspace etc)
+    pass, while methods that put their per-contrast direction in shared
+    (cosine_gated, pca, ...) fail because contrasts differ across rounds.
+  - stacked tensors are cat'd along dim 0 (k_a + k_b rounds).
+  - methods opt in to multi-round simply by placing per-contrast tensors in
+    `stacked` and writing apply() to handle the leading k-dim.
 
 `Vector * alpha` scales every stacked tensor uniformly. Magnitudes of
 stacked rows carry per-direction calibration -- e.g. for sspace, row norm
@@ -23,7 +26,7 @@ from dataclasses import replace
 import torch
 from torch import Tensor, nn
 
-from .config import SteeringConfig, REGISTRY
+from .config import SteeringConfig
 
 
 def _allclose_tree(a: dict, b: dict, *, atol: float = 1e-5, rtol: float = 1e-4) -> None:
@@ -71,16 +74,6 @@ class Vector:
         finally:
             detach(model)
 
-    def _check_supports_multi(self) -> None:
-        method = REGISTRY[self.cfg.method]
-        if not getattr(method, "supports_multi", False):
-            raise ValueError(
-                f"method {self.cfg.method!r} does not declare supports_multi=True; "
-                f"Vector + Vector / accumulation is not enabled for it. "
-                f"Either set supports_multi on the variant class and update its apply() "
-                f"to loop over the leading k-dim of stacked tensors, or use a single round."
-            )
-
     def __add__(self, other: "Vector") -> "Vector":
         if self.cfg.method != other.cfg.method:
             raise ValueError(f"cannot add {self.cfg.method!r} + {other.cfg.method!r}")
@@ -88,7 +81,6 @@ class Vector:
             raise ValueError(
                 f"target_submodule mismatch: {self.cfg.target_submodule!r} vs "
                 f"{other.cfg.target_submodule!r}")
-        self._check_supports_multi()
         if sorted(self.shared) != sorted(other.shared):
             raise ValueError(f"layer keys differ: {sorted(self.shared)} vs {sorted(other.shared)}")
         new_shared, new_stacked = {}, {}

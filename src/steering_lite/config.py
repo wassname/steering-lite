@@ -79,9 +79,10 @@ class Method(Protocol):
     `_steering_shared_<key>` / `_steering_stacked_<key>` and rebuilt into dicts
     by the hook.
 
-    Methods opt into multi-round accumulation by setting `supports_multi = True`
-    as a class attribute and writing `apply` to loop / einsum over the leading
-    k-dim of every stacked tensor.
+    Methods opt into multi-round accumulation by placing per-contrast tensors
+    in `stacked` (cat'd on Vector + Vector) and writing `apply` to loop /
+    einsum over the leading k-dim. Methods that keep per-contrast tensors in
+    `shared` naturally fail Vector + Vector via the allclose check.
     """
     name: str
 

@@ -6,7 +6,7 @@ most aligned with the current residual (max cosine similarity) and add it.
 $$\\{c_1, ..., c_k\\} = \\text{cosine-kmeans}_k(H^+ - H^-)$$
 $$h \\leftarrow h + \\alpha \\cdot c_{j^*}, \\quad j^* = \\arg\\max_j \\cos(h, c_j)$$
 
-Multi-round (`supports_multi=True`):
+Multi-round:
 
   Stacked tensor `C: [k_rounds, n_clusters, d]`. Each round runs its OWN
   argmax routing (one centroid pick per token per round) then sums deltas.
@@ -62,7 +62,6 @@ def _kmeans(X: Tensor, k: int, n_iters: int, seed: int) -> Tensor:
 @register
 class TopKClusters:
     name = "topk_clusters"
-    supports_multi = True
 
     @staticmethod
     def extract(

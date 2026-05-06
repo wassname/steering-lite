@@ -6,7 +6,7 @@ compute contrastive mean-diff direction `d_S_hat`), but `apply` projects
 `d_S_hat` *out of* `x_S` instead of nudging along it. The output
 perturbation is then lifted back via `(delta_S * sqrt(S)) @ U_r^T`.
 
-Math (per token):
+Math (per token, k=1):
 
     x_S      = (y - b) @ U_r / sqrt(S)         # whitened S-space coords
     proj     = (x_S . d_S_hat)                 # scalar component along contrastive dir
@@ -14,10 +14,15 @@ Math (per token):
     delta_y  = (delta_S * sqrt(S)) @ U_r^T     # lift back to out-space
     y'       = y + delta_y
 
-When `coeff = 0` this is pure projection-out -- a 1-D ablation in the
-weight-SVD subspace. Norm shrinkage in S-space is `|x_S . d_S_hat|`, an
-informative diagnostic: if it is near zero the contrastive direction wasn't
-present and the intervention is a no-op.
+Multi-round (k stacked):
+  Naive sum of independent rank-1 ablations is *wrong* if directions overlap
+  (the shared component would be subtracted multiple times). We orthonormalize
+  the stack via QR, then project x_S onto that subspace and ablate the
+  projection in one shot. For k=1 reduces exactly to the formula above.
+
+Gating: none. The projection magnitude `(x_S . d_S_hat)` IS the input-dependent
+strength, so a separate cosine gate would be redundant. Tokens with no
+contrastive component get a near-zero ablation by construction.
 
 Compare to:
 - `directional_ablation.py`: ablation in full residual d-space. Removes the
@@ -53,7 +58,7 @@ class SSpaceAblateC(SteeringConfig):
 class SSpaceAblate:
     name = "sspace_ablate"
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
-    extract = SSpace.extract  # share path: state has U_r, sqrtS, dS_hat (+optional b)
+    extract = SSpace.extract  # shared: U_r, sqrtS, Vh_r (+ optional b); stacked: dS [k,r]
 
     @staticmethod
     def apply(
@@ -66,13 +71,15 @@ class SSpaceAblate:
     ) -> Float[Tensor, "b s d_out"]:
         U_r    = shared["U_r"].to(y)
         sqrtS  = shared["sqrtS"].to(y)
-        dS_hat = stacked["dS"][0].to(y)                       # [r]; supports_multi=False, take k=0
-        y_eff = y - shared["b"].to(y) if "b" in shared else y
+        dS_raw = stacked["dS"].to(y)                          # [k, r], rows = alpha_i * dS_hat_i
+        y_eff  = y - shared["b"].to(y) if "b" in shared else y
 
         xS = (y_eff @ U_r) / sqrtS                            # [b, s, r]
-        proj = (xS * dS_hat).sum(dim=-1, keepdim=True)        # [b, s, 1]
-        delta_S = -proj * dS_hat                              # ablate, [b, s, r]
+        # QR-orthonormalize for clean k-dim subspace projection (k=1 reduces to dS_hat)
+        Q, _ = torch.linalg.qr(dS_raw.T)                      # [r, k_eff]
+        proj_S = (xS @ Q) @ Q.T                               # [b, s, r]
+        delta_S = -proj_S
         if cfg.coeff != 0.0:
-            delta_S = delta_S + cfg.coeff * dS_hat            # broadcast nudge
+            delta_S = delta_S + cfg.coeff * dS_raw.sum(0)     # weighted-sum nudge
         delta_y = (delta_S * sqrtS) @ U_r.T                   # [b, s, d_out]
         return y + delta_y
