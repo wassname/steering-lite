@@ -314,6 +314,23 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
             f"",
         ]
 
+    lines += [
+        f"## Notes",
+        f"",
+        f"The logit scores measure P(wrong) on the tinymfv JSON-bool eval (forced-choice "
+        f"`true`/`false`). Negative Δlogit means the steered model assigns lower probability "
+        f"to the scenario being wrong. The free-text demo responses may move in the opposite "
+        f"direction (more emphatic condemnation) because generation and forced-choice probe "
+        f"different aspects of the distribution — the steering shifts latent wrongness "
+        f"activations but free-form generation can compensate with stronger surface rhetoric.",
+        f"",
+        f"`wrongness` ∈ [0,1]: mean P(wrong) across all (vignette, condition) pairs after "
+        f"dual-frame bias cancellation. `pmass`: fraction of probability mass on true/false "
+        f"tokens (format coherence; gate threshold={args.target_pmass}). "
+        f"`ppl`: perplexity on the demo prompt.",
+        f"",
+    ]
+
     if (out / "plot.png").exists():
         lines += [f"## Trajectory plot", f"", f"![plot](plot.png)", f""]
 
