@@ -1,6 +1,7 @@
 """Iterated steering: accumulate a sum of fresh vectors, plot trajectory.
 
-Works for any method declaring `supports_multi=True` (mean_diff, sspace,
+Works for any method whose extract puts per-contrast tensors in `stacked`
+(mean_diff, sspace, sspace_ablate, sspace_damp_amp, super_sspace,
 topk_clusters). Linear methods (mean_diff) collapse to a single direction at
 apply time; nonlinear methods (sspace cosine gate, topk_clusters argmax)
 preserve per-direction gating: each round's direction keeps its own gate /
@@ -435,15 +436,13 @@ def main() -> None:
     v_running: Vector | None = None
     round_summaries = []
 
-    from steering_lite.config import _CONFIG_REGISTRY, REGISTRY
+    from steering_lite.config import _CONFIG_REGISTRY
     if args.method not in _CONFIG_REGISTRY:
         raise ValueError(f"unknown method {args.method!r}; "
                          f"registered: {sorted(_CONFIG_REGISTRY)}")
-    if not getattr(REGISTRY[args.method], "supports_multi", False):
-        raise ValueError(f"method {args.method!r} does not support multi-round "
-                         f"accumulation. Add `supports_multi = True` to its "
-                         f"variant class and ensure apply() loops over the "
-                         f"leading k-dim of stacked tensors.")
+    # Multi-round support is enforced naturally via Vector + Vector: methods
+    # that put per-contrast tensors in `stacked` succeed; methods that put
+    # them in `shared` fail the allclose check on the second round.
     cfg_cls = _CONFIG_REGISTRY[args.method]
 
     def _make_cfg() -> sl.SteeringConfig:
