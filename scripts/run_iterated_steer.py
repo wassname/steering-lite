@@ -492,6 +492,9 @@ def main() -> None:
             sign, signed_C, chosen_dlogit, chosen_report = "-", -C, neg_dlogit, neg_report
             signed_fresh = -C * v_fresh_unit
         logger.info(f"  Auth Δ: +C={auth_pos:+.3f}  -C={auth_neg:+.3f}  → chose {sign}C")
+        tbl = [[f, f"{chosen_dlogit[f]['mean']:+.3f}", f"{chosen_dlogit[f]['std']:.2f}"]
+               for f in FOUNDATION_ORDER if f in chosen_dlogit]
+        logger.info("  foundations (chosen):\n" + tabulate(tbl, headers=["foundation", "Δlogit", "std"], tablefmt="plain"))
 
         v_running = signed_fresh if v_running is None else v_running + signed_fresh
 
