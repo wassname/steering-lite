@@ -4,7 +4,7 @@ Three baseline modalities + 11 calibrated steering methods, all targeting the
 Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv airisk
 vignettes:
   1. bare        -- no system prompt, no steering vector
-  2. prompt_only -- POS persona as system prompt, no vector
+  2. prompt_only -- POS persona as user-message prefix, no vector
   3. steer_*     -- extract POS-vs-NEG vector, iso-KL calibrate, eval at ±C
 
 Persona-branching pairs (POS/NEG share suffix, differ only in 1-2 axis words):
@@ -43,10 +43,10 @@ import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
-from steering_lite.eval.tinymfv import evaluate_with_vector
+from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    baseline_logit_per_foundation, dlogit_per_foundation,
+    baseline_logit_per_foundation_multibool, dlogit_per_foundation_multibool,
     flips_per_foundation, axis_shift, format_cell, cue,
 )
 
@@ -70,15 +70,19 @@ def _row_bare(absolute_logit_per_f: dict, *, elapsed_s: float = 0.0) -> list:
     return cells
 
 
-class _SystemInjectTok:
-    """Wraps a tokenizer so apply_chat_template injects a system message.
+class _UserPrefixTok:
+    """Wraps a tokenizer so apply_chat_template prefixes the first user
+    message with a persona string.
 
-    Used for prompt-only / engineered-prompt baselines: persona delivered as a
-    system prompt, no steering vector.
+    Used for the prompt-only baseline: persona delivered as a user-message
+    prefix (matching the injection mechanism in `make_persona_pairs` —
+    extract and baseline must use the same channel for the comparison to
+    be fair). User-prefix instead of system role because not every chat
+    template supports the system role.
     """
-    def __init__(self, tok, system: str):
+    def __init__(self, tok, prefix: str):
         object.__setattr__(self, "_tok", tok)
-        object.__setattr__(self, "_sys", system)
+        object.__setattr__(self, "_prefix", prefix)
 
     def __getattr__(self, name):
         return getattr(self._tok, name)
@@ -90,8 +94,11 @@ class _SystemInjectTok:
         return self._tok(*args, **kw)
 
     def apply_chat_template(self, messages, **kw):
-        if messages and messages[0].get("role") != "system":
-            messages = [{"role": "system", "content": self._sys}] + list(messages)
+        messages = list(messages)
+        for i, m in enumerate(messages):
+            if m.get("role") == "user":
+                messages[i] = {**m, "content": self._prefix + "\n\n" + m["content"]}
+                break
         return self._tok.apply_chat_template(messages, **kw)
 
 quiet_external_logs()
@@ -100,8 +107,8 @@ logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format
 
 
 METHODS = [
+    "mean_diff", "cosine_gated", "mean_centred", "pca", "topk_clusters",
     "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
-    "mean_diff", "mean_centred", "pca", "topk_clusters", "cosine_gated",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
@@ -145,20 +152,21 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
 @torch.no_grad()
 def _log_persona_demo(model, tok, persona_pairs, user_msgs, *, max_new_tokens: int) -> None:
     """Sanity-check the persona pairs before extract: free-form greedy gen
-    from POS and NEG system prompts on shared user_msgs. Shows the full
-    chat-templated input + completion *with* special tokens, so we can
-    eyeball whether the chat template is right and whether the persona is
-    biting (POS vs NEG should differ in voice/values).
+    from POS and NEG persona-prefixed user_msgs. Shows the full chat-
+    templated input + completion *with* special tokens, so we can eyeball
+    whether the chat template is right and whether the persona is biting
+    (POS vs NEG should differ in voice/values). Mirrors the user-prefix
+    injection in `make_persona_pairs` so the demo distribution matches what
+    extract sees.
     """
     for i, (pos_persona, neg_persona) in enumerate(persona_pairs):
         for j, user_msg in enumerate(user_msgs):
-            pos_sys = PROMPT_TEMPLATE.format(persona=pos_persona)
-            neg_sys = PROMPT_TEMPLATE.format(persona=neg_persona)
+            pos_user = PROMPT_TEMPLATE.format(persona=pos_persona) + "\n\n" + user_msg
+            neg_user = PROMPT_TEMPLATE.format(persona=neg_persona) + "\n\n" + user_msg
             blocks = []
-            for tag, sys_prompt in (("POS", pos_sys), ("NEG", neg_sys)):
+            for tag, user_content in (("POS", pos_user), ("NEG", neg_user)):
                 input_ids = tok.apply_chat_template(
-                    [{"role": "system", "content": sys_prompt},
-                     {"role": "user", "content": user_msg}],
+                    [{"role": "user", "content": user_content}],
                     add_generation_prompt=True,
                     return_tensors="pt",
                     return_dict=False,
@@ -172,12 +180,28 @@ def _log_persona_demo(model, tok, persona_pairs, user_msgs, *, max_new_tokens: i
                 full = tok.decode(out[0], skip_special_tokens=False)
                 blocks.append(f"--- {tag} (pair={i}, msg={j}) ---\n{full}")
             logger.info(
-                "EXPECT: POS+NEG share user_msg + chat template; differ in system persona "
+                "EXPECT: POS+NEG share user_msg + chat template; differ in persona prefix "
                 "and downstream voice. ELSE persona too weak or template misrendered.\n"
                 f"=== PERSONA demo (pair={i}/{len(persona_pairs)}, user_msg={user_msg!r}) ===\n"
                 + "\n".join(blocks)
                 + "\n=== /PERSONA ==="
             )
+
+
+def _authority_demo_msgs(vignettes: str = "airisk", n: int = 2) -> list[str]:
+    """Authority-category vignette prompts for persona demo.
+
+    Using actual eval vignettes means the demo directly shows how the persona
+    affects the exact question type being measured, rather than generic prompts
+    that don't invoke the authority axis.
+    """
+    from tinymfv.data import load_vignettes
+    from tinymfv.core import CONDITIONS
+    vigs = load_vignettes(vignettes)
+    auth = [v for v in vigs if v.get("foundation") == "Authority"]
+    cond = next(iter(CONDITIONS))  # first condition, e.g. other_violate
+    msgs = [v[cond] for v in auth if cond in v]
+    return msgs[:n]
 
 
 def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
@@ -212,6 +236,9 @@ def main() -> None:
     ap.add_argument("--prompt-baseline", action=argparse.BooleanOptionalAction, default=True,
                     help="include a persona-as-system-prompt baseline row (no steering vector)")
     ap.add_argument("--batch-size", type=int, default=8)
+    ap.add_argument("--eval-batch-size", type=int, default=8,
+                    help="batch size for eval forward passes (tinymfv default is 16; "
+                         "lower if shared-GPU OOM)")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=1.0)
     ap.add_argument("--calib-T", type=int, default=20)
@@ -270,7 +297,7 @@ def main() -> None:
     # so we can abort early if personas don't bite.
     _log_persona_demo(
         model, tok, PERSONA_PAIRS_AUTHORITY,
-        user_msgs=_calib_prompts(tok, n=args.demo_pairs, seed=1),
+        user_msgs=_authority_demo_msgs(args.vignettes, n=args.demo_pairs),
         max_new_tokens=args.demo_max_tokens,
     )
     if args.demo_only:
@@ -287,46 +314,39 @@ def main() -> None:
     # === (1) bare baseline: no system prompt, no steering ==================
     logger.info("\n=== bare baseline (no system prompt, no steering) ===")
     base_t0 = time.time()
-    base_report = evaluate_with_vector(model, tok, name=args.vignettes,
-                                       max_think_tokens=args.max_think_tokens)
-    base_logit_per_f = baseline_logit_per_foundation(base_report, args.vignettes)
+    base_report = evaluate_multibool(model, tok, name=args.vignettes,
+                                     max_think_tokens=args.max_think_tokens,
+                                     batch_size=args.eval_batch_size)
+    base_logit_per_f = baseline_logit_per_foundation_multibool(base_report)
     bare_elapsed = time.time() - base_t0
-    logger.info("bare per-foundation logit(wrongness) ± std: " +
+    logger.info("bare per-foundation logratio ± std: " +
                 ", ".join(f"{f}={format_cell(base_logit_per_f[f])}" for f in FOUNDATION_ORDER))
-    logger.info(f"bare elapsed={bare_elapsed:.1f}s "
-                f"wrongness_mean={base_report['wrongness']:+.3f}")
+    logger.info(f"bare elapsed={bare_elapsed:.1f}s")
     rows.append(_row_bare(base_logit_per_f, elapsed_s=bare_elapsed))
 
-    # Persist bare report for later re-analysis (raw p_true grid + bool_mass).
-    # raw_pmass MUST be saved -- aggregator's pmass-floor gating uses it on the
-    # bare side; without it, gating is asymmetric (bare cells default to 1.0,
-    # steered cells get gated, biasing |Δlogit| of heavily-steered methods).
     (args.out / "bare.json").write_text(json.dumps({
         "label": "bare",
         "meta": meta,
         "model": args.model, "vignettes": args.vignettes,
         "max_think_tokens": args.max_think_tokens,
-        "wrongness_mean": float(base_report["wrongness"]),
         "absolute_logit_per_foundation": base_logit_per_f,
-        "raw_p_true": base_report["raw"],
+        "raw_logratios": base_report["raw_logratios"],
         "raw_pmass": base_report["raw_pmass"],
-        "info": {k: v for k, v in base_report["info"].items() if k != "elapsed_s"},
         "elapsed_s": bare_elapsed,
     }, indent=2))
-    method_summaries.append({"label": "bare", "elapsed_s": bare_elapsed,
-                             "wrongness_mean": float(base_report["wrongness"])})
+    method_summaries.append({"label": "bare", "elapsed_s": bare_elapsed})
 
-    # === (2) prompt_only baseline: POS persona as system prompt ============
+    # === (2) prompt_only baseline: POS persona as user-message prefix ======
     if args.prompt_baseline:
         pos_persona = PERSONA_PAIRS_AUTHORITY[0][0]
-        sys_prompt = PROMPT_TEMPLATE.format(persona=pos_persona)
-        logger.info(f"\n=== prompt_only (system='{sys_prompt}') ===")
-        wrapped_tok = _SystemInjectTok(tok, sys_prompt)
+        persona_prefix = PROMPT_TEMPLATE.format(persona=pos_persona)
+        logger.info(f"\n=== prompt_only (user_prefix='{persona_prefix}') ===")
+        wrapped_tok = _UserPrefixTok(tok, persona_prefix)
         pb_t0 = time.time()
-        pb_report = evaluate_with_vector(model, wrapped_tok, name=args.vignettes,
-                                         max_think_tokens=args.max_think_tokens)
-        pb_dlogit = dlogit_per_foundation(base_report, pb_report, args.vignettes)
-        pb_flips = flips_per_foundation(base_report, pb_report, args.vignettes)
+        pb_report = evaluate_multibool(model, wrapped_tok, name=args.vignettes,
+                                       max_think_tokens=args.max_think_tokens,
+                                       batch_size=args.eval_batch_size)
+        pb_dlogit = dlogit_per_foundation_multibool(base_report, pb_report)
         pb_elapsed = time.time() - pb_t0
         rows.append(_row_steer("prompt_only", pb_dlogit, elapsed_s=pb_elapsed))
 
@@ -334,17 +354,20 @@ def main() -> None:
             "label": "prompt_only",
             "meta": meta,
             "model": args.model,
-            "system_prompt": sys_prompt, "vignettes": args.vignettes,
+            "user_prefix": persona_prefix, "vignettes": args.vignettes,
             "dlogit_per_foundation": pb_dlogit,
-            "flips_per_foundation": pb_flips,
             "axis_shift": axis_shift(pb_dlogit),
-            "raw_p_true": pb_report["raw"],
-            "raw_pmass": pb_report.get("raw_pmass", {}),
+            "raw_logratios": pb_report["raw_logratios"],
+            "raw_pmass": pb_report["raw_pmass"],
             "elapsed_s": pb_elapsed,
         }, indent=2))
         method_summaries.append({"label": "prompt_only",
                                  "axis_shift": axis_shift(pb_dlogit),
                                  "elapsed_s": pb_elapsed})
+
+    headers = (["cue", "axis", "row", "C_calib", "kl_p95"]
+               + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
+               + ["t"])
 
     # === (3) 11 calibrated steering methods =================================
     # Bidirectional: calibrate |C| at +sign, then run eval at +C and -C. Lets the
@@ -363,6 +386,7 @@ def main() -> None:
             v, model, tok, calib_prompts,
             target_kl=args.target_kl, T=args.calib_T,
             max_iters=args.calib_iters, device=args.device,
+            bracket=(0.01, 1e6),
         )
         kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
         C = float(coeff_calib)
@@ -370,18 +394,20 @@ def main() -> None:
         # +C eval
         v.cfg.coeff = +C
         with v(model):
-            pos_report = evaluate_with_vector(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
-        pos_dlogit = dlogit_per_foundation(base_report, pos_report, args.vignettes)
-        pos_flips = flips_per_foundation(base_report, pos_report, args.vignettes)
+            pos_report = evaluate_multibool(
+                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
+                batch_size=args.eval_batch_size)
+        pos_dlogit = dlogit_per_foundation_multibool(base_report, pos_report)
+        pos_flips = {}  # flips not defined for continuous logratios
 
         # -C eval (same |C|, flipped sign — no recalibration)
         v.cfg.coeff = -C
         with v(model):
-            neg_report = evaluate_with_vector(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens, vector=v)
-        neg_dlogit = dlogit_per_foundation(base_report, neg_report, args.vignettes)
-        neg_flips = flips_per_foundation(base_report, neg_report, args.vignettes)
+            neg_report = evaluate_multibool(
+                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
+                batch_size=args.eval_batch_size)
+        neg_dlogit = dlogit_per_foundation_multibool(base_report, neg_report)
+        neg_flips = {}
 
         elapsed = time.time() - t0
         # Pick the sign with larger |axis_shift| for the headline row; the JSON
@@ -405,18 +431,16 @@ def main() -> None:
             "pos": {
                 "coeff": +C,
                 "dlogit_per_foundation": pos_dlogit,
-                "flips_per_foundation": pos_flips,
                 "axis_shift": ax_pos,
-                "raw_p_true": pos_report["raw"],
+                "raw_logratios": pos_report["raw_logratios"],
                 "raw_pmass": pos_report["raw_pmass"],
             },
             "neg": {
                 "coeff": -C,
                 "dlogit_per_foundation": neg_dlogit,
-                "flips_per_foundation": neg_flips,
                 "axis_shift": ax_neg,
-                "raw_p_true": neg_report["raw"],
-                "raw_pmass": neg_report.get("raw_pmass", {}),
+                "raw_logratios": neg_report["raw_logratios"],
+                "raw_pmass": neg_report["raw_pmass"],
             },
             "n_pairs": args.n_pairs, "max_think_tokens": args.max_think_tokens,
             "vignettes": args.vignettes, "elapsed_s": elapsed,
@@ -428,6 +452,25 @@ def main() -> None:
             "elapsed_s": elapsed,
         })
 
+        # Inline per-method result — printed as each method finishes so you
+        # can monitor correlation structure without waiting for the full sweep.
+        # co-move=YES means dCare and dAuth move in the same direction (bad:
+        # extracts moral-intensity not Auth↔Auth rotation).
+        ts = time.strftime("%H:%M:%S")
+        dc_p = pos_dlogit.get("Care", {}).get("mean", float("nan"))
+        da_p = pos_dlogit.get("Authority", {}).get("mean", float("nan"))
+        dc_n = neg_dlogit.get("Care", {}).get("mean", float("nan"))
+        da_n = neg_dlogit.get("Authority", {}).get("mean", float("nan"))
+        co_p = "co-move=YES" if (dc_p > 0) == (da_p > 0) else "co-move=no"
+        co_n = "co-move=YES" if (dc_n > 0) == (da_n > 0) else "co-move=no"
+        logger.info(
+            f"[{ts}] DONE method={method}  C={C:+.4f}  kl_p95={kl_hit:.3f}  elapsed={elapsed:.0f}s\n"
+            f"  +C: axis_shift={ax_pos:+.3f}  dCare={dc_p:+.3f}  dAuth={da_p:+.3f}  {co_p}\n"
+            f"  -C: axis_shift={ax_neg:+.3f}  dCare={dc_n:+.3f}  dAuth={da_n:+.3f}  {co_n}\n"
+            "--- running table so far ---\n"
+            + tabulate(rows, headers=headers, tablefmt="tsv")
+        )
+
     # One audit line per sweep invocation. Metadata is per-run, not per-method;
     # method JSONs already carry their full results, so this is a thin index.
     append_run(args.out, {**meta, "kind": "sweep", "methods": method_summaries})
@@ -438,9 +481,6 @@ def main() -> None:
     logger.info("SHOULD: bare row shows absolute logit(wrongness)±std per foundation; expect "
                 "Care high (model thinks care violations are wrong), Sanctity lower. Other rows "
                 "are paired Δlogit±std vs bare. axis_shift>0 means moved toward binding cluster.")
-    headers = (["cue", "axis", "row", "C_calib", "kl_p95"]
-               + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
-               + ["t"])
     logger.info("\n" + tabulate(rows, headers=headers, tablefmt="tsv"))
 
 

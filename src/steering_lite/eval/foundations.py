@@ -137,6 +137,51 @@ def dlogit_per_foundation(base_report, steer_report, name: str) -> dict[str, dic
     return {f: _agg(by_f[f]) for f in FOUNDATION_ORDER}
 
 
+# Multibool foundation name mapping (lowercase → FOUNDATION_ORDER capitalized)
+_MULTIBOOL_TO_FOUNDATION: dict[str, str] = {
+    "care": "Care", "fairness": "Fairness", "loyalty": "Loyalty",
+    "authority": "Authority", "sanctity": "Sanctity", "liberty": "Liberty",
+}
+
+
+def baseline_logit_per_foundation_multibool(report: dict) -> dict[str, dict[str, float]]:
+    """Absolute mean logratio per foundation from a multibool report (bare baseline).
+
+    Multibool logratios are already log-odds of violation, so they sit on the
+    same scale as logit(wrongness) from the frame-cancelled eval. Positive =
+    model thinks it's a violation of that foundation.
+    """
+    raw_lr = report["raw_logratios"]  # {vid|cond: {f_lower: logratio}}
+    by_f: dict[str, list[float]] = defaultdict(list)
+    for lr in raw_lr.values():
+        for f_lower, v in lr.items():
+            f = _MULTIBOOL_TO_FOUNDATION.get(f_lower)
+            if f is not None and not math.isnan(v):
+                by_f[f].append(v)
+    return {f: _agg(by_f.get(f, [])) for f in FOUNDATION_ORDER}
+
+
+def dlogit_per_foundation_multibool(base_report: dict, steer_report: dict) -> dict[str, dict[str, float]]:
+    """Paired Δlogratio per foundation from multibool reports.
+
+    Δlogratio(vid,cond,f) = logratio_steer[f] - logratio_base[f].
+    Aggregates over all (vid,cond) pairs — no need to group by vignette
+    foundation_coarse because multibool scores every foundation on every vignette.
+    """
+    base_lr = base_report["raw_logratios"]
+    steer_lr = steer_report["raw_logratios"]
+    by_f: dict[str, list[float]] = defaultdict(list)
+    for key in base_lr.keys() & steer_lr.keys():
+        for f_lower in base_lr[key]:
+            f = _MULTIBOOL_TO_FOUNDATION.get(f_lower)
+            if f is None:
+                continue
+            b, s = base_lr[key][f_lower], steer_lr[key].get(f_lower, float("nan"))
+            if not (math.isnan(b) or math.isnan(s)):
+                by_f[f].append(s - b)
+    return {f: _agg(by_f.get(f, [])) for f in FOUNDATION_ORDER}
+
+
 def flips_per_foundation(base_report, steer_report, name: str) -> dict[str, dict[str, int]]:
     """Per-foundation flip counts: how many (vid,cond) pairs crossed wrongness=0.5.
 
