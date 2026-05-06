@@ -5,6 +5,8 @@ hf-internal-testing tiny LlamaForCausalLM (cached).
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -113,3 +115,66 @@ def test_pipeline(method, tiny_model, tmp_path):
             l2 = model(prompt).logits.detach().float()
     err = (l1 - l2).abs().max().item()
     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"
+
+
+# methods that put per-contrast tensors in `stacked` -> Vector + Vector works
+MULTI_OK = ["mean_diff", "sspace", "sspace_ablate", "sspace_damp_amp",
+            "super_sspace", "topk_clusters"]
+# methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
+MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
+              "chars", "linear_act", "angular_steering"]
+
+
+def _train_two(method, model, tok, *, multi: bool = False):
+    """Two vectors from disjoint pos/neg halves so the contrasts truly differ.
+
+    For multi-round, sspace-family methods need full-rank basis (r=-1) because
+    `topk(r)` mode selection is contrast-dependent and would pick different
+    basis subsets per round, violating the shared-basis invariant.
+    """
+    cfg = _make_cfg(method)
+    if multi and hasattr(cfg, "r"):
+        cfg = replace(cfg, r=-1)
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+    v2 = sl.train(model, tok, POS[2:], NEG[2:], cfg, batch_size=2, max_length=64)
+    return cfg, v1, v2
+
+
+@pytest.mark.parametrize("method", MULTI_OK)
+def test_multi_round(method, tiny_model, tmp_path):
+    """Vector + Vector cats stacked, applies through hook, save/load round-trips."""
+    model, tok = tiny_model
+    sl.detach(model)
+    cfg, v1, v2 = _train_two(method, model, tok, multi=True)
+
+    v_sum = v1 + v2
+    assert v_sum.k_rounds() == 2, f"{method}: expected k=2 after +, got {v_sum.k_rounds()}"
+
+    prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+    with torch.no_grad():
+        base = model(prompt).logits.float()
+    with v_sum(model, C=cfg.coeff):
+        with torch.no_grad():
+            steered = model(prompt).logits.float()
+    diff = (steered - base).abs().max().item()
+    assert diff > 1e-6, f"{method}: k=2 steering had no effect (diff={diff:.2e})"
+
+    path = str(tmp_path / f"{method}_k2.safetensors")
+    v_sum.save(path)
+    v_loaded = Vector.load(path)
+    assert v_loaded.k_rounds() == 2
+    with v_loaded(model, C=cfg.coeff):
+        with torch.no_grad():
+            steered2 = model(prompt).logits.float()
+    err = (steered - steered2).abs().max().item()
+    assert err < 1e-4, f"{method}: k=2 save/load mismatch err={err:.2e}"
+
+
+@pytest.mark.parametrize("method", MULTI_FAIL)
+def test_multi_round_natural_fail(method, tiny_model):
+    """Methods that keep per-contrast tensors in `shared` must raise on +."""
+    model, tok = tiny_model
+    sl.detach(model)
+    _cfg, v1, v2 = _train_two(method, model, tok)
+    with pytest.raises(ValueError, match="shared"):
+        _ = v1 + v2
