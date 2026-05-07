@@ -144,7 +144,16 @@ class SuperSSpace:
             else:
                 U_r, sqrtS_r, dS_r = U_super.contiguous(), sqrtΣ.contiguous(), dS
 
-            dS_unit = (dS_r / (dS_r.norm() + ε)).contiguous()
+            # Normalize by the residual-space magnitude of dS: ||(dS_r * sqrtS_r)||.
+            # S-space normalization (||dS_r||=1) is wrong for super_sspace because
+            # Gram eigenvalues (sqrtS) are pooled across ALL Linears and can be
+            # orders of magnitude larger than any single Linear's σ. The roundtrip
+            # (dS_unit * sqrtS) @ U_r.T would then produce a huge residual delta
+            # at any nonzero gate, causing NaN at k=2. Residual-space normalization
+            # makes alpha=||stacked[dS] row|| directly equal to the residual delta
+            # magnitude, matching mean_diff's coeff semantics.
+            dS_residual_norm = ((dS_r * sqrtS_r).norm() + ε)
+            dS_unit = (dS_r / dS_residual_norm).contiguous()
             out[li] = {
                 "shared": {"U_r": U_r, "sqrtS": sqrtS_r},
                 "stacked": {"dS": dS_unit.unsqueeze(0)},   # [1, r] on first round

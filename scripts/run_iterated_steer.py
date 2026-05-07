@@ -64,9 +64,17 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
 
 
 def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
-    from steering_lite.data import load_suffixes
+    """Return persona-contextual prompts for iso-KL calibration.
+
+    Includes the authority persona so cosine-gated methods (sspace, super_sspace)
+    see residual activations that align with the extracted direction. Bare user_msg
+    prompts without persona context produce near-zero gate values, making KL
+    calibration useless for these methods.
+    """
+    from steering_lite.data import load_suffixes, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
     import random
     rng = random.Random(seed)
+    pos_personas = [p for p, _ in PERSONA_PAIRS_AUTHORITY]
     entries = load_suffixes(thinking=True)
     rng.shuffle(entries)
     seen, out = set(), []
@@ -74,7 +82,8 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
         if e["user_msg"] in seen:
             continue
         seen.add(e["user_msg"])
-        out.append(e["user_msg"])
+        persona = rng.choice(pos_personas)
+        out.append(PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"])
         if len(out) >= n:
             break
     return out
