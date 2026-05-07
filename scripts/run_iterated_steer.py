@@ -63,30 +63,68 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
     return tuple(int(x) for x in layers_arg.split(","))
 
 
-def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
-    """Return persona-contextual prompts for iso-KL calibration.
+def _calib_prompts(tok, n_domain: int = 6, seed: int = 0) -> list[torch.Tensor]:
+    """Diverse calibration prompts covering in-domain and OOD token distributions.
 
-    Includes the authority persona so cosine-gated methods (sspace, super_sspace)
-    see residual activations that align with the extracted direction. Bare user_msg
-    prompts without persona context produce near-zero gate values, making KL
-    calibration useless for these methods.
+    Returns pre-tokenized Tensors (bypasses _tokenize's chat-template path) so
+    we can mix formatted and raw prompts in the same list.
+
+    - Domain prompts: persona + user_msg through chat template. Activates the
+      extracted direction's cosine gate for gated methods (sspace, super_sspace).
+    - Weird/OOD prompts: repeated tokens, broken syntax, raw (no template).
+      These stress-test that the steering doesn't produce extreme KL on garbage
+      inputs, giving a more conservative C estimate.
     """
     from steering_lite.data import load_suffixes, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
     import random
     rng = random.Random(seed)
     pos_personas = [p for p, _ in PERSONA_PAIRS_AUTHORITY]
+
+    # --- domain prompts (through chat template with authority persona) ---
     entries = load_suffixes(thinking=True)
     rng.shuffle(entries)
-    seen, out = set(), []
+    domain: list[torch.Tensor] = []
+    seen: set[str] = set()
     for e in entries:
         if e["user_msg"] in seen:
             continue
         seen.add(e["user_msg"])
         persona = rng.choice(pos_personas)
-        out.append(PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"])
-        if len(out) >= n:
+        text = PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"]
+        ids = tok.apply_chat_template(
+            [{"role": "user", "content": text}],
+            add_generation_prompt=True, return_tensors="pt",
+        ).input_ids[0]
+        domain.append(ids)
+        if len(domain) >= n_domain:
             break
-    return out
+
+    # --- OOD prompts: weird content through chat template ---
+    weird_texts = [
+        "the the the the the the the the the the the the the the",  # repetition
+        "!@#$ ??? fjkl !!! ??? the the",                            # broken syntax
+        "translate: 我 我 我 我 我 我 我 我",                         # CJK repetition
+        "def f(x):\n    return {'': [None, None, None]}",           # code fragment
+    ]
+    weird: list[torch.Tensor] = [
+        tok.apply_chat_template(
+            [{"role": "user", "content": t}],
+            add_generation_prompt=True, return_tensors="pt",
+        ).input_ids[0]
+        for t in weird_texts
+    ]
+
+    # --- raw prompts: no chat template, OOD for chat-trained model ---
+    raw_strings = [
+        "the the the the the",           # pure repetition, no structure
+        "Paris is the capital of",        # mid-sentence, no template
+    ]
+    raw: list[torch.Tensor] = [
+        tok(s, return_tensors="pt").input_ids[0]
+        for s in raw_strings
+    ]
+
+    return domain + weird + raw
 
 
 def _ppl(report) -> float:
@@ -167,7 +205,7 @@ def _calibrate_combined_pmass(
     C_init: float,
     target_pmass: float = 0.85,
     n_vignettes: int = 8,
-    max_halvings: int = 5,
+    max_halvings: int = 15,
 ) -> tuple[float | None, float]:
     """Binary search for max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
 
@@ -372,9 +410,9 @@ def main() -> None:
     ap.add_argument("--n-pairs", type=int, default=128)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-length", type=int, default=384)
-    ap.add_argument("--target-kl", type=float, default=1.0,
+    ap.add_argument("--target-kl", type=float, default=0.5,
                     help="KL upper bound for iso-KL calibration (gives C_init)")
-    ap.add_argument("--calib-T", type=int, default=20)
+    ap.add_argument("--calib-T", type=int, default=60)
     ap.add_argument("--calib-iters", type=int, default=8)
     ap.add_argument("--target-pmass", type=float, default=0.85,
                     help="min pmass on combined vector; bisect C if below")
@@ -430,7 +468,7 @@ def main() -> None:
         tok, n_pairs=args.n_pairs, thinking=True,
         persona_pairs=PERSONA_PAIRS_AUTHORITY,
     )
-    calib_prompts = _calib_prompts(tok, n=8)
+    calib_prompts = _calib_prompts(tok)  # 6 domain + 4 weird + 2 raw = 12 total
 
     # All rows use ABSOLUTE logit(wrongness) per foundation so units are consistent.
     # bare logit(w) ≈ +2 means model strongly judges scenario as wrong.
