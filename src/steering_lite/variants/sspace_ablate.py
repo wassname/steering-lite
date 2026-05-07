@@ -76,7 +76,8 @@ class SSpaceAblate:
 
         xS = (y_eff @ U_r) / sqrtS                            # [b, s, r]
         # QR-orthonormalize for clean k-dim subspace projection (k=1 reduces to dS_hat)
-        Q, _ = torch.linalg.qr(dS_raw.T)                      # [r, k_eff]
+        Q, _ = torch.linalg.qr(dS_raw.T.float())              # float32: geqrf_cuda unsupported for bf16
+        Q = Q.to(y)
         proj_S = (xS @ Q) @ Q.T                               # [b, s, r]
         delta_S = -proj_S
         if cfg.coeff != 0.0:

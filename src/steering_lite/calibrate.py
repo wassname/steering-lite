@@ -12,7 +12,9 @@ Recommended: greedy decode with target_kl=1.0 nat, target_stat="kl_p95".
 Greedy makes the statistic deterministic so the solver doesn't fight noise.
 """
 from __future__ import annotations
+import json
 import math
+from pathlib import Path
 from typing import Callable
 
 import torch
@@ -39,14 +41,33 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
     logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
-_demo_logged = {"flag": False}
+def _log_per_t_profile(method: str, c: float, per_t_p50: list[float],
+                       per_t_p90: list[float], per_t_p95: list[float],
+                       per_t_max: list[float], per_t_n: list[int]) -> None:
+    """Per-position KL trace at the calibrated c. Lets us see whether KL is
+    front-loaded (decreasing/flat across t = T=20 calibration generalizes) or
+    ramping (= calibration undershoots inference T)."""
+    if not per_t_p95:
+        return
+    rows = [
+        [str(t), f"{p50:.4f}", f"{p90:.4f}", f"{p95:.5f}", f"{mx:.4f}", str(n)]
+        for t, (p50, p90, p95, mx, n) in enumerate(
+            zip(per_t_p50, per_t_p90, per_t_p95, per_t_max, per_t_n)
+        )
+    ]
+    table = tabulate(rows, headers=["t", "p50", "p90", "p95", "max", "n"], tablefmt="plain")
+    logger.info(
+        f"SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration "
+        f"generalizes). ELSE: ramping -> T undershoots inference.\n"
+        f"--- per-t KL profile ({method}, c={c:+.4f}) ---\n{table}"
+    )
 
 
 # Generic user messages for cheap default calibration. Diversity > length:
 # 4 domains spanning factual / narrative / technical / introspective.
 # Wrapped through tok.apply_chat_template so calibration reflects real chat use.
 DEFAULT_MESSAGES = [
-    "The eiffel tower is in Paris",
+    "The eiffel tower is in Paris <think>🗼🗼",
     "埃菲尔铁塔🗼位于天都城",
     "Tell me a greentext story about a small village during the smaller Martion carrot bubble.",
     "Think step by step to calculate the integral of x^2 from 0 to 1 in lean4.",
@@ -97,13 +118,24 @@ def measure_kl(
     do_sample: bool = False,
     device: str | torch.device = "cuda",
     show_pbar: bool = True,
+    log_demo: bool = False,
+    demo_log_path: Path | None = None,
+    demo_iter: int | None = None,
 ) -> dict:
     """Roll out T tokens with steering attached, then score under base
-    (detached) and steer (re-attached). Returns KL summary stats.
+    (detached) and steer (re-attached). Returns KL summary stats and per-token
+    KL distributions across positions.
+
+    Logging knobs (method/eval-agnostic — only inputs and outputs):
+      log_demo       : emit a BASE-vs-STEER comparison for prompt 0 to loguru.
+      demo_log_path  : if set, append one JSONL line per (iter, prompt) with
+                       full base text, steer text, and per-position KL.
+      demo_iter      : iteration index, written into JSONL records (cosmetic).
     """
     prompts = _tokenize(prompts, tok)
     all_kls = []
     per_t = [[] for _ in range(T)]
+    need_base_gen = log_demo or demo_log_path is not None
 
     for idx, pids in enumerate(tqdm(prompts, desc="measure_kl",
                                     mininterval=60, disable=not show_pbar)):
@@ -113,20 +145,6 @@ def measure_kl(
         if n_gen == 0:
             continue
         full_ids = torch.cat([pids.to(device), gen])
-        if idx == 0 and not _demo_logged["flag"]:
-            _demo_logged["flag"] = True
-            base_gen = _generate(model, pids, T, tok, do_sample, device)
-            base_full = torch.cat([pids.to(device), base_gen])
-            decoded_base = tok.decode(base_full, skip_special_tokens=False)
-            decoded_steer = tok.decode(full_ids, skip_special_tokens=False)
-            logger.info(
-                f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
-                "steered should differ from base but not collapse.\n"
-                f"\n=== CALIBRATE demo trace (T={T}) ===\n"
-                f"--- BASE (c=0) ---\n{decoded_base}\n"
-                f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
-                f"=== /CALIBRATE ==="
-            )
         full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
 
@@ -140,7 +158,38 @@ def measure_kl(
         for i in range(n_gen):
             per_t[i].append(float(kls[i]))
 
+        # Demo: extra base-only gen for side-by-side text. One per measure_kl
+        # call (idx==0) for stdout, all prompts for JSONL.
+        if need_base_gen:
+            base_gen = _generate(model, pids, T, tok, do_sample, device)
+            base_full = torch.cat([pids.to(device), base_gen])
+            decoded_base = tok.decode(base_full, skip_special_tokens=False)
+            decoded_steer = tok.decode(full_ids, skip_special_tokens=False)
+            if log_demo and idx == 0:
+                logger.info(
+                    f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
+                    "steered should differ from base but not collapse.\n"
+                    f"\n=== CALIBRATE demo trace (T={T}, kl_p95_so_far) ===\n"
+                    f"--- BASE (c=0) ---\n{decoded_base}\n"
+                    f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                    f"=== /CALIBRATE ==="
+                )
+            if demo_log_path is not None:
+                with demo_log_path.open("a") as f:
+                    f.write(json.dumps({
+                        "iter": demo_iter,
+                        "c": float(v.cfg.coeff),
+                        "prompt_idx": idx,
+                        "T": T,
+                        "base_text": decoded_base,
+                        "steer_text": decoded_steer,
+                        "per_t_kl": kls.tolist(),
+                    }) + "\n")
+
     cat = torch.cat(all_kls)
+    # per-t quantiles: torch.quantile needs >=1 sample per t; pad with 0 if empty.
+    def _q(xs, q):
+        return float(torch.tensor(xs).quantile(q)) if xs else 0.0
     return {
         "kl_mean": float(cat.mean()),
         "kl_p50": float(cat.quantile(0.50)),
@@ -149,7 +198,11 @@ def measure_kl(
         "kl_max": float(cat.max()),
         "n_pos": int(cat.numel()),
         "per_t_mean": [sum(xs) / len(xs) if xs else 0.0 for xs in per_t],
-        "per_t_max": [max(xs) if xs else 0.0 for xs in per_t],
+        "per_t_p50":  [_q(xs, 0.50) for xs in per_t],
+        "per_t_p90":  [_q(xs, 0.90) for xs in per_t],
+        "per_t_p95":  [_q(xs, 0.95) for xs in per_t],
+        "per_t_max":  [max(xs) if xs else 0.0 for xs in per_t],
+        "per_t_n":    [len(xs) for xs in per_t],
     }
 
 
@@ -169,6 +222,7 @@ def calibrate_iso_kl(
     sign: float = 1.0,
     sign_probe: Callable[[Vector], float] | None = None,
     sign_probe_c: float = 1.0,
+    demo_log_path: Path | None = None,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -191,8 +245,12 @@ def calibrate_iso_kl(
     whichever sign scored higher, and uses that as the `sign` for bracketing.
     Catches sign-ambiguous extractions (e.g. PCA top eigenvector) before
     calibration sinks budget into the wrong direction.
+
+    `demo_log_path`: optional Path. If set, every measure_kl call appends one
+    JSONL line per prompt with the full base/steer text and per-position KL.
+    Lets us inspect *what* the model output looks like across the calibration
+    sweep — useful for spotting where format collapse begins.
     """
-    _demo_logged["flag"] = False
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
     pbar = tqdm(desc=f"calib {v.cfg.method}", mininterval=10, leave=False)
@@ -210,18 +268,59 @@ def calibrate_iso_kl(
         )
         sign = sign * chosen
 
+    iter_idx = {"n": 0}
+    POST_ELBOW_RATIO = 5.0  # log demo when this iter blew past target
+
+    def _finalize(returned_coeff: float):
+        """Log bracket trace + per-t profile for the returned coeff, close
+        progress bar. Per-t profile lets us see whether KL is front-loaded
+        (T calibration generalizes) or ramping (T calibration undershoots
+        long-form inference)."""
+        _log_kl_history(v.cfg.method, history)
+        match = next((h for h in history if abs(h["coeff"] - returned_coeff) < 1e-9), None)
+        if match is None and history:
+            match = min(history, key=lambda h: abs(h["coeff"] - returned_coeff))
+        if match is not None and "per_t_p95" in match:
+            _log_per_t_profile(
+                v.cfg.method, match["coeff"],
+                match["per_t_p50"], match["per_t_p90"],
+                match["per_t_p95"], match["per_t_max"], match["per_t_n"],
+            )
+        pbar.close()
+
     def eval_at(c: float) -> float:
         v.cfg.coeff = sign * c
+        # Demo on first iter (always) or if any past iter exploded past 5x
+        # target (post-elbow snapshot to compare against the coherent regime).
+        is_first = iter_idx["n"] == 0
+        post_elbow_hit_yet = any(
+            h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl for h in history
+        )
+        log_demo = is_first or not post_elbow_hit_yet
         m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device,
-                       show_pbar=False)
-        history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign,
-                        **{k: val for k, val in m.items() if k not in ("per_t_mean", "per_t_max")}})
+                       show_pbar=False, log_demo=log_demo,
+                       demo_log_path=demo_log_path, demo_iter=iter_idx["n"])
+        history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})
         logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} "
                      f"p90={m['kl_p90']:.4f} p95={m['kl_p95']:.5f} "
                      f"max={m['kl_max']:.4f} n={m['n_pos']}")
         pbar.update(1)
         pbar.set_postfix(c=f"{sign * c:+.3f}", kl=f"{m[target_stat]:.3f}",
                          tgt=f"{target_kl:.2f}")
+        # Post-elbow snapshot: log demo on the iter that *first* exceeded 5x
+        # target, even though we already returned its measurement above. This
+        # is a separate log call, since by the time we know it's post-elbow
+        # the generations are already discarded — but next time eval_at is
+        # called we'll skip log_demo (post_elbow_hit_yet=True), so this iter
+        # is the natural place to dump it.
+        if (m[target_stat] > POST_ELBOW_RATIO * target_kl
+                and not any(h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl
+                            for h in history[:-1])):
+            logger.info(
+                f"POST-ELBOW: c={sign*c:+.4f} kl_{target_stat}={m[target_stat]:.3f} "
+                f"> {POST_ELBOW_RATIO}x target ({target_kl}). Demo logged above."
+            )
+        iter_idx["n"] += 1
         return m[target_stat]
 
     lo, hi = bracket
@@ -247,8 +346,7 @@ def calibrate_iso_kl(
                 f"bracket (max c={c:.4f} -> kl={v_lo:.3f} < {target_kl}). "
                 "Returning bracket-top; intervention is weaker than budget."
             )
-            _log_kl_history(v.cfg.method, history)
-            pbar.close()
+            _finalize(sign * c)
             return sign * c, history
     else:
         c_hi, v_hi = mid, v_mid
@@ -268,8 +366,7 @@ def calibrate_iso_kl(
                 "Returning bracket-floor; method has different geometric scale "
                 "than (lo, hi) bracket assumes -- consider widening lo."
             )
-            _log_kl_history(v.cfg.method, history)
-            pbar.close()
+            _finalize(sign * c)
             return sign * c, history
 
     # 2. log-log Illinois (regula falsi) inside the bracket. The KL-vs-C curve
@@ -303,8 +400,7 @@ def calibrate_iso_kl(
 
         v_new = eval_at(c_new)
         if abs(v_new - target_kl) < tol:
-            _log_kl_history(v.cfg.method, history)
-            pbar.close()
+            _finalize(sign * c_new)
             return sign * c_new, history
         if v_new < target_kl:
             c_lo, v_lo = c_new, v_new
@@ -317,6 +413,5 @@ def calibrate_iso_kl(
 
     # pick best from history
     best = min(history, key=lambda h: abs(h[target_stat] - target_kl))
-    _log_kl_history(v.cfg.method, history)
-    pbar.close()
+    _finalize(best["coeff"])
     return best["coeff"], history

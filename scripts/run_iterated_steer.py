@@ -63,68 +63,64 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
     return tuple(int(x) for x in layers_arg.split(","))
 
 
-def _calib_prompts(tok, n_domain: int = 6, seed: int = 0) -> list[torch.Tensor]:
-    """Diverse calibration prompts covering in-domain and OOD token distributions.
+def _calib_prompts(tok, seed: int = 0) -> list[torch.Tensor]:
+    """Curated calibration prompts covering key modalities for conservative KL estimation.
 
-    Returns pre-tokenized Tensors (bypasses _tokenize's chat-template path) so
-    we can mix formatted and raw prompts in the same list.
+    p95 means one bad prompt already dominates, so a small diverse set beats many
+    similar ones. Coverage: domain (authority persona, activates cosine gate for
+    gated methods), thinking, programming, math, multilingual, weird prefill, OOD.
 
-    - Domain prompts: persona + user_msg through chat template. Activates the
-      extracted direction's cosine gate for gated methods (sspace, super_sspace).
-    - Weird/OOD prompts: repeated tokens, broken syntax, raw (no template).
-      These stress-test that the steering doesn't produce extreme KL on garbage
-      inputs, giving a more conservative C estimate.
+    Returns pre-tokenized Tensors so _tokenize passes them through unchanged,
+    allowing raw prompts (no chat template) alongside formatted ones.
     """
     from steering_lite.data import load_suffixes, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
     import random
     rng = random.Random(seed)
     pos_personas = [p for p, _ in PERSONA_PAIRS_AUTHORITY]
 
-    # --- domain prompts (through chat template with authority persona) ---
+    def chat(user: str, assistant_prefix: str = "") -> torch.Tensor:
+        msgs = [{"role": "user", "content": user}]
+        if assistant_prefix:
+            msgs.append({"role": "assistant", "content": assistant_prefix})
+            return tok.apply_chat_template(
+                msgs, add_generation_prompt=False,
+                continue_final_message=True, return_tensors="pt",
+            ).input_ids[0]
+        return tok.apply_chat_template(
+            msgs, add_generation_prompt=True, return_tensors="pt",
+        ).input_ids[0]
+
+    def raw(text: str) -> torch.Tensor:
+        return tok(text, return_tensors="pt").input_ids[0]
+
+    # 1. domain: authority persona + vignette (activates direction's cosine gate)
     entries = load_suffixes(thinking=True)
     rng.shuffle(entries)
-    domain: list[torch.Tensor] = []
     seen: set[str] = set()
+    domain: list[torch.Tensor] = []
     for e in entries:
         if e["user_msg"] in seen:
             continue
         seen.add(e["user_msg"])
         persona = rng.choice(pos_personas)
-        text = PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"]
-        ids = tok.apply_chat_template(
-            [{"role": "user", "content": text}],
-            add_generation_prompt=True, return_tensors="pt",
-        ).input_ids[0]
-        domain.append(ids)
-        if len(domain) >= n_domain:
+        domain.append(chat(PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"]))
+        if len(domain) >= 2:
             break
 
-    # --- OOD prompts: weird content through chat template ---
-    weird_texts = [
-        "the the the the the the the the the the the the the the",  # repetition
-        "!@#$ ??? fjkl !!! ??? the the",                            # broken syntax
-        "translate: 我 我 我 我 我 我 我 我",                         # CJK repetition
-        "def f(x):\n    return {'': [None, None, None]}",           # code fragment
+    return domain + [
+        # 2. think step by step math
+        chat("Think step by step: what is 17 * 23 + sqrt(144)?"),
+        # 3. programming
+        chat("Write a Python function that returns the nth Fibonacci number using memoization. def f(x):\n    return {'': [None, None, None]}"),
+        # 4. multilingual (Esperanto) — different token distribution
+        chat("Kiu estas la ĉefurbo de Francio? Respondu en Esperanto."),
+        # 5. weird assistant prefill — model sees unusual start of its own turn
+        chat("Tell me a joke.", assistant_prefix="Sure! Here's one: Why did the"),
+        # 6. OOD repetition through chat template
+        chat("fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"),
+        # 7. raw text, no template — tests steering on non-chat token sequences
+        raw("The 🗼 tower is in Tianducheng"),
     ]
-    weird: list[torch.Tensor] = [
-        tok.apply_chat_template(
-            [{"role": "user", "content": t}],
-            add_generation_prompt=True, return_tensors="pt",
-        ).input_ids[0]
-        for t in weird_texts
-    ]
-
-    # --- raw prompts: no chat template, OOD for chat-trained model ---
-    raw_strings = [
-        "the the the the the",           # pure repetition, no structure
-        "Paris is the capital of",        # mid-sentence, no template
-    ]
-    raw: list[torch.Tensor] = [
-        tok(s, return_tensors="pt").input_ids[0]
-        for s in raw_strings
-    ]
-
-    return domain + weird + raw
 
 
 def _ppl(report) -> float:
@@ -148,7 +144,8 @@ def _demo_response(model, tok, v: Vector | None, label: str) -> str:
             msgs, add_generation_prompt=True,
             enable_thinking=False, return_tensors="pt",
         )["input_ids"].to(next(model.parameters()).device)
-    except TypeError:
+    except TypeError as e:
+        logger.warning(f"{e}chat template does not support enable_thinking, falling back to no template")
         ids = tok.apply_chat_template(
             msgs, add_generation_prompt=True, return_tensors="pt",
         )["input_ids"].to(next(model.parameters()).device)

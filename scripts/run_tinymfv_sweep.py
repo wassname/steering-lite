@@ -256,6 +256,10 @@ def main() -> None:
     ap.add_argument("--demo-pairs", type=int, default=2,
                     help="number of user_msgs to demo each persona pair on")
     ap.add_argument("--demo-max-tokens", type=int, default=200)
+    ap.add_argument("--demo-log-path", type=Path, default=None,
+                    help="if set, calibrate_iso_kl appends one JSONL line per "
+                         "(iter, prompt) with full base/steer text and per-t KL. "
+                         "Filename gets <method>.jsonl appended per method.")
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -382,11 +386,19 @@ def main() -> None:
         t0 = time.time()
         v = sl.train(model, tok, pos_prompts, neg_prompts, cfg,
                      batch_size=args.batch_size, max_length=args.max_length)
+        method_demo_path = (
+            args.demo_log_path.with_name(f"{args.demo_log_path.stem}.{method}.jsonl")
+            if args.demo_log_path is not None else None
+        )
+        if method_demo_path is not None:
+            method_demo_path.parent.mkdir(parents=True, exist_ok=True)
+            method_demo_path.write_text("")  # truncate per method per run
         coeff_calib, _hist = sl.calibrate_iso_kl(
             v, model, tok, calib_prompts,
             target_kl=args.target_kl, T=args.calib_T,
             max_iters=args.calib_iters, device=args.device,
             bracket=(0.01, 1e6),
+            demo_log_path=method_demo_path,
         )
         kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
         C = float(coeff_calib)
