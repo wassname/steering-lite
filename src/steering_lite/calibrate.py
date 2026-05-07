@@ -297,7 +297,7 @@ def calibrate_iso_kl(
             h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl for h in history
         )
         log_demo = is_first or not post_elbow_hit_yet
-        m = measure_kl(v, model, tok, prompts, T=T, do_sample=False, device=device,
+        m = measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
                        show_pbar=False, log_demo=log_demo,
                        demo_log_path=demo_log_path, demo_iter=iter_idx["n"])
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})
