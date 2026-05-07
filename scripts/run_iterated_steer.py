@@ -109,17 +109,17 @@ def _calib_prompts(tok, seed: int = 0) -> list[torch.Tensor]:
 
     return domain + [
         # 2. think step by step math
-        chat("Think step by step: what is 17 * 23 + sqrt(144)?"),
+        chat("Think step by step: what is 17 * 23 + sqrt(144)? <=="),
         # 3. programming
-        chat("Write a Python function that returns the nth Fibonacci number using memoization. def f(x):\n    return {'': [None, None, None]}"),
+        chat("Write a Python function that returns the nth Fibonacci number using memoization. `def f(x):\n    return {'': [None, None, None]}```"),
         # 4. multilingual (Esperanto) — different token distribution
-        chat("Kiu estas la ĉefurbo de Francio? Respondu en Esperanto."),
+        chat("Kiu estas la ĉefurbo de Francio? Respondu en Antaŭ-Esperanto."),
         # 5. weird assistant prefill — model sees unusual start of its own turn
-        chat("Tell me a joke.", assistant_prefix="Sure! Here's one: Why did the"),
+        chat("Tell me a joke.", assistant_prefix="<thunk/>Et Tu user</thunk> Here's none, tool(translate\): 我 我 我 我 我 我 我 我"),
         # 6. OOD repetition through chat template
-        chat("fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"),
+        chat("            fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"),
         # 7. raw text, no template — tests steering on non-chat token sequences
-        raw("The 🗼 tower is in Tianducheng"),
+        raw("The 🗼 tower is in Tianducheng, 🇨🇳 天都城 · ℍ𝕒𝕟𝕘𝕫𝕙𝕠𝕦 · ℂ𝕙𝕚𝕟𝕒. `where 🏛️`"),
     ]
 
 
@@ -204,16 +204,23 @@ def _calibrate_combined_pmass(
     n_vignettes: int = 8,
     max_halvings: int = 15,
 ) -> tuple[float | None, float]:
-    """Binary search for max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+    """Binary search for max C such that pmass(v_running ± C*v_fresh_unit) >= target_pmass.
 
-    Returns (C, pmass). C is None if pmass < target even after max_halvings.
-    v_running may be None (round 1: combined = C * v_fresh_unit).
+    Tests BOTH ± directions (full eval picks the better sign), so we must
+    ensure both are on-distribution. Returns (C, min_pmass). C is None if
+    min(pmass_pos, pmass_neg) < target even after max_halvings.
+
+    v_running may be None (round 1: combined = ±C * v_fresh_unit).
     """
     C = C_init
     for i in range(max_halvings + 1):
-        v_candidate = (C * v_fresh_unit) if v_running is None else (v_running + C * v_fresh_unit)
-        pmass = _fast_pmass(v_candidate, model, tok, vignette_name, n_vignettes)
-        logger.info(f"  pmass_calib C={C:.4f} pmass={pmass:.3f} (target>={target_pmass})")
+        def _combined(sign: float) -> Vector:
+            delta = sign * C * v_fresh_unit
+            return delta if v_running is None else (v_running + delta)
+        pmass_pos = _fast_pmass(_combined(+1), model, tok, vignette_name, n_vignettes)
+        pmass_neg = _fast_pmass(_combined(-1), model, tok, vignette_name, n_vignettes)
+        pmass = min(pmass_pos, pmass_neg)
+        logger.info(f"  pmass_calib C={C:.4f} pmass_pos={pmass_pos:.3f} pmass_neg={pmass_neg:.3f} min={pmass:.3f} (target>={target_pmass})")
         if pmass >= target_pmass:
             return C, pmass
         C /= 2
