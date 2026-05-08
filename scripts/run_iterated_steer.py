@@ -13,14 +13,15 @@ Each round:
      captures whatever signal remains after prior rounds.
   2. Get C_init from iso-KL calibration on v_fresh alone (fast upper bound).
   3. Bake C_init into v_fresh_unit (coeff=1).
-  4. Binary-search for max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+  4. Binary-search for max C such that margin(v_running + C*v_fresh_unit) >= target_margin.
      Uses fast next-token eval (max_think_tokens=0, small vignette subset).
-     If no valid C found, stop iteration (model already OOD).
+     `margin` = mean forced-choice top1-vs-top2 score gap in nats; healthy
+     model ~1-3 nats, destroyed ~0. If no valid C found, stop iteration.
   5. Full eval at ±C, pick sign with lower Authority Δlogit. Commit.
 
 Outputs:
-  - rounds.tsv         BLUF table: round, ±, axis, dlogit_<F>, pmass, ppl
-  - round_NN.json      raw_p_true / raw_pmass / raw_nll for offline plotting
+  - rounds.tsv         BLUF table: round, ±, axis, dlogit_<F>, margin, top1
+  - round_NN.json      raw_logratios + per-row diagnostics for offline plotting
   - meta.json          full run config + rounds summary
 """
 from __future__ import annotations
@@ -44,7 +45,7 @@ from steering_lite.eval.tinymfv import evaluate_with_vector
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
     baseline_logit_per_foundation, dlogit_per_foundation,
-    axis_shift, _mean_pmass,
+    axis_shift, _mean_margin,
 )
 from steering_lite.vector import Vector
 from _meta import make_metadata, append_run
@@ -123,9 +124,10 @@ def _calib_prompts(tok, seed: int = 0) -> list[torch.Tensor]:
     ]
 
 
-def _ppl(report) -> float:
-    nll = report["info"].get("prompt_nll_mean")
-    return math.exp(nll) if nll is not None and not math.isnan(nll) else float("nan")
+def _top1_acc(report) -> float:
+    """Forced-choice top1-vs-label accuracy. None if labels missing -> NaN."""
+    v = report.get("top1_acc")
+    return float(v) if v is not None else float("nan")
 
 
 DEMO_SCENARIO = (
@@ -177,11 +179,12 @@ def _bake_coeff(v: Vector) -> Vector:
     return scaled
 
 
-def _fast_pmass(v: Vector, model, tok, vignette_name: str, n: int) -> float:
-    """Quick pmass check using next-token logits only (max_think_tokens=0).
+def _fast_margin(v: Vector, model, tok, vignette_name: str, n: int) -> float:
+    """Quick OOD check using forced-choice margin on `n` vignettes.
 
-    Loads n vignettes (deterministic subset), attaches v, runs eval.
-    ~15-30s vs ~375s for guided eval -- cheap enough for calibration bisection.
+    Loads n vignettes (deterministic subset), attaches v, runs eval with
+    max_think_tokens=1 (minimal think; tinymfv requires >=1). Returns mean
+    margin in nats. Healthy ~1-3, destroyed -> 0.
     """
     from tinymfv.data import load_vignettes
     all_vigs = load_vignettes(vignette_name)
@@ -189,26 +192,26 @@ def _fast_pmass(v: Vector, model, tok, vignette_name: str, n: int) -> float:
     with v(model):
         report = evaluate_with_vector(
             model, tok, name=vignette_name,
-            max_think_tokens=0, vignettes=subset, log_demo=False,
+            max_think_tokens=1, vignettes=subset, log_demo=False,
         )
-    return _mean_pmass(report)
+    return _mean_margin(report)
 
 
-def _calibrate_combined_pmass(
+def _calibrate_combined_margin(
     v_running: Vector | None,
     v_fresh_unit: Vector,          # coeff already baked to 1
     model, tok,
     vignette_name: str,
     C_init: float,
-    target_pmass: float = 0.85,
+    target_margin: float = 0.3,
     n_vignettes: int = 8,
     max_halvings: int = 15,
 ) -> tuple[float | None, float]:
-    """Binary search for max C such that pmass(v_running ± C*v_fresh_unit) >= target_pmass.
+    """Binary search for max C such that margin(v_running ± C*v_fresh_unit) >= target_margin.
 
-    Tests BOTH ± directions (full eval picks the better sign), so we must
-    ensure both are on-distribution. Returns (C, min_pmass). C is None if
-    min(pmass_pos, pmass_neg) < target even after max_halvings.
+    Tests BOTH ± directions (full eval picks the better sign), so both must
+    stay on-distribution. Returns (C, min_margin). C is None if
+    min(margin_pos, margin_neg) < target even after max_halvings.
 
     v_running may be None (round 1: combined = ±C * v_fresh_unit).
     """
@@ -217,14 +220,14 @@ def _calibrate_combined_pmass(
         def _combined(sign: float) -> Vector:
             delta = sign * C * v_fresh_unit
             return delta if v_running is None else (v_running + delta)
-        pmass_pos = _fast_pmass(_combined(+1), model, tok, vignette_name, n_vignettes)
-        pmass_neg = _fast_pmass(_combined(-1), model, tok, vignette_name, n_vignettes)
-        pmass = min(pmass_pos, pmass_neg)
-        logger.info(f"  pmass_calib C={C:.4f} pmass_pos={pmass_pos:.3f} pmass_neg={pmass_neg:.3f} min={pmass:.3f} (target>={target_pmass})")
-        if pmass >= target_pmass:
-            return C, pmass
+        m_pos = _fast_margin(_combined(+1), model, tok, vignette_name, n_vignettes)
+        m_neg = _fast_margin(_combined(-1), model, tok, vignette_name, n_vignettes)
+        margin = min(m_pos, m_neg)
+        logger.info(f"  [margin] C={C:.4f} +={m_pos:.3f} -={m_neg:.3f} min={margin:.3f} (target>={target_margin})")
+        if margin >= target_margin:
+            return C, margin
         C /= 2
-    return None, pmass
+    return None, margin
 
 
 def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -> None:
@@ -233,7 +236,7 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
     Each point is one round's position in (Auth, SocN) space. Arrows show the
     trajectory. If the model moves mostly along one axis the path is near-1D;
     if the steering also shifts SocN separately a 2D meander is visible.
-    Second panel: pmass and ppl over rounds (coherence diagnostics).
+    Second panel: forced-choice margin (nats) and top1 acc over rounds.
     """
     try:
         import matplotlib
@@ -250,8 +253,8 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
     auth_pts = [auth_base] + [auth_base + s["dlogit_per_f"]["Authority"] for s in round_summaries]
     socn_pts = [socn_base] + [socn_base + s["dlogit_per_f"]["Social Norms"] for s in round_summaries]
     rounds = list(range(len(auth_pts)))
-    pmasses = [s["pmass"] for s in round_summaries]
-    ppls = [s["ppl"] for s in round_summaries]
+    margins = [s["margin"] for s in round_summaries]
+    top1s = [s["top1_acc"] for s in round_summaries]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
 
@@ -271,20 +274,20 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
                      xytext=(5, 4), fontsize=8)
     ax1.axhline(0, color="lightgray", linewidth=0.7)
     ax1.axvline(0, color="lightgray", linewidth=0.7)
-    ax1.set_xlabel("Authority  logit(wrongness)")
-    ax1.set_ylabel("Social Norms  logit(wrongness)")
+    ax1.set_xlabel("Authority  logit(p[Auth])")
+    ax1.set_ylabel("Social Norms  logit(p[SocN])")
     ax1.set_title("Steering trajectory (Auth vs SocN)")
     fig.colorbar(sc, ax=ax1, label="round")
 
     # Coherence panel
-    ax2.plot(rounds[1:], pmasses, "s-", color="darkorange", linewidth=2, markersize=6, label="pmass")
-    ax2.axhline(0.85, color="gray", linestyle="--", linewidth=0.8, label="gate=0.85")
+    ax2.plot(rounds[1:], margins, "s-", color="darkorange", linewidth=2, markersize=6, label="margin (nats)")
+    ax2.axhline(0.3, color="gray", linestyle="--", linewidth=0.8, label="gate=0.3")
     ax2r = ax2.twinx()
-    ax2r.plot(rounds[1:], ppls, "^--", color="firebrick", linewidth=1.5, markersize=5, label="ppl")
-    ax2r.set_ylabel("ppl", color="firebrick")
+    ax2r.plot(rounds[1:], top1s, "^--", color="firebrick", linewidth=1.5, markersize=5, label="top1_acc")
+    ax2r.set_ylabel("top1_acc", color="firebrick")
     ax2.set_xlabel("round")
-    ax2.set_ylabel("pmass")
-    ax2.set_title("Format coherence")
+    ax2.set_ylabel("margin (nats)")
+    ax2.set_title("Coherence (forced-choice)")
     ax2.set_xticks(rounds[1:])
     lines = ax2.get_legend_handles_labels()
     lines2 = ax2r.get_legend_handles_labels()
@@ -302,8 +305,8 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     """Write report.md summarising the full run."""
     from datetime import date
     bare_wrongness = base_report["wrongness"]
-    bare_pmass = _mean_pmass(base_report)
-    bare_ppl = _ppl(base_report)
+    bare_margin = _mean_margin(base_report)
+    bare_top1 = _top1_acc(base_report)
 
     lines = [
         f"# Iterated steering run",
@@ -315,38 +318,39 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
         f"**Rounds**: {len(round_summaries)}  ",
         f"**Layers**: {args.layers}  ",
         f"**Personas** (pos→neg): {PERSONA_PAIRS_AUTHORITY[0][0]} → {PERSONA_PAIRS_AUTHORITY[0][1]}  ",
-        f"**n_pairs**: {args.n_pairs}  target_kl={args.target_kl}  target_pmass={args.target_pmass}",
+        f"**n_pairs**: {args.n_pairs}  target_kl={args.target_kl}  target_margin={args.target_margin}",
         f"",
         f"## What we did",
         f"",
         f"Each round: extract a mean-difference vector from contrastive persona pairs "
         f"(pos=defers to chain of command, neg=disregards) under the currently-attached "
         f"accumulated vector. Calibrate magnitude via iso-KL (gives C_init), then bisect "
-        f"on pmass of the combined vector (fast next-token eval, {args.pmass_n_vignettes} vignettes) "
-        f"until pmass >= {args.target_pmass}. Full tinymfv eval at ±C; commit sign with "
-        f"lower Authority Δlogit. Accumulate via Vector + Vector (linear sum, coeff baked in).",
+        f"on forced-choice margin of the combined vector (fast next-token eval, "
+        f"{args.pmass_n_vignettes} vignettes) until margin >= {args.target_margin} nats. "
+        f"Full tinymfv eval at ±C; commit sign with lower Authority Δlogit. Accumulate "
+        f"via Vector + Vector (linear sum, coeff baked in).",
         f"",
         f"## Results",
         f"",
-        f"All values are absolute logit(wrongness) per foundation "
-        f"(bare = logit of model's raw wrongness score; rounds 1+ = bare + Δlogit). "
-        f"`wrongness` is mean P(wrong) across all (vignette, condition) pairs ∈ [0,1].",
+        f"Foundation columns are absolute logit(p[f]) from the K-way forced-choice "
+        f"softmax over moral foundations (rounds 1+ = bare + Δlogit). "
+        f"`wrongness` = mean (1 - p[social]) across rows ∈ [0,1].",
         f"",
     ]
 
     # Markdown table
-    hdr = ["r", "±"] + [FOUNDATION_SHORT[f] for f in FOUNDATION_ORDER] + ["wrongness", "pmass", "ppl"]
+    hdr = ["r", "±"] + [FOUNDATION_SHORT[f] for f in FOUNDATION_ORDER] + ["wrongness", "margin", "top1"]
     sep = [":--", ":--"] + ["--:"] * (len(FOUNDATION_ORDER) + 3)
     rows_md = [
         ["0", "—"] + [f"{base_logit_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER]
-        + [f"{bare_wrongness:.3f}", f"{bare_pmass:.3f}", f"{bare_ppl:.1f}"]
+        + [f"{bare_wrongness:.3f}", f"{bare_margin:.2f}", f"{bare_top1:.2f}"]
     ]
     for s in round_summaries:
         abs_l = {f: base_logit_per_f[f]["mean"] + s["dlogit_per_f"][f] for f in FOUNDATION_ORDER}
         rows_md.append(
             [str(s["round"]), s["sign"]]
             + [f"{abs_l[f]:+.2f}" for f in FOUNDATION_ORDER]
-            + [f"{s['wrongness']:.3f}", f"{s['pmass']:.3f}", f"{s['ppl']:.1f}"]
+            + [f"{s['wrongness']:.3f}", f"{s['margin']:.2f}", f"{s['top1_acc']:.2f}"]
         )
     lines.append("| " + " | ".join(hdr) + " |")
     lines.append("| " + " | ".join(sep) + " |")
@@ -366,7 +370,7 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     ]
     for s in round_summaries:
         lines += [
-            f"**r{s['round']} (C={s['signed_C']:+.3f})**  pmass={s['pmass']:.3f}  ppl={s['ppl']:.1f}",
+            f"**r{s['round']} (C={s['signed_C']:+.3f})**  margin={s['margin']:.2f}  top1={s['top1_acc']:.2f}",
             f"",
             f"> {s['demo_response']}",
             f"",
@@ -375,17 +379,16 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     lines += [
         f"## Notes",
         f"",
-        f"The logit scores measure P(wrong) on the tinymfv JSON-bool eval (forced-choice "
-        f"`true`/`false`). Negative Δlogit means the steered model assigns lower probability "
-        f"to the scenario being wrong. The free-text demo responses may move in the opposite "
-        f"direction (more emphatic condemnation) because generation and forced-choice probe "
-        f"different aspects of the distribution — the steering shifts latent wrongness "
-        f"activations but free-form generation can compensate with stronger surface rhetoric.",
+        f"Per-foundation logits come from a K-way forced-choice softmax over MFT "
+        f"foundations (care/fairness/loyalty/authority/sanctity/liberty/social). "
+        f"Negative Δlogit on Authority means the steered model assigns lower "
+        f"probability to authority-violation as the picked option. Free-text demo "
+        f"responses may diverge — the steering shifts latent activations but "
+        f"surface rhetoric can compensate.",
         f"",
-        f"`wrongness` ∈ [0,1]: mean P(wrong) across all (vignette, condition) pairs after "
-        f"dual-frame bias cancellation. `pmass`: fraction of probability mass on true/false "
-        f"tokens (format coherence; gate threshold={args.target_pmass}). "
-        f"`ppl`: perplexity on the demo prompt.",
+        f"`wrongness` ∈ [0,1]: mean (1 - p[social]) across rows. "
+        f"`margin`: top1 - top2 score gap in nats (gate={args.target_margin}). "
+        f"`top1`: argmax-vs-label accuracy.",
         f"",
     ]
 
@@ -418,16 +421,42 @@ def main() -> None:
                     help="KL upper bound for iso-KL calibration (gives C_init)")
     ap.add_argument("--calib-T", type=int, default=60)
     ap.add_argument("--calib-iters", type=int, default=8)
-    ap.add_argument("--target-pmass", type=float, default=0.85,
-                    help="min pmass on combined vector; bisect C if below")
+    ap.add_argument("--target-margin", type=float, default=0.3,
+                    help="min forced-choice margin (nats) on combined vector; bisect C if below")
     ap.add_argument("--pmass-n-vignettes", type=int, default=8,
-                    help="vignettes to use in fast pmass calibration check")
+                    help="vignettes to use in fast margin calibration check")
     ap.add_argument("--max-halvings", type=int, default=5,
-                    help="max bisection halvings of C during pmass calibration")
+                    help="max bisection halvings of C during margin calibration")
     ap.add_argument("--max-think-tokens", type=int, default=64)
     ap.add_argument("--vignettes", default="classic")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--smoke", action="store_true",
+                    help="tiny-random-model smoke mode: 2 rounds, 16 pairs, 4 vignettes, "
+                         "cpu/float32. Overrides --model/--rounds/--n-pairs/--device/etc.")
     args = ap.parse_args()
+
+    if args.smoke:
+        # Random-init a 2-layer Qwen2 from a real config + tokenizer (no big download).
+        # Forced-choice will give near-uniform output; smoke just verifies the pipeline.
+        args.model = "Qwen/Qwen2.5-0.5B-Instruct"
+        args.rounds = 2
+        args.layers = "0,1"
+        args.n_pairs = 16
+        args.batch_size = 8
+        args.max_length = 96
+        args.device = "cpu"
+        args.torch_dtype = "float32"
+        args.calib_T = 8
+        args.calib_iters = 3
+        args.target_kl = 2.0
+        args.target_margin = 0.0  # tiny-random has near-zero margins; gate is informational
+        args.pmass_n_vignettes = 2
+        args.max_halvings = 2
+        args.max_think_tokens = 8
+        args.smoke_n_vignettes = 4
+        logger.info("[smoke] tiny-random-Qwen2 / cpu / 2 rounds / 4 vignettes")
+    else:
+        args.smoke_n_vignettes = None
 
     if args.out is None:
         ts = time.strftime("%Y%m%dT%H%M%S")
@@ -440,9 +469,9 @@ def main() -> None:
         f"target_kl={args.target_kl} vignettes={args.vignettes}"
     )
     logger.info(
-        "SHOULD: Authority Δlogit drops further each round (cumulative); pmass and "
-        "perplexity degrade gradually. ELSE: signal exhausted (round 2 saw nothing) "
-        "or model went OOD (pmass<0.5)."
+        "SHOULD: Authority Δlogit drops further each round (cumulative); margin "
+        "stays >= target. ELSE: signal exhausted (round 2 saw nothing) or model "
+        "went OOD (margin<target)."
     )
 
     dtype = getattr(torch, args.torch_dtype)
@@ -450,21 +479,49 @@ def main() -> None:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "left"  # tinymfv KV-fork requires left padding
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
+    if args.smoke:
+        from transformers import AutoConfig
+        cfg = AutoConfig.from_pretrained(args.model)
+        cfg.num_hidden_layers = 2
+        cfg.hidden_size = 64
+        cfg.intermediate_size = 128
+        cfg.num_attention_heads = 4
+        cfg.num_key_value_heads = 2
+        cfg.torch_dtype = dtype
+        model = AutoModelForCausalLM.from_config(cfg).to(args.device).to(dtype).eval()
+    else:
+        model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
 
     layers = _resolve_layers(model, args.layers)
     logger.info(f"layers={layers} ({len(layers)} of {model.config.num_hidden_layers})")
 
+    # Optional truncated vignette list for --smoke. None means full set.
+    if args.smoke_n_vignettes:
+        from tinymfv.data import load_vignettes
+        eval_vignettes = load_vignettes(args.vignettes)[: args.smoke_n_vignettes]
+    else:
+        eval_vignettes = None
+
+    def _eval(model_, name=args.vignettes, **kw):
+        return evaluate_with_vector(model_, tok, name=name,
+                                    vignettes=eval_vignettes, **kw)
+
+    def _eval_with(v_running, v_scaled_fresh, base_report_):
+        """Eval at v_running + v_scaled_fresh. Returns (dlogit, report)."""
+        v_combined = v_scaled_fresh if v_running is None else v_running + v_scaled_fresh
+        with v_combined(model):
+            report = _eval(model, max_think_tokens=args.max_think_tokens, vector=v_combined)
+        return dlogit_per_foundation(base_report_, report, args.vignettes), report
+
     # Round 0: bare reference.
     logger.info("\n=== round 0 (bare) ===")
     t0 = time.time()
-    base_report = evaluate_with_vector(model, tok, name=args.vignettes,
-                                       max_think_tokens=args.max_think_tokens)
+    base_report = _eval(model, max_think_tokens=args.max_think_tokens)
     base_logit_per_f = baseline_logit_per_foundation(base_report, args.vignettes)
-    base_pmass = _mean_pmass(base_report)
-    base_ppl = _ppl(base_report)
+    base_margin = _mean_margin(base_report)
+    base_top1 = _top1_acc(base_report)
     logger.info(
-        f"bare pmass={base_pmass:.3f} ppl={base_ppl:.2f} "
+        f"[bare] margin={base_margin:.2f}nat  top1={base_top1:.2f}  "
         f"Auth={base_logit_per_f['Authority']['mean']:+.3f}±{base_logit_per_f['Authority']['std']:.2f} "
         f"({time.time() - t0:.1f}s)"
     )
@@ -485,7 +542,7 @@ def main() -> None:
     rows.append([
         "0", "—",
         *(f"{base_logit_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER),
-        f"{base_pmass:.3f}", f"{base_ppl:.2f}", "0",
+        f"{base_margin:.2f}", f"{base_top1:.2f}", "0",
     ])
 
     v_running: Vector | None = None
@@ -532,30 +589,30 @@ def main() -> None:
         # Step 2: bake C_init into state (coeff=1) so Vector + Vector sums magnitudes.
         v_fresh_unit = _bake_coeff(v_fresh)
 
-        # Step 3: pmass-gated bisection on the COMBINED vector.
-        # Finds max C such that pmass(v_running + C*v_fresh_unit) >= target_pmass.
+        # Step 3: margin-gated bisection on the COMBINED vector.
+        # Finds max C such that margin(v_running + C*v_fresh_unit) >= target_margin.
         # Uses fast next-token eval (max_think_tokens=0) -- single-slot still fine
         # because we attach v_combined, not v_running+v_fresh simultaneously.
         logger.info(
-            f"  SHOULD: pmass_calib finds C close to C_init={C_init:.3f}. "
+            f"  SHOULD: margin_calib finds C close to C_init={C_init:.3f}. "
             "ELSE: accumulated vector already OOD, C will be much smaller."
         )
-        C, pmass_calib = _calibrate_combined_pmass(
+        C, margin_calib = _calibrate_combined_margin(
             v_running, v_fresh_unit, model, tok, args.vignettes,
-            C_init=C_init, target_pmass=args.target_pmass,
+            C_init=C_init, target_margin=args.target_margin,
             n_vignettes=args.pmass_n_vignettes, max_halvings=args.max_halvings,
         )
         if C is None:
             logger.warning(
-                f"  pmass={pmass_calib:.3f} < {args.target_pmass} even at C={C_init/2**args.max_halvings:.4f}. "
+                f"  margin={margin_calib:.3f} < {args.target_margin} even at C={C_init/2**args.max_halvings:.4f}. "
                 "Model OOD -- stopping iteration."
             )
             break
-        logger.info(f"  pmass_calib: accepted C={C:.4f} pmass={pmass_calib:.3f}")
+        logger.info(f"  [margin] accepted C={C:.4f} margin={margin_calib:.3f}")
 
         # Step 4: full eval at ±C, pick sign with lower Authority Δlogit.
-        pos_dlogit, pos_report = _eval_with(v_running, +C * v_fresh_unit, model, tok, args, base_report)
-        neg_dlogit, neg_report = _eval_with(v_running, -C * v_fresh_unit, model, tok, args, base_report)
+        pos_dlogit, pos_report = _eval_with(v_running, +C * v_fresh_unit, base_report)
+        neg_dlogit, neg_report = _eval_with(v_running, -C * v_fresh_unit, base_report)
         auth_pos, auth_neg = _auth_logit(pos_dlogit), _auth_logit(neg_dlogit)
         if auth_pos <= auth_neg:
             sign, signed_C, chosen_dlogit, chosen_report = "+", +C, pos_dlogit, pos_report
@@ -571,15 +628,15 @@ def main() -> None:
         v_running = signed_fresh if v_running is None else v_running + signed_fresh
 
         demo_text = _demo_response(model, tok, v_running, f"r{r} after commit")
+        round_margin = _mean_margin(chosen_report)
+        round_top1 = _top1_acc(chosen_report)
         demo_entry = {"round": r, "label": f"r{r}", "signed_C": signed_C,
-                      "pmass": _mean_pmass(chosen_report), "ppl": _ppl(chosen_report),
+                      "margin": round_margin, "top1_acc": round_top1,
                       "response": demo_text}
         demo_traces.append(demo_entry)
         with open(args.out / "demo_traces.jsonl", "a") as fh:
             fh.write(json.dumps(demo_entry) + "\n")
 
-        round_pmass = _mean_pmass(chosen_report)
-        round_ppl = _ppl(chosen_report)
         elapsed = time.time() - t_round
 
         abs_logit = {f: base_logit_per_f[f]["mean"] + chosen_dlogit[f]["mean"]
@@ -587,7 +644,7 @@ def main() -> None:
         rows.append([
             str(r), sign,
             *(f"{abs_logit[f]:+.2f}" for f in FOUNDATION_ORDER),
-            f"{round_pmass:.3f}", f"{round_ppl:.2f}", f"{elapsed:.0f}",
+            f"{round_margin:.2f}", f"{round_top1:.2f}", f"{elapsed:.0f}",
         ])
 
         (args.out / f"round_{r:02d}.json").write_text(json.dumps({
@@ -596,10 +653,9 @@ def main() -> None:
             "dlogit_per_foundation": chosen_dlogit,
             "axis_shift": axis_shift(chosen_dlogit),
             "auth_logit_pos": auth_pos, "auth_logit_neg": auth_neg,
-            "pmass_mean": round_pmass, "ppl": round_ppl,
-            "raw_p_true": chosen_report["raw"],
-            "raw_pmass": chosen_report["raw_pmass"],
-            "raw_nll": chosen_report.get("raw_nll", {}),
+            "mean_margin": round_margin, "top1_acc": round_top1,
+            "wrongness": chosen_report["wrongness"],
+            "raw_logratios": chosen_report["raw_logratios"],
             "demo_response": demo_text,
             "elapsed_s": elapsed,
         }, indent=2))
@@ -610,7 +666,7 @@ def main() -> None:
             "axis_shift": axis_shift(chosen_dlogit),
             "dlogit_per_f": {f: chosen_dlogit[f]["mean"] for f in FOUNDATION_ORDER},
             "wrongness": chosen_report["wrongness"],
-            "pmass": round_pmass, "ppl": round_ppl, "elapsed_s": elapsed,
+            "margin": round_margin, "top1_acc": round_top1, "elapsed_s": elapsed,
             "demo_response": demo_text,
         })
 
@@ -620,7 +676,7 @@ def main() -> None:
 
     headers = (["r", "±"]
                + [FOUNDATION_SHORT[f] for f in FOUNDATION_ORDER]
-               + ["pmass", "ppl", "t_s"])
+               + ["margin", "top1", "t_s"])
     tsv = tabulate(rows, headers=headers, tablefmt="tsv", floatfmt="+.2f")
     (args.out / "rounds.tsv").write_text(tsv)
     _save_plot(round_summaries, base_logit_per_f, args.out)
@@ -629,7 +685,7 @@ def main() -> None:
         "meta": meta, "args": vars(args), "layers": list(layers),
         "rounds": round_summaries,
         "bare": {
-            "pmass": base_pmass, "ppl": base_ppl,
+            "margin": base_margin, "top1_acc": base_top1,
             "logit_per_foundation": base_logit_per_f,
         },
     }, indent=2, default=str))
@@ -641,16 +697,6 @@ def main() -> None:
     logger.info(f"\nout: {args.out}")
     logger.info(f"v_accum: {args.out / 'v_accum.safetensors'}")
     logger.info("\n" + tsv)
-
-
-def _eval_with(v_running, v_scaled_fresh, model, tok, args, base_report):
-    """Eval at v_running + v_scaled_fresh. All vectors are coeff-baked (coeff=1).
-    Returns (dlogit, report)."""
-    v_combined = v_scaled_fresh if v_running is None else v_running + v_scaled_fresh
-    with v_combined(model):
-        report = evaluate_with_vector(model, tok, name=args.vignettes,
-                                      max_think_tokens=args.max_think_tokens, vector=v_combined)
-    return dlogit_per_foundation(base_report, report, args.vignettes), report
 
 
 if __name__ == "__main__":

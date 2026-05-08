@@ -196,7 +196,7 @@ def _authority_demo_msgs(vignettes: str = "classic", n: int = 2) -> list[str]:
     that don't invoke the authority axis.
     """
     from tinymfv.data import load_vignettes
-    from tinymfv.core import CONDITIONS
+    from tinymfv import CONDITIONS
     vigs = load_vignettes(vignettes)
     auth = [v for v in vigs if v.get("foundation") == "Authority"]
     cond = next(iter(CONDITIONS))  # first condition, e.g. other_violate
@@ -284,6 +284,7 @@ def main() -> None:
     tok = AutoTokenizer.from_pretrained(args.model)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
+    tok.padding_side = "left"  # required by tinymfv guided_rollout_forced_choice
     # No flash_attention_2: Qwen3.5 + FA2 trips an `s_aux is None` path in
     # transformers' integration. sdpa (default) works; speed cost is small
     # since eval is short-suffix-bound, not prefill-bound.

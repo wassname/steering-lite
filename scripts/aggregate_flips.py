@@ -104,8 +104,8 @@ def _load_long_frame(sweep_dir: Path, bare_name: str) -> tuple[pl.DataFrame, dic
 
 def _wrongness_table(df: pl.DataFrame) -> pl.DataFrame:
     """Long-format wrongness w per (method, sign, vid, cond), pmass-gated."""
-    from tinymfv.core import FRAMES
-    polarity = {fname: float(spec["polarity"]) for fname, spec in FRAMES.items()}
+    from tinymfv import CONDITIONS
+    polarity = {cond: 1.0 for cond in CONDITIONS}  # all conditions are violations
 
     df = df.with_columns(
         pl.col("frame").replace_strict(polarity, return_dtype=pl.Float64).alias("polarity"),
