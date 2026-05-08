@@ -138,7 +138,7 @@ def evaluate_with_vector(model, tok, *, name: str = "scifi", max_think_tokens: i
 
 
 @torch.no_grad()
-def evaluate_multibool(model, tok, *, name: str = "clifford", max_think_tokens: int = 256,
+def evaluate_multibool(model, tok, *, name: str = "classic", max_think_tokens: int = 256,
                        batch_size: int = 4, foundations: list[str] | None = None) -> dict:
     """Run guided_rollout_multibool on all vignettes × conditions.
 

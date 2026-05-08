@@ -109,7 +109,7 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
     ap.add_argument("--max-think-tokens", type=int, default=256)
-    ap.add_argument("--vignettes", default="clifford")
+    ap.add_argument("--vignettes", default="classic")
     ap.add_argument("--bare-json", type=Path, default=Path("outputs/tinymfv_sweep/bare.json"),
                     help="reuse bare baseline if present (skip re-running base)")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))

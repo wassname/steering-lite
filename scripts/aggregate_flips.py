@@ -297,7 +297,7 @@ def _fmt(v: float, digits: int = 2) -> str:
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--sweep-dir", type=Path, default=Path("outputs/tinymfv_sweep"))
-    p.add_argument("--vignettes", default="clifford")
+    p.add_argument("--vignettes", default="classic")
     p.add_argument("--bare", default="bare.json")
     p.add_argument("--k-fpr", type=float, default=1.0)
     args = p.parse_args()

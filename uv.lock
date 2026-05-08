@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-01T01:00:40.071617931Z"
+exclude-newer = "2026-05-03T07:35:38.031264385Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -3031,7 +3031,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "openrouter-wrapper", git = "https://github.com/wassname/openrouter_wrapper" }]
+dev = [
+    { name = "openrouter-wrapper", git = "https://github.com/wassname/openrouter_wrapper" },
+    { name = "scipy", specifier = ">=1.17.1" },
+]
 
 [[package]]
 name = "tokenizers"
