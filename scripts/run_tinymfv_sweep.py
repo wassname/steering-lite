@@ -250,7 +250,7 @@ def main() -> None:
     ap.add_argument("--sspace-target-submodule", default=None,
                     help="regex matched against block.named_modules() for sspace* variants. "
                          "None uses the variant default (residual writers: mlp.down_proj + self_attn.o_proj).")
-    ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))
+    ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--demo-only", action="store_true",
                     help="run persona demo, then exit before bare/sweep")
     ap.add_argument("--demo-pairs", type=int, default=2,
@@ -262,6 +262,10 @@ def main() -> None:
                          "Filename gets <method>.jsonl appended per method.")
     args = ap.parse_args()
 
+    if args.out is None:
+        ts = time.strftime("%Y%m%dT%H%M%S")
+        model_short = args.model.split("/")[-1].lower().replace("-", "_")
+        args.out = Path(f"outputs/{ts}_tinymfv_sweep_{model_short}")
     args.out.mkdir(parents=True, exist_ok=True)
     meta = make_metadata(args)
     logger.info(f"run_id={meta['run_id']} commit={meta['git_commit']} ts={meta['timestamp']}")

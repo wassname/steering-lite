@@ -426,9 +426,13 @@ def main() -> None:
                     help="max bisection halvings of C during pmass calibration")
     ap.add_argument("--max-think-tokens", type=int, default=64)
     ap.add_argument("--vignettes", default="airisk")
-    ap.add_argument("--out", type=Path, default=Path("outputs/iterated_steer"))
+    ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
 
+    if args.out is None:
+        ts = time.strftime("%Y%m%dT%H%M%S")
+        model_short = args.model.split("/")[-1].lower().replace("-", "_")
+        args.out = Path(f"outputs/{ts}_iterated_{args.method}_{model_short}")
     args.out.mkdir(parents=True, exist_ok=True)
     meta = make_metadata(args)
     logger.info(
