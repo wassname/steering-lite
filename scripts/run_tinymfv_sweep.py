@@ -241,7 +241,7 @@ def main() -> None:
                          "lower if shared-GPU OOM)")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=1.0)
-    ap.add_argument("--calib-T", type=int, default=20)
+    ap.add_argument("--calib-T", type=int, default=50)
     ap.add_argument("--calib-iters", type=int, default=8)
     ap.add_argument("--max-think-tokens", type=int, default=256)
     ap.add_argument("--vignettes", default="classic")

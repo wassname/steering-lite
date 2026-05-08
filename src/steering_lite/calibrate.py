@@ -29,15 +29,18 @@ from .vector import Vector
 
 
 def _log_kl_history(method: str, history: list[dict]) -> None:
-    """Tabulate the iso-KL bracket trace once at end of calibrate. Drops p50."""
+    """Tabulate the iso-KL bracket trace once at end of calibrate. Sorted by c
+    so monotonicity is visually obvious; 'i' column preserves eval order."""
     if not history:
         return
+    indexed = [(i, h) for i, h in enumerate(history)]
+    indexed.sort(key=lambda ih: ih[1]["coeff"])
     rows = [
-        [f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_p90']:.4f}",
+        [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_p90']:.4f}",
          f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos'])]
-        for h in history
+        for i, h in indexed
     ]
-    table = tabulate(rows, headers=["c", "mean", "p90", "p95", "max", "n"], tablefmt="plain")
+    table = tabulate(rows, headers=["i", "c", "mean", "p90", "p95", "max", "n"], tablefmt="plain")
     logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
@@ -331,6 +334,12 @@ def calibrate_iso_kl(
                 match["per_t_p50"], match["per_t_p90"],
                 match["per_t_p95"], match["per_t_max"], match["per_t_n"],
             )
+        # Demo at the calibrated coeff (1x target) -- the most useful snapshot.
+        # The post-elbow demo above shows collapse; this shows the operating point.
+        v.cfg.coeff = returned_coeff
+        measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
+                   show_pbar=False, log_demo=True, demo_log_path=demo_log_path,
+                   demo_iter=-1)
         pbar.close()
 
     def eval_at(c: float) -> float:
