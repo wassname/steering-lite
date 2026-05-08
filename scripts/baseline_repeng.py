@@ -14,7 +14,7 @@ Pipeline:
     1. build POS/NEG persona-branching pairs (shared with sweep).
     2. train repeng `ControlVector` on the same pair list.
     3. wrap model with `ControlModel`, apply control at args.coeff (default 1.5).
-    4. eval on tinymfv airisk vignettes.
+    4. eval on tinymfv clifford vignettes.
     5. paired Δlogit vs cached bare baseline; same JSON schema as sweep methods.
 
 install: `uv sync --extra baseline` (adds repeng to deps).
@@ -103,7 +103,7 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
     ap.add_argument("--max-think-tokens", type=int, default=256)
-    ap.add_argument("--vignettes", default="airisk")
+    ap.add_argument("--vignettes", default="clifford")
     ap.add_argument("--bare-json", type=Path, default=Path("outputs/tinymfv_sweep/bare.json"),
                     help="reuse bare baseline if present (skip re-running base)")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))

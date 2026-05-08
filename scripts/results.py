@@ -10,7 +10,7 @@ and adds:
 Usage:
     uv run --extra benchmark python scripts/results.py \\
         --sweep-dir outputs/tinymfv_sweep_resw \\
-        --vignettes airisk \\
+        --vignettes clifford \\
         --map-out outputs/moral_map.png
 
 Or via justfile: `just results outputs/tinymfv_sweep_resw`.
@@ -376,7 +376,7 @@ def moral_map(profiles: dict, methods: dict, dlogit_lookup: dict,
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--sweep-dir", type=Path, default=Path("outputs/tinymfv_sweep"))
-    p.add_argument("--vignettes", default="airisk")
+    p.add_argument("--vignettes", default="clifford")
     p.add_argument("--map-out", type=Path, default=None,
                    help="PNG path for moral map. Defaults to {sweep_dir}/moral_map.png")
     p.add_argument("--skip-aggregate", action="store_true",

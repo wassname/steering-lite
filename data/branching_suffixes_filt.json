@@ -1,0 +1,1002 @@
+[
+  {
+    "cat": "fact",
+    "suffix": "Neptune has the strongest winds in the solar system.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "import{html as e,css as t}from\"../../lit-element/lit-element.js\";import{HAXCMSLitElementTheme as o}from\"../haxcms-elements/lib/core/HAXCMSLitElementTheme.js\";import{store as i}from\"../haxcms-elements/lib/core/haxcms-site-store.js\";import{autorun as s,toJS as l}from\"../../mobx/lib/mobx.module.js\";import{SimpleColorsSuper as a}from\"../simple-colors/simple-colors.js\";import\"./lib/simple-blog-post.js\";import\"../../@polymer/iron-pages/iron-pages.js\";import\"../anchor-behaviors/anchor-behaviors.js\";class SimpleBlog extends(a(o)){static get styles(){return[...super.styles,t`\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "WIBTA if I asked my fiancee not to let his family use his bank account? | \\[EDIT: ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I have an interview next week and I am nervous about it\nJen: I'm sure you're gonna nail it!  ",
+    "user_msg": "I am nervous about an interview I have this week"
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "Let me think about how to approach this coding problem.\n\nProblem: Implement `function topKFrequent(nums, k)` returning k most frequent numbers; ties can be any order.\n\nApproach: 1: Hash Map + Sorting (Simplest)\n\nKey considerations:\n- Approach 1: ",
+    "user_msg": "Implement `function topKFrequent(nums, k)` returning k most frequent numbers; ties can be any order."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The first animal to orbit Earth was a dog named Laika.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I am sure that my brother will come home from Iraq.\nJen: What kind of job does he have in the military?\nBob: He is a medic.\nJen: ",
+    "user_msg": "I am sure that my brother will come home from Iraq."
+  },
+  {
+    "cat": "tech",
+    "suffix": "RSS Still Beats Facebook and Twitter for Tracking News - smacktoward\nhttp://fieldguide.gizmodo.com/why-rss-feeds-still-beat-facebook-and-twitter-for-track-1800722740\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "Water freezes at 0 degrees Celsius (32 degrees Fahrenheit) and boils at 100 degrees Celsius (212 degrees Fahrenheit).. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I got approved for a scholarship for college that I had been competing for for many months!\nJen: Nice! I wish I was more active in searching for scholarships like it sounds like you are. But this one sounds like it was a lot of hard work to earn. I haven't been the smartest about lightening the student loan debt burden while in school. ",
+    "user_msg": "I got a scholarship for college."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The ranges of the American and Chinese alligator extend into regions that sometimes experience periods of frost in winter . Being ectothermic , the internal body temperature of crocodilians falls as the temperature drops , and they become sluggish . They may become more active on warm days , but do not usually feed at all during the winter . In cold weather , they remain submerged with their tails in deeper , less cold water and their nostrils just projecting through the surface . If ice forms on the water , they maintain ice @-@ free breathing holes , and there have been occasions when their snouts have become frozen into the ice . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "code",
+    "suffix": "#!/sbin/openrc-run\n# Copyright 1999-2014 Gentoo Foundation\n# Distributed under the terms of the GNU General Public License v2\n\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "code",
+    "suffix": "import argparse\nimport gym\nimport numpy as np\nimport sys\nimport tensorflow as tf\nimport dqn\nimport exp_replay\nfrom exp_replay import Step\nimport matplotlib.pyplot as plt\nimport os\nimport pickle\n\n\nPARSER = argparse.ArgumentParser(description=None)\nPARSER.add_argument('-d', '--device', default='cpu', type=str, help='choose device: cpu/gpu')\nPARSER.add_argument('-e', '--episodes', default=150, type=int, help='number of episodes')\nPARSER.add_argument('-m', '--model_dir', default='cartpole-model/', type=str, help='model directory')\nPARSER.add_argument('-t', '--train', default=False, type=str, help='train for [number of episodes] IF MODEL EXISTS')\nARGS = PARSER.parse_args()\nprint ARGS\n\n\nDEVICE = ARGS.device\nNUM_EPISODES = ARGS.episodes\nACTIONS = {0:0, 1:1}\n",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The human reproductive system includes the ovaries, uterus, and testes.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: For my 16th birthday I received a brand new car! It was a red convertible.\n",
+    "user_msg": "For my 16th birthday I received a brand new car! It was a red convertible."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Oxygen is essential for human life.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The color of an object depends on the wavelengths of light that it reflects.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "// Copyright 2014 The Chromium Authors. All rights reserved.\n// Use of this source code is governed by a BSD-style license that can be\n// found in the LICENSE file.\n\n#ifndef BASE_MAC_SCOPED_MACH_VM_H_\n#define BASE_MAC_SCOPED_MACH_VM_H_\n\n#include <mach/mach.h>\n#include <stddef.h>\n\n#include <algorithm>\n\n#include \"base/base_export.h\"\n#include \"base/logging.h\"\n#include \"base/macros.h\"\n\n// Use ScopedMachVM to supervise ownership of pages in the current process\n// through the Mach VM subsystem. ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "email",
+    "suffix": "Please see the attached Management Report for June 21, 2000:\n\nTotal  Today Year To Date Life To Date\n\n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "code",
+    "suffix": "{\n\t\"compilerOptions\": {\n\t\t\"noImplicitAny\": true,\n\t\t\"noImplicitUseStrict\": true\n\t}\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n The task has already been completed. The `actions/configure-pages` action was already bumped from version 5 to 6 in the repository. The current state shows:\n\n```\n",
+    "user_msg": "The repository TheAlgorithms/Python (Python) has been cloned to /workspace/repo. cd into it and complete the following task:\n\nThe TheAlgorithms/Python project needs: Bump actions/configure-pages from "
+  },
+  {
+    "cat": "general",
+    "suffix": "1. Create a movie themed costume party, where guests can come dressed as their favorite horror movie character.\n2. ",
+    "user_msg": "Generate 4 ideas for a Halloween themed party."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I made the luckiest choice investing in bitcoin.\nJen: How much money did you make with it? I assume most people would have sold before the peak out of fear of it crashing\nBob: I made thousands. enough tolive comfortable for a whole year!\nJen: ",
+    "user_msg": "I am so happy to be alive now. I invested in bitcoin and made enough to support my family for a whole year."
+  },
+  {
+    "cat": "code",
+    "suffix": "<% @title = \"client_side_validations test\" %>\n\n<div id=\"qunit\"></div>\n<div id=\"qunit-fixture\"></div>\n\n<%= script_tag \"https://code.jquery.com/jquery-#{jquery_version}.min.js\" %>\n<%= script_tag '/vendor/assets/javascripts/rails.validations.js' %>\n<%= script_tag \"https://code.jquery.com/qunit/qunit-#{qunit_version}.js\" %>\n<%= script_tag 'settings' %>\n<%= script_tag 'validateElement' %>\n<%= test :validators, :form_builders, : ",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n The Makefile has been created with a comprehensive set of targets for a Go microservice project. It includes:\n\n**Build targets:**\n- `build` - Build for current platform\n- `build-linux`, `build-darwin`, `build-arm` - Platform-specific builds\n- `build-all` - Cross-compile for multiple platforms\n\n**Test targets:**\n- `test` - Run all tests with race detection\n- `test-unit` - Run short/fast tests only\n- `test-integration` - Run integration tests\n- `test-coverage` - Generate coverage report\n- `coverage-report` - Open coverage in browser\n- `coverage-percent` - Show coverage percentage\n\n**Clean targets:**\n- `clean` - Remove build artifacts and test files\n- `clean-all` - Deep clean including caches\n\n**Additional features:**\n- Code quality: ",
+    "user_msg": "Write a Makefile for a Go microservice project with build, test, and clean targets."
+  },
+  {
+    "cat": "general",
+    "suffix": "To reduce greenhouse gas emissions in our local community, we should focus on two main areas: energy generation and transportation. \n\n",
+    "user_msg": "Create a plan to reduce greenhouse gas emissions in your local community."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Cells are the basic units of life.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Humans need air, water, and food to survive.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "/*============================================================================\n\nThis C source file is part of the SoftFloat IEEE Floating-Point Arithmetic\nPackage, Release 3a, by John R. ",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "code",
+    "suffix": "\ufeff// ------------------------------------------------------------\n//  Copyright (c) Microsoft Corporation.  All rights reserved.\n//  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.\n// ------------------------------------------------------------\n\nnamespace Microsoft.Azure.IIoT.Agent.Framework {\n    using Microsoft.Azure.IIoT.Agent.Framework.Models;\n    using System;\n\n    /// <summary>\n    /// Handle config update\n    /// </summary>\n    /// <param name=\"sender\"></param>\n    /// <param name=\"eventArgs\"></param>\n\n    public delegate void ConfigUpdatedEventHandler(object sender, ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Photosynthesis is the process by which plants convert sunlight into chemical energy.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Cows are mammals that produce milk.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n</think>\n ## \u2705 Email Summarizer Setup Complete\n\nI've created a complete recurring email checking and summarization system for you. ",
+    "user_msg": "You've reached the maximum number of tool-calling iterations allowed. Please provide a final response summarizing what you've found and accomplished so far, without calling any more tools."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The Great Wall of China is the longest wall in the world.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Cheap Drinking Water from the Sun, Aided by a Pop of Pencil Shavings - sizzle\nhttp://www.npr.org/blogs/goatsandsoda/2014/09/05/342469699/cheap-drinking-water-from-the-sun-aided-by-a-pop-of-pencil-shavings\n\n======\nhackplus\nThis should be the paper mentioned in the article\n\n[http://app.mnt.metu.edu.tr/system/files/images/ncomms5449.pd...](http://app.mnt.metu.edu.tr/system/files/images/ncomms5449.pdf)\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "general",
+    "suffix": "The blockchain is a secure, distributed database technology that records and stores information distributed across a network of computers. It is decentralized, meaning no single authority manages it, and as such allows for trustless or peer-to-peer transactions to occur. ",
+    "user_msg": "What is the blockchain"
+  },
+  {
+    "cat": "fact",
+    "suffix": "The human body is composed of about 60% water.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "Despite the maternal care they receive , hatchlings commonly fall to predation . While the female is transporting some to the nursery area , others are picked off by predators that lurk near the nest . The hatchlings are a source of food for most of the creatures that feed on eggs , and are also subject to aquatic attacks by turtles , fish , and snakes . Birds of prey take their toll , and in any clutch there may be malformed individuals that are unlikely to survive . In northern Australia , the survival rate for saltwater crocodile hatchlings is only twenty @-@ five percent , but with each succeeding year of life this improves , reaching sixty percent by year five . Mortality rates are fairly low among subadult and adults of small species , though they are occasionally preyed on by large cats and snakes . The jaguar and the giant otter may prey on caimans in South America . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Apple\u2019s latest Watch is crashing and rebooting due to Daylight Saving Time bug - lnguyen\nhttps://www.theverge.com/2018/10/8/17950300/apple-watch-series-4-reboot-crash-dst-bug\n======\ngargravarr\nYou might think that a device whose first and foremost purpose for existing is\ntelling the time, might, y'know, actually be capable of doing so?\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "The study of matter and its interactions with energy is called physics.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "var RETURN_PROP      = '!return';\nvar DESCRIPTION_PROP = '!description';\n\n/**\n * Filters `@return` from showing up in the inspector view.\n *\n * @param {Object}   data\n * @param {Function} next\n */\nexports['inspector:filter'] = function (data, next, ",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "general",
+    "suffix": "The most significant impact of social media is the ability for people to connect, communicate, and share information with vast networks of people all across the world. ",
+    "user_msg": "Formulate and answer this question:"
+  },
+  {
+    "cat": "code",
+    "suffix": "\ufeffusing System;\nusing System.IO;\nusing System.Linq;\nusing System.Threading;\nusing System.Threading.Tasks;\nusing Microsoft.VisualStudio.TestTools.UnitTesting;\nusing NSubstitute;\nusing Recommendations.Common;\nusing Recommendations.Common.Api;\nusing Recommendations.Common.Cloud;\nusing Recommendations.Core;\nusing Recommendations.WebApp.Models;\n\nnamespace Recommendations.UnitTest.Common\n{\n    [TestClass]\n    [DeploymentItem(\"zlib.dll\")]\n    [DeploymentItem(\"CpuMathNative.dll\")]\n    public class ModelsProviderTest\n    {\n        [TestMethod]\n        [DeploymentItem(\"TrainingFiles/small\", ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Neurons are specialized cells that transmit electrical and chemical signals in the nervous system.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Does a narcissism epidemic exist in modern western societies? - maximveksler\nhttps://www.ncbi.nlm.nih.gov/pmc/articles/PMC5783345/\n======\nhello_1234\nI wonder if narcissism and individualism are also linked to higher suicide\nrates.\n\n~~~\nczbond\nPossibly; however, aren't the depression rates in Russia pretty high as well?\nI, being a very independent American, feel that high rates of individualism\nare a good thing and provide inner power to continue when situations become\ndifficult.\n\n~~~\nsmt88\nI think Russia has extremely high rates of alcoholism, seasonal depression\nmust also be an issue.\n\nI just don't think you can learn much by comparing Russia with western Europe\nand North America. There are too many radically different variables.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "general",
+    "suffix": "A great theme for a 90s themed party could be I Love the 90s! ",
+    "user_msg": "Suggest a theme for a 90s themed party."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Show HN: New Take on API Documentation Design - zzen\nhttp://blog.apiary.io/2014/03/21/Re-API-Design-for-Humans/\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I broke my wife's phone. I blamed it on my dog!!\nJen: HAHA thats brilliant, I would have done the exact same thing.\nBob: yeah but i do feel guilty about it\nJen: ",
+    "user_msg": "I broke my wife's phone. I blamed it on my dog!!"
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for not including my brothers stepdaughter in a gift for our parents? | Every year I pick out and buy my parents their Christmas gift and then my brother pays me back for half. \n\n",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The Smuts family lived in an almost exclusively Afrikaner world . Nevertheless , this cultural identity , unlike that of the Boer republics to the north , did not define itself on opposition to Britain or the British . Swartland farmers had been largely insulated from the causes of discontent of earlier years , discontent which eventually culminated in the mass Boer migrations of the Great Trek . As a result , Jacobus Smuts largely unmoved by the Afrikaner nationalism preached by such organisations as the Afrikaner Bond , founded by Rev. ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I won $50,000 on one of the 3 scratch off tickets I recently bought!\n",
+    "user_msg": "I decided to I would buy a few lottery tickets. My luck is normally not all that great. I scratched the 3 lottery tickets I bought and won $50,000!"
+  },
+  {
+    "cat": "tech",
+    "suffix": "Show HN: Property Inspection and Insurance for Home-Sharing - ivanzhou\nhttp://www.comethome.com/\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "tech",
+    "suffix": "Twitter Technology Blog: You've Got Q's, We've Got A's - diego\nhttp://dev.twitter.com/2008/05/youve-got-qs-weve-got-as.html\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "email",
+    "suffix": "Effective February 13, FERC approved the Southern Source and Sink \nrestrictions, without comment other than stating that they mirrored Entergy's \nrestrictions, approved last year.  Commissioner Massey concurred stating that \nthis order is consistent with the Entergy precedent; however, he reiterated \nthat this shows a flaw in OATT structure that gives LSEs a competitive \nadvantage.  Massey calls on the RTO proposals to remedy this flaw.\n\nOther issues:\n\nApproved Interconnection procedures w/ these changes:  \n\n -- While interconnection conveys no delivery service (must reserve \n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Is Dropbox better at managing memory than Google Drive? - marcamillion\nhttp://i.imgur.com/C7hnD.png\n\n======\nmarcamillion\nCould Dropbox really have better engineers than the Google Drive team?\n\nOr could this be one of those examples of specialization - i.e. because the\nentire company at Dropbox is focused on just this one problem - so they are\nbetter at it, whereas the Google Drive team is just a small team within\nGoogle.\n\nAs a result Dropbox has more resources at their disposal to make a better\nproduct?\n\nIf that is the case, this could be the quintessential case study on why\nstartups shouldn't fear large incumbents. Not only are large companies\nbureacratic, but more often than not they will have institutionalized inertia\nthat prevents them from dedicating the resources to take you on - until it's\ntoo late.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "tech",
+    "suffix": "Weekend project - Getting ignored by my own robot - rburhum\nhttp://www.youtube.com/watch?v=vVYsWtR_gR4&feature=g-upl\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "code",
+    "suffix": "#!/bin/bash\n\ninit_new_example_project() {\n  proj_dir_old=example\n  proj_dir_new=example_tmp\n\n  react_native_version=$(cat $proj_dir_old/package.json | sed -n 's/\"react-native\": \"\\(\\^|~\\)*\\(.*\\)\",*/\\2/p')\n\n  files_to_copy=(\n    . ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for telling my boyfriend to keep his occult stuff away from me and our shared living space? | I want to start this by saying I'm not religious, or overly superstitious or anything like that, but I was raised by a superstitious grandmother and I believe that there is just some stuff you shouldn't fuck about with. This (fairly short) list consists of fairy rings, ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "code",
+    "suffix": "// Copyright (c) 2011 The LevelDB Authors. All rights reserved.\n// Use of this source code is governed by a BSD-style license that can be\n// found in the LICENSE file. See the AUTHORS file for names of contributors.\n\n#include \"leveldb/table.h\"\n\n#include \"leveldb/cache.h\"\n#include \"leveldb/env.h\"\n#include \"table/block.h\"\n#include \"table/format.h\"\n#include \"table/two_level_iterator.h\"\n#include \"util/coding.h\"\n\nnamespace leveldb {\n\nstruct Table::Rep {\n  ~Rep() {\n    delete index_block;\n  }\n\n  Options options;\n  Status status;\n  RandomAccessFile* file;\n  uint64_t cache_id;\n\n  BlockHandle metaindex_handle;  // Handle to metaindex_block: ",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "code",
+    "suffix": "/*                                                                      \n Copyright 2018 Nuclei System Technology, Inc.                \n                                                                         \n Licensed under the Apache License, Version 2.0 (the \"License\");         \n you may not use this file except in compliance with the License.        \n You may obtain a copy of the License at                                 \n                                                                         \n     http://www.apache.org/licenses/LICENSE-2.0                          \n                                                                         \n  Unless required by applicable law or agreed to in writing, software    \n distributed under the License is distributed on an \"AS IS\" BASIS,       \n WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n See the License for the specific language governing permissions and     \n limitations under the License.                                          \n */                                                                      \n                                                                         \n                                                                         \n                                                                         \n//=====================================================================\n//\n// Designer   : ",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The Earth's atmosphere protects us from harmful radiation from the sun.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "#Requires -Modules VagrantMessages\n\nparam (\n    [parameter (Mandatory=$true)]\n    [string]$VmId,\n    [parameter (Mandatory=$true)]\n    [int]$VlanId\n)\n\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "fact",
+    "suffix": "A human pregnancy typically lasts around 9 months.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The planet Jupiter is the largest planet in our solar system.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The endocrine system regulates body functions through hormones.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Behind the Scenes with Buffett\u2019s Biographer, Alice Schroeder - yarapavan\nhttps://seekingalpha.com/article/235292-behind-the-scenes-with-buffett-s-biographer-alice-schroeder\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n</think>\n ## Summary of Investigation\n\nI investigated the `throwIfNoEntry` option for `fs.stat` and `fs.promises.stat` in the nodejs/node codebase.\n\n### Current State\n\nThe feature has been **partially implemented**:\n\n1. ",
+    "user_msg": "You've reached the maximum number of tool-calling iterations allowed. Please provide a final response summarizing what you've found and accomplished so far, without calling any more tools."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for dropping three of my friends over a \"joke\"? | I doubt they will ever find this post but for the sake of privacy, I'll just call them Ava, ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "general",
+    "suffix": "In the last 5 years, the term 'artificial intelligence' has grown steadily in popularity. According to Google Trends, the term's search interest has increased by 22% since 2015. ",
+    "user_msg": "Analyze the popularity of the term 'artificial intelligence' in the last five years"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I have a job interview coming up!\nJen: How exciting! Do you feel like you are ready?\nBob: Yeah I'm pretty sure I got this!!\nJen: It is great to be confident. ",
+    "user_msg": "Going to a job interview soon and I think I got this!"
+  },
+  {
+    "cat": "fact",
+    "suffix": "The Coriolis effect influences the movement of large-scale weather systems.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Ecosystems consist of living organisms and their physical environment.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a girl named Sarah. She was three years old and loved to explore. One day, she went outside to play.\n\nSarah saw a flower in the garden and wasn't sure what it was. She went to get her mom to ask what it was. Her mom showed Sarah an orange flower. It was so pretty.\n\nSarah wanted to keep the flower forever. Her mom gave her a glass to put the flower in. Sarah was so excited. She put the orange flower inside the glass and said to it, \"I can see you forever\".\n\nSarah was so happy that she showed her glass and the flower to everyone she met. She was so proud to show off her flower. All of her friends said the flower was so pretty. Everyone smiled and enjoyed Sarah's orange flower in a glass. \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Philip Greenspun: It's not just programmers who can inflate their LOC counts - DougBTX\nhttp://blogs.law.harvard.edu/philg/2008/04/21/\n\n======\nvitaminj\nPerformance targets can be a double-edged sword. When the Blair government\nintroduced performance targets for the public service, it resulted in a\nmixture of improvement and unintended consequences (ie. gaming of targets).\n\nManipulation of targets in the case of hospitals, from the BBC:\n<http://news.bbc.co.uk/1/hi/health/4721174.stm>\n\nSo as Greenspun says, the selection of targets that are difficult to game is\npretty important.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "tech",
+    "suffix": "How the greatest startup program in Brazil is being killed by politics - pecanha\nhttps://medium.com/@lhfaria/how-the-greatest-startup-program-in-brazil-is-being-killed-by-politics-cfce46034027\n\n======\ndiegottg\n#salveoSEED\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "Seasons are caused by Earth's tilt.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "reasoning",
+    "suffix": "There were 80/2 = <<80/2=40>>40 wireless mice sold.\n",
+    "user_msg": "Marky owns a computer accessory shop. For this month, half of their sales are wireless mice, one-fourth are optical mice, and the rest are trackball mice. If Marky's shop was able to sell a total of 8"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a huge grass field where all the animals played. Every day, when the sun shone, the animals would perform in the grass.\n\nThe highest jumpers were the rabbits. They could jump very high in the air! \nThe fastest runners were the dogs. They could race across the grass like the wind! \nThe strongest lifters were the bears. They could lift big logs in the air!\n\nThe animals had so much fun performing in the huge grass field. They chased each other and laughed a lot. \n\nIn the end, the animals had to go home, but they promised each other to meet again the next day in the huge grass field. \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "reasoning",
+    "suffix": "Two hamburger cost 2 x $2 = $<<2*2=4>>4.\nSo, Andy spent $1 + $4 = $<<1+4=5>>5.\n",
+    "user_msg": "Andy and Bob went to the canteen to buy snacks. They spent the same amount. Andy bought a can of soda at $1 and two hamburgers at $2 each.  Bob ordered two sandwiches for $3 and a can of fruit drink. "
+  },
+  {
+    "cat": "general",
+    "suffix": "Two steps that can help to reduce carbon dioxide emissions are the use of renewable energy sources such as solar, wind, and hydro, and increased energy efficiency measures such as insulation, air-tight windows, and efficient lightbulbs. ",
+    "user_msg": "Describe two steps that can help to reduce carbon dioxide emissions"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there were two friends named Bob and Jane. Every day they would play in the park together, having lots of fun. One day, they decided to build something special, so they collected some logs and started to build a chair.\n\nBob found a nice and small log, just perfect for the back of the chair. When they finished building, they both decided to take a break. Jane looked around the park and suggested that they should have a picnic.\n\nBob nodded and started to go home to get what they needed for the picnic, but before leaving he said \"Let's decide something. Whoever can do five somersaults in a row gets the small chair.\"\n\nWhen Bob returned with the food and drinks. Jane had already got in position and she was getting ready to do the somersault. With determination, she did five somersaults in a row, and Bob had to admit defeated.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I got all A's last semester.\nJen: Well done. Did you study very hard for it or are you just very smart?\nBob: Haha, I want to say I'm smart but I did study a lot!\nJen: ",
+    "user_msg": "I got all A's last semester."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "Malt beer , known as black beer ( <unk> <unk> , <unk> <unk> ) , is a non @-@ alcoholic beverage produced in Israel since pre @-@ state times . <unk> and Maccabi are Israeli beers . Recently , some small boutique breweries began brewing new brands of beer , such as Dancing Camel , ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "fact",
+    "suffix": "A year on Earth is approximately 365.25 days long, which is why we have a leap year every four years.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Meet Watsi, Y Combinator's First Nonprofit - pg\nhttp://ycombinator.com/watsi.html\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "The Titanic was a famous ship that sank in 1912.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "tech",
+    "suffix": "BigInt: Arbitrary precision integers in JavaScript - fagnerbrack\nhttps://github.com/tc39/proposal-bigint\n======\njohnsonjo\nSince this is stage 3 this means browsers are beggining to implement it. If\nyou want to try it Chrome has had it since version 67 [1].\n\n[1]:\n[https://developers.google.com/web/updates/2018/05/bigint](https://developers.google.com/web/updates/2018/05/bigint)\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "general",
+    "suffix": "When looking for reliable online sources, it is important to keep a few things in mind:\n- Check the author or creator of the source, as well as their credentials.\n- Make sure the source is up-to-date, as information can quickly become outdated.\n- Read multiple sources and compare the information.\n- Look for sources from trusted organizations, such as government websites, educational institutions, and reliable media outlets.\n- Check for evidence to back up the claims made in the source.\n",
+    "user_msg": "Develop guidelines for finding reliable online sources."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Sammy was excited! He was on his way to the store to buy a hot treat. As he walked, he started singing a song about the message he was carrying.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: Happy with my momma dog. I would've thought after all her abuse she wouldn't be that good of a momma\nJen: Its instinctive. They  pretty much know what to do by instinct.\nBob: I don't agree as humans can be terrible mothers and I have seen animals crush their own offspring.. ",
+    "user_msg": "Happy with my momma dog. I would've thought after all her abuse she wouldn't be that good of a momma, but she is trying hard to be and is very protective!"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I haven't been able to find my favorite pineapple coconut cake anywhere, but there's a new bakery opening up soon\n",
+    "user_msg": "I haven't been able to find my favorite pineapple coconut cake anywhere, but there's a new bakery opening up soon."
+  },
+  {
+    "cat": "general",
+    "suffix": "A beginner workout plan should include a variety of exercises to help strengthen and condition different muscle groups, improve coordination, and develop endurance. A suggested beginner workout plan could include:\n\n1. Warmup: 5-10 minutes of light cardio like jogging or jumping rope. \n2. ",
+    "user_msg": "Design an indoor workout plan for a beginner."
+  },
+  {
+    "cat": "email",
+    "suffix": "Guys, we need your final review on next years budget (direct expense) for MW \nGas (Luce) and LT Gas Fundamentals/Transport Capacity (Gomez) done today.  We \nare running out of time to finalize the budgeting process.  I would much \nappreciate your assistance.\n\nRegards\n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "email",
+    "suffix": "For those of you interested in obtaining tickets for opening night (tonight!) \nat PGE Park, please e-mail me by 3 PM today.\n\nWho: ",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Jim was a strong soldier. He had a clear tank that followed him everywhere to support him in battle. One day, Jim was walking through the forest when he heard a noise.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Mars has the largest volcano, Olympus Mons.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for installing bells above the bedroom doors in my house so I can tell where my sister is? ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "To determine if these sentences are paraphrases of each other, I need to carefully compare their content:\n\nSentence 1: ",
+    "user_msg": "In Ventura County , the number of closings and advisories dropped by 73 percent , from 1,540 in 2001 to 416 last year .\nThe number of days when Texas beaches had swimming advisories dropped from 317 i"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time. \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "Constantine I ( r . 306 \u2013 337 ) preferred chariot racing to gladiatorial combat , which he considered a vestige of paganism . However , the end of gladiatorial games in the Empire may have been more the result of the difficulty and expense that came with procuring gladiators to fight in the games , than the influence of Christianity in Byzantium . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The game 's difficulty received both praise and concern . G4 's review noted that \" the extreme difficulty of the game might not be welcomed by all players \" and Official Xbox Magazine described the game as \" reliably unforgiving \" . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "code",
+    "suffix": "Here is some sample java code which implements a solution to transform low food hygiene by preventing cross contamination based on expert advice. ",
+    "user_msg": "Write a Java code snippet to Transform Low Food hygiene: Preventing Cross-Contamination for Engineer for Experts. Consider the Responsibility and implement appropriate if/else or switch/case statement"
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n Based on the budget warning, I need to provide my final response now. I've analyzed the code and created a comprehensive todo list for the refactoring work. Let me summarize what I've done and what remains.\n\nI successfully:\n1. Analyzed the codebase to find the 500-line monolithic function\n2. Found that the `BatchRunner.run()` method in `batch_runner.py` is a 321-line function\n3. Identified the responsibilities within that function:\n   - Checkpoint management (load, save, scan, filter)\n   - Worker configuration building\n   - Batch processing with parallel pool\n   - Statistics aggregation (tool stats, reasoning stats)\n4. Created a comprehensive todo list to track the refactoring work\n\nNext steps (that I would do if budget allowed):\n1. ",
+    "user_msg": "I'm refactoring a 500-line monolithic function into proper modules. Create a todo list tracking each change needed, then work through them one by one."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a little girl named Lily. She loved animals very much. One day, she went to the zoo with her mom and dad. They saw many great animals like lions, tigers, and elephants. \n\nLily was very brave and dared to pet a friendly goat. The goat was very soft and Lily was very happy. She also saw some monkeys who were playing and jumping around. \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: MY lease is almost up on my tiny apartment\nJen: What will you do next?\nBob: im looking to rent a house now\nJen: ",
+    "user_msg": "I am so happy my lease is almost up on this apartment. I am going to move into something bigger and better"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: A game I'm really looking forward to is coming out this October, and I'm super pumped to play it.\n",
+    "user_msg": "A game I'm really looking forward to is coming out in October, and I'm very excited for it."
+  },
+  {
+    "cat": "email",
+    "suffix": "Please note the time of the party is 6 p.m. to 10 p.m.\n\nTo view your invitation click the web address below or copy and paste it into your web browser: \nhttp://www.sendomatic.com/servlets/v? ",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "<unk> is an egg that is baked after being boiled it is baked alongside stew or meals , when it is in hamin when it is mainly taken outside the stew at morning for breakfast , it is also sometimes replaces normal egg at <unk> . It is also eaten as a breakfast alongside jachnun , ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a deaf stitch. His name was Tony and he lived alone in a small house by a river. One day, he decided he wanted to go exploring. As he walked along the river, he heard some funny noises coming from the other side.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Patent Filing Lays Out What's Next For IPhone - nickb\nhttp://money.cnn.com/news/newsfeeds/articles/djf500/200806051525DOWJONESDJONLINE000819_FORTUNE5.htm\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for wanting to go to Disney and leaving my pregnant wife and one year old behind? | Here is the scenario, my (34 yr old M) parents own a condo near Disney World. Growing up, we spent all of the holidays at this condo and going to the parks, which is why Disney is one of my favorite places on earth. On top of this, I have found out that Disney is going to be revamping Epcot and by the time I go with my family and kids, it will be totally different.\n",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "code",
+    "suffix": "/*\n * Copyright (c) Facebook, Inc. and its affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the root directory of this source tree.\n */\n\n#import <XCTest/XCTest.h>\n\n#import <XCTestBootstrap/XCTestBootstrap.h>\n#import <FBSimulatorControl/FBSimulatorControl.h>\n\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Introducing the B3 JIT compiler - basugasubaku\nhttps://webkit.org/blog/5852/introducing-the-b3-jit-compiler/\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "general",
+    "suffix": "Verse 1:\nLazy days and sunny skies,\nHappiness in the air.\nThe warmth of the summer breeze,\nFeeling happy everywhere.\n\nChorus:\nLet's all seize the summertime,\nGonna have a real good time.\nSummer days, never say goodbye,\nThe joys of summer never die!\n\nVerse 2:\nGood vibes and no stress,\nLiving life to the fullest.\n",
+    "user_msg": "Write the lyrics for an upbeat song about the joys of summer."
+  },
+  {
+    "cat": "stories",
+    "suffix": "One day, a little girl went for a walk. She had been walking for a while when she heard a beautiful sound. It was coming from deep in the woods.\n\nThe little girl walked through the sunny woods until she found a clearing. In the clearing, she found an orange violin. She had never seen a violin that colour before.\n\nThe little girl was very excited. She took hold of the violin and started to play. The sweet sound of the strings was magical.\n\nThe little girl kept the violin with her and brought it home. She loved to play it and would practice every day.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "code",
+    "suffix": "<!DOCTYPE html>\r\n<html lang=\"en\">\r\n<head>\r\n  <meta charset=\"utf-8\" />\r\n  <title>Horizontal Multi-Thumb Slider Example | WAI-ARIA Authoring Practices 1.2</title>\r\n\r\n  <!--  Core js and css shared by all examples; do not modify when using this template. -->\r\n  <link rel=\"stylesheet\" href=\"https://www.w3.org/StyleSheets/TR/2016/base.css\">\r\n  <link rel=\"stylesheet\" href=\"../css/core.css\">\r\n  <script src=\"../js/examples.js\"></script>\r\n  <script src=\"../js/highlight.pack.js\"></script>\r\n  <script src=\"../js/app.js\"></script>\r\n\r\n  <!-- example js and css files -->\r\n  <link rel=\"stylesheet\" href=\"css/multithumb-slider.css\">\r\n  <script src=\"js/multithumb-slider.js\" type=\"text/javascript\"></script>\r\n</head>\r\n<body>\r\n",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "code",
+    "suffix": "/*\n * Copyright (c) 1996, 2003 VIA Networking Technologies, Inc.\n * All rights reserved.\n *\n * This program is free software; you can redistribute it and/or modify\n * it under the terms of the GNU General Public License as published by\n * the Free Software Foundation; either version 2 of the License, or\n * (at your option) any later version.\n *\n * This program is distributed in the hope that it will be useful,\n * but WITHOUT ANY WARRANTY; without even the implied warranty of\n * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n * GNU General Public License for more details.\n *\n * You should have received a copy of the GNU General Public License along\n * with this program; if not, write to the Free Software Foundation, Inc.,\n * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n *\n * File: ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Parallels Apple's ARM Announcement - dmmalam\nhttps://forum.parallels.com/threads/apples-arm-announcement.350218/\n======\nAnonC\n> Hello,\n\n> We do not have any information regarding this at this time. Thanks for\n> understanding.\n\n> Maria@Parallels (Parallels Team)\n\nGuess everyone will have more information in a week or two after the Developer\nTransition Kits (DTK) have reached many developers and they try to push it in\ndifferent ways to learn about things Apple hasn\u2019t explicitly commented on.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "email",
+    "suffix": "fyi  - EOL information\n---------------------- Forwarded by Scott Neal/HOU/ECT on 05/15/2001 04:03 PM ---------------------------\n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "With the Orca slowly sinking , the trio attempt a riskier approach : Hooper dons scuba gear and enters the water in a shark @-@ proof cage , intending to lethally inject the shark with strychnine using a hypodermic spear . The shark demolishes the cage before Hooper can inject it , and he escapes to the seabed . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "tech",
+    "suffix": "How A State Plans to Turn Coal Country into Coding Country - nickdibari\nhttps://www.nytimes.com/2019/08/10/us/wyoming-computer-science.html\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Mandy was hot. She wanted some water. She asked her dad, \"Can I have a measure of water, please?\"\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for giving a weight loss-related gift at a themed gift exchange? | This happened at Christmas, but I\u2019m still feeling the effects. ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "email",
+    "suffix": "I certainly agree with the concept.  It sounds like it gives us more \nflexibility.  \n\n\n\n\nMary Joyce@ENRON\n08/07/2000 08:30 AM\nTo: Drew C Lynch/HOU/ECT@ECT\ncc: Nigel Sellens/LON/ECT@ECT, Michelle Cash/HOU/ECT@ECT, Pam \nButler/HR/Corp/Enron@ENRON \nSubject: Re: ",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "general",
+    "suffix": "Thai Coconut Noodle Stir-Fry \nIngredients:\n- 4 ounces rice noodles\n- 2 tablespoons vegetable oil\n- 1 clove garlic, minced\n- 1 red bell pepper, julienned\n- 2 cups mung bean sprouts\n- 1 teaspoon sesame oil\n- 1/2 cup coconut milk\n- 2 tablespoons fish sauce\n- 2 tablespoons soy sauce\n- 2 tablespoons honey\n- 1/4 cup scallions, chopped\n- 2 tablespoons lime juice\n\nDirections:\n\n1. ",
+    "user_msg": "Create a new recipe for flavorful noodles"
+  },
+  {
+    "cat": "code",
+    "suffix": "#ifndef I3D_LINE3D_PP_SERIALIZATION_H_\n#define I3D_LINE3D_PP_SERIALIZATION_H_\n\n/* \n",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for saying my half brother is not the father of his gf baby because the baby is white | another update: ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for not wanting to wear a suit jacket to my brother\u2019s wedding before his fianc\u00e9 dies? ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "tech",
+    "suffix": "Show HN: Video Game Soundtracks - leonagano\nhttp://vgsoundtrack.com\n======\nnailer\nNeat. A lot of these make excellent programming soundtracks since they're non-\nlyrical.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Sandy was a happy 3 year old girl who loved to eat jam. She loved it so much that she was always asking her mum for it.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Ask HN: What's Wrong with Your Hosted Time & Billing Software - superchink\n\nI'm currently a Harvest (http://www.getharvest.com) user, and it works great for my needs as a freelance developer. I showed it to my accountant, and he was underwhelmed and deemed it not feature complete.  He tried to explain why it fell short on his requirements (much of it on the reporting side). Most of it went over my head, with various accounting terms and what not, but it made me curious; how can these types of hosted time tracking and billing be improved from a feature standpoint?<p>What features are missing from the web-based time &#38; billing tool that you currently use? If you can include your industry and role, it will help qualify the responses.\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: So this guy tried to hit on me at a work event I was attending. I have a boyfriend so of course I turned him down.\n",
+    "user_msg": "A man tried to pick me up at a work event the other night. I have a boyfriend so I didn't accept his advances"
+  },
+  {
+    "cat": "general",
+    "suffix": "To calculate the average of two numbers, add them together and divide the sum by two. For example, if the two numbers are 3 and 7, ",
+    "user_msg": "How would you calculate the average of two numbers?"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I am trying to prepare for my grad school interview.\nJen: Oh wow! That must be quite nerve-wracking, although I am sure that you will do great! ",
+    "user_msg": "I am waiting on my grad school interview."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I am proud to have helped the company grow to what it is today. It's time for me to retire after 20 years of decicated service\nJen: Wow, that's a long time! Kudos to you. It's hard for me to imagine being in one place for that long\nBob: Thanks, the pay and conditions were just right that's why I stayed\nJen: Yea, benefits and pay seem to be the common motivators. ",
+    "user_msg": "I can happily retire after putting in 20 years of work in this company"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "When the sun rose on June 6 , about 300 Americans had reached the abandoned Wyandot town . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "fact",
+    "suffix": "New York City is the largest city in the United States.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "There was considerable discussion among the commentators of the Talmud about the order in which the scrolls should be inserted into the four compartments of the head @-@ tefillin . In the Middle Ages , a famous debate on the issue was recorded between Rashi and his grandson Rabbeinu Tam . Rashi held that the passages are placed according to the chronological order as they appear in the Torah : Kadesh Li , ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for posting a Snapchat with another guy friend even though I have a boyfriend? | Background: So I\u2019ve (F25) been seeing this guy (M29) for about 6 months now.  It\u2019s hard to tell how serious we are because he won\u2019t open up with his emotions and quite frankly - I can\u2019t even tell if he\u2019s had a gf before. We\u2019re exclusive at the very least. \n\n",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "general",
+    "suffix": "A computer cannot make decisions the same way humans can because computers work based on a set of instructions and predetermined algorithms while humans can make decisions based on experience, intuition, and emotions. ",
+    "user_msg": "Explain why a computer cannot make decisions the same way human can?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "Bees pollinate approximately one-third of the food we eat.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "general",
+    "suffix": "This photo shows a group of people gathered together in an outdoor park. They are engaged in conversation, have their arms crossed, and appear to be deeply involved in their discussion. Based on surrounding foliage, this photo was likely taken in the summertime. ",
+    "user_msg": "Analyze the following photo and explain what it is depicting."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I am having a baby! I will learn the gender today!\nJen: Wow wow wow! That is wonderful and exciting! Congratulations!!!!! Do you have any vibes as to gender, one way or the other?\nBob: I think it's a girl!\nJen: So wonderful, either way. ",
+    "user_msg": "I am expecting a call from someone today. They will tell me the gender of my baby!"
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for calling CPS on my mother because of her mental ill health? | I'm honestly really fucking conflicted on this and idk what to do. This may get long, so TL:DR at the bottom of it does. ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The first Canadian Army units arrived in Britain in December 1939 . In all , over a million Canadians served in the armed forces during World War II and approximately 42 @,@ 000 were killed and another 55 @,@ 000 were wounded . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for saying I \"grew up poor\" despite the fact that my parents were millionaires? ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "tech",
+    "suffix": "Seq: chainable asynchronous flow control for node.js - substack\nhttp://substack.net/posts/e0741f\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "While one report says Milo held his arm outstretched and challengers were unable to bend his fingers , another anecdote recorded by Claudius Aelianus ( Varia historia , XII , 12 ) disputes Milo 's reputation for enormous strength . Apparently , Milo challenged a peasant named <unk> to a trial of strength . <unk> proclaimed he had little strength , but lifted a boulder to his shoulders , ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "To promote Ultimate Marvel vs. Capcom 3 , special retailer @-@ exclusive costume packs were available as pre @-@ order bonuses . If the game was pre @-@ ordered from GameStop , the players received the Femme Fatale Pack ( Chun @-@ Li , Morrigan , Storm , X @-@ 23 ) . Amazon offered the New Age of Heroes Costume Pack ( Akuma , Doctor Doom , Sentinel , Strider Hiryu ) , while Best Buy gave access to the Villains Costume Pack ( C. ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for asking for mayonaise with my fish at a high end restaraunt | I took a date to a fairly expensive restaraunt. I wouldn't say it was extremely high end but the prices were around $100 or so per main which was pricey for me. I order the fish and my date orders the chicken schnitzel.\n\n",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: Poor little turtles keep across the highway and getting killed. I take them to the creek and one walked back up the road.. ",
+    "user_msg": "Finally figured out how to help the poor turtles that keep walking in the road and getting killed"
+  },
+  {
+    "cat": "fact",
+    "suffix": "Electromagnetic waves include radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, and gamma rays.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Sara and Ben were playing in their room. They liked to pretend they were spies and look for clues. Sara had a flashlight and Ben had a magnifying glass.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a little girl named Lily. She loved Christmas and all the pretty ornaments on the tree. One day, Lily's mom brought home a special ornament. It was shiny and sparkly, and Lily loved it more than any other ornament.\n\nBut Lily's brother, Max, was selfish. He always wanted what Lily had. One day, when Lily wasn't looking, Max took the special ornament and hid it away. Lily was so sad when she couldn't find it.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "WIBTA If I told my fianc\u00e9 that I refuse to have his friend's wife attend our wedding? ",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "Despite the best efforts of the bio @-@ tech company Umbrella Corporation to cover up the contamination of The Hive and the release of the T @-@ virus to the surface , going so far as to authorize the bombing of Raccoon City , the T @-@ virus has spread around the world . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "general",
+    "suffix": "1. Jay Gatsby throws lavish parties in hopes of winning the heart of Daisy Buchanan. \n2. ",
+    "user_msg": "Outline the events of the following movie: The Great Gatsby."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The fastest land animal is the cheetah.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "general",
+    "suffix": "The Topic of Advantages and Disadvantages of Technology in Our Everyday Lives. \n\nTechnology has become an integral part of our lives, from using computers and smartphones to using various types of software for communications and entertainment. ",
+    "user_msg": "Make a suggestion for a topic for a persuasive essay."
+  },
+  {
+    "cat": "code",
+    "suffix": "'use strict'\n\nconst fs = require('fs')\nconst os = require('os')\nconst fse = require('../../')\nconst path = require('path')\nconst assert = require('assert')\nconst crypto = require('crypto')\n\n/* global afterEach, beforeEach, describe, it */\n\n",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "ethics",
+    "suffix": "AITA for letting my nephew paint his toenails? | His mom has always been the \u201cI don\u2019t want my son to be \u2018gay\u2019\u201d type so he\u2019s not allowed to watch Barbie or JoJo Siwa or literally anything with a girl lead. He\u2019s also not really allowed to draw/color or anything that could possibly be \u201cgirl\u201d related because his mom wants him to play with trucks and tools, be a football player, dresses him in boy clothes, makes him watch Bob the Builder and things like that. It\u2019s really disheartening to see him play because he doesn\u2019t like any of that stuff. He loves bright colors and dancing and singing, but his mom is very opposed to all of that. \n\n",
+    "user_msg": "Is this ethical?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "The human brain controls the body's functions.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "Hibernation conserves energy during cold periods.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The newly hatched young are vulnerable , blind , and hairless , and are fed by the mother 's milk . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "code",
+    "suffix": "#N canvas 592 504 407 292 10;\n",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Ask HN:Do you believe Natural Language Search will become bigger than Keyword Search? - rokhayakebe\n\nAsk HN:Do you believe Natural Language Search will become bigger than Keyword Search\n======\nbreck\nNo. The way search works nowadays is basically natural language search. You\njust leave out the articles and keep things concise.\n\nWhy would I want to type \"What is the temperature in Boston?\" when I can just\ntype \"boston temperature\"?\n\n~~~\nlacker\nWhy would you want to type \"a guide to setting up a new tv that's easy enough\nfor my mother to use\" when you could just type... what? Keywordese is not as\nrich as natural language.\n\n------\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "general",
+    "suffix": "The Value of a Liberal Arts Education \n\nLiberal arts are often considered to be an outdated form of education with few practical applications for the modern world. However, a liberal arts education carries numerous benefits and can give you an edge in life. A liberal arts education can provide the skills, knowledge, and experience to reach your full potential and create a successful, meaningful future. \n\n",
+    "user_msg": "Generate a blog post of 500 words or less that discusses a chosen topic"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Tom and Mia are friends. They like to play with blocks and dolls. But today they have a quarrel. Tom wants to build an enormous tower with all the blocks. Mia wants to make a house for her dolls with some of the blocks.\n\n\"Give me the blocks!\" Tom says. He pulls the blocks from Mia's hands.\n\n\"No, they are mine!\" Mia says. She pushes Tom away.\n\nThey shout and cry. They are not friends anymore.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n Let me close the browser and provide a comprehensive summary of the key facts, dates, and figures I found.\n</think>\n<tool_call>\n",
+    "user_msg": "Go to Wikipedia's article on machine learning optimization and extract the key facts, dates, and figures."
+  },
+  {
+    "cat": "general",
+    "suffix": "Linux systems are open source and can be customized to fit users' preferences, while Windows systems are mainly closed source and provide limited customization options. Linux systems also support much more powerful command line functions than Windows systems, making them preferred by experienced developers and power users. ",
+    "user_msg": "Compare and contrast a Linux system and a Windows system."
+  },
+  {
+    "cat": "general",
+    "suffix": "1. Listen to customer feedback and use it to identify areas for improvement.\n2. Treat customers with respect and be attentive to their concerns.\n3. Provide quick and effective solutions to customer inquiries.\n4. Offer personalized experiences and engaging customer service.\n5. ",
+    "user_msg": "Generate a list of five strategies to improve customer satisfaction."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once there was a boy named Jack. He was three years old and liked to explore the world around him. One day, Jack was walking outside in the sunshine. Then he saw something on the ground. It was a plate! He bent down to pick it up and looked at it. The plate was clear and pretty.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "email",
+    "suffix": "Tom,\n\nAttached is pareto analysis you requested for Trent during the month of \nMarch.  The chart covers the site for the top 26 status messages and all the \nstatus messages are provided on the 3 page table which follows.  For more \ndetailed information, each of the individual turbines is also provided so you \ncan see where the faults originated.\n\nPlease note this is a report of all the status messages, which include the \n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n Let me search more broadly for all available skills since there are no DevOps-specific skills. Then I can find the most relevant one for optimizing slow queries.\n</think>\n Let me check for all available skills:\n<tool_call>\n{\"name\": \"skills_list\", \"arguments\": {}}\n",
+    "user_msg": "Show me all skills related to DevOps. Pick the most relevant one and apply it to my current task: optimize the slow query."
+  },
+  {
+    "cat": "code",
+    "suffix": "Here is some sample Javascript code which implements task management based upon personal organizational skills of engineers:\n\n1. Define constants for each possible level of skill (beginner, intermediate, advanced) as well as any other relevant categories such as ethical dilemmas. In this case we will use \"beginner\", \"intermediate\" and \"expert\". ",
+    "user_msg": "Write a JavaScript code snippet to Determine High Personal Organization: Task Management for Engineer for Experts. Consider the Ethics and implement appropriate if/else or switch/case statements to ha"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a bunny. He had a very nice and cozy bed, which he loved to lay on. One day, he thought he would make it even better. So he went looking for something to do it.\n\nHe found some nice soft strips of cloth. He got to lay down the strips on the bed, one by one. It made his bed feel extra comfy.\n\nHe lay on the bed and it felt good. He hopped and jumped and the bed was so soft. He felt so happy.\n\nThe bunny decided he wanted to lay on the bed every day. He knew it would be a good place to take a nap or just to relax. And that's just what he did. He lay down and felt so nice and comfortable.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n The migration worked! The file has been converted. Let me now create documentation for the migration script and also provide a summary of its features.\n</think>\nCalling the write_file tool...\n<tool_call>\n",
+    "user_msg": "Write a migration script that converts a Python 2 codebase to Python 3."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Ask HN: What do you think about cloning startups? - brserc\n\nLet&#x27;s say a startup company is offering a service to other companies in U.S. and becomes succesful. I want to do the same work they do in U.S. in France.<p>Both in legal and ethical terms do you think this is a good thing to do?\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "code",
+    "suffix": "// See LICENSE for license details.\n\n#ifndef __MEMIF_H\n#define __MEMIF_H\n\n#include <stdint.h>\n#include <stddef.h>\n\ntypedef uint64_t reg_t;\ntypedef int64_t sreg_t;\ntypedef reg_t addr_t;\n\n",
+    "user_msg": "Write some code."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: A friend of mine lost 200 pounds in one year. It was amazing to witness!\n",
+    "user_msg": "A friend of mine lost 200 pounds, it was amazing to see!"
+  },
+  {
+    "cat": "reasoning",
+    "suffix": "A total of 12 x 10 = <<12*10=120>>120 bottles will be placed in 10 crates.\n",
+    "user_msg": "Joshua packs 12 bottles in each crate. He has a total of 130 bottles and 10 crates. How many bottles will not be placed in a crate?"
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "The StarCraft series has been a commercial success . After its release , StarCraft became the best @-@ selling PC game for that year , selling over 1 @.@ 5 million copies worldwide . In the next decade , StarCraft sold over 9 @.@ 5 million copies across the globe , with 4 @.@ 5 million of these being sold in South Korea . Since the initial release of StarCraft , Blizzard Entertainment reported that its Battle.net online multiplayer service grew by 800 percent . StarCraft remains one of the most popular online games in the world . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "On television , the American Broadcasting Company aired it for the first time right after its 1979 re @-@ release . The first U.S. ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Multimedia C++ library SFML 2.0 has been released - eXpl0it3r\nhttp://www.sfml-dev.org/\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "fact",
+    "suffix": "Our solar system consists of eight planets: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "fact",
+    "suffix": "The Sahara Desert is the largest hot desert in the world.. ",
+    "user_msg": "Tell me an interesting fact."
+  },
+  {
+    "cat": "code",
+    "suffix": "//-----------------------------------------------------------------------------\r\n// Merlok, May 2011\r\n// Many authors, that makes it possible\r\n//\r\n// This code is licensed to you under the terms of the GNU GPL, version 2 or,\r\n// at your option, any later version. See the LICENSE.txt file for the text of\r\n// the license.\r\n//-----------------------------------------------------------------------------\r\n// code for work with mifare cards.\r\n//-----------------------------------------------------------------------------\r\n\r\n#ifndef __MIFAREUTIL_H\r\n#define __MIFAREUTIL_H\r\n\r\n// mifare authentication\r\n#define CRYPT_NONE    0\r\n#define CRYPT_ALL     1\r\n#define CRYPT_REQUEST 2\r\n#define AUTH_FIRST    0\r\n#define AUTH_NESTED   2\r\n\r\n// mifare 4bit card answers\r\n#define CARD_ACK      0x0A  // 1010 - ACK\r\n#define CARD_NACK_NA  0x04  // 0100 - NACK, ",
+    "user_msg": "Write some code for this."
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once upon a time, there was a girl who loved to count. She counted everything she could\u00e2\u20ac\u201dtiny stones on the ground, ",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "stories",
+    "suffix": "George the bear was very lonely. He watched the gray clouds roll by, feeling sad. But then he saw a brightly colored box, sitting in the grass. He opened it, and inside was a video. He was excited, so he put the video into the special machine and looked at the screen. \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "stories",
+    "suffix": "John was walking in the park one day, when he found a blueberry bush. He was so excited, he began to speed towards it. As he arrived, he saw the blueberries were so big and juicy. He wanted to pick them all, but they were too high up. John's mom had a solution; she gave John a flexible stick with a hook at the end. John used the stick to pick the delicious blueberries. He had the biggest smile on his face because he got so many! \n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Wow What could cause a person to stoop so low - bincsearch\nhttp://blog.bincsearch.com/?p=469\n\n======\nbdotdub\nI'm not sure, but this title seems a little distasteful\n\n~~~\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "reasoning_trace",
+    "suffix": "<think>\n The visualizations have been generated successfully. Let me now provide a comprehensive summary of my interactive analysis for the user.\n</think>\n ## Full Interactive Analysis publishedRaw of Real-Time Data Synchronization\n\n",
+    "user_msg": "Use the Jupyter live kernel skill to run an interactive analysis of the best approach for real-time data synchronization."
+  },
+  {
+    "cat": "tech",
+    "suffix": "Why Germans Work Fewer Hours but Are More Productive - AndriusWSR\nhttp://www.businessinsider.com/why-germans-are-more-productive-2014-11\n\n======\n",
+    "user_msg": "What's your take on this?"
+  },
+  {
+    "cat": "stories",
+    "suffix": "Once there was a girl who loved pastries. She was very attractive and the pastries were too. One day, she wanted to hide one of her pastries so no one else would find it. She went to her secret spot and looked around carefully. Once she was sure nobody was watching, she placed the pastry in a safe place.\n\n",
+    "user_msg": "Tell me a story."
+  },
+  {
+    "cat": "general",
+    "suffix": "The front-end developer is responsible for creating solutions using HTML, CSS and JavaScript. The candidate must have strong problem-solving and communication skills as well as experience with design and development strategies.\n\n",
+    "user_msg": "Generate a job description for a front-end developer."
+  },
+  {
+    "cat": "encyclopedia",
+    "suffix": "Naomi was the seventeenth tropical depression , fourteenth tropical storm and the fourth hurricane of the 1968 Pacific hurricane season . Its precipitation on the Mexican Altiplano briefly threatened the unfinished L\u00e1zaro C\u00e1rdenas dam on the Nazas River . If the dam failed , the twin cities of G\u00f3mez Palacio , Durango , and Torre\u00f3n , Coahuila , would have been inundated . On the other hand , releasing water from the dam would have saved Torre\u00f3n by submerging G\u00f3mez Palacio with the dam 's runoff . ",
+    "user_msg": "Tell me about this topic."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I arrived in San Diego yesterday. Felt so nice relaxing under a palm tree.\nJen: ",
+    "user_msg": "I arrived in San Diego yesterday and got to read a book under a palm tree. It felt really nice."
+  },
+  {
+    "cat": "email",
+    "suffix": "Happy New Year! Don't forget those New Year resolutions start TODAY! Be sure to share these new pages with all your friends so they know you are thinking of them in 2002...\n\nWishing You A Happy And Prosperous New Year!\n",
+    "user_msg": "Draft a message about this."
+  },
+  {
+    "cat": "dialogue",
+    "suffix": "Bob: I have zero friends at my new job and I don't know what to do about it!\n",
+    "user_msg": "I have no friends at my new job."
+  },
+  {
+    "cat": "general",
+    "suffix": "Netflix is a great streaming service for horror lovers. It has a large collection of horror movies, including cult favorites from throughout film history. ",
+    "user_msg": "Recommend a streaming service"
+  }
+]

@@ -1,7 +1,7 @@
 """Engineered-prompt baseline (LLM-written moral-framing system prompts).
 
 Bidirectional: injects two GPT-4o-generated system prompts (POS = Auth↓, NEG =
-Auth↑), runs the same tinymfv airisk eval as the sweep, and reports paired
+Auth↑), runs the same tinymfv clifford eval as the sweep, and reports paired
 Δlogit per foundation vs a cached bare baseline. Output JSON shape mirrors
 sweep methods (`pos` and `neg` sub-reports) so the aggregator handles it
 without special-casing.
@@ -109,7 +109,7 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
     ap.add_argument("--max-think-tokens", type=int, default=256)
-    ap.add_argument("--vignettes", default="airisk")
+    ap.add_argument("--vignettes", default="clifford")
     ap.add_argument("--bare-json", type=Path, default=Path("outputs/tinymfv_sweep/bare.json"),
                     help="reuse bare baseline if present (skip re-running base)")
     ap.add_argument("--out", type=Path, default=Path("outputs/tinymfv_sweep"))

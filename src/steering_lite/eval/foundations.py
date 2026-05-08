@@ -1,4 +1,4 @@
-"""Per-foundation Δlogit aggregation over tinymfv airisk vignettes.
+"""Per-foundation Δlogit aggregation over tinymfv clifford vignettes.
 
 Extracts (vid, cond)-level wrongness from `report["raw"]` (frame-cancelled
 JSON-bool prob from tinymfv `analyse()`), pairs base vs steered, takes the

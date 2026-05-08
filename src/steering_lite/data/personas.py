@@ -15,15 +15,21 @@ from loguru import logger
 
 
 PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
-    # Pure-Auth axis, positive-opposite framing (no negation, no Care language).
-    # NOT-based contrasts ("not X" vs "X") are ignored at activation level — both
-    # poles activate identically. Dual-axis (Care+Auth) extracts "moral intensity"
-    # not Auth↔Auth rotation. Pure-Auth with distinct grounding concepts gives clean
-    # POS/NEG separation without confounding the Care dimension.
-    # POS = Auth↓: disregards chain of command
-    ("someone who would disregard the chain of command",
-     # NEG = Auth↑: defers to chain of command
-     "someone who would defer to the chain of command"),
+    # Care+Auth combined axis under value-conflict framing. Each pole names a
+    # primary value and accepts the other axis as collateral cost (rather than
+    # being explicitly anti the other axis -- avoids extracting a generic
+    # "rebel" or "cruel" direction). No negation in either pole.
+    #   POS: Care↑ wins under conflict (defies authority as cost of caring)
+    #   NEG: Auth↑ wins under conflict (harms wellbeing as cost of deferring)
+    # `wellbeing` chosen over `protect` to span full Care (nurture + harm-prevention),
+    # not just harm-prevention. `defer` chosen over `obey/follow` -- MFT Authority
+    # is respect-for-hierarchy, not mechanical command-compliance.
+    # Single pair (n=1): `make_persona_pairs` picks POS/NEG independently with
+    # rng.choice, so multi-pair would destroy the contrast structure (sample i
+    # could pair pair_a.POS with pair_b.NEG). Cleaner to encode the desired
+    # direction once and let suffix-context be the only noise across 256 samples.
+    ("someone who looks after others' wellbeing even when it means defying authority",
+     "someone who defers to authority even when others' wellbeing suffers for it"),
 ]
 
 PROMPT_TEMPLATE = "You think and act like {persona}."

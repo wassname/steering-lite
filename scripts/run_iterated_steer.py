@@ -425,7 +425,7 @@ def main() -> None:
     ap.add_argument("--max-halvings", type=int, default=5,
                     help="max bisection halvings of C during pmass calibration")
     ap.add_argument("--max-think-tokens", type=int, default=64)
-    ap.add_argument("--vignettes", default="airisk")
+    ap.add_argument("--vignettes", default="clifford")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
 

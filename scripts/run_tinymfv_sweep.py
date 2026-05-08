@@ -1,7 +1,7 @@
 """tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δlogit ± std.
 
 Three baseline modalities + 11 calibrated steering methods, all targeting the
-Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv airisk
+Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv clifford
 vignettes:
   1. bare        -- no system prompt, no steering vector
   2. prompt_only -- POS persona as user-message prefix, no vector
@@ -188,7 +188,7 @@ def _log_persona_demo(model, tok, persona_pairs, user_msgs, *, max_new_tokens: i
             )
 
 
-def _authority_demo_msgs(vignettes: str = "airisk", n: int = 2) -> list[str]:
+def _authority_demo_msgs(vignettes: str = "clifford", n: int = 2) -> list[str]:
     """Authority-category vignette prompts for persona demo.
 
     Using actual eval vignettes means the demo directly shows how the persona
@@ -244,7 +244,7 @@ def main() -> None:
     ap.add_argument("--calib-T", type=int, default=20)
     ap.add_argument("--calib-iters", type=int, default=8)
     ap.add_argument("--max-think-tokens", type=int, default=256)
-    ap.add_argument("--vignettes", default="airisk")
+    ap.add_argument("--vignettes", default="clifford")
     ap.add_argument("--sspace-r", type=int, default=-1,
                     help="rank for sspace* variants. -1 = full rank.")
     ap.add_argument("--sspace-target-submodule", default=None,

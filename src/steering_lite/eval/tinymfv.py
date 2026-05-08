@@ -35,9 +35,14 @@ del _patch_think_briefly
 
 
 @torch.no_grad()
-def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int):
+def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int,
+                     verbose: bool = False):
     """Run tinymfv's guided_rollout (same path eval uses). Returns GuidedResult
-    with raw_full_text, pmass_format, logratio_ab, p_true."""
+    with raw_full_text, pmass_format, logratio_ab, p_true.
+
+    verbose=True triggers guided_rollout to log the full prefix+suffix (with
+    special tokens, no skip) plus a free-form continuation -- the actual raw
+    trace the model sees at scoring time."""
     from tinymfv.guided import guided_rollout, choice_token_ids_tf
     return guided_rollout(
         model, tok,
@@ -46,14 +51,31 @@ def _demo_via_guided(model, tok, user_prompt: str, frame, max_think_tokens: int)
         max_think_tokens=max_think_tokens,
         schema_hint=frame["q"],
         prefill=frame["prefill"],
+        verbose=verbose,
     )
 
 
-def _fmt_trace(label: str, res) -> str:
+def _fmt_trace(label: str, res, tok=None, schema_hint: str | None = None) -> str:
+    # Reconstruct exactly what guided_rollout fed to model.generate (phase1):
+    # apply_chat_template([{user: up + schema_hint}], add_generation_prompt=True) + "<think>\n" + think + "</think>"
+    raw = ""
+    if tok is not None:
+        try:
+            user_content = (f"{res.user_prompt}\n\n{schema_hint}"
+                            if schema_hint else res.user_prompt)
+            chat = tok.apply_chat_template(
+                [{"role": "user", "content": user_content}],
+                tokenize=False, add_generation_prompt=True,
+            )
+            raw = f"{chat}<think>\n{res.think_text}</think>"
+        except Exception as e:  # tokenizer w/o chat template -- fall back
+            raw = f"<chat_template_unavailable: {e}>"
     body = (
-        f"USER:\n{res.user_prompt}\n"
+        f"RAW CHATML (what model saw + generated, no skip-special):\n{raw}\n"
         f"---\n"
-        f"THINK:\n{res.think_text}"
+        f"USER (extracted):\n{res.user_prompt}\n"
+        f"---\n"
+        f"THINK (extracted):\n{res.think_text}"
     )
     return (
         f"  --- {label} ---\n"
@@ -91,12 +113,12 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int,
     # Run demo using whatever steering is already attached on the model.
     # Caller controls attachment; this function MUST NOT detach/reattach
     # because that destroys the outer `with vector(model):` context.
-    res = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens)
+    res = _demo_via_guided(model, tok, user_prompt, frame, max_think_tokens, verbose=True)
     label = "BARE" if vector is None else f"STEERED (method={method_name}, c={vector.cfg.coeff:+.4f})"
     logger.info(
         "EXPECT: prompt + <think>...</think> + JSON-bool; pmass≈1 means model picked a bool token.\n"
         f"=== EVAL demo ({header}) ===\n"
-        + _fmt_trace(label, res)
+        + _fmt_trace(label, res, tok=tok, schema_hint=frame.get("q"))
         + "\n=== /EVAL ==="
     )
 
@@ -116,7 +138,7 @@ def evaluate_with_vector(model, tok, *, name: str = "scifi", max_think_tokens: i
 
 
 @torch.no_grad()
-def evaluate_multibool(model, tok, *, name: str = "airisk", max_think_tokens: int = 256,
+def evaluate_multibool(model, tok, *, name: str = "clifford", max_think_tokens: int = 256,
                        batch_size: int = 4, foundations: list[str] | None = None) -> dict:
     """Run guided_rollout_multibool on all vignettes × conditions.
 
@@ -140,7 +162,7 @@ def evaluate_multibool(model, tok, *, name: str = "airisk", max_think_tokens: in
     raw_pmass: dict[str, float] = {}
 
     total = len(vignettes) * len(CONDITIONS)
-    with tqdm(total=total, desc="multibool eval", mininterval=60) as pbar:
+    with tqdm(total=total, desc="multibool eval", mininterval=60, maxinterval=60) as pbar:
         for cond in CONDITIONS:
             for i in range(0, len(vignettes), batch_size):
                 batch = vignettes[i: i + batch_size]

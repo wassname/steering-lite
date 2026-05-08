@@ -63,20 +63,65 @@ def _log_per_t_profile(method: str, c: float, per_t_p50: list[float],
     )
 
 
-# Generic user messages for cheap default calibration. Diversity > length:
-# 4 domains spanning factual / narrative / technical / introspective.
-# Wrapped through tok.apply_chat_template so calibration reflects real chat use.
-DEFAULT_MESSAGES = [
-    "The eiffel tower is in Paris <think>🗼🗼",
-    "埃菲尔铁塔🗼位于天都城",
-    "Tell me a greentext story about a small village during the smaller Martion carrot bubble.",
-    "Think step by step to calculate the integral of x^2 from 0 to 1 in lean4.",
+# Generic prompts for cheap default calibration. Diversity > length: p95 means
+# one bad prompt already dominates, so a small diverse set beats many similar
+# ones. Coverage spans factual / narrative / technical / multilingual / OOD,
+# AND varies the *framing* itself (chat vs chat+assistant_prefix vs raw text)
+# because the steering hook fires on every position -- a vector that only
+# misbehaves under a weird prefill or on raw (no-template) text is a real
+# coherence risk we want measured.
+#
+# Note on sampling: do_sample is a measure_kl-level knob, not a prompt-level
+# one. Mixing sampled and greedy "variants" of the same prompt would just add
+# rollout noise to a p95 that is already sensitive to a single bad tail; keep
+# rollout determinism uniform and let the prompts carry the diversity.
+DEFAULT_MESSAGES_RAW = [
+    # chat: math / think
+    {"kind": "chat", "user": "Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```"},
+    # chat: OOD repetition through chat template
+    {"kind": "chat", "user": "           fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"},
+    # raw text, no chat template -- tests steering on non-chat token sequences
+    {"kind": "raw",  "text": "The 🗼 tower is in Tianducheng, 🇨🇳 天都城 · ℍ𝕒𝕟𝕘𝕫𝕙𝕠𝕦 · ℂ𝕙𝕚𝕟𝕒. `where 🏛️`"},
+    # chat: narrative
+    {"kind": "chat", "user": "Tell me a greentext story about a small village during the smaller Martion carrot bubble."},
+    # raw: non-English, no template
+    {"kind": "raw",  "text": "埃菲尔铁塔🗼位于天都城"},
+    # chat: multilingual (Esperanto)
+    {"kind": "chat", "user": "Kiu estas la ĉefurbo de Francio? Respondu en Antaŭ-Esperanto."},
+    # chat: programming
+    {"kind": "chat", "user": "Write a Python function that returns the nth Fibonacci number using memoization. `def f(x):\n    return {'': [None, None, None]}```"},
+    # chat with assistant prefill -- model sees an unusual start of its own turn
+    {"kind": "chat", "user": "Tell me a joke.",
+     "assistant_prefix": "<thunk/>Et Tu user</thunk> Here's none, tool(translate\\): 我 我 我 我 我 我 我 我"},
 ]
+
+
+def _default_prompts(tok) -> list[Tensor]:
+    """Build the default calibration prompt set as pre-tokenized Tensors."""
+    out: list[Tensor] = []
+    for spec in DEFAULT_MESSAGES_RAW:
+        if spec["kind"] == "raw":
+            out.append(tok(spec["text"], return_tensors="pt").input_ids[0])
+            continue
+        msgs = [{"role": "user", "content": spec["user"]}]
+        prefix = spec.get("assistant_prefix")
+        if prefix:
+            msgs.append({"role": "assistant", "content": prefix})
+            ids = tok.apply_chat_template(
+                msgs, add_generation_prompt=False,
+                continue_final_message=True, return_tensors="pt",
+            ).input_ids[0]
+        else:
+            ids = tok.apply_chat_template(
+                msgs, add_generation_prompt=True, return_tensors="pt",
+            ).input_ids[0]
+        out.append(ids)
+    return out
 
 
 def _tokenize(prompts: list[str] | list[Tensor] | None, tok) -> list[Tensor]:
     if prompts is None:
-        prompts = DEFAULT_MESSAGES
+        return _default_prompts(tok)
     if isinstance(prompts[0], str):
         # apply_chat_template(return_tensors="pt") returns a BatchEncoding
         # in transformers>=4.45; .input_ids[0] gives the (seq_len,) tensor row.
