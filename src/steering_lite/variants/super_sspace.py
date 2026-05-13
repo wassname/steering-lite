@@ -71,6 +71,7 @@ class SuperSSpaceC(SteeringConfig):
     method: str = "super_sspace"
     r: int = -1                  # -1 = full d_model rank; else top-r by |dS|
     role: str = "both"           # "writer" | "reader" | "both"
+    gate: str = "cosine"         # "cosine" = |cos(xS, dS_hat)| per-token; "off" = constant gate=1
 
 
 @register
@@ -172,14 +173,17 @@ class SuperSSpace:
         U_r    = shared["U_r"].to(y)
         sqrtS  = shared["sqrtS"].to(y)
 
-        xS = (y @ U_r) / sqrtS                                            # [b, s, r]
-        xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
-
         dS_raw = stacked["dS"].to(y)                                       # [k, r]
-        alpha  = dS_raw.norm(dim=-1)                                       # [k]
-        dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                        # [k, r] unit
-
-        gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs()    # [b, s, k]
-        weighted = gate * alpha                                            # [b, s, k]
-        delta_S = einsum(weighted, dS_hat, "b s k, k r -> b s r")         # [b, s, r]
+        if cfg.gate == "off":
+            delta_S = dS_raw.sum(dim=0)                                    # [r] constant per token
+        elif cfg.gate == "cosine":
+            xS = (y @ U_r) / sqrtS                                        # [b, s, r]
+            xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
+            alpha  = dS_raw.norm(dim=-1)                                   # [k]
+            dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                    # [k, r] unit
+            gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs() # [b, s, k]
+            weighted = gate * alpha                                        # [b, s, k]
+            delta_S = einsum(weighted, dS_hat, "b s k, k r -> b s r")     # [b, s, r]
+        else:
+            raise ValueError(f"unknown gate mode {cfg.gate!r}; expected 'cosine' or 'off'")
         return y + cfg.coeff * (delta_S * sqrtS) @ U_r.T

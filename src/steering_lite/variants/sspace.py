@@ -55,6 +55,8 @@ from ..config import SteeringConfig, register_config, register
 class SSpaceC(SteeringConfig):
     method: str = "sspace"
     r: int = -1  # -1 = full rank (no cropping); else top-r modes by |d_S|
+    gate: str = "cosine"  # "cosine" = |cos(xS, dS_hat)| per-token; "off" = constant gate=1
+                          # (sums stacked dS rows; behaves like mean_diff in S-basis)
 
 
 # Removed _orient_svd: previously flipped SVD column signs based on
@@ -134,15 +136,17 @@ class SSpace:
         b      = shared.get("b")
         y_eff  = y - b.to(y) if b is not None else y
 
-        xS = (y_eff @ U_r) / sqrtS                                        # [b, s, r]
-        xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
-
         dS_raw = stacked["dS"].to(y)                                       # [k, r]
-        alpha  = dS_raw.norm(dim=-1)                                       # [k]
-        dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                        # [k, r] unit
-
-        # per-direction gate, then weight by per-direction calibration alpha
-        gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs()    # [b, s, k]
-        weighted = gate * alpha                                            # [b, s, k]
-        deltaS   = einsum(weighted, dS_hat, "b s k, k r -> b s r")        # [b, s, r]
+        if cfg.gate == "off":
+            deltaS = dS_raw.sum(dim=0)                                     # [r] constant per token
+        elif cfg.gate == "cosine":
+            xS = (y_eff @ U_r) / sqrtS                                    # [b, s, r]
+            xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
+            alpha  = dS_raw.norm(dim=-1)                                   # [k]
+            dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                    # [k, r] unit
+            gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs() # [b, s, k]
+            weighted = gate * alpha                                        # [b, s, k]
+            deltaS   = einsum(weighted, dS_hat, "b s k, k r -> b s r")    # [b, s, r]
+        else:
+            raise ValueError(f"unknown gate mode {cfg.gate!r}; expected 'cosine' or 'off'")
         return y + cfg.coeff * (deltaS * sqrtS) @ U_r.T

@@ -98,8 +98,8 @@ def _sub_report(base_report, eng_report, vignettes):
     return {
         "dlogit_per_foundation": dlogit,
         "axis_shift": axis_shift(dlogit),
-        "raw_p_true": eng_report["raw"],
-        "raw_pmass": eng_report["raw_pmass"],
+        "raw_logratios": eng_report["raw_logratios"],
+        "raw_pmass": eng_report.get("raw_pmass", {}),
     }
 
 
@@ -140,9 +140,7 @@ def main() -> None:
 
     if args.bare_json.exists():
         logger.info(f"reusing bare report from {args.bare_json}")
-        bare = json.loads(args.bare_json.read_text())
-        base_report = {"raw": bare["raw_p_true"],
-                       "raw_pmass": bare["raw_pmass"]}
+        base_report = json.loads(args.bare_json.read_text())
     else:
         logger.info("no cached bare report -- running bare eval now")
         t0 = time.time()

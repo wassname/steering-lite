@@ -31,6 +31,11 @@ FOUNDATION_SHORT = {
     "Fairness": "Fair", "Liberty": "Lib", "Social Norms": "SocN",
 }
 
+# In the old binary eval pmass was prob mass (threshold ~0.3).
+# In the new forced-choice eval raw_pmass holds margins (nats); structurally
+# enforced answers are never truly dead, so floor = 0.0 (no filtering).
+PMASS_FLOOR = 0.0
+
 # forced-choice probe word (lowercase, in raw_logratios) -> display foundation.
 _PROBE_TO_FOUNDATION: dict[str, str] = {
     "care": "Care", "fairness": "Fairness", "loyalty": "Loyalty",

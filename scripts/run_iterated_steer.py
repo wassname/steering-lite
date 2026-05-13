@@ -27,6 +27,7 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import math
 import time
@@ -64,21 +65,28 @@ def _resolve_layers(model, layers_arg: str) -> tuple[int, ...]:
     return tuple(int(x) for x in layers_arg.split(","))
 
 
-def _calib_prompts(tok, seed: int = 0) -> list[torch.Tensor]:
-    """Curated calibration prompts covering key modalities for conservative KL estimation.
+# Diverse OOD calibration prompts. p95 KL means one outlier dominates, so
+# coverage beats quantity. Mix: math/code (structured), narrative, multilingual,
+# raw non-template text, OOD token sequences, weird prefill.
+_DEFAULT_MESSAGES_RAW = [
+    {"kind": "chat", "user": "Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```"},
+    {"kind": "chat", "user": "           fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"},
+    {"kind": "raw",  "text": "The 🗼 tower is in Tianducheng, 🇨🇳 天都城 · ℍ𝕒𝕟𝕘𝕫𝕙𝕠𝕦 · ℂ𝕙𝕚𝕟𝕒. `where 🏛️`"},
+    {"kind": "chat", "user": "Tell me a greentext story about a small village during the smaller Martion carrot bubble."},
+    {"kind": "raw",  "text": "埃菲尔铁塔🗼位于天都城"},
+    {"kind": "chat", "user": "Kiu estas la ĉefurbo de Francio? Respondu en Antaŭ-Esperanto."},
+    {"kind": "chat", "user": "Write a Python function that returns the nth Fibonacci number using memoization. `def f(x):\n    return {'': [None, None, None]}```"},
+    {"kind": "chat", "user": "Tell me a joke.",
+     "assistant_prefix": "<thunk/>Et Tu user</thunk> Here's none, tool(translate\\): 我 我 我 我 我 我 我 我"},
+]
 
-    p95 means one bad prompt already dominates, so a small diverse set beats many
-    similar ones. Coverage: domain (authority persona, activates cosine gate for
-    gated methods), thinking, programming, math, multilingual, weird prefill, OOD.
+
+def _calib_prompts(tok) -> list[torch.Tensor]:
+    """Tokenize _DEFAULT_MESSAGES_RAW into Tensors for calibrate_iso_kl.
 
     Returns pre-tokenized Tensors so _tokenize passes them through unchanged,
     allowing raw prompts (no chat template) alongside formatted ones.
     """
-    from steering_lite.data import load_suffixes, PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE
-    import random
-    rng = random.Random(seed)
-    pos_personas = [p for p, _ in PERSONA_PAIRS_AUTHORITY]
-
     def chat(user: str, assistant_prefix: str = "") -> torch.Tensor:
         msgs = [{"role": "user", "content": user}]
         if assistant_prefix:
@@ -94,34 +102,13 @@ def _calib_prompts(tok, seed: int = 0) -> list[torch.Tensor]:
     def raw(text: str) -> torch.Tensor:
         return tok(text, return_tensors="pt").input_ids[0]
 
-    # 1. domain: authority persona + vignette (activates direction's cosine gate)
-    entries = load_suffixes(thinking=True)
-    rng.shuffle(entries)
-    seen: set[str] = set()
-    domain: list[torch.Tensor] = []
-    for e in entries:
-        if e["user_msg"] in seen:
-            continue
-        seen.add(e["user_msg"])
-        persona = rng.choice(pos_personas)
-        domain.append(chat(PROMPT_TEMPLATE.format(persona=persona) + "\n\n" + e["user_msg"]))
-        if len(domain) >= 2:
-            break
-
-    return domain + [
-        # 2. think step by step math
-        chat("Think step by step: what is 17 * 23 + sqrt(144)? <=="),
-        # 3. programming
-        chat("Write a Python function that returns the nth Fibonacci number using memoization. `def f(x):\n    return {'': [None, None, None]}```"),
-        # 4. multilingual (Esperanto) — different token distribution
-        chat("Kiu estas la ĉefurbo de Francio? Respondu en Antaŭ-Esperanto."),
-        # 5. weird assistant prefill — model sees unusual start of its own turn
-        chat("Tell me a joke.", assistant_prefix="<thunk/>Et Tu user</thunk> Here's none, tool(translate\): 我 我 我 我 我 我 我 我"),
-        # 6. OOD repetition through chat template
-        chat("            fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck"),
-        # 7. raw text, no template — tests steering on non-chat token sequences
-        raw("The 🗼 tower is in Tianducheng, 🇨🇳 天都城 · ℍ𝕒𝕟𝕘𝕫𝕙𝕠𝕦 · ℂ𝕙𝕚𝕟𝕒. `where 🏛️`"),
-    ]
+    out = []
+    for m in _DEFAULT_MESSAGES_RAW:
+        if m["kind"] == "chat":
+            out.append(chat(m["user"], m.get("assistant_prefix", "")))
+        else:
+            out.append(raw(m["text"]))
+    return out
 
 
 def _top1_acc(report) -> float:
@@ -428,6 +415,10 @@ def main() -> None:
     ap.add_argument("--max-halvings", type=int, default=5,
                     help="max bisection halvings of C during margin calibration")
     ap.add_argument("--max-think-tokens", type=int, default=64)
+    ap.add_argument("--gate", default="cosine", choices=["cosine", "off"],
+                    help="sspace/super_sspace only: 'cosine' (default) or 'off' "
+                         "(constant gate=1, sums stacked dS rows; isolates 'weight basis' "
+                         "from 'input-gated' contribution)")
     ap.add_argument("--vignettes", default="classic")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--smoke", action="store_true",
@@ -533,7 +524,7 @@ def main() -> None:
         tok, n_pairs=args.n_pairs, thinking=True,
         persona_pairs=PERSONA_PAIRS_AUTHORITY,
     )
-    calib_prompts = _calib_prompts(tok)  # 6 domain + 4 weird + 2 raw = 12 total
+    calib_prompts = _calib_prompts(tok)  # 8 diverse OOD prompts (see _DEFAULT_MESSAGES_RAW)
 
     # All rows use ABSOLUTE logit(wrongness) per foundation so units are consistent.
     # bare logit(w) ≈ +2 means model strongly judges scenario as wrong.
@@ -558,7 +549,10 @@ def main() -> None:
     cfg_cls = _CONFIG_REGISTRY[args.method]
 
     def _make_cfg() -> sl.SteeringConfig:
-        return cfg_cls(layers=layers, coeff=1.0, dtype=dtype, seed=0)
+        kw = {"layers": layers, "coeff": 1.0, "dtype": dtype, "seed": 0}
+        if "gate" in {f.name for f in dataclasses.fields(cfg_cls)}:
+            kw["gate"] = args.gate
+        return cfg_cls(**kw)
 
     for r in range(1, args.rounds + 1):
         logger.info(f"\n=== round {r} ===")

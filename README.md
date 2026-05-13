@@ -92,91 +92,85 @@ just sweep Qwen/Qwen3.5-4B
 
 ### Results
 
-Setup: Qwen/Qwen3.5-4B, layers mid 20-80%, seed=42, target_kl=1.0, 256 persona-branching pairs, vignettes=airisk (131 × 4 prompt variants), max_think=256. Run ID: `4c338a356760`.
+Setup: Qwen/Qwen3-4B (Qwen3.5-4B is hybrid/linear-attn, incompatible with the KV-fork required by forced-choice eval), layers mid 20-80%, seed=42, target_kl=0.50, 256 persona-branching pairs, vignettes=classic (264 vignettes), max_think=256. Run ID: `c7b02f03306f`.
+
+Note: eval changed from binary is_wrong (soft pmass) to 7-way forced-choice (margin metric). Numbers are not directly comparable to the prior Qwen3.5-4B binary-eval sweep.
 
 #### Bare model
 
-Logit that a foundation violation is wrong (positive = model says wrong), before any steering. The model rates nearly everything as wrong at 128-token think, meaning probabilities are very high (~82-93%).
+Mean forced-choice logit(p[f]) over all 264 vignettes (averaged across all foundation types; each foundation's logit is diluted by the ~6/7 vignettes where it is not the target). Negative logit means the model rarely picks that foundation as the primary violation when forced to choose among all 7.
 
-| foundation   | logit(is_wrong) ± std | prob(is_wrong) |   n |
-| ------------ | --------------------: | -------------: | --: |
-| Liberty      |           +2.77 ± 0.51 |            94% |  34 |
-| Authority    |           +2.74 ± 0.35 |            94% |  34 |
-| Sanctity     |           +2.59 ± 0.59 |            93% |  34 |
-| Care         |           +2.55 ± 0.55 |            93% |  62 |
-| Loyalty      |           +2.59 ± 0.45 |            93% |  32 |
-| Fairness     |           +2.15 ± 1.25 |            90% |  34 |
-| Social Norms |           +1.85 ± 1.29 |            86% |  32 |
+| foundation   | logit(p[f]) ± std |   n |
+| ------------ | ----------------: | --: |
+| Care         |      -3.31 ± 5.73 | 264 |
+| Sanctity     |      -4.63 ± 4.84 | 264 |
+| Authority    |      -4.22 ± 5.13 | 264 |
+| Loyalty      |      -5.76 ± 3.60 | 264 |
+| Fairness     |      -4.62 ± 4.95 | 264 |
+| Liberty      |      -5.95 ± 3.17 | 264 |
+| Social Norms |      -5.82 ± 3.31 | 264 |
 
-<!-- TODO add human % from clifford -->
-
-The model is near-ceiling on Authority (logit +2.56, ~93% probability). Our steering target is therefore Auth↓: making authority violations look less wrong. Which mean steering the model to care less about what authorities like supervisors or dictators say is wrong.
+Our steering target is Auth↓ (Care↑ persona): steering the model to treat authority-disobedience as less morally significant.
 
 #### Surgical Informedness (headline)
 
-SI(Auth) is our primary metric. A positive SI means the method successfully moved Authority in the intended direction (Auth↓) more than it inadvertently damaged correct verdicts on other foundations. `Auth_sep` indicates the logit separation between steered and unsteered models on Authority vignettes (positive is the correct direction).
+SI(Auth) is our primary metric. A positive SI means the method successfully moved Authority in the intended direction (Auth↓) more than it inadvertently damaged correct verdicts on other foundations. `Auth_sep` = ΔlogitAuth of the selected direction: negative means the steered model assigns less weight to Authority violations (the intended direction). Sign in brackets indicates which direction ([+] or [-]) achieves Auth↓.
 
-| method                 | SI(Auth) | SI_fwd | SI_rev | Auth_sep | pmass²×100 |
-| ---------------------- | -------: | -----: | -----: | -------: | ---------: |
-| directional_ablation   |    52.90 |   0.32 |  +1.00 |    +2.05 |       80.1 |
-| sspace                 |    45.67 |   0.64 |  +0.85 |    +0.69 |       61.0 |
-| super_sspace †         |    47.71 |   0.67 |  +0.40 |    +1.99 |       88.8 |
-| mean_diff              |    32.81 |   0.34 |  +1.00 |    +1.65 |       49.0 |
-| mean_centred           |    32.72 |   0.29 |  +1.00 |    +1.56 |       50.6 |
-| topk_clusters          |    31.34 |   0.13 |  +0.72 |    +1.55 |       73.9 |
-| prompt_only (no steer) |    30.44 |   0.41 |    n/a |     n/a* |       74.6 |
-| sspace_ablate          |    24.11 |   0.74 |  +0.02 |    +0.59 |       63.6 |
-| engineered_prompt[+]   |    17.36 |   0.50 |  −0.02 |    +1.90 |       71.7 |
-| repeng (uncalibrated)  |     9.02 |   0.10 |    n/a |      n/a |       87.5 |
-| cosine_gated           |     8.92 |   0.09 |  +1.00 |    +2.00 |       16.4 |
-| angular_steering       |     7.00 |   0.55 |  −0.38 |    +0.32 |       80.6 |
-| spherical              |     4.98 |   0.16 |    n/a |    +0.85 |       30.3 |
-| linear_act             |    20.24 |  −0.19 |  +1.00 |    +0.83 |       49.9 |
-| pca                    |    −0.92 |   0.03 |  −0.08 |    +0.85 |       39.0 |
-| chars                  |    −9.16 |  −0.26 |  −0.00 |    +0.50 |       68.3 |
+| method                  | SI(Auth) | SI_fwd | SI_rev | Auth_sep | kl_p95 |
+| ----------------------- | -------: | -----: | -----: | -------: | -----: |
+| pca[-]                  |   +36.56 |  +0.13 |  +0.60 |    -0.84 |   0.49 |
+| linear_act[+]           |   +34.95 |  +0.03 |  +0.67 |    -0.64 |   0.52 |
+| spherical[+]            |   +16.67 |  +0.06 |  +0.27 |    -0.43 |   0.75 |
+| sspace_ablate[+]        |   +15.05 |  +0.03 |  +0.27 |    -0.62 |   0.47 |
+| topk_clusters[-]        |    +3.23 |  +0.06 |  +0.00 |    -0.13 |   0.49 |
+| super_sspace[+]         |    +1.61 |  +0.03 |  +0.00 |    -0.55 |   0.51 |
+| chars[+]                |    +0.00 |  +0.00 |  +0.00 |    -0.44 |   0.46 |
+| mean_centred[+]         |    -3.23 |  +0.00 |  -0.06 |    -0.59 |   0.47 |
+| mean_diff[+]            |    -3.23 |  +0.06 |  -0.13 |    -0.59 |   0.50 |
+| cosine_gated[+]         |    -6.45 |  +0.00 |  -0.13 |    -0.29 |   0.48 |
+| angular_steering[-]     |   -24.73 |  -0.63 |  +0.14 |    -0.59 |   3.48 |
+| sspace[+]               |   -26.34 |  -0.67 |  +0.14 |    -0.16 |   0.49 |
+| directional_ablation[+] |   -36.56 |  -0.67 |  -0.06 |    +0.16 |   1.59 |
+| sspace_damp_amp[+]      |   -39.78 |  -0.60 |  -0.19 |    -0.11 |   0.51 |
+| prompt_only[+]          |  -126.88 |  -1.27 |    n/a |      n/a |    n/a |
 
-Top 3 by SI: directional_ablation (52.9), sspace/weight-SVD (45.7), mean_diff (32.8). sspace_ablate SI_fwd=0.74 is the highest forward-arm score, confirming the down_proj S-space contrastive direction is load-bearing. cosine_gated has low pmass² (16.4) — model is uncertain at its calibrated coefficient, reducing SI despite positive SI_rev.
-
-† super_sspace was added after the 4B sweep; number shown is from the Qwen3-0.6B sub-study (job 126, alllin/r=-1). 4B re-run pending.
-
-`prompt_only` (running the model with the POS persona system prompt, no steering vector) is now filled in — it's the load-bearing baseline since "your engineered_prompt was weak" is the obvious reading of low engineered_prompt SI. SI=30.44 is between topk_clusters and sspace_ablate, *well above* engineered_prompt (17.36). But ΔAuth=−2.33±1.65 with all other foundations also dropped 2.0–2.4 — broad suppression rather than surgical (the model just permissivizes everything when prompted as no-Authority-respecter). Bidirectional SI_rev is unmeasurable because the persona prompt only goes one way; `n/a*` reflects this, not failure. The 4B prompt_only run uses run_id `e2a061cf7bad` (other rows from `4c338a356760`); bare logits match exactly so SI is comparable.
-
-`super_sspace` still pending re-run on 4B (it post-dates the original sweep).
+Sign in brackets is the selected steering direction (whichever of [+]/[-] moves ΔAuth downward). Top 5 by SI: pca[-] (+36.56), linear_act[+] (+34.95), spherical[+] (+16.67), sspace_ablate[+] (+15.05), topk_clusters[-] (+3.23). `angular_steering` and `directional_ablation` have calibration issues (kl_p95 >> 0.50 target). `prompt_only` persona prompt strongly moves Auth in the wrong direction on this model (-1.27 SI_fwd).
 
 #### Δlogit per foundation
 
 Mean Δlogit relative to the bare model. `axis_Δ` is the negative change on the target foundation (−ΔAuth), where a positive value indicates successful movement in the target direction. For surgical steering, ΔAuth should be large and negative, while other foundations remain near zero. We also report standard deviations to seek methods that deliver strong shifts with low uncertainty.
 
-| method                 | axis_Δ |  ΔAuth     | ΔCare      | ΔSanc      | ΔLoy       | ΔFair      | ΔLib       | ΔSocN      |
-| ---------------------- | -----: |  ---------:| ---------: | ---------: | ---------: | ---------: | ---------: | ---------: |
-| sspace_ablate          |   2.89 |  −2.89±0.86| −2.79±0.92 | −2.85±0.91 | −3.00±0.76 | −2.73±0.95 | −2.81±0.93 | −2.60±1.17 |
-| sspace                 |   2.78 |  −2.78±0.93| −2.57±0.90 | −2.53±0.89 | −2.82±0.69 | −2.53±0.94 | −2.63±0.89 | −2.51±1.22 |
-| angular_steering       |   2.67 |  −2.67±0.89| −2.49±0.84 | −2.53±0.86 | −2.71±0.80 | −2.49±0.97 | −2.59±0.95 | −2.31±1.15 |
-| cosine_gated           |   2.08 |  −2.08±0.64| −1.88±0.61 | −1.71±0.67 | −2.07±0.53 | −1.86±0.76 | −1.91±0.71 | −1.74±0.97 |
-| directional_ablation   |   1.94 |  −1.94±1.22| −1.80±1.24 | −2.26±1.20 | −1.89±1.28 | −1.75±1.19 | −1.77±1.25 | −1.94±1.26 |
-| mean_diff              |   1.93 |  −1.93±1.11| −1.72±1.09 | −1.86±1.11 | −1.75±1.06 | −1.62±0.99 | −1.60±1.04 | −1.92±1.25 |
-| mean_centred           |   1.80 |  −1.80±1.17| −1.63±1.14 | −1.78±1.03 | −1.57±1.11 | −1.50±1.06 | −1.49±1.11 | −1.85±1.25 |
-| spherical              |   1.44 |  −1.44±0.89| −1.21±0.71 | −1.33±0.81 | −1.31±0.71 | −1.15±0.72 | −1.16±0.70 | −1.46±1.09 |
-| pca                    |   1.36 |  −1.36±1.50| −1.30±1.36 | −1.32±1.37 | −1.38±1.45 | −1.12±1.47 | −1.28±1.47 | −1.33±1.42 |
-| topk_clusters          |   1.18 |  −1.18±0.97| −1.12±0.91 | −1.22±0.87 | −1.20±0.85 | −1.13±1.01 | −1.13±0.92 | −1.19±1.16 |
-| linear_act             |   0.83 |  −0.83±0.67| −0.70±0.52 | −0.68±0.57 | −0.72±0.48 | −0.70±0.57 | −0.70±0.55 | −0.85±0.91 |
-| chars                  |   0.45 |  −0.45±0.61| −0.40±0.54 | −0.43±0.49 | −0.49±0.40 | −0.35±0.65 | −0.42±0.54 | −0.42±0.76 |
+Mean Δlogit(p[f]) relative to bare, averaged over all vignettes. axis = ΔCare − ΔAuth (positive = intended direction). Sign in brackets is the selected steering sign. Methods are sorted by ΔAuth ascending (most negative = most on-target).
 
-<!-- TODO note lower uncertainty measure. this table is mainly because we get nice uncertainty, and we want the highest reliably steering -->
+| method                    | axis  | ΔCare | ΔSanc | ΔAuth | ΔLoy  | ΔFair | ΔLib  | ΔSocN | kl_p95 |
+| ------------------------- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | -----: |
+| pca[-]                    | +1.40 | +0.56 | -0.11 | -0.84 | -0.06 | +0.12 | +0.23 | +0.15 |   0.49 |
+| linear_act[+]             | +1.27 | +0.63 | +0.07 | -0.64 | -0.06 | +0.37 | +0.04 | -0.26 |   0.52 |
+| sspace_ablate[+]          | +0.79 | +0.17 | -0.11 | -0.62 | +0.14 | -0.08 | +0.04 | +0.45 |   0.47 |
+| angular_steering[-]       | +1.47 | +0.88 | +0.20 | -0.59 | +0.12 | +0.11 | -0.45 | -0.25 |   3.48 |
+| mean_centred[+]           | +0.77 | +0.18 | -0.10 | -0.59 | -0.05 | +0.14 | +0.22 | +0.10 |   0.47 |
+| mean_diff[+]              | +0.92 | +0.34 | -0.13 | -0.59 | +0.03 | +0.00 | +0.21 | +0.07 |   0.50 |
+| super_sspace[+]           | +0.58 | +0.02 | -0.09 | -0.55 | +0.05 | +0.02 | +0.27 | +0.21 |   0.51 |
+| chars[+]                  | +0.71 | +0.26 | -0.37 | -0.44 | -0.23 | +0.41 | -0.11 | +0.40 |   0.46 |
+| spherical[+]              | +0.42 | -0.01 | +0.32 | -0.43 | -0.03 | +0.05 | +0.21 | -0.23 |   0.75 |
+| cosine_gated[+]           | +0.24 | -0.05 | -0.08 | -0.29 | +0.03 | -0.02 | +0.24 | +0.07 |   0.48 |
+| sspace[+]                 | +0.21 | +0.05 | -0.35 | -0.16 | +0.05 | +0.03 | +0.10 | +0.29 |   0.49 |
+| topk_clusters[-]          | +0.63 | +0.50 | +0.10 | -0.13 | +0.07 | -0.31 | -0.16 | +0.05 |   0.49 |
+| sspace_damp_amp[+]        | -0.11 | -0.22 | +0.43 | -0.11 | -0.12 | +0.03 | +0.09 | -0.06 |   0.51 |
+| directional_ablation[+]   | +0.04 | +0.20 | -0.16 | +0.16 | -0.04 | -0.40 | -0.18 | +0.45 |   1.59 |
+| prompt_only[+]            | -0.29 | +1.51 | -0.82 | +1.80 | -0.42 | -0.65 | -0.55 | -0.96 |    n/a |
 
-sspace and sspace_ablate have the highest axis_Δ (2.78, 2.89) but both suppress all foundations equally — broad suppression. angular_steering is similar. directional_ablation and mean_diff have more selective Auth shifts relative to other foundations, which is reflected in their higher SI scores.
+Key finding: with correct sign selection (whichever direction moves ΔAuth downward), most methods do move Authority in the intended direction. The strongest movers are pca[-] (ΔAuth=-0.84) and linear_act[+] (ΔAuth=-0.64). `directional_ablation` and `prompt_only` still move Auth in the wrong direction. `angular_steering` moves strongly (ΔAuth=-0.59) but is 7× over-calibrated (kl_p95=3.48). `directional_ablation` is also overcalibrated (kl_p95=1.59).
 
 ![moral map](image.png)
 
 #### Notes
 
-The axis_Δ and SI tables tell different stories, and both are needed. Several methods move ΔAuth downward (correct direction) but also suppress every other foundation equally — broad moral suppression rather than axis rotation. SI penalizes this because correctly-categorized verdicts get broken as a side effect.
+The axis and SI tables tell different stories, and both are needed. `angular_steering` has the highest axis (+1.47) but negative SI (-24.73) because it is 7× over-calibrated (kl_p95=3.48), making its forced-choice answers unreliable. `pca[-]` tops SI (+36.56) despite a more moderate axis (+1.40) because it is well-calibrated and bidirectionally coherent.
 
-The asymmetric steerability finding: Qwen3.5-4B can be pushed Auth↓ easily by most methods. Pushing Auth↑ (NEG direction) fails for nearly every method — the sign agreement table shows this clearly. Safety fine-tuning appears to create a floor for how much authority-disobedience the model will endorse as morally acceptable.
+The big change vs the old Qwen3.5-4B binary eval: `directional_ablation`, which led the old ranking, miscalibrates on Qwen3-4B. `pca` and `sspace_ablate` rank high here but with different sign than expected — both need their [-] or [+] direction selected rather than defaulting to [+]. Method rankings are not portable across model families or eval formats.
 
-repeng (uncalibrated at coeff=0.75) shows broad suppression of all foundations (all Δ ≈ −0.8), consistent with an uninformed coefficient choice. Its negative SI confirms it's breaking as many verdicts as it fixes.
-
-Reproduce: `just sweep Qwen/Qwen3.5-4B`. Baselines: `uv run --extra baseline python scripts/baseline_engineered_prompt.py` (needs `OPENROUTER_API_KEY`); `uv run --extra baseline --extra benchmark python scripts/baseline_repeng.py`.
+Reproduce: `just sweep Qwen/Qwen3-4B out=outputs/tinymfv_sweep_4b_fc`. Run `just results outputs/tinymfv_sweep_4b_fc` for the Δlogit table; SI computed via `si_per_foundation` from `src/steering_lite/eval/foundations.py`.
 
 #### Variant/regime sensitivity (Qwen3-0.6B)
 
