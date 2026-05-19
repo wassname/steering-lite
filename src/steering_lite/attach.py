@@ -25,11 +25,6 @@ from torch.utils.hooks import RemovableHandle
 from .config import SteeringConfig, REGISTRY
 from .target import find_targets
 from .extract import record_activations
-from .extract_attn import (
-    record_activations_attn,
-    record_activations_mean,
-    Mode, PairAgg, Pool,
-)
 
 
 _ATTACHED_ATTR = "_steering_lite_attached"
@@ -220,53 +215,6 @@ def train(
             extracted = method.extract(pos_acts, neg_acts, cfg, model=model)
         else:
             extracted = method.extract(pos_acts, neg_acts, cfg)
-    shared, stacked = _split_extracted(extracted)
-    return Vector(cfg, shared, stacked)
-
-
-def train_attn(
-    model: nn.Module,
-    tok,
-    pos_prompts: list[str],
-    neg_prompts: list[str],
-    cfg: SteeringConfig,
-    *,
-    pool: Pool = "attn_v",
-    pair_agg: PairAgg = "mean",
-    batch_size: int = 8,
-    max_length: int = 256,
-):
-    if len(pos_prompts) != len(neg_prompts):
-        raise ValueError("pos and neg prompt lists must be the same length")
-    method = REGISTRY[cfg.method]
-    targets = find_targets(model, cfg)
-    layers = tuple(li for _, _, li in targets)
-
-    if pool == "last":
-        pos_acts = record_activations(model, tok, pos_prompts, layers,
-                                      batch_size=batch_size, max_length=max_length)
-        neg_acts = record_activations(model, tok, neg_prompts, layers,
-                                      batch_size=batch_size, max_length=max_length)
-    elif pool == "mean":
-        pos_acts = record_activations_mean(model, tok, pos_prompts, layers,
-                                           batch_size=batch_size, max_length=max_length)
-        neg_acts = record_activations_mean(model, tok, neg_prompts, layers,
-                                           batch_size=batch_size, max_length=max_length)
-    elif pool in ("attn_v", "attn_kq"):
-        interleaved = [p for pair in zip(pos_prompts, neg_prompts) for p in pair]
-        mode: Mode = "v" if pool == "attn_v" else "kq"
-        acts = record_activations_attn(
-            model, tok, interleaved, layers,
-            mode=mode, pair_agg=pair_agg,
-            batch_size=batch_size, max_length=max_length,
-        )
-        pos_acts = {li: t[0::2] for li, t in acts.items()}
-        neg_acts = {li: t[1::2] for li, t in acts.items()}
-    else:
-        raise ValueError(f"unknown pool {pool!r}")
-
-    from .vector import Vector
-    extracted = method.extract(pos_acts, neg_acts, cfg)
     shared, stacked = _split_extracted(extracted)
     return Vector(cfg, shared, stacked)
 

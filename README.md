@@ -194,7 +194,7 @@ Best-of-all-sweeps ranking on Qwen3-0.6B (each method shown at its best regime/r
 | method                   | best regime    | SI(Auth) | note                                             |
 | ------------------------ | -------------- | -------: | ------------------------------------------------ |
 | linear_act               | alllin r=-1    |   +61.39 | (untouched by this work)                         |
-| mean_diff / mean_centred | any            |   +55.66 | (untouched; byte-identical — see open bug below) |
+| mean_diff                | any            |   +55.66 | (mean_centred was a duplicate; removed)          |
 | sspace_ablate            | writers r=-1   |   +54.52 |                                                  |
 | sspace                   | writers r=-1   |   +53.40 |                                                  |
 | topk_clusters            | alllin/writers |   +49.72 |                                                  |
@@ -205,7 +205,7 @@ Best-of-all-sweeps ranking on Qwen3-0.6B (each method shown at its best regime/r
 
 `super_sspace` is mid-pack on SI but **4× faster** than per-Linear sspace (582s vs 2279s) — best bang/buck of the gated family for iterative experimentation. `prompt_only` (just running the persona prompt with no steering) lands ahead of cosine_gated and within ~15 SI of the best gated methods, which is a sobering baseline.
 
-Open bugs surfaced by these sweeps: `mean_diff ≡ mean_centred` byte-identical across all 4 sweeps — `subtract_corpus_mean=True` is a no-op. `directional_ablation` and `angular_steering` produce NaN at C ≈ ±0.006 (calibration collapse).
+Open bugs surfaced by these sweeps: `directional_ablation` and `angular_steering` produce NaN at C ≈ ±0.006 (calibration collapse). (`mean_centred` was byte-identical to `mean_diff` after normalize; removed.)
 
 See [RESEARCH_JOURNAL.md](RESEARCH_JOURNAL.md) for full per-method tables.
 

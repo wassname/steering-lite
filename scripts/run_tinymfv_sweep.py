@@ -46,7 +46,7 @@ from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY, PROM
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    baseline_logit_per_foundation_multibool, dlogit_per_foundation_multibool,
+    baseline_logit_per_foundation, dlogit_per_foundation,
     flips_per_foundation, axis_shift, format_cell, cue,
 )
 
@@ -107,7 +107,7 @@ logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format
 
 
 METHODS = [
-    "mean_diff", "cosine_gated", "mean_centred", "pca", "topk_clusters",
+    "mean_diff", "cosine_gated", "pca", "topk_clusters",
     "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
@@ -121,7 +121,6 @@ def _make_cfg(method: str, layers: tuple[int, ...], *,
         sspace_kw["target_submodule"] = sspace_target_submodule
     table = {
         "mean_diff":             sl.MeanDiffC(**common),
-        "mean_centred":          sl.MeanDiffC(**common, subtract_corpus_mean=True),
         "pca":                   sl.PCAC(**common),
         "topk_clusters":         sl.TopKClustersC(**common, k=4),
         "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),
@@ -326,7 +325,7 @@ def main() -> None:
     base_report = evaluate_multibool(model, tok, name=args.vignettes,
                                      max_think_tokens=args.max_think_tokens,
                                      batch_size=args.eval_batch_size)
-    base_logit_per_f = baseline_logit_per_foundation_multibool(base_report)
+    base_logit_per_f = baseline_logit_per_foundation(base_report)
     bare_elapsed = time.time() - base_t0
     logger.info("bare per-foundation logratio ± std: " +
                 ", ".join(f"{f}={format_cell(base_logit_per_f[f])}" for f in FOUNDATION_ORDER))
@@ -355,7 +354,7 @@ def main() -> None:
         pb_report = evaluate_multibool(model, wrapped_tok, name=args.vignettes,
                                        max_think_tokens=args.max_think_tokens,
                                        batch_size=args.eval_batch_size)
-        pb_dlogit = dlogit_per_foundation_multibool(base_report, pb_report)
+        pb_dlogit = dlogit_per_foundation(base_report, pb_report)
         pb_elapsed = time.time() - pb_t0
         rows.append(_row_steer("prompt_only", pb_dlogit, elapsed_s=pb_elapsed))
 
@@ -414,7 +413,7 @@ def main() -> None:
             pos_report = evaluate_multibool(
                 model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
                 batch_size=args.eval_batch_size)
-        pos_dlogit = dlogit_per_foundation_multibool(base_report, pos_report)
+        pos_dlogit = dlogit_per_foundation(base_report, pos_report)
         pos_flips = {}  # flips not defined for continuous logratios
 
         # -C eval (same |C|, flipped sign — no recalibration)
@@ -423,7 +422,7 @@ def main() -> None:
             neg_report = evaluate_multibool(
                 model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
                 batch_size=args.eval_batch_size)
-        neg_dlogit = dlogit_per_foundation_multibool(base_report, neg_report)
+        neg_dlogit = dlogit_per_foundation(base_report, neg_report)
         neg_flips = {}
 
         elapsed = time.time() - t0

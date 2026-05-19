@@ -103,11 +103,6 @@ def dlogit_per_foundation(base_report: dict, steer_report: dict,
     return {f: _agg(by_f.get(f, [])) for f in FOUNDATION_ORDER}
 
 
-# Multibool aliases retained for the sweep script which imports them by that name.
-baseline_logit_per_foundation_multibool = baseline_logit_per_foundation
-dlogit_per_foundation_multibool = dlogit_per_foundation
-
-
 def flips_per_foundation(base_report: dict, steer_report: dict,
                          name: str | None = None) -> dict[str, dict[str, int]]:
     """Per-foundation flip counts across the 0-logit (p=0.5) threshold.
@@ -145,9 +140,8 @@ def flips_per_foundation(base_report: dict, steer_report: dict,
 def _mean_margin(report: dict) -> float:
     """Mean forced-choice margin (nats) over rows. Healthy ~1-3, destroyed ~0.
 
-    Replaces legacy `_mean_pmass`. Forced-choice format is structurally
-    enforced, so soft pmass is meaningless; margin (= top1 score - top2
-    score) is the live OOD signal."""
+    Forced-choice format is structurally enforced, so soft pmass is
+    meaningless; margin (= top1 score - top2 score) is the live OOD signal."""
     if (m := report.get("mean_margin")) is not None:
         return float(m)
     pmass = report.get("raw_pmass") or {}
@@ -155,11 +149,6 @@ def _mean_margin(report: dict) -> float:
         return float("nan")
     vals = list(pmass.values())
     return sum(vals) / len(vals) if vals else float("nan")
-
-
-# Legacy alias so older callers keep working — semantically `pmass` is gone but
-# in the multibool-shaped report `raw_pmass` cells are populated with margins.
-_mean_pmass = _mean_margin
 
 
 def si_per_foundation(

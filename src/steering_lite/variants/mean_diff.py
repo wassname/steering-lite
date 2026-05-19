@@ -33,7 +33,6 @@ from ..config import SteeringConfig, register_config, register
 class MeanDiffC(SteeringConfig):
     method: str = "mean_diff"
     normalize: bool = True
-    subtract_corpus_mean: bool = False
 
 
 @register
@@ -50,16 +49,9 @@ class MeanDiff:
         for li in pos_acts:
             p = pos_acts[li].float()
             n = neg_acts[li].float()
-
-            if cfg.subtract_corpus_mean:
-                mu = torch.cat([p, n], dim=0).mean(0)
-                v = p.mean(0) - mu
-            else:
-                v = p.mean(0) - n.mean(0)
-
+            v = p.mean(0) - n.mean(0)
             if cfg.normalize:
                 v = v / (v.norm() + ε)
-
             out[li] = {"shared": {}, "stacked": {"v": v.unsqueeze(0)}}  # [1, d]
         return out
 

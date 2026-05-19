@@ -16,7 +16,7 @@ from steering_lite import Vector
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
-    "mean_diff", "mean_centred", "pca", "topk_clusters", "cosine_gated",
+    "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
@@ -42,7 +42,6 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
     common = dict(layers=layers, coeff=coeff, dtype=torch.float32, seed=0)
     table = {
         "mean_diff":             sl.MeanDiffC(**common),
-        "mean_centred":          sl.MeanDiffC(**common, subtract_corpus_mean=True),
         "pca":                   sl.PCAC(**common),
         "topk_clusters":         sl.TopKClustersC(**common, k=2),
         "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),

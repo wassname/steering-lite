@@ -1,7 +1,7 @@
 """Multiplicative damp/amp steering in S-space.
 
 Companion to `sspace`: same extract path (full SVD, |dS|.topk(r) mode
-selection, store U_r, sqrtS, dS_hat, Vh_r). At apply time, instead of
+selection, store U_r, sqrtS, dS_hat). At apply time, instead of
 adding `alpha * gate * d_S_hat` we *multiply* per-mode singular values by
 `exp(c * d_S_hat_i)`, so modes with positive contrastive sign get amplified
 and modes with negative get damped.
@@ -46,8 +46,7 @@ Compare to:
     sign-agnostic gate.
   - `sspace_ablate.py` (subtractive): projects d_S_hat *out* of x_S.
 
-Hook target: `mlp.down_proj` (output-side); V is implicit via SVD identity
-so we don't need Vh_r at apply time even though extract saves it.
+Hook target: `mlp.down_proj` (output-side); V is implicit via SVD identity.
 """
 from dataclasses import dataclass
 import torch
@@ -73,7 +72,7 @@ class SSpaceDampAmpC(SteeringConfig):
 class SSpaceDampAmp:
     name = "sspace_damp_amp"
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
-    extract = SSpace.extract  # shared: U_r, sqrtS, Vh_r (+ optional b); stacked: dS [k,r]
+    extract = SSpace.extract  # shared: U_r, sqrtS (+ optional b); stacked: dS [k,r]
 
     @staticmethod
     def apply(

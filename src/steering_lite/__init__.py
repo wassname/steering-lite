@@ -6,8 +6,7 @@ if _os.environ.get("BEARTYPE"):
 
 from .config import SteeringConfig, REGISTRY, register
 from .extract import record_activations
-from .extract_attn import record_activations_attn
-from .attach import attach, detach, save, load, train, train_attn
+from .attach import attach, detach, save, load, train
 from .calibrate import measure_kl, calibrate_iso_kl
 from . import variants  # noqa: F401  triggers method + config registration
 from .vector import Vector
@@ -42,9 +41,7 @@ __all__ = [
     "LinearAcTC",
     "AngularSteeringC",
     "record_activations",
-    "record_activations_attn",
     "train",
-    "train_attn",
     "attach",
     "detach",
     "save",

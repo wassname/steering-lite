@@ -15,7 +15,7 @@ We use the *output* projection at both extract and apply time.
 
 Multi-round:
 
-  - SVD basis (U_r, sqrtS, Vh_r, b) is a property of the weight matrix and
+  - SVD basis (U_r, sqrtS, b) is a property of the weight matrix and
     is `shared` across rounds. Each round's `dS_2`, `dS_3`, ... extracts in
     the SAME basis (since W is frozen), which is exactly what makes
     accumulation valid.
@@ -106,16 +106,15 @@ class SSpace:
             if r_eff < k:
                 mask = dS.abs().topk(r_eff).indices.sort().values
                 U_r = U[:, mask].contiguous()
-                Vh_r = Vh[mask, :].contiguous()
                 sqrtS = sqrtS_full[mask].contiguous()
                 dS_r = dS[mask]
             else:
-                U_r, Vh_r = U.contiguous(), Vh.contiguous()
+                U_r = U.contiguous()
                 sqrtS = sqrtS_full
                 dS_r = dS
             dS_unit = (dS_r / (dS_r.norm() + ε)).contiguous()
 
-            shared = {"U_r": U_r, "sqrtS": sqrtS, "Vh_r": Vh_r}
+            shared = {"U_r": U_r, "sqrtS": sqrtS}
             if b is not None:
                 shared["b"] = b
             stacked = {"dS": dS_unit.unsqueeze(0)}  # [1, r]; magnitude=1 on first round

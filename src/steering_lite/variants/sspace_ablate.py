@@ -58,7 +58,7 @@ class SSpaceAblateC(SteeringConfig):
 class SSpaceAblate:
     name = "sspace_ablate"
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
-    extract = SSpace.extract  # shared: U_r, sqrtS, Vh_r (+ optional b); stacked: dS [k,r]
+    extract = SSpace.extract  # shared: U_r, sqrtS (+ optional b); stacked: dS [k,r]
 
     @staticmethod
     def apply(
