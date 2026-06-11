@@ -46,6 +46,11 @@ noisy, but the *consensus* of writers/readers is cleaner.
 Square Linears (e.g. Qwen3 o_proj / q_proj where d_in=d_out=d_model) are
 ambiguous (writer or reader?) and are skipped by shape detection. Pass a
 custom `fallback_regex` if your arch has unusual shapes.
+
+
+# TODO change this to use Gram method short cut
+# $$G = MM^T = \sum_l W_lW_l^T,\qquad \operatorname{eig}(G) \rightarrow U_\star,\Sigma_\star$$
+# It avoids explicitly computing each Linear's U, V, or SVD. torch.linalg.eigh(G) directly recovers the pooled left singular vectors U_star; lambda**0.25 equals sqrt(Sigma_star).
 """
 from dataclasses import dataclass
 import torch
