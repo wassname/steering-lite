@@ -55,8 +55,15 @@ from ..config import SteeringConfig, register_config, register
 class SSpaceC(SteeringConfig):
     method: str = "sspace"
     r: int = -1  # -1 = full rank (no cropping); else top-r modes by |d_S|
-    gate: str = "cosine"  # "cosine" = |cos(xS, dS_hat)| per-token; "off" = constant gate=1
-                          # (sums stacked dS rows; behaves like mean_diff in S-basis)
+    gate: str = "cosine"  # per-token gate on the S-space contrast:
+    #   "cosine" = |cos(xS, dS_hat)|  -- engagement magnitude, sign-agnostic; aligned AND
+    #              anti-aligned tokens both move toward +dS_hat (the original behaviour).
+    #   "signed" = cos(xS, dS_hat)    -- keep the sign; anti-aligned tokens (cos<0) get
+    #              pushed the *other* way (toward the negative persona). A directional steer:
+    #              use when "not engaging the concept" should mean "pushed away", not
+    #              "pushed toward by |alignment|".
+    #   "off"    = constant gate=1    -- ungated; sums stacked dS rows (mean_diff in S-basis).
+    #              Ablation control to show the gate earns its place.
 
 
 # Removed _orient_svd: previously flipped SVD column signs based on
@@ -138,14 +145,15 @@ class SSpace:
         dS_raw = stacked["dS"].to(y)                                       # [k, r]
         if cfg.gate == "off":
             deltaS = dS_raw.sum(dim=0)                                     # [r] constant per token
-        elif cfg.gate == "cosine":
+        elif cfg.gate in ("cosine", "signed"):
             xS = (y_eff @ U_r) / sqrtS                                    # [b, s, r]
             xS_norm = xS / (xS.norm(dim=-1, keepdim=True) + ε)
             alpha  = dS_raw.norm(dim=-1)                                   # [k]
             dS_hat = dS_raw / (alpha.unsqueeze(-1) + ε)                    # [k, r] unit
-            gate    = einsum(xS_norm, dS_hat, "b s r, k r -> b s k").abs() # [b, s, k]
+            cos     = einsum(xS_norm, dS_hat, "b s r, k r -> b s k")       # [b, s, k] in [-1, 1]
+            gate    = cos.abs() if cfg.gate == "cosine" else cos          # signed keeps the sign
             weighted = gate * alpha                                        # [b, s, k]
             deltaS   = einsum(weighted, dS_hat, "b s k, k r -> b s r")    # [b, s, r]
         else:
-            raise ValueError(f"unknown gate mode {cfg.gate!r}; expected 'cosine' or 'off'")
+            raise ValueError(f"unknown gate mode {cfg.gate!r}; expected 'cosine', 'signed' or 'off'")
         return y + cfg.coeff * (deltaS * sqrtS) @ U_r.T
