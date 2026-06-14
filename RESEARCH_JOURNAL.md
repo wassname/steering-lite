@@ -1,5 +1,424 @@
 # Research Journal — steering-lite
 
+## 2026-05-12 — Full 4B tinymfv forced-choice sweep (pueue 90, Qwen3-4B, run_id=c7b02f03306f)
+
+Model: Qwen/Qwen3-4B (Qwen3.5-4B failed: hybrid/linear-attn incompatible with KV-fork in guided_rollout_forced_choice). Eval: 7-way forced-choice, classic vignettes (264), target_kl=0.50, max_think=256. Previous 4B sweep (run_id=4c338a356760) used old binary is_wrong eval on Qwen3.5-4B — numbers not comparable.
+
+### SI table (Auth↓ intent, Qwen3-4B, forced-choice; corrected sign flip)
+
+Sign in brackets = selected direction (whichever of [+]/[-] achieves ΔAuth↓). First pass used [+] always; corrected by selecting the direction with lower ΔAuth as pos_report.
+
+| method | SI(Auth)×100 | SI_fwd | SI_rev | Auth_sep | kl_p95 |
+|---|---:|---:|---:|---:|---:|
+| pca[-] | +36.56 | +0.13 | +0.60 | -0.84 | 0.49 |
+| linear_act[+] | +34.95 | +0.03 | +0.67 | -0.64 | 0.52 |
+| spherical[+] | +16.67 | +0.06 | +0.27 | -0.43 | 0.75 |
+| sspace_ablate[+] | +15.05 | +0.03 | +0.27 | -0.62 | 0.47 |
+| topk_clusters[-] | +3.23 | +0.06 | +0.00 | -0.13 | 0.49 |
+| super_sspace[+] | +1.61 | +0.03 | +0.00 | -0.55 | 0.51 |
+| chars[+] | +0.00 | +0.00 | +0.00 | -0.44 | 0.46 |
+| mean_centred[+] | -3.23 | +0.00 | -0.06 | -0.59 | 0.47 |
+| mean_diff[+] | -3.23 | +0.06 | -0.13 | -0.59 | 0.50 |
+| cosine_gated[+] | -6.45 | +0.00 | -0.13 | -0.29 | 0.48 |
+| angular_steering[-] | -24.73 | -0.63 | +0.14 | -0.59 | 3.48 |
+| sspace[+] | -26.34 | -0.67 | +0.14 | -0.16 | 0.49 |
+| directional_ablation[+] | -36.56 | -0.67 | -0.06 | +0.16 | 1.59 |
+| sspace_damp_amp[+] | -39.78 | -0.60 | -0.19 | -0.11 | 0.51 |
+| prompt_only[+] | -126.88 | -1.27 | n/a | n/a | n/a |
+
+### Key findings
+
+1. **pca[-] is the top performer** (SI=+36.56) when the correct sign is selected. The [-] direction moves ΔAuth=-0.84, stronger than any other method. In first-pass (always [+]), pca showed SI=-77.96 — a 113-point swing from sign selection alone.
+
+2. **5 methods have positive SI**, all well-calibrated (kl_p95 ≈ 0.47–0.75): pca[-], linear_act[+], spherical[+], sspace_ablate[+], topk_clusters[-].
+
+3. **Calibration failures for angular_steering and directional_ablation.** Both overshoot target KL badly (3.48 and 1.59 vs target 0.50). angular_steering moves Auth strongly (ΔAuth=-0.59) but is too noisy to rank well on SI.
+
+4. **prompt_only strongly moves Auth in the wrong direction** (ΔAuth=+1.80, SI=-126.88). The Care↑ persona prompt causes Qwen3-4B to become MORE authority-respecting in forced-choice. Model-specific persona effect, opposite to old Qwen3.5-4B result.
+
+5. **Method rankings not portable across models or eval formats.** Old Qwen3-0.6B top-3 were linear_act, mean_diff/mean_centred, sspace_ablate. On Qwen3-4B the ordering shifts (pca rises, sspace methods split by sign).
+
+### Δlogit table (selected sign, sorted by ΔAuth ascending)
+
+| method | axis | ΔCare | ΔAuth | kl_p95 |
+|---|---:|---:|---:|---:|
+| pca[-] | +1.40 | +0.56 | -0.84 | 0.49 |
+| linear_act[+] | +1.27 | +0.63 | -0.64 | 0.52 |
+| sspace_ablate[+] | +0.79 | +0.17 | -0.62 | 0.47 |
+| angular_steering[-] | +1.47 | +0.88 | -0.59 | 3.48 |
+| mean_centred[+] | +0.77 | +0.18 | -0.59 | 0.47 |
+| mean_diff[+] | +0.92 | +0.34 | -0.59 | 0.50 |
+| super_sspace[+] | +0.58 | +0.02 | -0.55 | 0.51 |
+| chars[+] | +0.71 | +0.26 | -0.44 | 0.46 |
+| spherical[+] | +0.42 | -0.01 | -0.43 | 0.75 |
+| cosine_gated[+] | +0.24 | -0.05 | -0.29 | 0.48 |
+| sspace[+] | +0.21 | +0.05 | -0.16 | 0.49 |
+| topk_clusters[-] | +0.63 | +0.50 | -0.13 | 0.49 |
+| sspace_damp_amp[+] | -0.11 | -0.22 | -0.11 | 0.51 |
+| directional_ablation[+] | +0.04 | +0.20 | +0.16 | 1.59 |
+| prompt_only[+] | -0.29 | +1.51 | +1.80 | n/a |
+
+### Fix applied
+
+`PMASS_FLOOR = 0.0` added to `src/steering_lite/eval/foundations.py` (was imported by `scripts/aggregate_flips.py` but missing after forced-choice rewrite). Value 0.0 is correct for structurally-enforced forced-choice where margin is always > 0. `aggregate_flips.py` still uses old `raw_p_true` format; `results.py` fails for new format — SI computed directly via `foundations.si_per_foundation` instead.
+
+## 2026-05-10 — Coherence budget law confirmed method-agnostic (pueue 84/85 complete, 86 running)
+
+### super_sspace gate=off KL=0.2 results (pueue 85, 10 rounds, Qwen3-4B)
+
+Output: `outputs/20260510T001936_iterated_super_sspace_qwen3_4b/`
+
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1   t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75     0
+1  +   -3.16  -4.15  -4.16  -5.75  -4.55  -6.06  -6.27  +11.53  0.75  1829
+2  +   -2.82  -4.16  -4.44  -5.70  -4.41  -6.26  -6.32  +12.03  0.77  1874
+3  +   -2.47  -3.99  -4.64  -5.91  -4.18  -6.37  -6.45  +12.01  0.73  1817
+4  +   -1.83  -4.33  -4.91  -6.03  -4.19  -6.40  -6.50  +11.95  0.70  1970
+5  +   +0.45  -5.01  -5.30  -6.35  -4.62  -6.70  -6.70  +11.12  0.61  1830
+6  +   +2.48  -5.78  -5.75  -6.56  -5.13  -6.86  -6.73   +9.55  0.52  1939
+7  +   +4.29  -6.49  -6.51  -6.79  -5.41  -6.91  -6.29   +6.94  0.35  1854  ← Care latch
+8  +   +1.74  -6.89  -6.91  -6.84  -4.19  -6.91  -2.20   +2.08  0.28  1837  ← SocN creep
+9  +   -0.64  -6.91  -6.91  -6.91  -4.60  -6.91  +0.58   +0.74  0.19  1872  ← BREAK: SocN-jump
+10 +   -1.81  -6.90  -6.91  -6.89  -5.61  -6.91  +1.77   +1.80  0.12  2071
+```
+
+Usable rounds (margin ≥ 5): 7 (r=1..7). Healthy (margin ≥ 9): 6 (r=1..6). Break at r=9.
+
+### mean_diff KL=0.2 results (pueue 84, 10 rounds, Qwen3-4B)
+
+Output: `outputs/20260509T224436_iterated_mean_diff_qwen3_4b/`
+
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75    0
+1  +   -3.13  -4.16  -4.07  -5.77  -4.55  -6.07  -6.31  +11.50  0.75  543
+2  +   -2.89  -4.17  -4.40  -5.74  -4.44  -6.18  -6.32  +11.99  0.77  538
+3  +   -2.55  -4.10  -4.53  -5.87  -4.22  -6.35  -6.41  +11.88  0.73  572
+4  +   -1.71  -4.30  -5.03  -6.05  -4.11  -6.39  -6.55  +11.89  0.69  572
+5  +   +0.12  -4.91  -5.26  -6.28  -4.53  -6.65  -6.72  +11.29  0.64  544
+6  +   +2.42  -5.82  -5.69  -6.54  -5.09  -6.85  -6.75   +9.73  0.53  542
+7  +   +4.42  -6.57  -6.58  -6.78  -5.44  -6.91  -6.20   +6.69  0.34  547  ← Care latch
+8  +   +1.39  -6.90  -6.91  -6.87  -4.14  -6.91  -1.76   +1.77  0.27  547  ← SocN creep
+9  +   -1.04  -6.91  -6.91  -6.90  -5.11  -6.91  +0.99   +1.03  0.13  546  ← BREAK: SocN-jump
+10 +   -2.03  -6.81  -6.91  -6.69  -5.79  -6.91  +1.97   +2.02  0.12  548
+```
+
+Usable rounds (margin ≥ 5): 7 (r=1..7). Healthy (margin ≥ 9): 6 (r=1..6). Break at r=9.
+
+### mean_diff KL=0.15 results (pueue 86, 15 rounds, Qwen3-4B)
+
+Output: `outputs/20260510T053801_iterated_mean_diff_qwen3_4b/`
+
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75    0
+1  +   -3.09  -4.15  -4.14  -5.75  -4.54  -6.09  -6.29  +11.42  0.75  586
+2  +   -3.04  -4.17  -4.32  -5.76  -4.45  -6.18  -6.16  +11.70  0.77  588
+3  +   -2.69  -4.15  -4.50  -5.81  -4.27  -6.29  -6.37  +11.98  0.74  582
+4  +   -2.26  -4.23  -4.74  -5.91  -4.09  -6.41  -6.44  +11.68  0.72  579
+5  +   -1.72  -4.32  -5.01  -6.03  -4.11  -6.38  -6.57  +12.02  0.70  548
+6  +   -0.09  -4.76  -5.26  -6.25  -4.47  -6.66  -6.69  +11.15  0.65  547
+7  +   +1.73  -5.56  -5.52  -6.48  -4.99  -6.80  -6.75  +10.52  0.55  552
+8  +   +3.57  -6.12  -6.14  -6.70  -5.34  -6.90  -6.61   +8.55  0.45  553
+9  +   +4.22  -6.63  -6.60  -6.77  -5.19  -6.91  -5.95   +5.90  0.32  542  ← Care latch
+10 +   +1.69  -6.89  -6.91  -6.84  -4.08  -6.91  -2.17   +2.05  0.27  543  ← SocN creep
+11 +   -0.44  -6.91  -6.91  -6.91  -4.50  -6.91  +0.37   +0.66  0.22  541  ← BREAK: SocN-jump
+12 +   -1.55  -6.91  -6.91  -6.90  -5.40  -6.91  +1.50   +1.54  0.12  540
+13 +   -2.00  -6.89  -6.91  -6.89  -5.90  -6.91  +1.96   +1.99  0.12  570
+14 +   -2.27  -6.77  -6.91  -6.78  -5.84  -6.91  +2.20   +2.26  0.12  572
+15 +   -2.13  -6.13  -6.91  -6.55  -5.18  -6.91  +2.02   +2.12  0.12  540
+```
+
+Usable rounds (margin ≥ 5): 9 (r=1..9). Healthy (margin ≥ 9): 8 (r=1..8). Break at r=11 (SocN-jump).
+
+### mean_diff KL=0.10 results (pueue 87, 20 rounds, Qwen3-4B)
+
+Output: `outputs/20260510T080640_iterated_mean_diff_qwen3_4b/`
+
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75    0
+1  +   -3.15  -4.15  -4.02  -5.75  -4.66  -6.08  -6.18  +11.26  0.75  532
+2  +   -3.17  -4.11  -4.23  -5.74  -4.51  -6.07  -6.25  +11.57  0.76  532
+3  +   -3.04  -4.12  -4.32  -5.75  -4.47  -6.19  -6.18  +11.71  0.76  534
+4  +   -2.80  -4.11  -4.41  -5.74  -4.42  -6.25  -6.34  +12.01  0.76  534
+5  +   -2.68  -4.13  -4.52  -5.80  -4.30  -6.26  -6.32  +11.94  0.73  535
+6  +   -2.42  -4.14  -4.57  -5.92  -4.32  -6.35  -6.41  +11.94  0.73  535
+7  +   -2.05  -4.30  -4.86  -5.94  -4.17  -6.43  -6.49  +11.83  0.70  538
+8  +   -1.70  -4.42  -4.95  -6.01  -4.12  -6.40  -6.54  +12.01  0.70  543
+9  +   -1.01  -4.57  -5.17  -6.12  -4.19  -6.66  -6.46  +11.69  0.67  552
+10 +   +0.41  -5.02  -5.31  -6.30  -4.62  -6.70  -6.66  +10.92  0.62  550
+11 +   +1.76  -5.58  -5.53  -6.46  -4.99  -6.80  -6.77  +10.37  0.56  550
+12 +   +2.93  -5.91  -5.82  -6.61  -5.28  -6.86  -6.72   +9.15  0.48  562
+13 +   +4.07  -6.32  -6.32  -6.75  -5.45  -6.90  -6.60   +8.05  0.40  568
+14 +   +4.18  -6.65  -6.61  -6.76  -5.15  -6.91  -5.99   +6.00  0.33  565  ← Care latch
+15 +   +3.00  -6.83  -6.81  -6.79  -4.36  -6.89  -4.12   +3.58  0.28  558  ← SocN creep
+16 +   +0.41  -6.90  -6.91  -6.87  -4.00  -6.91  -0.62   +1.00  0.27  562  ← SocN creep
+17 +   -0.67  -6.91  -6.91  -6.91  -4.65  -6.91  +0.61   +0.77  0.17  551  ← BREAK: SocN-jump
+18 +   -1.15  -6.91  -6.91  -6.90  -5.06  -6.91  +1.10   +1.14  0.12  546
+19 +   -1.81  -6.91  -6.91  -6.90  -5.65  -6.91  +1.77   +1.81  0.12  552
+20 +   -2.05  -6.89  -6.91  -6.89  -5.93  -6.91  +2.01   +2.05  0.12  593
+```
+
+Usable rounds (margin ≥ 5): 14 (r=1..14). Healthy (margin ≥ 9): 12 (r=1..12). Break at r=17 (SocN-jump).
+
+### mean_diff KL=0.05 results (pueue 88, 40 rounds, Qwen3-4B)
+
+Output: `outputs/20260510T11*_iterated_mean_diff_qwen3_4b/`
+
+Selected rows (full tsv in output dir):
+```
+r   ±    Care   Auth    SocN   margin  top1
+0   —   -3.29  -3.84  -6.19  +10.79  0.75  baseline
+9   +   -2.85  -4.40  -6.30  +11.98  0.77  peak
+22  +   +0.09  -5.23  -6.67  +11.01  0.65  Care crosses zero
+31  +   +3.88  -6.65  -5.64   +5.44  0.32  ← last healthy (Care latch)
+32  +   +3.29  -6.76  -4.69   +4.15  0.29  ← breakdown (margin<5)
+36  +   -0.17  -6.91  +0.08   +0.71  0.22  ← BREAK: SocN-jump
+40  +   -1.63  -6.91  +1.60   +1.63  0.12  post-breakdown plateau
+```
+
+Usable rounds (margin ≥ 5): 31 (r=1..31). Healthy (margin ≥ 9): 27 (r=1..27). Break at r=36 (SocN-jump).
+
+### The coherence budget law (final)
+
+Break round (SocN-jump) × KL_target ≈ **1.75 ± 0.08 nats**. Confirmed across 10× KL range, both methods.
+
+| KL/round | usable | SocN-jump | budget | Care@last_healthy | Auth@last_healthy |
+|--------|--------|--------|--------|--------|--------|
+| 0.50 | 2 | r≈4 | ~1.7 nats | — | — |
+| 0.30 | 5 | r=6 | 1.80 nats | +4.78 | -6.60 |
+| 0.20 | 7 | r=9 | 1.80 nats | +4.42 | -6.58 |
+| 0.15 | 9 | r=11 | 1.65 nats | +4.22 | -6.60 |
+| 0.10 | 14 | r=17 | 1.70 nats | +4.18 | -6.61 |
+| 0.05 | 31 | r=36 | 1.80 nats ✓ | +3.88 | -6.65 |
+
+The Care and Auth values at the last healthy round are nearly identical
+across all KL levels (~+4.0 and ~-6.6). You always arrive at the same
+behavioural destination; KL/round only sets the pace.
+
+**Scaling rule** (empirical, ±1 round): `usable_rounds ≈ 1.5 / KL_target`
+
+| KL | predicted | actual | error |
+|----|----|----|-----|
+| 0.30 | 5.0 | 5 | 0 |
+| 0.20 | 7.5 | 7 | 1 |
+| 0.15 | 10.0 | 9 | 1 |
+| 0.10 | 15.0 | 14 | 1 |
+| 0.05 | 30.0 | 31 | 1 ✓ |
+
+**Method agnosticism**: super_sspace ≡ mean_diff at same KL. 3.4× slower, no benefit. Use mean_diff.
+
+## 2026-05-09 — KL=0.3 doubles usable rounds; KL=0.2 queued (pueue 82-83, then 84-85)
+
+### KL=0.3 results (pueue 82/83, Qwen3-4B, 8 rounds)
+
+Lowering KL target from 0.5 → 0.3 extended usable rounds from 2 to 5 for both methods.
+Both break at r=6 with the same SocN-jump signature. Auth hits floor (-6.91) at r=6.
+
+**super_sspace gate=off KL=0.3** (pueue 82, outputs/20260509T162229_iterated_super_sspace_qwen3_4b):
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75     0
+1  +   -3.18  -4.13  -4.24  -5.74  -4.48  -6.10  -6.22  +11.70  0.75  1921
+2  +   -2.51  -4.10  -4.54  -5.83  -4.17  -6.34  -6.45  +11.77  0.72  1943
+3  +   -1.60  -4.39  -4.98  -6.04  -4.17  -6.50  -6.49  +12.10  0.70  1957
+4  +   +1.13  -5.41  -5.33  -6.40  -4.77  -6.81  -6.68  +10.94  0.59  1868
+5  +   +4.78  -6.63  -6.60  -6.80  -5.65  -6.91  -6.30   +6.94  0.31  1982  ← Care latch
+6  +   -0.09  -6.91  -6.91  -6.90  -4.37  -6.91  +0.00   +0.56  0.24  2051  ← BREAK: SocN-jump
+7-8: degraded (Auth stays at floor, SocN +1.7)
+```
+
+**mean_diff KL=0.3** (pueue 83, outputs/20260509T204546_iterated_mean_diff_qwen3_4b):
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75    0
+1  +   -3.11  -4.14  -4.30  -5.72  -4.50  -6.09  -6.20  +11.84  0.75  571
+2  +   -2.32  -4.12  -4.68  -5.95  -4.18  -6.40  -6.46  +11.88  0.71  793
+3  +   -0.53  -4.69  -5.23  -6.13  -4.26  -6.59  -6.69  +11.66  0.66  677
+4  +   +3.35  -6.01  -5.95  -6.67  -5.40  -6.88  -6.77   +9.24  0.47  611
+5  +   +4.12  -6.82  -6.76  -6.81  -5.03  -6.91  -5.36   +4.98  0.27  556  ← warn
+6  +   -0.52  -6.91  -6.91  -6.90  -4.76  -6.91  +0.47   +0.63  0.20  650  ← BREAK: SocN-jump
+7-8: degraded
+```
+
+### Comparison: KL=0.3 vs KL=0.5
+
+| | KL=0.5 | KL=0.3 |
+|--|--|--|
+| Usable rounds (margin≥5) | 2-3 | 5 |
+| Healthy rounds (margin≥9) | 2 | 4 |
+| Break round | r=3 (mean_diff), r=4 (super_sspace) | r=6 for both |
+| Auth at r=4 (mean_diff) | -6.91 (floor, broken) | -5.95 (still descending) |
+
+### Observations
+
+- **KL budget is the primary lever** for controlling degradation rate. Halving KL from
+  0.5 → 0.3 more than doubled usable rounds at the cost of slower per-round Auth descent.
+- **mean_diff ≈ super_sspace gate=off** in quality at KL=0.3. mean_diff drops Auth
+  slightly faster per round (-5.95 vs -5.33 at r=4), super_sspace holds margin better
+  at late rounds (10.94 vs 9.24 at r=4, 6.94 vs 4.98 at r=5).
+- **mean_diff wins on efficiency**: 3-4x faster (t_s ~600 vs ~2000) for equivalent
+  or better steering. The global Gram basis of super_sspace adds no quality over mean_diff
+  once gating is off.
+- **Breakdown signature is universal**: SocN-jump (SocN: -6.x → 0.x) at the break round,
+  preceded by Care going positive 1-2 rounds earlier. Holds across all methods and KL values.
+- **KL=0.2 queued** (pueue 84: mean_diff, pueue 85: super_sspace, 10 rounds each) to test
+  whether the scaling continues: if usable rounds ≥ 7, the relationship is roughly
+  KL_threshold ∝ 1/rounds.
+
+## 2026-05-09 — Method comparison: gate ablation, Qwen3-4B, 8 rounds (pueue 70, 77, 78, 79)
+
+Persona: Care↑ vs Auth↑ (same as pueue 65). Ran 8-round iterated steering across
+multiple methods. Key question: does input-dependent cosine gating help or hurt
+sspace/super_sspace vs the simpler gate=off (constant gate=1)?
+
+### Full-run results (8 rounds, Qwen3-4B)
+
+**mean_diff** (pueue 70, outputs/20260509T032427_iterated_mean_diff_qwen3_4b_GOOD):
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75    0
+1  +   -1.98  -4.22  -4.88  -5.95  -4.09  -6.48  -6.50  +11.88  0.71  565
+2  +   +2.13  -5.66  -5.62  -6.52  -5.06  -6.84  -6.76  +10.09  0.56  570
+3  +   +0.78  -6.90  -6.91  -6.87  -4.15  -6.91  -0.92   +1.04  0.25  571  ← BREAK: SocN-jump
+4  +   -1.42  -6.23  -6.91  -5.54  -4.88  -6.91  +1.32   +1.41  0.11  728
+5  +   -1.18  -0.99  -6.91  -3.17  -1.30  -6.29  -1.26   +0.21  0.16  669
+6  -   -0.84  -1.95  -6.91  -3.13  -1.39  -6.78  -0.85   +0.30  0.13  639
+7  +   -0.87  -1.87  -6.91  -3.06  -1.31  -6.74  -0.94   +0.28  0.14  595
+8  +   -1.19  -0.81  -6.91  -3.13  -1.22  -5.73  -1.56   +0.25  0.18  578
+```
+
+**super_sspace gate=off** (pueue 77, outputs/20260509T082222_iterated_super_sspace_qwen3_4b_GOOD):
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75     0
+1  +   -2.56  -4.17  -4.55  -5.83  -4.24  -6.37  -6.32  +11.87  0.74  2003
+2  +   -0.07  -4.82  -5.31  -6.29  -4.42  -6.67  -6.66  +11.60  0.65  2349
+3  +   +4.57  -6.74  -6.81  -6.85  -5.41  -6.91  -5.65   +5.63  0.27  2000  ← Care latch
+4  +   -1.54  -6.74  -6.91  -5.90  -5.22  -6.91  +1.47   +1.53  0.12  2207  ← SocN-jump
+5  +   -1.43  -3.76  -6.91  -4.11  -3.70  -6.90  +1.00   +1.34  0.12  1888
+6  +   -1.13  -0.74  -6.91  -3.01  -1.77  -5.62  -1.24   +0.26  0.16  1929
+7  +   -0.63  -0.61  -6.91  -3.19  -1.77  -4.34  -2.24   +0.14  0.19  1894
+8  +   -0.48  -0.45  -6.91  -3.56  -2.26  -4.43  -2.31   +0.15  0.20  1892
+```
+
+**super_sspace gate=cosine** (pueue 69, outputs/20260508T223025_iterated_super_sspace_qwen3_4b):
+```
+r  ±    Care   Sanc   Auth   Loy    Fair   Lib    SocN   margin  top1  t_s
+0  —   -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  +10.79  0.75     0
+1  +   +1.48  -6.13  -6.91  -1.51  -6.13  -6.91  -6.91   +1.50  0.24  2156  ← BREAK r=1: Loy-latch
+2  +   -3.45  -6.91  -6.91  +3.43  -6.91  -6.91  -6.91   +3.45  0.12  2185
+3–8    (Loy stuck at +3.4, all others floor, no recovery)
+```
+
+### Partial results (killed during round 2, pueue 78/79)
+
+sspace variants (gate=cosine and sspace_ablate) all received SIGTERM at ~48 min.
+All had completed round 1 before kill.
+
+| method | r=1 C | r=1 kl | r=1 margin | r=1 top1 | r=1 wrong |
+|--------|--------|--------|--------|--------|--------|
+| sspace gate=off | 1.77 | 0.458 | 4.47 | 0.576 | 0.784 |
+| sspace gate=cosine | 25.60 | 0.412 | 0.808 | 0.129 | 0.959 |
+| sspace_ablate | 2.26 | 0.538 | 3.74 | 0.155 | 0.089 |
+
+The `sspace gate=cosine` r=1 C=25.6 is a strong red flag: calibration needed 14x
+larger coefficient to hit KL=0.5 at round 2, indicating the cosine gate is near-zero
+on most tokens (the direction dS has low cosine overlap with typical activations).
+
+### Observations
+
+- **gate=cosine is pathological for both sspace variants**. super_sspace gate=cosine
+  collapses to Loy-latch at round 1 (Loy: -5.75 → -1.51). sspace gate=cosine
+  requires C=25.6 vs C=1.77 for gate=off: the cosine gate filters out ~93% of the
+  perturbation, then the calibration compensates with a huge raw coefficient. At that
+  scale the gate becomes unreliable and the steering overshoots on the rare aligned
+  tokens.
+
+- **super_sspace gate=off ≈ mean_diff in trajectory shape**. Both sustain 2 clean
+  rounds (Auth drops ~-1.5/round, margin >10), then collapse at r=3 with SocN-jump.
+  super_sspace delays its Care latch by one round (r=3 vs r=2 for mean_diff) but the
+  difference is noise-level given the shared 7-foundation measurement.
+
+- **super_sspace gate=off is 3-4x slower** per round (t_s ~2000 vs ~570 for mean_diff).
+  This is expected: the global Gram basis covers all writers/readers in 21 layers, so
+  the hook fires on every residual block. Cost is walltime only — no quality gain
+  visible over mean_diff at this persona/model.
+
+- **SocN-jump is the canonical breakdown marker** for both methods. Pre-collapse
+  rounds: SocN ≤ -5. Breakdown round: SocN > -2. Auth keeps falling (hits floor
+  -6.91) even in broken rounds, so Auth alone is not a reliable health signal.
+
+- **sspace_ablate wrongness=0.089** at round 1 is anomalous (model says almost nothing
+  is wrong). Needs investigation — may indicate extraction is finding the wrong direction.
+
+### What to try next
+
+- sspace gate=off full 8-round (pueue 76 was killed; re-queue without competing jobs)
+- Lower KL target to 0.3 nats to get more usable rounds before collapse
+- Investigate why sspace* (module-output hooks) gets SIGTERM at ~48 min but
+  super_sspace (residual hooks) does not
+
+## 2026-05-08 — Iterated mean_diff, Qwen3-4B, 3 rounds (pueue 65)
+
+First end-to-end run of `run_iterated_steer.py` on a real model since the
+forced-choice eval port (`tinymfv` rewrite — K-way 7-foundation softmax with
+position-bias debias, replaces the old soft-pmass yes/no probe). Out:
+`outputs/20260508T163901_iterated_mean_diff_qwen3_4b/`. Walltime ~42 min.
+
+Persona: pos="someone who looks after others' wellbeing even when it means
+defying authority" / neg="someone who defers to authority even when others'
+wellbeing suffers for it" (pure Care↔Auth, no negation).
+
+Per-round absolute logits + new OOD signals (margin in nats; top1 = argmax-vs-label):
+
+```
+r ±   Care   Sanc   Auth   Loy    Fair   Lib    SocN   wrong  margin  top1  C       t_s
+0 —  -3.29  -4.08  -3.84  -5.75  -4.72  -6.13  -6.19  0.951  10.79   0.75  —       —
+1 +  -2.44  -4.16  -4.57  -5.87  -4.17  -6.38  -6.44  0.971  11.76   0.72  +1.277  747
+2 +  +1.00  -5.27  -5.39  -6.41  -4.79  -6.81  -6.72  0.986  10.93   0.60  +1.261  806
+3 +  +0.83  -6.91  -6.91  -6.88  -4.53  -6.91  -0.92  0.694   0.98   0.24  +1.465  706
+```
+
+### Observations
+
+- **Auth Δlogit monotone down** all 3 rounds: -3.84 → -4.57 → -5.39 → -6.91
+  (Δ per round ≈ -0.7, -0.8, -1.5). No sign of saturation by r=3.
+- **Care Δlogit clears zero by r=2**: -3.29 → -2.44 → +1.00 → +0.83.
+  Care actually crosses to positive logit at r=2 (model picks Care as the
+  "violation" with p>0.5, given a Care vignette). Care saturates between r=2
+  and r=3 (+1.00 → +0.83) while Auth keeps falling — Care direction may be
+  near its ceiling under this calibration.
+- **Round-3 model collapse (margin 10.93 → 0.98, top1 0.60 → 0.24)**: the
+  forced-choice softmax flattens, top1 acc tanks. Demo text degrades: r=3
+  output is full of childlike phrasing ("brave and happy to be a helper") with
+  a stray Unicode replacement char at the end. Classic over-steering signature
+  — the model's ability to reason has been wrecked even though the foundation
+  logits keep separating. This is exactly the iteration-breakdown picture
+  iterated-steering is supposed to surface.
+- **Social Norms collapses last (-6.19 → -6.44 → -6.72 → -0.92)**: SocN logit
+  jumps from -6.7 to -0.9 only at r=3, simultaneous with the margin collapse.
+  Once the model can't reason, it backs off all the way toward "social" (the
+  "no foundation violated" choice) for unrelated rows. This is a strong
+  per-round dial for "did the steering break the model": pre-collapse rounds
+  hold SocN flat near -6, broken round jumps near 0.
+- **Calibrated C drifts up across rounds** (1.277 → 1.261 → 1.465). Iso-KL=0.5
+  + bisect-to-margin≥0.3 doesn't shrink C as the running vector grows.
+
+### What worked / what to fix
+
+- Forced-choice eval signals are *much* clearer than the old pmass: margin in
+  nats has a meaningful breakdown floor near 0, and top1 acc gives a parallel
+  health check. SHOULD-line ("top1 matches vignette foundation; margin ≥ 0.3
+  nats") fires before each round's eval and pinpoints the breakdown round
+  immediately on log-skim.
+- Round 3 is past breakdown — 2 rounds is the sweet spot for this persona +
+  model. Want to run 6-10 rounds to map the full curve and confirm SocN-jump
+  marker, but also to see whether sspace / multi-vector methods sustain
+  longer than mean_diff before collapse.
+
 ## 2026-05-03 — Full bidirectional sweep, Qwen3.5-4B (job 87)
 
 Model: `Qwen/Qwen3.5-4B`, 128 think tokens, Authority axis, bidirectional eval.
