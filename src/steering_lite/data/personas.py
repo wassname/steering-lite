@@ -33,6 +33,28 @@ PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
 ]
 
 PROMPT_TEMPLATE = "You think and act like {persona}."
+# Top template from wassname/persona-steering-template-library (seed-24, score 51.3): binds the
+# persona to a behaviour channel, not identity-echo. Used for the short-adjective foundation pairs.
+PRIORITIES_TEMPLATE = "Use the priorities of a {persona} person."
+
+# Foundation-target axes for the "better steer": pairs are short, mirrored, enactable dispositions
+# (library rules: same domain, no negation-only/abstract-absence poles). Chosen for headroom -- the
+# model saturates high on Care/Authority, so we steer toward NON-saturated directions: +purity,
+# -authority(individualist), +loyalty, +equality, +/-traditionalism. Candidates; selectivity probe
+# (does the target foundation move on MFQ-2/MFV while others stay) decides which to keep.
+PERSONA_PAIRS_FOUNDATION: dict[str, tuple[str, str]] = {
+    "traditionalist": ("traditionalist", "individualist"),       # binding bundle (authority+purity+loyalty)
+    "sanctity":       ("sanctity-minded", "utility-minded"),     # +C raises purity/sanctity
+    "authority":      ("authority-respecting", "authority-questioning"),
+    "loyalty":        ("group-loyal", "self-interested"),
+    "equality":       ("egalitarian", "hierarchical"),
+}
+
+PERSONA_REGISTRY: dict[str, tuple[list[tuple[str, str]], str]] = {
+    # name -> (persona_pairs, template)
+    "authority_care": (PERSONA_PAIRS_AUTHORITY, PROMPT_TEMPLATE),   # original showcase axis
+    **{k: ([v], PRIORITIES_TEMPLATE) for k, v in PERSONA_PAIRS_FOUNDATION.items()},
+}
 
 
 def _data_path() -> Path:
@@ -72,6 +94,7 @@ def make_persona_pairs(
     n_pairs: int,
     thinking: bool = True,
     persona_pairs: list[tuple[str, str]] | None = None,
+    template: str = PROMPT_TEMPLATE,
     seed: int = 42,
 ) -> tuple[list[str], list[str]]:
     """Build (POS, NEG) chat-templated strings.
@@ -100,8 +123,8 @@ def make_persona_pairs(
     for entry in sampled:
         suffix = entry["suffix"]
         user_msg = entry["user_msg"]
-        pos_user = PROMPT_TEMPLATE.format(persona=rng.choice(pos_personas)) + "\n\n" + user_msg
-        neg_user = PROMPT_TEMPLATE.format(persona=rng.choice(neg_personas)) + "\n\n" + user_msg
+        pos_user = template.format(persona=rng.choice(pos_personas)) + "\n\n" + user_msg
+        neg_user = template.format(persona=rng.choice(neg_personas)) + "\n\n" + user_msg
         pos_texts.append(tok.apply_chat_template(
             [{"role": "user", "content": pos_user},
              {"role": "assistant", "content": suffix}],
