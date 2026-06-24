@@ -26,7 +26,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
-from tinymfv import evaluate
+from tinymfv import evaluate, get_instrument, administer
 
 
 def _mfv(model, tok, tag: str, budget: int, bs: int) -> None:
@@ -43,6 +43,8 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--n-pairs", type=int, default=256)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--only-stage3", action="store_true",
+                    help="skip stage0-2 evals (already confirmed clean); train, run ordinal admin, eval MFV")
     args = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(args.model)
@@ -54,7 +56,8 @@ def main() -> None:
 
     logger.info("SHOULD: stage0 pmass ~0.98. A stage where pmass crashes to ~0.17 / "
                 "is the culprit for the job-183 MFV collapse.")
-    _mfv(model, tok, "stage0-fresh", args.budget, args.batch_size)
+    if not args.only_stage3:
+        _mfv(model, tok, "stage0-fresh", args.budget, args.batch_size)
 
     n = model.config.num_hidden_layers
     layers = tuple(range(max(2, int(n * 0.2)), min(n - 2, int(n * 0.8))))
@@ -63,11 +66,22 @@ def main() -> None:
     v = sl.train(model, tok, pos, neg,
                  sl.MeanDiffC(layers=layers, coeff=1.0, dtype=torch.bfloat16, seed=0),
                  batch_size=8, max_length=384)
-    _mfv(model, tok, "stage1-after-train", args.budget, args.batch_size)
+    if not args.only_stage3:
+        _mfv(model, tok, "stage1-after-train", args.budget, args.batch_size)
+        with v(model, C=1.0):
+            pass  # attach + immediate detach, mirroring a steered eval's lifecycle
+        _mfv(model, tok, "stage2-after-attach-detach", args.budget, args.batch_size)
 
-    with v(model, C=1.0):
-        pass  # attach + immediate detach, mirroring a steered eval's lifecycle
-    _mfv(model, tok, "stage2-after-attach-detach", args.budget, args.batch_size)
+    # stage3: the exact job-183 pre-MFV sequence -- administer every ordinal at
+    # base/+C/-C (12 steered think-then-read passes) before re-checking MFV. This
+    # is the last untested difference; stages 0-2 are all clean.
+    for name in ["mfq2", "big5", "16pf", "humor_styles"]:
+        instr = get_instrument(name)
+        administer(model, tok, instr, batch_size=36, max_think_tokens=64)
+        for C in (1.0, -1.0):
+            with v(model, C=C):
+                administer(model, tok, instr, batch_size=36, max_think_tokens=64)
+    _mfv(model, tok, "stage3-after-ordinal-admin", args.budget, args.batch_size)
 
 
 if __name__ == "__main__":
