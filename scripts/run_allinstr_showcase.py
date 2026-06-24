@@ -192,21 +192,22 @@ def main() -> None:
     # === nominal MFV: evaluate at base / +C / -C ==========================
     if "mfv" in args.instruments:
         logger.info("\n=== evaluate MFV (classic vignettes) base / +C / -C ===")
-        # log_demo=False: the adapter's bs=1 demo trace NaNs once the run has
-        # accumulated process state (train + ordinal admin), and that NaN forward
-        # poisons the subsequent batched eval (Qwen3.5 gated-delta-net state), which
-        # is exactly the jobs-183/210 MFV collapse (pmass 0.166, demo top1 NaN). The
-        # direct/no-demo path stays coherent (pmass 0.984, bisect 206/208). The demo
-        # is a logging nicety, not the measurement, so we drop it here.
-        base_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
-                                         max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
+        # verbose=0 + log_demo=False: BOTH bs=1 demo traces must be off. After the run
+        # accumulates state (train + ordinal admin), a bs=1 large-budget forced-choice /
+        # free-generation NaNs and that NaN forward poisons the subsequent batched MFV
+        # eval (Qwen3.5 gated-delta-net recurrent-state persistence) -- the jobs-183/210/213
+        # collapse (pmass 0.166). There are TWO such demos: the adapter's _log_eval_demo_trace
+        # (log_demo) and tinymfv.evaluate's internal free_generation_demo (verbose>=1). The
+        # no-demo path is coherent (pmass 0.984, bisect 206/208/stage3, all verbose=0). The
+        # demos are logging niceties, not the measurement, so drop both here.
+        mfv_kw = dict(name="classic", log_demo=False, verbose=0,
+                      max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
+        base_report = evaluate_multibool(model, tok, **mfv_kw)
         base_logit = baseline_logit_per_foundation(base_report)
         with v(model, C=+C):
-            pos_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
-                                            max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
+            pos_report = evaluate_multibool(model, tok, **mfv_kw)
         with v(model, C=-C):
-            neg_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
-                                            max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
+            neg_report = evaluate_multibool(model, tok, **mfv_kw)
         pos_dlogit = dlogit_per_foundation(base_report, pos_report)
         neg_dlogit = dlogit_per_foundation(base_report, neg_report)
         logger.info("  MFV base logit: " + ", ".join(f"{f}={format_cell(base_logit[f])}" for f in FOUNDATION_ORDER))
