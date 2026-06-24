@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-03T07:35:38.031264385Z"
+exclude-newer = "2026-06-19T05:12:51.031698643Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -3004,6 +3004,7 @@ dependencies = [
     { name = "datasets" },
     { name = "httpx" },
     { name = "loguru" },
+    { name = "numpy" },
     { name = "openai" },
     { name = "pandas" },
     { name = "python-dotenv" },
@@ -3020,15 +3021,19 @@ requires-dist = [
     { name = "datasets" },
     { name = "httpx" },
     { name = "loguru" },
+    { name = "matplotlib", marker = "extra == 'maps'", specifier = ">=3.8" },
+    { name = "numpy" },
     { name = "openai", specifier = ">=1.40" },
     { name = "pandas" },
     { name = "python-dotenv" },
     { name = "tabulate" },
+    { name = "textalloc", marker = "extra == 'maps'", specifier = ">=1.2.3" },
     { name = "torch" },
     { name = "tqdm" },
-    { name = "transformers", specifier = ">=4.45" },
+    { name = "transformers", specifier = ">=5.7" },
     { name = "tyro" },
 ]
+provides-extras = ["maps"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3123,7 +3128,7 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "5.6.0"
+version = "5.12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -3136,9 +3141,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/14/e3eb58bd4c9df45af154f9de59a6e66a2ece30dd64434c710e40e5a4b1f1/transformers-5.6.0.tar.gz", hash = "sha256:291951976b79a6f93ec06d6ab14489a99aecdbc8f05aaabab538ea1d508c9a97", size = 8311711, upload-time = "2026-04-22T15:42:03.393Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/7c/8240f612819718100a9346dc28dea6a11370c3ca9c8c6eabadd3dea4ef29/transformers-5.12.1.tar.gz", hash = "sha256:679ee731c8225347889ad4fb3b2c926a62e9da3b7d284e9d12c791da7272466b", size = 8924054, upload-time = "2026-06-15T17:27:50.604Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/80/ac700df26a83969d2cf8d09d3dd191bb9bbe8156fa4607e614438b1da8c8/transformers-5.6.0-py3-none-any.whl", hash = "sha256:def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd", size = 10364790, upload-time = "2026-04-22T15:41:58.723Z" },
+    { url = "https://files.pythonhosted.org/packages/df/56/bbd60dd8668055803bf8ba55a81f9b8a8b31497f620109a9671d26a2076d/transformers-5.12.1-py3-none-any.whl", hash = "sha256:2a5e109d2021265df7098ffbb738295acaf5ad256f12cbc586db2ea4dcbb1a8a", size = 11150587, upload-time = "2026-06-15T17:27:46.679Z" },
 ]
 
 [[package]]
