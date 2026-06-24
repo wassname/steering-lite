@@ -192,14 +192,20 @@ def main() -> None:
     # === nominal MFV: evaluate at base / +C / -C ==========================
     if "mfv" in args.instruments:
         logger.info("\n=== evaluate MFV (classic vignettes) base / +C / -C ===")
-        base_report = evaluate_multibool(model, tok, name="classic",
+        # log_demo=False: the adapter's bs=1 demo trace NaNs once the run has
+        # accumulated process state (train + ordinal admin), and that NaN forward
+        # poisons the subsequent batched eval (Qwen3.5 gated-delta-net state), which
+        # is exactly the jobs-183/210 MFV collapse (pmass 0.166, demo top1 NaN). The
+        # direct/no-demo path stays coherent (pmass 0.984, bisect 206/208). The demo
+        # is a logging nicety, not the measurement, so we drop it here.
+        base_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
                                          max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
         base_logit = baseline_logit_per_foundation(base_report)
         with v(model, C=+C):
-            pos_report = evaluate_multibool(model, tok, name="classic",
+            pos_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
                                             max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
         with v(model, C=-C):
-            neg_report = evaluate_multibool(model, tok, name="classic",
+            neg_report = evaluate_multibool(model, tok, name="classic", log_demo=False,
                                             max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
         pos_dlogit = dlogit_per_foundation(base_report, pos_report)
         neg_dlogit = dlogit_per_foundation(base_report, neg_report)
