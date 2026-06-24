@@ -87,9 +87,10 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
     return out
 
 
-def _administer_profile(model, tok, instr, *, batch_size: int) -> dict:
-    """administer once -> {foundation: (mean, pmass)} aligned to instr.dimensions."""
-    res = administer(model, tok, instr, batch_size=batch_size)
+def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int) -> dict:
+    """administer once -> {foundation: (mean, pmass)} aligned to instr.dimensions.
+    max_think_tokens > 0 so the steer accrues over the think trace before the answer slot."""
+    res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens)
     return {f["foundation"]: (float(f["mean"]), float(res["mean_pmass_allowed"]))
             for f in res["foundations"]}
 
@@ -109,7 +110,10 @@ def main() -> None:
     ap.add_argument("--target-kl", type=float, default=0.5)
     ap.add_argument("--calib-T", type=int, default=60)
     ap.add_argument("--calib-iters", type=int, default=9)
-    ap.add_argument("--max-think-tokens", type=int, default=256)
+    ap.add_argument("--max-think-tokens", type=int, default=256)  # MFV vignette think budget
+    ap.add_argument("--admin-think-tokens", type=int, default=64)  # ordinal survey think budget (spec "light")
+    ap.add_argument("--fixed-C", type=float, default=None,
+                    help="skip iso-KL calibration and deploy this coefficient (iso-KL 0.5 gave a too-gentle 0.38)")
     ap.add_argument("--instruments", nargs="*", default=ORDINAL_INSTRUMENTS + ["mfv"])
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
@@ -143,12 +147,16 @@ def main() -> None:
     t0 = time.time()
     v = sl.train(model, tok, pos_prompts, neg_prompts, cfg,
                  batch_size=args.batch_size, max_length=args.max_length)
-    coeff_calib, _hist = sl.calibrate_iso_kl(
-        v, model, tok, calib_prompts, target_kl=args.target_kl, T=args.calib_T,
-        max_iters=args.calib_iters, device=args.device, bracket=(0.01, 1e6))
-    C = float(coeff_calib)
-    kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
-    logger.info(f"calibrated C={C:+.4f} kl_p95={kl_hit:.3f} elapsed={time.time()-t0:.0f}s")
+    if args.fixed_C is not None:
+        C, kl_hit = float(args.fixed_C), float("nan")
+        logger.info(f"fixed C={C:+.4f} (iso-KL skipped) elapsed={time.time()-t0:.0f}s")
+    else:
+        coeff_calib, _hist = sl.calibrate_iso_kl(
+            v, model, tok, calib_prompts, target_kl=args.target_kl, T=args.calib_T,
+            max_iters=args.calib_iters, device=args.device, bracket=(0.01, 1e6))
+        C = float(coeff_calib)
+        kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
+        logger.info(f"calibrated C={C:+.4f} kl_p95={kl_hit:.3f} elapsed={time.time()-t0:.0f}s")
 
     summary: dict = {"meta": meta, "model": args.model, "method": args.method,
                      "layers": list(layers), "calibrated_C": C, "kl_p95_at_calib": kl_hit,
@@ -162,10 +170,12 @@ def main() -> None:
         prof_by_pole = {}
         for tag, coeff in poles:
             if coeff is None:
-                prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size)
+                prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
+                                                        max_think_tokens=args.admin_think_tokens)
             else:
                 with v(model, C=coeff):
-                    prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size)
+                    prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
+                                                            max_think_tokens=args.admin_think_tokens)
             pm = list(prof_by_pole[tag].values())[0][1]
             logger.info(f"  {name} {tag} (C={coeff}): pmass={pm:.3f} "
                         f"profile=" + ", ".join(f"{f}={prof_by_pole[tag][f][0]:.2f}" for f in instr.dimensions))
