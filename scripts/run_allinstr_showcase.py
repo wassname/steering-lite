@@ -88,10 +88,17 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
 
 
 def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int) -> dict:
-    """administer once -> {foundation: (mean, pmass)} aligned to instr.dimensions.
+    """administer once -> {foundation: {E, C, logodds, pmass}} aligned to instr.dimensions.
+
+    E   = expected Likert score (human-comparable, but saturates near a confident answer).
+    C   = rank-centered logit contrast sum (k-mid)*logp_k -- the steer-legible readout (sensitive,
+          signed, normalizer-invariant); this is what the range/map plots should show for steering.
+    logodds = agree-vs-disagree, the readable 2-bin direction.
     max_think_tokens > 0 so the steer accrues over the think trace before the answer slot."""
     res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens)
-    return {f["foundation"]: (float(f["mean"]), float(res["mean_pmass_allowed"]))
+    pm = float(res["mean_pmass_allowed"])
+    return {f["foundation"]: {"E": float(f["mean"]), "C": float(f["C"]), "C_sd": float(f["C_sd"]),
+                              "logodds": float(f["logodds"]), "pmass": pm}
             for f in res["foundations"]}
 
 
@@ -194,18 +201,21 @@ def main() -> None:
                 with v(model, C=coeff):
                     prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
                                                             max_think_tokens=args.admin_think_tokens)
-            pm = list(prof_by_pole[tag].values())[0][1]
+            pm = list(prof_by_pole[tag].values())[0]["pmass"]
             logger.info(f"  {name} {tag} (C={coeff}): pmass={pm:.3f} "
-                        f"profile=" + ", ".join(f"{f}={prof_by_pole[tag][f][0]:.2f}" for f in instr.dimensions))
+                        f"C=" + ", ".join(f"{f}={prof_by_pole[tag][f]['C']:+.2f}" for f in instr.dimensions))
+        # mean = E (human-comparable), C = logit contrast (steer-legible), logodds = direction.
         rows = [{"foundation": f, "pole": tag, "c": cm,
-                 "mean": prof_by_pole[tag][f][0], "pmass": prof_by_pole[tag][f][1]}
+                 "mean": prof_by_pole[tag][f]["E"], "C": prof_by_pole[tag][f]["C"],
+                 "C_sd": prof_by_pole[tag][f]["C_sd"], "logodds": prof_by_pole[tag][f]["logodds"],
+                 "pmass": prof_by_pole[tag][f]["pmass"]}
                 for tag, _, cm in poles for f in instr.dimensions]
         with open(args.out / f"{name}_profiles.csv", "w", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=["foundation", "pole", "c", "mean", "pmass"])
+            w = csv.DictWriter(fh, fieldnames=["foundation", "pole", "c", "mean", "C", "C_sd", "logodds", "pmass"])
             w.writeheader()
             w.writerows(rows)
         summary["instruments"][name] = {"display": instr.display, "dimensions": instr.dimensions,
-                                        "pmass_base": prof_by_pole["base"][instr.dimensions[0]][1]}
+                                        "pmass_base": prof_by_pole["base"][instr.dimensions[0]]["pmass"]}
 
     # === nominal MFV: evaluate at base / +C / -C ==========================
     if "mfv" in args.instruments:
