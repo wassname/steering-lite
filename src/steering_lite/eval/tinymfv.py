@@ -123,7 +123,7 @@ def evaluate_with_vector(
       - raw_pmass:     {vid|cond|f: margin}                (margin in nats; OOD proxy)
       - wrongness:     mean (1 - p[social]) across rows  ∈ [0,1]
       - mean_margin:   mean margin over rows (nats)        -- main OOD signal
-      - mean_js:       JS vs label dist (nats)             (None if no labels)
+      - informedness:  macro Youden's J vs label argmax, in [-1,1] (None if no labels)
       - top1_acc:      argmax-match vs label argmax        (None if no labels)
       - table:         per-foundation pandas DataFrame from tinymfv
       - info:          diagnostics dict
@@ -144,7 +144,7 @@ def evaluate_with_vector(
         "raw_pmass": raw_pmass,
         "wrongness": wrongness,
         "mean_margin": mean_margin,
-        "mean_js": rep["mean_js"],
+        "informedness": rep["informedness"],
         "top1_acc": rep["top1_acc"],
         "table": rep["table"],
         "info": rep["info"],
