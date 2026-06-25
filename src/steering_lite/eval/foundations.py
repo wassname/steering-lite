@@ -57,10 +57,11 @@ def _agg(xs: list[float]) -> dict[str, float]:
     valid = [x for x in xs if not math.isnan(x)]
     n_total, n = len(xs), len(valid)
     if n == 0:
-        return {"mean": float("nan"), "std": float("nan"), "n": 0, "n_total": n_total}
+        return {"mean": float("nan"), "std": float("nan"), "sem": float("nan"), "n": 0, "n_total": n_total}
     m = sum(valid) / n
     var = sum((x - m) ** 2 for x in valid) / max(1, n - 1)
-    return {"mean": m, "std": var ** 0.5, "n": n, "n_total": n_total}
+    std = var ** 0.5
+    return {"mean": m, "std": std, "sem": std / n ** 0.5, "n": n, "n_total": n_total}
 
 
 def baseline_logit_per_foundation(report: dict, name: str | None = None) -> dict[str, dict[str, float]]:
