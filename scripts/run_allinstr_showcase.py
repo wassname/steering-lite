@@ -114,6 +114,9 @@ def main() -> None:
     ap.add_argument("--admin-think-tokens", type=int, default=64)  # ordinal survey think budget (spec "light")
     ap.add_argument("--fixed-C", type=float, default=None,
                     help="skip iso-KL calibration and deploy this coefficient (iso-KL 0.5 gave a too-gentle 0.38)")
+    ap.add_argument("--c-grid", default="1",
+                    help="comma multipliers of calibrated C for the ORDINAL c-sweep, e.g. '1,2,3'. Each "
+                         "administers at +-m*C; '1' reproduces the 3-point base/+C/-C. MFV stays +-C.")
     ap.add_argument("--instruments", nargs="*", default=ORDINAL_INSTRUMENTS + ["mfv"])
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
@@ -162,13 +165,19 @@ def main() -> None:
                      "layers": list(layers), "calibrated_C": C, "kl_p95_at_calib": kl_hit,
                      "instruments": {}}
 
-    # === ordinal instruments: administer at base / +C / -C ================
-    poles = [("base", None), ("pos", +C), ("neg", -C)]
+    # === ordinal instruments: administer over the signed c-sweep =========
+    # poles: (tag, coeff, c_mult). c_mult is the SIGNED multiplier of calibrated C written to the CSV
+    # so the plotter draws the real trajectory; base is c=0. A '1' grid gives the classic base/+C/-C.
+    mults = [float(m) for m in args.c_grid.split(",")]
+    poles = [("base", None, 0.0)]
+    for m in mults:
+        poles += [(f"pos{m:g}", +m * C, +m), (f"neg{m:g}", -m * C, -m)]
     for name in [n for n in args.instruments if n in ORDINAL_INSTRUMENTS]:
         instr = get_instrument(name)
-        logger.info(f"\n=== administer {name} ({instr.display}, {len(instr.dimensions)} factors) ===")
+        logger.info(f"\n=== administer {name} ({instr.display}, {len(instr.dimensions)} factors) "
+                    f"over c-sweep {[round(c, 2) for _, c, _ in poles]} ===")
         prof_by_pole = {}
-        for tag, coeff in poles:
+        for tag, coeff, _cm in poles:
             if coeff is None:
                 prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
                                                         max_think_tokens=args.admin_think_tokens)
@@ -179,9 +188,9 @@ def main() -> None:
             pm = list(prof_by_pole[tag].values())[0][1]
             logger.info(f"  {name} {tag} (C={coeff}): pmass={pm:.3f} "
                         f"profile=" + ", ".join(f"{f}={prof_by_pole[tag][f][0]:.2f}" for f in instr.dimensions))
-        rows = [{"foundation": f, "pole": tag, "c": {"base": 0, "pos": 1, "neg": -1}[tag],
+        rows = [{"foundation": f, "pole": tag, "c": cm,
                  "mean": prof_by_pole[tag][f][0], "pmass": prof_by_pole[tag][f][1]}
-                for tag, _ in poles for f in instr.dimensions]
+                for tag, _, cm in poles for f in instr.dimensions]
         with open(args.out / f"{name}_profiles.csv", "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=["foundation", "pole", "c", "mean", "pmass"])
             w.writeheader()
