@@ -18,6 +18,7 @@ Run at base / +2C / -2C of the calibrated equality (sspace) vector on mfq2 only 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -93,6 +94,9 @@ def main() -> None:
     mults = [float(m) for m in args.mults.split(",")]
     thinks = [int(t) for t in args.admin_think_list.split(",")]
 
+    # {think: {mult: {foundation: {E,mode,lo,ent}}}} -- saved to disk so nothing depends on the
+    # truncated stdout buffer (pueue keeps only the tail; the per-c tables scrolled off last time).
+    allprofs: dict = {}
     for think in thinks:
         profs: dict[float, dict] = {}
         for m in mults:
@@ -103,6 +107,9 @@ def main() -> None:
                 with v(model, C=coeff):
                     profs[m] = score_profile(model, tok, instr, batch_size=args.admin_batch_size, max_think_tokens=think)
             logger.info(f"administered mfq2 at think={think} c={m:+g} (coeff={coeff:+.2f})")
+        allprofs[think] = profs
+        (args.out / "readouts.json").write_text(json.dumps(
+            {str(t): {str(m): p for m, p in pr.items()} for t, pr in allprofs.items()}, indent=2))
 
         print(f"\n############### THINK BUDGET = {think} tokens ###############")
         for key, label in [("E", "EXPECTATION E (bounded 1-5, midpoint 3)"),
@@ -114,18 +121,23 @@ def main() -> None:
             print(tabulate(rows, headers=["foundation"] + [f"c={m:+g}" for m in mults],
                            tablefmt="pipe", floatfmt="+.3f"))
 
-        # odd/even decomposition at |c|=max: a CLEAN bipolar axis is odd-symmetric (directional >> common-mode).
-        # GPT-5.5's catch: if MFQ direction~0 and common-mode dominates, the categorical itself lacks direction
-        # (response-style shift), not just a bounded-readout artifact. Compare E vs log-odds on this.
-        mmax = max(mults)
-        if mmax in profs and -mmax in profs:
-            print(f"\n=== ODD/EVEN decomposition at |c|={mmax:g} (directional = (d+ - d-)/2, common-mode = (d+ + d-)/2) ===")
+        # odd/even decomposition at EVERY |c| with both poles (|c|=1 stays coherent; |c|=2 collapses
+        # some foundations to NaN at think=256). A CLEAN bipolar axis is odd-symmetric (directional >>
+        # common-mode). GPT-5.5's catch: if MFQ direction~0 and common-mode dominates on log-odds too
+        # (not just bounded E), the categorical itself lacks direction -- a response-style shift, not a
+        # bounded-readout artifact. nan-safe: skip a foundation whose pole is NaN (collapsed).
+        for mm in sorted({abs(m) for m in mults if m > 0}):
+            if mm not in profs or -mm not in profs:
+                continue
+            print(f"\n=== ODD/EVEN at |c|={mm:g} (directional = (d+ - d-)/2, common-mode = (d+ + d-)/2) ===")
             dec = []
             for f in instr.dimensions:
                 for key in ("E", "lo"):
-                    b, dp, dn = profs[0.0][f][key], profs[mmax][f][key] - profs[0.0][f][key], profs[-mmax][f][key] - profs[0.0][f][key]
-                    direc, comm = (dp - dn) / 2, (dp + dn) / 2
-                    dec.append([f, key, round(b, 3), round(dp, 3), round(dn, 3), round(direc, 3), round(comm, 3)])
+                    b, vp, vn = profs[0.0][f][key], profs[mm][f][key], profs[-mm][f][key]
+                    if not (np.isfinite(vp) and np.isfinite(vn) and np.isfinite(b)):
+                        continue
+                    dp, dn = vp - b, vn - b
+                    dec.append([f, key, round(b, 3), round(dp, 3), round(dn, 3), round((dp - dn) / 2, 3), round((dp + dn) / 2, 3)])
             print(tabulate(dec, headers=["foundation", "readout", "base", "d(+c)", "d(-c)", "directional", "common-mode"],
                            tablefmt="pipe", floatfmt="+.3f"))
 
