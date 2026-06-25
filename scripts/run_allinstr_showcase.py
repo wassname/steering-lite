@@ -36,7 +36,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
-from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
+from steering_lite.data import make_persona_pairs, PERSONA_REGISTRY
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation, format_cell,
@@ -99,6 +99,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3-4B")
     ap.add_argument("--method", default="mean_diff", choices=["mean_diff", "pca", "sspace"])
+    ap.add_argument("--persona", default="authority_care", choices=sorted(PERSONA_REGISTRY),
+                    help="axis from PERSONA_REGISTRY (library-template + selectivity-probe validated). "
+                         "authority/traditionalist steer NON-saturated directions (model sits near ceiling "
+                         "on care+/auth+, so -auth and +trad show the most coherent movement).")
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
@@ -142,8 +146,12 @@ def main() -> None:
     logger.info(f"layers={layers} ({len(layers)} of {model.config.num_hidden_layers})")
 
     # === one vector, extracted + iso-KL calibrated once ===================
+    persona_pairs, template = PERSONA_REGISTRY[args.persona]
+    pos_pole, neg_pole = persona_pairs[0]
+    vec_label = f"{args.method}: {args.persona} ({pos_pole} vs {neg_pole})"
+    logger.info(f"persona={args.persona} template={template!r} +pole={pos_pole!r} -pole={neg_pole!r}")
     pos_prompts, neg_prompts = make_persona_pairs(
-        tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONA_PAIRS_AUTHORITY)
+        tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=persona_pairs, template=template)
     calib_prompts = _calib_prompts(tok, n=8)
     cfg = _make_cfg(args.method, layers)
     logger.info(f"\n=== train+calibrate steer_{args.method} ===")
@@ -162,6 +170,7 @@ def main() -> None:
         logger.info(f"calibrated C={C:+.4f} kl_p95={kl_hit:.3f} elapsed={time.time()-t0:.0f}s")
 
     summary: dict = {"meta": meta, "model": args.model, "method": args.method,
+                     "persona": args.persona, "vec_label": vec_label,
                      "layers": list(layers), "calibrated_C": C, "kl_p95_at_calib": kl_hit,
                      "instruments": {}}
 
@@ -175,7 +184,7 @@ def main() -> None:
     for name in [n for n in args.instruments if n in ORDINAL_INSTRUMENTS]:
         instr = get_instrument(name)
         logger.info(f"\n=== administer {name} ({instr.display}, {len(instr.dimensions)} factors) "
-                    f"over c-sweep {[round(c, 2) for _, c, _ in poles]} ===")
+                    f"over signed c-mults {[cm for _, _, cm in poles]} (calibrated C={C:+.3f}) ===")
         prof_by_pole = {}
         for tag, coeff, _cm in poles:
             if coeff is None:
