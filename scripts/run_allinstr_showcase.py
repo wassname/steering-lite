@@ -36,7 +36,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
-from steering_lite.data import make_persona_pairs, PERSONA_REGISTRY
+from steering_lite.data import make_persona_pairs, make_moralstory_pairs, PERSONA_REGISTRY
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation, format_cell,
@@ -110,6 +110,11 @@ def main() -> None:
                     help="axis from PERSONA_REGISTRY (library-template + selectivity-probe validated). "
                          "authority/traditionalist steer NON-saturated directions (model sits near ceiling "
                          "on care+/auth+, so -auth and +trad show the most coherent movement).")
+    ap.add_argument("--pairs-source", default="persona", choices=["persona", "moralstory"],
+                    help="persona = adjective-prefix contrast; moralstory = foundation-labelled "
+                         "situations from moral_stories_foundations (target vs balanced-other).")
+    ap.add_argument("--foundation", default="fairness",
+                    help="moralstory target foundation (care/fairness/loyalty/authority/sanctity/liberty).")
     ap.add_argument("--layers", default="mid")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
@@ -153,12 +158,24 @@ def main() -> None:
     logger.info(f"layers={layers} ({len(layers)} of {model.config.num_hidden_layers})")
 
     # === one vector, extracted + iso-KL calibrated once ===================
-    persona_pairs, template = PERSONA_REGISTRY[args.persona]
-    pos_pole, neg_pole = persona_pairs[0]
-    vec_label = f"{args.method}: {args.persona} ({pos_pole} vs {neg_pole})"
-    logger.info(f"persona={args.persona} template={template!r} +pole={pos_pole!r} -pole={neg_pole!r}")
-    pos_prompts, neg_prompts = make_persona_pairs(
-        tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=persona_pairs, template=template)
+    # pairs-source picks the contrast: 'persona' = a one-word adjective prefix (egalitarian vs
+    # hierarchical etc.); 'moralstory' = real foundation-labelled SITUATIONS from
+    # moral_stories_foundations (target foundation vs balanced-other, situation text only, no
+    # completions). The persona "equality" axis conflates fairness with the authority/hierarchy axis
+    # (authority moved most, equality barely), so moralstory steers the foundation domain directly.
+    # NB moralstory labels MFT foundations; 'fairness' reads on MFQ-2 as equality+proportionality.
+    if args.pairs_source == "moralstory":
+        vec_label = f"{args.method}: {args.foundation} situations vs others"
+        logger.info(f"pairs=moralstory foundation={args.foundation!r}")
+        pos_prompts, neg_prompts = make_moralstory_pairs(
+            tok, n_pairs=args.n_pairs, foundation=args.foundation, thinking=True)
+    else:
+        persona_pairs, template = PERSONA_REGISTRY[args.persona]
+        pos_pole, neg_pole = persona_pairs[0]
+        vec_label = f"{args.method}: {args.persona} ({pos_pole} vs {neg_pole})"
+        logger.info(f"persona={args.persona} template={template!r} +pole={pos_pole!r} -pole={neg_pole!r}")
+        pos_prompts, neg_prompts = make_persona_pairs(
+            tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=persona_pairs, template=template)
     calib_prompts = _calib_prompts(tok, n=8)
     cfg = _make_cfg(args.method, layers)
     logger.info(f"\n=== train+calibrate steer_{args.method} ===")

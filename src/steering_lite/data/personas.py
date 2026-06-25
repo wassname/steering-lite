@@ -88,6 +88,57 @@ def load_suffixes(thinking: bool = True) -> list[dict]:
     return entries
 
 
+def make_moralstory_pairs(
+    tok,
+    *,
+    n_pairs: int,
+    foundation: str = "fairness",
+    thinking: bool = True,
+    seed: int = 42,
+) -> tuple[list[str], list[str]]:
+    """Build (POS, NEG) from wassname/moral_stories_foundations SITUATIONS by foundation label.
+
+    POS = situations whose moral dilemma engages `foundation` (e.g. fairness); NEG = a sample
+    BALANCED across the other foundations. The contrastive signal is the situation text itself
+    (its moral domain), so we read activations over the prompt and do NOT use the chosen/rejected
+    completions -- the direction isolates "this scenario is about fairness" vs "about the other
+    foundations", a concrete foundation-domain direction. Balanced NEG (equal draw per other
+    foundation) so the diff is fairness-vs-rest, not fairness-vs-care (care dominates the corpus).
+
+    NB the dataset labels the MFT foundations (care/fairness/loyalty/authority/sanctity/liberty);
+    fairness is the parent of MFQ-2's equality+proportionality split, so steering
+    `foundation='fairness'` is read on MFQ-2 as equality+proportionality movement.
+    """
+    from datasets import load_dataset
+
+    rng = random.Random(seed)
+    ds = load_dataset("wassname/moral_stories_foundations")["train"]
+    all_founds = sorted({r["foundation"] for r in ds})
+    assert foundation in all_founds, f"foundation={foundation!r} not in {all_founds}"
+    pos_rows = [r for r in ds if r["foundation"] == foundation]
+    n = min(n_pairs, len(pos_rows))
+    pos_rows = rng.sample(pos_rows, n)
+    # balanced NEG: equal draw from each OTHER foundation, so POS-NEG = foundation vs the rest
+    others = [f for f in all_founds if f != foundation]
+    per = -(-n // len(others))  # ceil
+    neg_rows: list[dict] = []
+    for f in others:
+        fr = [r for r in ds if r["foundation"] == f]
+        neg_rows += rng.sample(fr, min(per, len(fr)))
+    neg_rows = rng.sample(neg_rows, n)
+
+    think = "<think>" if thinking else ""
+    def templ(r):
+        return tok.apply_chat_template(
+            [{"role": "user", "content": r["prompt"]},
+             {"role": "assistant", "content": think}],
+            tokenize=False, continue_final_message=True)
+    pos_texts = [templ(r) for r in pos_rows]
+    neg_texts = [templ(r) for r in neg_rows]
+    logger.info(f"Moral-story pairs: n={n} {foundation!r} situations vs balanced-other ({len(others)} foundations)")
+    return pos_texts, neg_texts
+
+
 def make_persona_pairs(
     tok,
     *,
