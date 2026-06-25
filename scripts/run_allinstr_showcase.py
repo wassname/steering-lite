@@ -98,7 +98,7 @@ def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens:
     res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens)
     pm = float(res["mean_pmass_allowed"])
     return {f["foundation"]: {"E": float(f["mean"]), "C": float(f["C"]), "C_sd": float(f["C_sd"]),
-                              "logodds": float(f["logodds"]), "pmass": pm}
+                              "logodds": float(f["logodds_agree"]), "pmass": pm}
             for f in res["foundations"]}
 
 
