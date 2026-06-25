@@ -95,7 +95,7 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int,
     res = results[0]
     p_sorted = sorted(res.p.items(), key=lambda kv: -kv[1])
     p_str = "  ".join(f"{f}={p:.2f}" for f, p in p_sorted[:4])
-    logger.info(
+    logger.debug(
         "[demo] SHOULD: top1 matches vignette foundation; margin >= 0.3 nats.\n"
         f"=== EVAL demo  stage=eval  method={method_name}  vid={r.get('id','?')}  "
         f"cond={cond}  max_think={max_think_tokens} ===\n"
