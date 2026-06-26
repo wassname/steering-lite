@@ -9,9 +9,25 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from pathlib import Path
 
 from loguru import logger
+
+
+# Keyword sharpening for moral-story POS situations: the raw foundation label is noisy for the
+# non-care foundations (the "authority" label is mostly mundane promise/obligation prudence -- traffic
+# jams, overgrown lawns -- with no chain-of-command stakes, so a mean_diff vector off it has an
+# ambiguous sign). We further filter POS to situations whose text actually voices the foundation, so
+# the contrast direction is unambiguous. This sharpens the STEERING set only; the eval instruments are
+# independent, so it is not the circular "select toward the measured foundation" cheat. Only defined
+# for foundations that need it; fairness works label-only.
+FOUNDATION_KEYWORDS: dict[str, list[str]] = {
+    "authority": ["boss", "manager", "supervisor", "officer", "police", "order", "command", "rule",
+                  "law", "permission", "obey", "authority", "superior", "captain", "sergeant",
+                  "principal", "chief", "official", "duty", "instruction", "regulation", "protocol",
+                  "in charge", "allowed", "forbid"],
+}
 
 
 PERSONA_PAIRS_AUTHORITY: list[tuple[str, str]] = [
@@ -116,6 +132,12 @@ def make_moralstory_pairs(
     all_founds = sorted({r["foundation"] for r in ds})
     assert foundation in all_founds, f"foundation={foundation!r} not in {all_founds}"
     pos_rows = [r for r in ds if r["foundation"] == foundation]
+    if foundation in FOUNDATION_KEYWORDS:
+        pat = re.compile(r"\b(" + "|".join(FOUNDATION_KEYWORDS[foundation]) + r")", re.I)
+        kept = [r for r in pos_rows if pat.search(r["prompt"])]
+        assert len(kept) >= 32, f"{foundation} keyword filter left only {len(kept)} situations (<32)"
+        logger.info(f"Keyword-sharpened {foundation}: {len(kept)}/{len(pos_rows)} situations voice the foundation")
+        pos_rows = kept
     n = min(n_pairs, len(pos_rows))
     pos_rows = rng.sample(pos_rows, n)
     # balanced NEG: equal draw from each OTHER foundation, so POS-NEG = foundation vs the rest
