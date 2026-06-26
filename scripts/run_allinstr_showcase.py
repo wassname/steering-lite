@@ -255,12 +255,26 @@ def main() -> None:
             neg_report = evaluate_multibool(model, tok, **mfv_kw)
         pos_dlogit = dlogit_per_foundation(base_report, pos_report)
         neg_dlogit = dlogit_per_foundation(base_report, neg_report)
+        # Coherence under forced reads: pmass is pinned high by the prefill scaffold, so
+        # read breakage off frac_unscorable (self-close rate, ~0 once tokens are suppressed)
+        # and mean_margin (healthy ~1-3 nats, -> 0 when steering destroys the model). Saved
+        # per pole so the figure is self-documenting (was dropped before, not recoverable).
+        def coh(rep):
+            i = rep["info"]
+            return {"mean_margin": rep["mean_margin"], "frac_unscorable": i["frac_unscorable"],
+                    "mean_pmass_allowed": i["mean_pmass_allowed"], "mean_nll_prefill": i["mean_nll_prefill"]}
+        for tag, rep in [("base", base_report), (f"+{C:.2f}", pos_report), (f"-{C:.2f}", neg_report)]:
+            c = coh(rep)
+            logger.info(f"  MFV coherence {tag}: margin={c['mean_margin']:+.2f}nat "
+                        f"unscorable={c['frac_unscorable']:.3f} pmass={c['mean_pmass_allowed']:.3f} "
+                        f"nll_prefill={c['mean_nll_prefill']:.2f}")
         logger.info("  MFV base logit: " + ", ".join(f"{f}={format_cell(base_logit[f])}" for f in FOUNDATION_ORDER))
         (args.out / "mfv.json").write_text(json.dumps({
             "base_logit_per_foundation": base_logit,
             "pos": {"coeff": +C, "dlogit_per_foundation": pos_dlogit},
             "neg": {"coeff": -C, "dlogit_per_foundation": neg_dlogit},
             "foundation_order": list(FOUNDATION_ORDER),
+            "coherence": {"base": coh(base_report), "pos": coh(pos_report), "neg": coh(neg_report)},
         }, indent=2))
         summary["instruments"]["mfv"] = {"display": "MFV vignettes", "foundations": list(FOUNDATION_ORDER)}
 
