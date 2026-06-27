@@ -214,14 +214,22 @@ def measure_kl(
             decoded_base = tok.decode(base_full, skip_special_tokens=False)
             decoded_steer = tok.decode(full_ids, skip_special_tokens=False)
             if log_demo and idx == 0:
-                logger.info(
-                    f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
-                    "steered should differ from base but not collapse.\n"
-                    f"\n=== CALIBRATE demo trace (T={T}, kl_p95_so_far) ===\n"
-                    f"--- BASE (c=0) ---\n{decoded_base}\n"
-                    f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
-                    f"=== /CALIBRATE ==="
-                )
+                # First bisection iter (demo_iter 0) and the final operating-point snapshot
+                # (demo_iter -1/None) print in FULL; the intermediate bisection iters collapse
+                # to one head...tail table row each, so calibration does not flood the log.
+                if demo_iter is None or demo_iter <= 0:
+                    logger.info(
+                        f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
+                        "steered should differ from base but not collapse.\n"
+                        f"\n=== CALIBRATE demo trace (T={T}, kl_p95_so_far) ===\n"
+                        f"--- BASE (c=0) ---\n{decoded_base}\n"
+                        f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                        f"=== /CALIBRATE ==="
+                    )
+                else:
+                    oneline = " ".join(decoded_steer.split())
+                    logger.info(f"| c={v.cfg.coeff:+.4f} kl_mean={float(kls.mean()):.2f} "
+                                f"| {oneline[:40]}...{oneline[-40:]} |")
             if demo_log_path is not None:
                 with demo_log_path.open("a") as f:
                     f.write(json.dumps({
