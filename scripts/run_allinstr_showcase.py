@@ -95,6 +95,24 @@ def _calib_prompts(tok, n: int = 8, seed: int = 0) -> list[str]:
     return out
 
 
+def _read_scenario_prompts(path: Path) -> list[str]:
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    prompts = [row["prompt"] if "prompt" in row else row["text"] for row in rows]
+    assert prompts, f"no prompts in {path}"
+    return prompts
+
+
+def _stratified_scenario_prompts(path: Path, n: int = 8) -> list[str]:
+    prompts = sorted(set(_read_scenario_prompts(path)), key=lambda s: len(s.split()))
+    if len(prompts) <= n:
+        return prompts
+    return [prompts[round(i * (len(prompts) - 1) / (n - 1))] for i in range(n)]
+
+
+def _persona_library_calib_prompts(tok, scenario_path: Path, n_iid: int = 8, n_ood: int = 4) -> list[str]:
+    return _stratified_scenario_prompts(scenario_path, n=n_iid) + _calib_prompts(tok, n=n_ood, seed=1)
+
+
 def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int) -> dict:
     """administer once -> {foundation: {E, C, logodds, pmass}} aligned to instr.dimensions.
 
@@ -128,6 +146,8 @@ def main() -> None:
                                  "persona-steering-template-library"))
     ap.add_argument("--persona-library-pair", default="dignity_over_authority")
     ap.add_argument("--persona-library-template", default=PERSONA_LIBRARY_TEMPLATE)
+    ap.add_argument("--persona-library-scenarios", type=Path,
+                    help="curated scenario JSONL from persona-steering-template-library selection")
     ap.add_argument("--foundation", default="fairness",
                     help="moralstory target foundation (care/fairness/loyalty/authority/sanctity/liberty).")
     ap.add_argument("--layers", default="mid")
@@ -192,6 +212,7 @@ def main() -> None:
             n_pairs=args.n_pairs,
             pair_id=args.persona_library_pair,
             template=args.persona_library_template,
+            scenario_path=args.persona_library_scenarios,
             thinking=True,
         )
         vec_label = (f"{args.method}: {persona_library_meta['pair_id']} "
@@ -203,7 +224,11 @@ def main() -> None:
         logger.info(f"persona={args.persona} template={template!r} +pole={pos_pole!r} -pole={neg_pole!r}")
         pos_prompts, neg_prompts = make_persona_pairs(
             tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=persona_pairs, template=template)
-    calib_prompts = _calib_prompts(tok, n=8)
+    if args.pairs_source == "persona_library" and args.persona_library_scenarios is not None:
+        calib_prompts = _persona_library_calib_prompts(tok, args.persona_library_scenarios)
+        logger.info(f"calibration prompts: 8 selected-scenario IID short/mid/long + 4 OOD")
+    else:
+        calib_prompts = _calib_prompts(tok, n=8)
     cfg = _make_cfg(args.method, layers)
     logger.info(f"\n=== train+calibrate steer_{args.method} ===")
     t0 = time.time()

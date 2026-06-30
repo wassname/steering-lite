@@ -189,6 +189,7 @@ def make_persona_library_pairs(
     n_pairs: int,
     pair_id: str = "dignity_over_authority",
     template: str = PERSONA_LIBRARY_TEMPLATE,
+    scenario_path: Path | None = None,
     thinking: bool = True,
     seed: int = 42,
 ) -> tuple[list[str], list[str], dict]:
@@ -206,28 +207,36 @@ def make_persona_library_pairs(
     pos_persona = pair["pos"]
     neg_persona = pair["neg"]
 
-    scenario_paths = sorted((library_dir / "data" / "scenarios").glob("*.jsonl"))
-    if not scenario_paths:
-        raise FileNotFoundError(library_dir / "data" / "scenarios")
-    per_source = -(-n_pairs // len(scenario_paths))
-
     sampled_rows: list[dict] = []
-    source_counts: dict[str, int] = {}
-    for path in scenario_paths:
-        rows = _jsonl_rows(path)
-        n = min(per_source, len(rows))
-        chosen = rng.sample(rows, n)
-        source_counts[path.stem] = n
+    if scenario_path is not None:
+        rows = _jsonl_rows(scenario_path)
+        chosen = rows if len(rows) <= n_pairs else rng.sample(rows, n_pairs)
         for row in chosen:
             sampled_rows.append({
-                "source_file": path.stem,
+                "source_file": row.get("source", scenario_path.stem),
                 "id": row["id"],
-                "text": _scenario_text(row, path),
+                "text": _scenario_text(row, scenario_path),
             })
+    else:
+        scenario_paths = sorted((library_dir / "data" / "scenarios").glob("*.jsonl"))
+        if not scenario_paths:
+            raise FileNotFoundError(library_dir / "data" / "scenarios")
+        per_source = -(-n_pairs // len(scenario_paths))
+        for path in scenario_paths:
+            rows = _jsonl_rows(path)
+            n = min(per_source, len(rows))
+            chosen = rng.sample(rows, n)
+            for row in chosen:
+                sampled_rows.append({
+                    "source_file": path.stem,
+                    "id": row["id"],
+                    "text": _scenario_text(row, path),
+                })
 
-    rng.shuffle(sampled_rows)
-    sampled_rows = sampled_rows[:n_pairs]
-    source_counts = {}
+    source_counts: dict[str, int] = {}
+    if scenario_path is None:
+        rng.shuffle(sampled_rows)
+        sampled_rows = sampled_rows[:n_pairs]
     for row in sampled_rows:
         source_counts[row["source_file"]] = source_counts.get(row["source_file"], 0) + 1
 
@@ -248,6 +257,7 @@ def make_persona_library_pairs(
 
     meta = {
         "library_dir": str(library_dir),
+        "scenario_path": str(scenario_path) if scenario_path is not None else None,
         "pair_id": pair_id,
         "pos_persona": pos_persona,
         "neg_persona": neg_persona,
@@ -256,7 +266,7 @@ def make_persona_library_pairs(
         "sample_ids": [{k: row[k] for k in ("source_file", "id")} for row in sampled_rows[:16]],
     }
     logger.info(f"Persona-library pairs: n={len(pos_texts)} pair={pair_id!r} template={template!r} "
-                f"sources={source_counts}")
+                f"scenario_path={scenario_path} sources={source_counts}")
     return pos_texts, neg_texts, meta
 
 
