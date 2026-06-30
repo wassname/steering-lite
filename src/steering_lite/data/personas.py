@@ -175,6 +175,8 @@ def _scenario_text(row: dict, path: Path) -> str:
 
 
 def _render_template(template: str, persona: str) -> str:
+    if template == "__verbatim_skill_persona__":
+        return persona
     if "{{ persona }}" in template:
         return template.replace("{{ persona }}", persona)
     if "{persona}" in template:
@@ -204,8 +206,12 @@ def make_persona_library_pairs(
     if len(matches) != 1:
         raise ValueError(f"{persona_path}: expected exactly one pair_id={pair_id!r}, found {len(matches)}")
     pair = matches[0]
-    pos_persona = pair["pos"]
-    neg_persona = pair["neg"]
+    if template == "__verbatim_skill_persona__":
+        pos_persona = pair["pos_persona"]
+        neg_persona = pair["neg_persona"]
+    else:
+        pos_persona = pair["pos"]
+        neg_persona = pair["neg"]
 
     sampled_rows: list[dict] = []
     if scenario_path is not None:
