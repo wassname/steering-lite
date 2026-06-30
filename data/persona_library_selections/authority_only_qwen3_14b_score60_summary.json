@@ -1,0 +1,68 @@
+{
+  "name": "authority_only_qwen3_14b_score60",
+  "axis": "authority_tradition_obedience",
+  "axis_note": "+Authority/-Authority via tradition, obedience, seniority, and established social order; not dignity/care/wellbeing.",
+  "positive_persona": "tradition-and-obedience-respecting",
+  "negative_persona": "tradition-and-obedience-minimizing",
+  "template": "Answer as someone who is {persona}.",
+  "generator_model": "qwen/qwen3-14b",
+  "generator_provider_only": [
+    "DeepInfra"
+  ],
+  "axis_judge_models": [
+    "google/gemini-3.1-flash-lite-preview",
+    "deepseek/deepseek-v4-flash"
+  ],
+  "seed_stage_a": 42,
+  "seed_stage_b": 43,
+  "stage_a": {
+    "n_results": 720,
+    "n_success": 720,
+    "n_errors": 0,
+    "winner": {
+      "axis": "authority_tradition_obedience",
+      "template": "Answer as someone who is {persona}.",
+      "n": 24,
+      "strict_pass_rate": 0.208,
+      "mean_axis_delta": 3.877,
+      "mean_axis_delta_judge_std": 0.41,
+      "mean_off_axis_problem": 2.658,
+      "mean_max_off_axis_category_likert": 2.188,
+      "mean_max_style_abs_delta": 1.204,
+      "mean_abs_word_delta_frac": 0.242,
+      "persona_echo_rate": 0.125,
+      "refusal_or_ai_break_rate": 0.0,
+      "recommended": false
+    }
+  },
+  "stage_b": {
+    "n_results": 342,
+    "n_success": 342,
+    "n_errors": 0,
+    "strict_pass_rate": 0.143,
+    "mean_axis_delta": 3.727,
+    "mean_off_axis_problem": 2.831,
+    "mean_max_style_abs_delta": 1.592
+  },
+  "selection_rule": "Stage B strict_pass=true, selection_score >= 60, ranked within source; keep up to 10 per source.",
+  "selected_count": 32,
+  "selected_source_counts": {
+    "scenarios_airisk": 1,
+    "scenarios_daily_dilemmas": 5,
+    "scenarios_ethics_qna": 4,
+    "scenarios_moral_stories": 3,
+    "scenarios_social_chem": 7,
+    "scenarios_v2_candidates": 1,
+    "scenarios_valuebench": 10,
+    "scenarios_w2s_character_3p": 1
+  },
+  "selected_score_min": 60.1539,
+  "selected_score_max": 96.67,
+  "selected_axis_delta_min": 5.25,
+  "selected_axis_delta_max": 8.0,
+  "source_artifacts": {
+    "stage_a": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/stage_a_live_qwen3_14b_deepinfra.json",
+    "stage_b": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/stage_b_live_qwen3_14b_deepinfra.json",
+    "selected_examples": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/authority_affordant_20260630/selection_qwen3_14b_deepinfra_score60/selected_examples.md"
+  }
+}
