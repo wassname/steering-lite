@@ -11,6 +11,8 @@ uv run --extra benchmark python scripts/run_allinstr_showcase.py \
   --persona-library-scenarios data/persona_library_selections/authority_dignity_strict22.jsonl \
   --n-pairs 22 \
   --instruments mfv humor_styles big5 mfq2 \
+  --fixed-C 37.1141 \
+  --admin-batch-size 4 \
   --admin-n-samples 8 \
   --admin-temperature 0.7 \
   --admin-top-p 0.95 \
