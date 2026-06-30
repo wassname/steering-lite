@@ -113,7 +113,8 @@ def _persona_library_calib_prompts(tok, scenario_path: Path, n_iid: int = 8, n_o
     return _stratified_scenario_prompts(scenario_path, n=n_iid) + _calib_prompts(tok, n=n_ood, seed=1)
 
 
-def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int) -> dict:
+def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int,
+                        n_samples: int, temperature: float, top_p: float) -> dict:
     """administer once -> {foundation: {E, C, logodds, pmass}} aligned to instr.dimensions.
 
     E   = expected Likert score (human-comparable, but saturates near a confident answer).
@@ -121,9 +122,14 @@ def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens:
           signed, normalizer-invariant); this is what the range/map plots should show for steering.
     logodds = agree-vs-disagree, the readable 2-bin direction.
     max_think_tokens > 0 so the steer accrues over the think trace before the answer slot."""
-    res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens)
+    res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens,
+                     n_samples=n_samples, temperature=temperature, top_p=top_p)
     pm = float(res["mean_pmass_allowed"])
     return {f["foundation"]: {"E": float(f["mean"]), "C": float(f["C"]), "C_sd": float(f["C_sd"]),
+                              "E_sd": float(f["sd"]), "E_ci95_lo": float(f["ci95_lo"]),
+                              "E_ci95_hi": float(f["ci95_hi"]),
+                              "C_ci95_lo": float(f["C_ci95_lo"]), "C_ci95_hi": float(f["C_ci95_hi"]),
+                              "framing_spread": float(f["framing_spread"]),
                               "logodds": float(f["logodds_agree"]), "pmass": pm}
             for f in res["foundations"]}
 
@@ -157,6 +163,12 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--eval-batch-size", type=int, default=16)
     ap.add_argument("--admin-batch-size", type=int, default=36)
+    ap.add_argument("--admin-n-samples", type=int, default=1,
+                    help="survey think trajectories per item/frame; >1 requires --admin-temperature > 0")
+    ap.add_argument("--admin-temperature", type=float, default=0.0,
+                    help="sampling temperature for survey think trajectories")
+    ap.add_argument("--admin-top-p", type=float, default=1.0,
+                    help="top-p for survey think trajectory sampling")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=0.5)
     ap.add_argument("--calib-T", type=int, default=60)
@@ -166,8 +178,8 @@ def main() -> None:
     ap.add_argument("--fixed-C", type=float, default=None,
                     help="skip iso-KL calibration and deploy this coefficient (iso-KL 0.5 gave a too-gentle 0.38)")
     ap.add_argument("--c-grid", default="1",
-                    help="comma multipliers of calibrated C for the ORDINAL c-sweep, e.g. '1,2,3'. Each "
-                         "administers at +-m*C; '1' reproduces the 3-point base/+C/-C. MFV stays +-C.")
+                    help="comma multipliers of calibrated C for the c-sweep, e.g. '1,2,3'. Each "
+                         "evals at +-m*C; '1' reproduces the 3-point base/+C/-C.")
     ap.add_argument("--instruments", nargs="*", default=ORDINAL_INSTRUMENTS + ["mfv"])
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
@@ -267,30 +279,45 @@ def main() -> None:
         for tag, coeff, _cm in poles:
             if coeff is None:
                 prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
-                                                        max_think_tokens=args.admin_think_tokens)
+                                                        max_think_tokens=args.admin_think_tokens,
+                                                        n_samples=args.admin_n_samples,
+                                                        temperature=args.admin_temperature,
+                                                        top_p=args.admin_top_p)
             else:
                 with v(model, C=coeff):
                     prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
-                                                            max_think_tokens=args.admin_think_tokens)
+                                                            max_think_tokens=args.admin_think_tokens,
+                                                            n_samples=args.admin_n_samples,
+                                                            temperature=args.admin_temperature,
+                                                            top_p=args.admin_top_p)
             pm = list(prof_by_pole[tag].values())[0]["pmass"]
             logger.info(f"  {name} {tag} (C={coeff}): pmass={pm:.3f} "
                         f"C=" + ", ".join(f"{f}={prof_by_pole[tag][f]['C']:+.2f}" for f in instr.dimensions))
         # mean = E (human-comparable), C = logit contrast (steer-legible), logodds = direction.
         rows = [{"foundation": f, "pole": tag, "c": cm,
                  "mean": prof_by_pole[tag][f]["E"], "C": prof_by_pole[tag][f]["C"],
-                 "C_sd": prof_by_pole[tag][f]["C_sd"], "logodds": prof_by_pole[tag][f]["logodds"],
+                 "E_sd": prof_by_pole[tag][f]["E_sd"],
+                 "E_ci95_lo": prof_by_pole[tag][f]["E_ci95_lo"],
+                 "E_ci95_hi": prof_by_pole[tag][f]["E_ci95_hi"],
+                 "C_sd": prof_by_pole[tag][f]["C_sd"],
+                 "C_ci95_lo": prof_by_pole[tag][f]["C_ci95_lo"],
+                 "C_ci95_hi": prof_by_pole[tag][f]["C_ci95_hi"],
+                 "framing_spread": prof_by_pole[tag][f]["framing_spread"],
+                 "logodds": prof_by_pole[tag][f]["logodds"],
                  "pmass": prof_by_pole[tag][f]["pmass"]}
                 for tag, _, cm in poles for f in instr.dimensions]
         with open(args.out / f"{name}_profiles.csv", "w", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=["foundation", "pole", "c", "mean", "C", "C_sd", "logodds", "pmass"])
+            w = csv.DictWriter(fh, fieldnames=[
+                "foundation", "pole", "c", "mean", "E_sd", "E_ci95_lo", "E_ci95_hi",
+                "C", "C_sd", "C_ci95_lo", "C_ci95_hi", "framing_spread", "logodds", "pmass"])
             w.writeheader()
             w.writerows(rows)
         summary["instruments"][name] = {"display": instr.display, "dimensions": instr.dimensions,
                                         "pmass_base": prof_by_pole["base"][instr.dimensions[0]]["pmass"]}
 
-    # === nominal MFV: evaluate at base / +C / -C ==========================
+    # === nominal MFV: evaluate over the same signed c-sweep ================
     if "mfv" in args.instruments:
-        logger.info("\n=== evaluate MFV (classic vignettes) base / +C / -C ===")
+        logger.info("\n=== evaluate MFV (classic vignettes) over signed c-mults ===")
         # verbose=0 + log_demo=False: BOTH bs=1 demo traces must be off. After the run
         # accumulates state (train + ordinal admin), a bs=1 large-budget forced-choice /
         # free-generation NaNs and that NaN forward poisons the subsequent batched MFV
@@ -301,14 +328,6 @@ def main() -> None:
         # demos are logging niceties, not the measurement, so drop both here.
         mfv_kw = dict(name="classic", log_demo=False, verbose=0,
                       max_think_tokens=args.max_think_tokens, batch_size=args.eval_batch_size)
-        base_report = evaluate_multibool(model, tok, **mfv_kw)
-        base_logit = baseline_logit_per_foundation(base_report)
-        with v(model, C=+C):
-            pos_report = evaluate_multibool(model, tok, **mfv_kw)
-        with v(model, C=-C):
-            neg_report = evaluate_multibool(model, tok, **mfv_kw)
-        pos_dlogit = dlogit_per_foundation(base_report, pos_report)
-        neg_dlogit = dlogit_per_foundation(base_report, neg_report)
         # Coherence under forced reads: pmass is pinned high by the prefill scaffold, so
         # read breakage off frac_unscorable (self-close rate, ~0 once tokens are suppressed)
         # and mean_margin (healthy ~1-3 nats, -> 0 when steering destroys the model). Saved
@@ -317,26 +336,64 @@ def main() -> None:
             i = rep["info"]
             return {"mean_margin": rep["mean_margin"], "frac_unscorable": i["frac_unscorable"],
                     "mean_pmass_allowed": i["mean_pmass_allowed"], "mean_nll_prefill": i["mean_nll_prefill"]}
-        for tag, rep in [("base", base_report), (f"+{C:.2f}", pos_report), (f"-{C:.2f}", neg_report)]:
-            c = coh(rep)
-            logger.info(f"  MFV coherence {tag}: margin={c['mean_margin']:+.2f}nat "
+        mfv_reports = {}
+        for tag, coeff, cm in poles:
+            if coeff is None:
+                mfv_reports[tag] = evaluate_multibool(model, tok, **mfv_kw)
+            else:
+                with v(model, C=coeff):
+                    mfv_reports[tag] = evaluate_multibool(model, tok, **mfv_kw)
+            c = coh(mfv_reports[tag])
+            logger.info(f"  MFV {tag} c={cm:+g} (C={coeff}): margin={c['mean_margin']:+.2f}nat "
                         f"unscorable={c['frac_unscorable']:.3f} pmass={c['mean_pmass_allowed']:.3f} "
                         f"nll_prefill={c['mean_nll_prefill']:.2f}")
+        base_report = mfv_reports["base"]
+        base_logit = baseline_logit_per_foundation(base_report)
+        mfv_dlogit = {
+            tag: ({f: {"mean": 0.0, "std": 0.0, "sem": 0.0, "n": base_logit[f]["n"],
+                       "n_total": base_logit[f]["n_total"]} for f in FOUNDATION_ORDER}
+                  if tag == "base" else dlogit_per_foundation(base_report, rep))
+            for tag, rep in mfv_reports.items()
+        }
+        rows = []
+        for tag, _coeff, cm in poles:
+            cinfo = coh(mfv_reports[tag])
+            for f in FOUNDATION_ORDER:
+                dl = mfv_dlogit[tag][f]
+                rows.append({
+                    "foundation": f, "pole": tag, "c": cm,
+                    "mean": base_logit[f]["mean"] + dl["mean"],
+                    "dlogit": dl["mean"], "dlogit_sd": dl["std"], "dlogit_sem": dl["sem"],
+                    "pmass": cinfo["mean_pmass_allowed"],
+                    "mean_margin": cinfo["mean_margin"],
+                    "frac_unscorable": cinfo["frac_unscorable"],
+                    "mean_nll_prefill": cinfo["mean_nll_prefill"],
+                })
+        with open(args.out / "mfv_profiles.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=[
+                "foundation", "pole", "c", "mean", "dlogit", "dlogit_sd", "dlogit_sem",
+                "pmass", "mean_margin", "frac_unscorable", "mean_nll_prefill"])
+            w.writeheader()
+            w.writerows(rows)
+        for tag, rep in mfv_reports.items():
+            c = coh(rep)
+            logger.info(f"  MFV summary {tag}: margin={c['mean_margin']:+.2f}nat pmass={c['mean_pmass_allowed']:.3f}")
         logger.info("  MFV base logit: " + ", ".join(f"{f}={format_cell(base_logit[f])}" for f in FOUNDATION_ORDER))
+        assert "pos1" in mfv_reports and "neg1" in mfv_reports, "mfv.json compatibility needs c-grid to include 1"
         (args.out / "mfv.json").write_text(json.dumps({
             "base_logit_per_foundation": base_logit,
-            "pos": {"coeff": +C, "dlogit_per_foundation": pos_dlogit},
-            "neg": {"coeff": -C, "dlogit_per_foundation": neg_dlogit},
+            "pos": {"coeff": +C, "dlogit_per_foundation": mfv_dlogit["pos1"]},
+            "neg": {"coeff": -C, "dlogit_per_foundation": mfv_dlogit["neg1"]},
             "foundation_order": list(FOUNDATION_ORDER),
-            "coherence": {"base": coh(base_report), "pos": coh(pos_report), "neg": coh(neg_report)},
+            "coherence": {"base": coh(base_report), "pos": coh(mfv_reports["pos1"]), "neg": coh(mfv_reports["neg1"])},
         }, indent=2))
         summary["instruments"]["mfv"] = {"display": "MFV vignettes", "foundations": list(FOUNDATION_ORDER)}
 
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2))
     append_run(args.out, {**meta, "kind": "allinstr", "method": args.method, "calibrated_C": C})
     logger.info(f"\n=== allinstr showcase complete -> {args.out} ===")
-    logger.info("SHOULD: one <instr>_profiles.csv per ordinal instrument (base/pos/neg x factors, "
-                "pmass near 1.0 = coherent) + mfv.json. ELSE pmass<<1 means steering broke the readout.")
+    logger.info("SHOULD: one <instr>_profiles.csv per instrument over the same signed c-grid, "
+                "plus mfv.json compatibility dump. ELSE pmass<<1 means steering broke the readout.")
 
 
 if __name__ == "__main__":
