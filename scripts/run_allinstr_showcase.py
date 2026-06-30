@@ -114,7 +114,8 @@ def _persona_library_calib_prompts(tok, scenario_path: Path, n_iid: int = 8, n_o
 
 
 def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int,
-                        n_samples: int, temperature: float, top_p: float) -> dict:
+                        n_samples: int, temperature: float, top_p: float,
+                        sample_path: Path | None = None, pole: str | None = None, c: float | None = None) -> dict:
     """administer once -> {foundation: {E, C, logodds, pmass}} aligned to instr.dimensions.
 
     E   = expected Likert score (human-comparable, but saturates near a confident answer).
@@ -124,6 +125,25 @@ def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens:
     max_think_tokens > 0 so the steer accrues over the think trace before the answer slot."""
     res = administer(model, tok, instr, batch_size=batch_size, max_think_tokens=max_think_tokens,
                      n_samples=n_samples, temperature=temperature, top_p=top_p)
+    if sample_path is not None:
+        assert pole is not None
+        assert c is not None
+        with sample_path.open("w") as fh:
+            for row in res["per_item_frame"]:
+                fh.write(json.dumps({
+                    "instrument": instr.name,
+                    "pole": pole,
+                    "c": c,
+                    "scale_max": instr.scale_max,
+                    "answer_space": instr.answer_space,
+                    "id": row["id"],
+                    "framing": row["framing"],
+                    "foundation": row["foundation"],
+                    "sign": row["sign"],
+                    "sample_lp": row["sample_lp"],
+                    "sample_pmass_allowed": row["sample_pmass_allowed"],
+                    "sample_nll_prefill": row["sample_nll_prefill"],
+                }) + "\n")
     pm = float(res["mean_pmass_allowed"])
     return {f["foundation"]: {"E": float(f["mean"]), "C": float(f["C"]), "C_sd": float(f["C_sd"]),
                               "E_sd": float(f["sd"]), "E_ci95_lo": float(f["ci95_lo"]),
@@ -277,19 +297,22 @@ def main() -> None:
                     f"over signed c-mults {[cm for _, _, cm in poles]} (calibrated C={C:+.3f}) ===")
         prof_by_pole = {}
         for tag, coeff, _cm in poles:
+            sample_path = args.out / f"{name}_{tag}_samples.jsonl"
             if coeff is None:
                 prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
                                                         max_think_tokens=args.admin_think_tokens,
                                                         n_samples=args.admin_n_samples,
                                                         temperature=args.admin_temperature,
-                                                        top_p=args.admin_top_p)
+                                                        top_p=args.admin_top_p,
+                                                        sample_path=sample_path, pole=tag, c=_cm)
             else:
                 with v(model, C=coeff):
                     prof_by_pole[tag] = _administer_profile(model, tok, instr, batch_size=args.admin_batch_size,
                                                             max_think_tokens=args.admin_think_tokens,
                                                             n_samples=args.admin_n_samples,
                                                             temperature=args.admin_temperature,
-                                                            top_p=args.admin_top_p)
+                                                            top_p=args.admin_top_p,
+                                                            sample_path=sample_path, pole=tag, c=_cm)
             pm = list(prof_by_pole[tag].values())[0]["pmass"]
             logger.info(f"  {name} {tag} (C={coeff}): pmass={pm:.3f} "
                         f"C=" + ", ".join(f"{f}={prof_by_pole[tag][f]['C']:+.2f}" for f in instr.dimensions))
