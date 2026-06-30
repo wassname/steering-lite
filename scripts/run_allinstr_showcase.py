@@ -36,7 +36,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import steering_lite as sl
 from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
-from steering_lite.data import make_persona_pairs, make_moralstory_pairs, PERSONA_REGISTRY
+from steering_lite.data import (
+    make_persona_pairs,
+    make_persona_library_pairs,
+    make_moralstory_pairs,
+    PERSONA_REGISTRY,
+    PERSONA_LIBRARY_TEMPLATE,
+)
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation, format_cell,
@@ -57,6 +63,8 @@ def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
         "mean_diff": sl.MeanDiffC(**common),
         "pca": sl.PCAC(**common),
         "sspace": sl.SSpaceC(**common, r=-1),
+        "directional_ablation": sl.DirectionalAblationC(**common),
+        "linear_act": sl.LinearAcTC(**common),
     }
     return table[method]
 
@@ -105,14 +113,21 @@ def _administer_profile(model, tok, instr, *, batch_size: int, max_think_tokens:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3-4B")
-    ap.add_argument("--method", default="mean_diff", choices=["mean_diff", "pca", "sspace"])
+    ap.add_argument("--method", default="mean_diff",
+                    choices=["mean_diff", "pca", "sspace", "directional_ablation", "linear_act"])
     ap.add_argument("--persona", default="authority_care", choices=sorted(PERSONA_REGISTRY),
                     help="axis from PERSONA_REGISTRY (library-template + selectivity-probe validated). "
                          "authority/traditionalist steer NON-saturated directions (model sits near ceiling "
                          "on care+/auth+, so -auth and +trad show the most coherent movement).")
-    ap.add_argument("--pairs-source", default="persona", choices=["persona", "moralstory"],
+    ap.add_argument("--pairs-source", default="persona", choices=["persona", "persona_library", "moralstory"],
                     help="persona = adjective-prefix contrast; moralstory = foundation-labelled "
-                         "situations from moral_stories_foundations (target vs balanced-other).")
+                         "situations from moral_stories_foundations (target vs balanced-other); "
+                         "persona_library = validated persona-template-library pair + scenario pools.")
+    ap.add_argument("--persona-library-dir", type=Path,
+                    default=Path("/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/"
+                                 "persona-steering-template-library"))
+    ap.add_argument("--persona-library-pair", default="dignity_over_authority")
+    ap.add_argument("--persona-library-template", default=PERSONA_LIBRARY_TEMPLATE)
     ap.add_argument("--foundation", default="fairness",
                     help="moralstory target foundation (care/fairness/loyalty/authority/sanctity/liberty).")
     ap.add_argument("--layers", default="mid")
@@ -164,11 +179,23 @@ def main() -> None:
     # completions). The persona "equality" axis conflates fairness with the authority/hierarchy axis
     # (authority moved most, equality barely), so moralstory steers the foundation domain directly.
     # NB moralstory labels MFT foundations; 'fairness' reads on MFQ-2 as equality+proportionality.
+    persona_library_meta = None
     if args.pairs_source == "moralstory":
         vec_label = f"{args.method}: {args.foundation} situations vs others"
         logger.info(f"pairs=moralstory foundation={args.foundation!r}")
         pos_prompts, neg_prompts = make_moralstory_pairs(
             tok, n_pairs=args.n_pairs, foundation=args.foundation, thinking=True)
+    elif args.pairs_source == "persona_library":
+        pos_prompts, neg_prompts, persona_library_meta = make_persona_library_pairs(
+            tok,
+            library_dir=args.persona_library_dir,
+            n_pairs=args.n_pairs,
+            pair_id=args.persona_library_pair,
+            template=args.persona_library_template,
+            thinking=True,
+        )
+        vec_label = (f"{args.method}: {persona_library_meta['pair_id']} "
+                     f"({persona_library_meta['pos_persona']} vs {persona_library_meta['neg_persona']})")
     else:
         persona_pairs, template = PERSONA_REGISTRY[args.persona]
         pos_pole, neg_pole = persona_pairs[0]
@@ -197,6 +224,8 @@ def main() -> None:
                      "persona": args.persona, "vec_label": vec_label,
                      "layers": list(layers), "calibrated_C": C, "kl_p95_at_calib": kl_hit,
                      "instruments": {}}
+    if persona_library_meta is not None:
+        summary["persona_library"] = persona_library_meta
 
     # === ordinal instruments: administer over the signed c-sweep =========
     # poles: (tag, coeff, c_mult). c_mult is the SIGNED multiplier of calibrated C written to the CSV

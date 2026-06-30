@@ -52,6 +52,7 @@ PROMPT_TEMPLATE = "You think and act like {persona}."
 # Top template from wassname/persona-steering-template-library (seed-24, score 51.3): binds the
 # persona to a behaviour channel, not identity-echo. Used for the short-adjective foundation pairs.
 PRIORITIES_TEMPLATE = "Use the priorities of a {persona} person."
+PERSONA_LIBRARY_TEMPLATE = "Answer as someone who is {{ persona }}."
 
 # Foundation-target axes for the "better steer": pairs are short, mirrored, enactable dispositions
 # (library rules: same domain, no negation-only/abstract-absence poles). Chosen for headroom -- the
@@ -159,6 +160,104 @@ def make_moralstory_pairs(
     neg_texts = [templ(r) for r in neg_rows]
     logger.info(f"Moral-story pairs: n={n} {foundation!r} situations vs balanced-other ({len(others)} foundations)")
     return pos_texts, neg_texts
+
+
+def _jsonl_rows(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _scenario_text(row: dict, path: Path) -> str:
+    if "text" in row:
+        return row["text"]
+    if "prompt" in row:
+        return row["prompt"]
+    raise KeyError(f"{path}: scenario row has neither 'text' nor 'prompt': {row.keys()}")
+
+
+def _render_template(template: str, persona: str) -> str:
+    if "{{ persona }}" in template:
+        return template.replace("{{ persona }}", persona)
+    if "{persona}" in template:
+        return template.format(persona=persona)
+    raise ValueError(f"persona template lacks a persona slot: {template!r}")
+
+
+def make_persona_library_pairs(
+    tok,
+    *,
+    library_dir: Path,
+    n_pairs: int,
+    pair_id: str = "dignity_over_authority",
+    template: str = PERSONA_LIBRARY_TEMPLATE,
+    thinking: bool = True,
+    seed: int = 42,
+) -> tuple[list[str], list[str], dict]:
+    """Build pairs from the validated persona-template-library pool.
+
+    Scenarios are sampled across source files so Machiavelli, AI-risk, Moral Stories,
+    Social Chemistry, and the small v2/character sets all get representation.
+    """
+    rng = random.Random(seed)
+    persona_path = library_dir / "data" / "personas" / "persona_pairs_v2_candidates.jsonl"
+    matches = [r for r in _jsonl_rows(persona_path) if r["id"] == pair_id]
+    if len(matches) != 1:
+        raise ValueError(f"{persona_path}: expected exactly one pair_id={pair_id!r}, found {len(matches)}")
+    pair = matches[0]
+    pos_persona = pair["pos"]
+    neg_persona = pair["neg"]
+
+    scenario_paths = sorted((library_dir / "data" / "scenarios").glob("*.jsonl"))
+    if not scenario_paths:
+        raise FileNotFoundError(library_dir / "data" / "scenarios")
+    per_source = -(-n_pairs // len(scenario_paths))
+
+    sampled_rows: list[dict] = []
+    source_counts: dict[str, int] = {}
+    for path in scenario_paths:
+        rows = _jsonl_rows(path)
+        n = min(per_source, len(rows))
+        chosen = rng.sample(rows, n)
+        source_counts[path.stem] = n
+        for row in chosen:
+            sampled_rows.append({
+                "source_file": path.stem,
+                "id": row["id"],
+                "text": _scenario_text(row, path),
+            })
+
+    rng.shuffle(sampled_rows)
+    sampled_rows = sampled_rows[:n_pairs]
+    source_counts = {}
+    for row in sampled_rows:
+        source_counts[row["source_file"]] = source_counts.get(row["source_file"], 0) + 1
+
+    think = "<think>" if thinking else ""
+    pos_texts: list[str] = []
+    neg_texts: list[str] = []
+    for row in sampled_rows:
+        pos_user = _render_template(template, pos_persona) + "\n\n" + row["text"]
+        neg_user = _render_template(template, neg_persona) + "\n\n" + row["text"]
+        pos_texts.append(tok.apply_chat_template(
+            [{"role": "user", "content": pos_user},
+             {"role": "assistant", "content": think}],
+            tokenize=False, continue_final_message=True))
+        neg_texts.append(tok.apply_chat_template(
+            [{"role": "user", "content": neg_user},
+             {"role": "assistant", "content": think}],
+            tokenize=False, continue_final_message=True))
+
+    meta = {
+        "library_dir": str(library_dir),
+        "pair_id": pair_id,
+        "pos_persona": pos_persona,
+        "neg_persona": neg_persona,
+        "template": template,
+        "source_counts": source_counts,
+        "sample_ids": [{k: row[k] for k in ("source_file", "id")} for row in sampled_rows[:16]],
+    }
+    logger.info(f"Persona-library pairs: n={len(pos_texts)} pair={pair_id!r} template={template!r} "
+                f"sources={source_counts}")
+    return pos_texts, neg_texts, meta
 
 
 def make_persona_pairs(
