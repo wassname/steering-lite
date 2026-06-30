@@ -17,4 +17,5 @@ uv run --extra benchmark python scripts/run_allinstr_showcase.py \
   --admin-temperature 0.7 \
   --admin-top-p 0.95 \
   --c-grid 0.5,1,2,3,4 \
-  --out outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_mfq2_n8
+  --out outputs/20260630_authority_only_qwen3_14b_score60_sspace_mfv_mfq2_n8 \
+  "$@"
