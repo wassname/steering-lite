@@ -1,0 +1,65 @@
+{
+  "name": "pure_authority_qwen3_14b_strict25",
+  "axis": "pure_authority",
+  "axis_note": "+Authority/-Authority fixed pair; not dignity, tradition, social norms, care, or wellbeing.",
+  "positive_persona": "authority-respecting",
+  "negative_persona": "authority-disregarding",
+  "template": "Speak with the priorities of someone {persona}.",
+  "generator_model": "qwen/qwen3-14b",
+  "generator_provider_only": [
+    "DeepInfra"
+  ],
+  "axis_judge_models": [
+    "google/gemini-3.1-flash-lite-preview",
+    "deepseek/deepseek-v4-flash"
+  ],
+  "seed_stage_a": 42,
+  "seed_stage_b": 43,
+  "stage_a": {
+    "n_results": 240,
+    "n_success": 240,
+    "n_errors": 0,
+    "winner": {
+      "axis": "pure_authority",
+      "template": "Speak with the priorities of someone {persona}.",
+      "n": 24,
+      "strict_pass_rate": 0.125,
+      "mean_axis_delta": 3.46,
+      "mean_axis_delta_judge_std": 0.598,
+      "mean_off_axis_problem": 3.429,
+      "mean_max_off_axis_category_likert": 3.121,
+      "mean_max_style_abs_delta": 2.087,
+      "mean_abs_word_delta_frac": 0.318,
+      "persona_echo_rate": 0.125,
+      "refusal_or_ai_break_rate": 0.0,
+      "recommended": false
+    }
+  },
+  "stage_b": {
+    "n_results": 342,
+    "n_success": 342,
+    "n_errors": 0,
+    "strict_pass_rate": 0.073,
+    "mean_axis_delta": 3.323,
+    "mean_off_axis_problem": 3.265,
+    "mean_max_style_abs_delta": 1.894
+  },
+  "selection_rule": "Stage B strict_pass=true, ranked within source; keep up to 30 per source.",
+  "selected_count": 25,
+  "selected_source_counts": {
+    "scenarios_airisk": 1,
+    "scenarios_daily_dilemmas": 4,
+    "scenarios_social_chem": 1,
+    "scenarios_valuebench": 18,
+    "scenarios_w2s_character_3p": 1
+  },
+  "selected_score_min": 46.9809,
+  "selected_score_max": 95.4616,
+  "selected_axis_delta_min": 4.1,
+  "selected_axis_delta_max": 8.0,
+  "source_artifacts": {
+    "stage_a": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_20260630_neutral_templates/stage_a_live_qwen3_14b_deepinfra.json",
+    "stage_b": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_20260630_neutral_templates/stage_b_live_qwen3_14b_deepinfra.json",
+    "selected_examples": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_20260630_neutral_templates/selection_qwen3_14b_deepinfra_strict/selected_examples.md"
+  }
+}
