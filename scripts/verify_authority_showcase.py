@@ -72,17 +72,24 @@ def main() -> None:
     ap.add_argument("--small-c", type=float, default=0.5)
     args = ap.parse_args()
 
-    mfv = read_rows(args.out / "mfv_profiles.csv")
-    mfq2 = read_rows(args.out / "mfq2_profiles.csv")
-
     rows = []
     ok = True
-    table, table_ok = instrument_table("MFV", mfv, args.small_c, "dlogit")
-    rows += table
-    ok = ok and table_ok
-    table, table_ok = instrument_table("MFQ-2", mfq2, args.small_c, "C")
-    rows += table
-    ok = ok and table_ok
+    mfv_path = args.out / "mfv_profiles.csv"
+    mfq2_path = args.out / "mfq2_profiles.csv"
+    assert mfv_path.exists() or mfq2_path.exists(), args.out
+
+    mfv = None
+    mfq2 = None
+    if mfv_path.exists():
+        mfv = read_rows(mfv_path)
+        table, table_ok = instrument_table("MFV", mfv, args.small_c, "dlogit")
+        rows += table
+        ok = ok and table_ok
+    if mfq2_path.exists():
+        mfq2 = read_rows(mfq2_path)
+        table, table_ok = instrument_table("MFQ-2", mfq2, args.small_c, "C")
+        rows += table
+        ok = ok and table_ok
 
     print("\nAuthority direction at smallest nonzero c")
     print(tabulate(
@@ -92,21 +99,23 @@ def main() -> None:
         floatfmt="+.3f",
     ))
 
-    print("\nMFV coherence")
-    print(tabulate(
-        coherence_rows(mfv, args.small_c, ["pmass", "mean_margin", "frac_unscorable"]),
-        headers=["c", "pmass", "mean_margin", "frac_unscorable"],
-        tablefmt="pipe",
-        floatfmt="+.3f",
-    ))
+    if mfv is not None:
+        print("\nMFV coherence")
+        print(tabulate(
+            coherence_rows(mfv, args.small_c, ["pmass", "mean_margin", "frac_unscorable"]),
+            headers=["c", "pmass", "mean_margin", "frac_unscorable"],
+            tablefmt="pipe",
+            floatfmt="+.3f",
+        ))
 
-    print("\nMFQ-2 coherence")
-    print(tabulate(
-        coherence_rows(mfq2, args.small_c, ["pmass"]),
-        headers=["c", "pmass"],
-        tablefmt="pipe",
-        floatfmt="+.3f",
-    ))
+    if mfq2 is not None:
+        print("\nMFQ-2 coherence")
+        print(tabulate(
+            coherence_rows(mfq2, args.small_c, ["pmass"]),
+            headers=["c", "pmass"],
+            tablefmt="pipe",
+            floatfmt="+.3f",
+        ))
 
     if not ok:
         raise SystemExit("FAIL: +c did not raise Authority and -c did not lower Authority at small c")
