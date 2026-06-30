@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-uv run --extra benchmark python scripts/run_allinstr_showcase.py \
+PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_allinstr_showcase.py \
   --model Qwen/Qwen3-4B \
   --method sspace \
   --pairs-source persona_library \
