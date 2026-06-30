@@ -1,0 +1,25 @@
+{
+  "pair_id": "pure_authority",
+  "positive": "authority-respecting",
+  "negative": "authority-disregarding",
+  "template": "__verbatim_skill_persona__",
+  "generator_model": "qwen/qwen3-14b",
+  "generator_provider_only": "DeepInfra",
+  "validator_artifact": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_verbatim_mundane5_20260630/stage_b_live_qwen3_14b_deepinfra.json",
+  "selection_artifact": "/media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library/out/pure_authority_verbatim_mundane5_20260630/selection_score70/selected_scenarios.jsonl",
+  "selection_rule": "strict_pass and 100 * on_axis_frac * (1 - off_axis_problem_frac) >= 70",
+  "n_candidates": 125,
+  "n_strict": 33,
+  "n_selected": 15,
+  "source_counts": {
+    "scenarios_daily_dilemmas": 5,
+    "scenarios_moral_stories": 6,
+    "scenarios_social_chem": 2,
+    "scenarios_w2s_character_3p": 2
+  },
+  "notes": [
+    "Authority pair is fixed; validation selected scenarios only.",
+    "Bare order/orders, master, and senior role cues were removed after false-positive audit.",
+    "Direct ValueBench, law/police, safety/harm, and high-stakes Airisk/Machiavelli rows are excluded."
+  ]
+}
