@@ -17,7 +17,7 @@ from steering_lite import Vector
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
-    "sspace", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+    "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
@@ -46,6 +46,8 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "topk_clusters":         sl.TopKClustersC(**common, k=2),
         "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),
         "sspace":                sl.SSpaceC(**common, r=2),
+        "sspace_pca":            sl.SSpacePCAC(**common, r=2),
+        "corda_pca":             sl.CordaPCAC(**common, r=2),
         "sspace_ablate":         sl.SSpaceAblateC(**common, r=2),
         "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, r=2),
         "super_sspace":          sl.SuperSSpaceC(**common, r=2),
@@ -117,11 +119,11 @@ def test_pipeline(method, tiny_model, tmp_path):
 
 
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
-MULTI_OK = ["mean_diff", "sspace", "sspace_ablate", "sspace_damp_amp",
+MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_damp_amp",
             "super_sspace", "topk_clusters"]
 # methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
 MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
-              "chars", "linear_act", "angular_steering"]
+              "chars", "linear_act", "angular_steering", "corda_pca"]
 
 
 def _train_two(method, model, tok, *, multi: bool = False):

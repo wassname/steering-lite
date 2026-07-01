@@ -108,7 +108,7 @@ logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format
 
 METHODS = [
     "mean_diff", "cosine_gated", "pca", "topk_clusters",
-    "sspace", "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+    "sspace", "sspace_pca", "corda_pca", "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering",
 ]
@@ -125,6 +125,8 @@ def _make_cfg(method: str, layers: tuple[int, ...], *,
         "topk_clusters":         sl.TopKClustersC(**common, k=4),
         "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),
         "sspace":                sl.SSpaceC(**common, **sspace_kw),
+        "sspace_pca":            sl.SSpacePCAC(**common, **sspace_kw),
+        "corda_pca":             sl.CordaPCAC(**common, **sspace_kw),
         "sspace_signed":         sl.SSpaceC(**common, gate="signed", **sspace_kw),
         "sspace_ablate":         sl.SSpaceAblateC(**common, **sspace_kw),
         "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, **sspace_kw),

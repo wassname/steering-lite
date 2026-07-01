@@ -200,12 +200,13 @@ def train(
         cfg.target_submodule = method.default_target_submodule
     targets = find_targets(model, cfg)
     if cfg.target_submodule is not None:
-        from .extract_linear import record_linear_outputs
+        from .extract_linear import record_linear_inputs, record_linear_outputs
         name_to_module = {full_name: mod for full_name, mod, _ in targets}
-        pos_acts = record_linear_outputs(model, tok, pos_prompts, name_to_module,
-                                         batch_size=batch_size, max_length=max_length)
-        neg_acts = record_linear_outputs(model, tok, neg_prompts, name_to_module,
-                                         batch_size=batch_size, max_length=max_length)
+        recorder = record_linear_inputs if getattr(method, "record_linear_inputs", False) else record_linear_outputs
+        pos_acts = recorder(model, tok, pos_prompts, name_to_module,
+                            batch_size=batch_size, max_length=max_length)
+        neg_acts = recorder(model, tok, neg_prompts, name_to_module,
+                            batch_size=batch_size, max_length=max_length)
         extracted = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
     else:
         layers = tuple(li for _, _, li in targets)

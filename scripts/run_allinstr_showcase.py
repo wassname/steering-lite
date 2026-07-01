@@ -63,6 +63,8 @@ def _make_cfg(method: str, layers: tuple[int, ...]) -> sl.SteeringConfig:
         "mean_diff": sl.MeanDiffC(**common),
         "pca": sl.PCAC(**common),
         "sspace": sl.SSpaceC(**common, r=-1),
+        "sspace_pca": sl.SSpacePCAC(**common, r=-1),
+        "corda_pca": sl.CordaPCAC(**common, r=-1),
         "directional_ablation": sl.DirectionalAblationC(**common),
         "linear_act": sl.LinearAcTC(**common),
     }
@@ -158,7 +160,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3-4B")
     ap.add_argument("--method", default="mean_diff",
-                    choices=["mean_diff", "pca", "sspace", "directional_ablation", "linear_act"])
+                    choices=["mean_diff", "pca", "sspace", "sspace_pca", "corda_pca",
+                             "directional_ablation", "linear_act"])
     ap.add_argument("--persona", default="authority_care", choices=sorted(PERSONA_REGISTRY),
                     help="axis from PERSONA_REGISTRY (library-template + selectivity-probe validated). "
                          "authority/traditionalist steer NON-saturated directions (model sits near ceiling "

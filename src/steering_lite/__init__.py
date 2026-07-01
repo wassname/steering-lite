@@ -16,6 +16,8 @@ from .variants.pca import PCAC
 from .variants.topk_clusters import TopKClustersC
 from .variants.cosine_gated import CosineGatedC
 from .variants.sspace import SSpaceC
+from .variants.sspace_pca import SSpacePCAC
+from .variants.corda_pca import CordaPCAC
 from .variants.sspace_ablate import SSpaceAblateC
 from .variants.sspace_damp_amp import SSpaceDampAmpC
 from .variants.super_sspace import SuperSSpaceC
@@ -32,6 +34,8 @@ __all__ = [
     "TopKClustersC",
     "CosineGatedC",
     "SSpaceC",
+    "SSpacePCAC",
+    "CordaPCAC",
     "SSpaceAblateC",
     "SSpaceDampAmpC",
     "SuperSSpaceC",
