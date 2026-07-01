@@ -62,7 +62,7 @@ def _regularized_cov_inv_mul(X: Tensor, Y: Tensor, lam: Tensor) -> Tensor:
 
 def _corda_basis(W: Tensor, X: Tensor, r: int, damping: float) -> tuple[Tensor, Tensor, Tensor]:
     W = W.float()
-    X = X.float()
+    X = X.to(device=W.device, dtype=torch.float32)
     n = X.shape[0]
     lam = X.square().mean() * damping
     if lam <= 0:
