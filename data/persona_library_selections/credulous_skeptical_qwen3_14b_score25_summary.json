@@ -1,0 +1,15 @@
+{
+  "//": "credulous_skeptical selection (persona-template-library). pair=credulous_skeptical; template='Judge the case as someone {persona} would.'; generator=qwen/qwen3-14b (DeepInfra); axis_judge=qwen/qwen3-14b bounded_thinking (N=2 budget=4096, found flag, phase-2 force-answer); style/confound_judge=google/gemini-3.1-flash-lite-preview; stage_b n=50; strict_pass_rate=0.0% (0/50 strict: authority-calibrated gate too tight for epistemic axes); mean_axis_delta=1.97; mean_off_axis=3.24; exported with --min-score 0 --keep-per-source 10 (score-ranked, not strict-only). source: persona-steering-template-library/out/credulous_skeptical_stage_b_bounded.json",
+  "axis": "credulous_skeptical",
+  "template": "Judge the case as someone {persona} would.",
+  "n_selected": 46,
+  "stage_b_n": 50,
+  "strict_pass_rate": 0.0,
+  "mean_axis_delta": 1.968,
+  "mean_off_axis_problem": 3.238,
+  "mean_max_style_abs_delta": 1.818,
+  "persona_echo_rate": 0.02,
+  "refusal_or_ai_break_rate": 0.0,
+  "export_gate": "min-score 0, keep-per-source 10 (score-ranked, NOT strict-only)",
+  "judge_did_not_commit_count": 0
+}

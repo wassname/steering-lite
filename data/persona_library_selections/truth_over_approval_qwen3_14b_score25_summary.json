@@ -1,0 +1,15 @@
+{
+  "//": "truth_over_approval selection (persona-template-library). pair=truth_over_approval; template='Speak with the priorities of someone {persona}.'; generator=qwen/qwen3-14b (DeepInfra); axis_judge=qwen/qwen3-14b bounded_thinking (N=2 budget=4096, found flag, phase-2 force-answer); style/confound_judge=google/gemini-3.1-flash-lite-preview; stage_b n=50; strict_pass_rate=0.0% (0/50 strict: authority-calibrated gate too tight for epistemic axes); mean_axis_delta=3.40; mean_off_axis=4.41; exported with --min-score 0 --keep-per-source 10 (score-ranked, not strict-only). source: persona-steering-template-library/out/truth_over_approval_stage_b_bounded.json",
+  "axis": "truth_over_approval",
+  "template": "Speak with the priorities of someone {persona}.",
+  "n_selected": 46,
+  "stage_b_n": 50,
+  "strict_pass_rate": 0.0,
+  "mean_axis_delta": 3.4,
+  "mean_off_axis_problem": 4.408,
+  "mean_max_style_abs_delta": 2.826,
+  "persona_echo_rate": 0.06,
+  "refusal_or_ai_break_rate": 0.02,
+  "export_gate": "min-score 0, keep-per-source 10 (score-ranked, NOT strict-only)",
+  "judge_did_not_commit_count": 0
+}

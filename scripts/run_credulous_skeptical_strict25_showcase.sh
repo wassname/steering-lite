@@ -17,7 +17,7 @@ PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_allinstr_showcase
   --persona-library-dir /media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library \
   --persona-library-pair credulous_skeptical \
   --persona-library-template "Judge the case as someone {persona} would." \
-  --persona-library-scenarios data/persona_library_selections/credulous_skeptical_qwen3_14b_strict25.jsonl \
+  --persona-library-scenarios data/persona_library_selections/credulous_skeptical_qwen3_14b_score25.jsonl \
   --n-pairs 25 \
   --instruments mfv mfq2 big5 humor_styles \
   --target-kl 0.5 \
@@ -26,5 +26,5 @@ PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_allinstr_showcase
   --admin-temperature 0.7 \
   --admin-top-p 0.95 \
   --c-grid 0.5,1 \
-  --out outputs/20260705_credulous_skeptical_qwen3_14b_strict25_sspace_allinstr_n8 \
+  --out outputs/20260705_credulous_skeptical_qwen3_14b_score25_sspace_allinstr_n8 \
   "$@"
