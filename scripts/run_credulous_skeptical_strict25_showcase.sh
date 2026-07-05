@@ -16,7 +16,7 @@ PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_allinstr_showcase
   --pairs-source persona_library \
   --persona-library-dir /media/wassname/SGIronWolf/projects5/2026/weight-steering-repos/persona-steering-template-library \
   --persona-library-pair credulous_skeptical \
-  --persona-library-template "Speak with the priorities of someone {persona}." \
+  --persona-library-template "Judge the case as someone {persona} would." \
   --persona-library-scenarios data/persona_library_selections/credulous_skeptical_qwen3_14b_strict25.jsonl \
   --n-pairs 25 \
   --instruments mfv mfq2 big5 humor_styles \
