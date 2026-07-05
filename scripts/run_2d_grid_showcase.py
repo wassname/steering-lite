@@ -132,9 +132,10 @@ def main():
                        f"Falling back to raw add (no orthogonalization) would not help here.")
 
     # load model
+    from transformers import AutoModelForCausalLM, AutoTokenizer
     dtype = getattr(torch, args.torch_dtype)
-    model = sl.load_model(args.model, dtype=dtype, device=args.device)
-    tok = sl.load_tokenizer(args.model)
+    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=dtype).to(args.device).eval()
+    tok = AutoTokenizer.from_pretrained(args.model)
 
     hc_grid = [float(x) for x in args.hc_grid.split(",")]
     cc_grid = [float(x) for x in args.cc_grid.split(",")]
