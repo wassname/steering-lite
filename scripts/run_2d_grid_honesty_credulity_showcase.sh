@@ -18,8 +18,8 @@ PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_2d_grid_showcase.
   --summary-b "$CREDULITY_DIR/summary.json" \
   --label-a honesty \
   --label-b credulity \
-  --hc-grid -1,-0.5,0,0.5,1 \
-  --cc-grid -1,-0.5,0,0.5,1 \
+  --hc-grid='-1,0,1' \
+  --cc-grid='-1,0,1' \
   --instruments mfv mfq2 big5 humor_styles \
   --admin-batch-size 4 \
   --admin-n-samples 8 \
