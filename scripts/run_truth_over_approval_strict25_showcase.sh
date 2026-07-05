@@ -23,4 +23,5 @@ PYTHONUNBUFFERED=1 uv run --extra benchmark python scripts/run_allinstr_showcase
   --admin-top-p 0.95 \
   --c-grid 0.5,1 \
   --out outputs/20260705_truth_over_approval_qwen3_14b_score25_sspace_allinstr_n8 \
+  --save-vector outputs/20260705_truth_over_approval_qwen3_14b_score25_sspace_allinstr_n8/vector.safetensors \
   "$@"

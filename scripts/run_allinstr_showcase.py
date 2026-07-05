@@ -204,6 +204,8 @@ def main() -> None:
                     help="comma multipliers of calibrated C for the c-sweep, e.g. '1,2,3'. Each "
                          "evals at +-m*C; '1' reproduces the 3-point base/+C/-C.")
     ap.add_argument("--instruments", nargs="*", default=ORDINAL_INSTRUMENTS + ["mfv"])
+    ap.add_argument("--save-vector", type=Path, default=None,
+                    help="save the trained+calibrated Vector to this .safetensors path for later combine/2D-grid use")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
 
@@ -279,6 +281,10 @@ def main() -> None:
         C = float(coeff_calib)
         kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
         logger.info(f"calibrated C={C:+.4f} kl_p95={kl_hit:.3f} elapsed={time.time()-t0:.0f}s")
+
+    if args.save_vector is not None:
+        v.save(str(args.save_vector))
+        logger.info(f"saved vector to {args.save_vector}")
 
     summary: dict = {"meta": meta, "model": args.model, "method": args.method,
                      "persona": args.persona, "vec_label": vec_label,
