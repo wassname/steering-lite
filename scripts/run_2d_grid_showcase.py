@@ -27,7 +27,9 @@ from loguru import logger
 import steering_lite as sl
 from steering_lite.vector import Vector
 from steering_lite.eval.tinymfv import evaluate_multibool
-from tinymfv import FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation
+from steering_lite.eval.foundations import (
+    FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation,
+)
 from tinymfv import get_instrument
 from tinymfv.administer import administer
 
