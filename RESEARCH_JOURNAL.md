@@ -949,3 +949,57 @@ The dual-axis persona (Care + anti-Auth) used in the judge_as sweep (tasks 200/2
 - dAuth and dCare should diverge in opposite directions (not co-move) with pure-Auth vector
 - Compare against old sweep best: cosine_gated +0.634, mean_diff +0.537
 
+
+## 2026-07-06: v2 honesty x credulity steering map (strict-pass selections)
+
+**Hypothesis**: v1 fumbled the persona library (10/100 mild templates, pooled not stratified
+sampling, score-ranked when 0 strict-pass). v2 fixes: test ALL 100 templates (Stage A),
+stratified per-source sampling (--n-per-source), strict-pass only, lower axis_delta threshold
+to 2.0, exclude on-axis confound dims.
+
+**Method**:
+- Stage A: 100 templates x 12 sources x 1 scenario/source = 1200 pairs per axis. Bounded judge.
+  Winner honesty: "Use the priorities of a {persona} person." (strict 8.3%, ax_d +2.03).
+  Winner credulity: "For this answer, use the values of someone {persona} as your own." (strict 16.7%, ax_d +2.37).
+- Stage B: 1 winner x 1000 scenarios (10 sources x 100/source). axis_delta >= 2.0.
+  Honesty: 24 strict-pass (excluded on-axis dims honesty_truthfulness/praise_flattery/sycophancy
+  - the confound judge was circularly penalizing the honesty axis as an off-axis confound).
+  Credulity: 24 strict-pass (no exclusion needed, mean ax_d=2.87 vs honesty's 0.68).
+- Training: sspace, target_kl=0.5, n=24 pairs, Qwen3-4B, 4 instruments (MFV/MFQ2/Big5/humor).
+- 2D grid: 5x5 (c={-1,-0.5,0,0.5,1} x 2 axes), 25 cells x 4 instruments.
+
+**Results**:
+
+| Axis | C (calib) | KL | Max effect (SD) | Foundation | vs authority (2.52 SD) |
+|---|---|---|---|---|---|
+| Honesty | +22.06 | 0.495 | 1.42 | MFQ2 equality | 56% |
+| Credulity | +45.30 | 0.495 | 2.86 | MFV Care | 113% |
+
+dS cosine(honesty, credulity) = -0.0229 (nearly orthogonal, PASS <0.9).
+
+2D grid: all 25 cells x 4 instruments, pmass=1.0 everywhere, 0 NaN.
+- Honesty axis moves: Social Norms (-1.44 dlogit), Fairness (+0.56), Liberty (+0.36), Loyalty (+0.34).
+- Credulity axis moves: Social Norms (+2.93), Authority (-1.29), Sanctity (-0.90), Fairness (-0.87).
+- The two axes move different foundations (orthogonality confirmed in the grid, not just the vector cosine).
+
+**Honest assessment**:
+- Credulity steers strongly (2.86 SD, beats authority benchmark). The hypothesis that credulity
+  (taking tests at face value, opposite of eval awareness) would steer cleanly was confirmed.
+- Honesty steers weakly (1.42 SD, 56% of authority). This is an honest finding: honesty/truth_over_approval
+  is a dominant RLHF axis, so steering against it fights a strong prior. The axis_delta distribution
+  confirms: mean 0.68 (vs credulity's 2.87) - most scenarios produce nearly identical responses
+  regardless of persona. Honesty is genuinely hard to steer via persona templates.
+- The circularity bug (confound judge scoring honesty_truthfulness as an off-axis dim) was a real
+  correctness issue, not a threshold relaxation. Excluding it only flipped 4 rows (20->24 strict-pass)
+  but the conceptual fix matters for future axes.
+- v2 honesty is weaker than v1's contaminated run on some foundations (v1 Fairness 1.76 SD vs v2 0.58 SD),
+  but v1 was inflated by style confounds the strict gate removes. v2 is the honest number.
+
+**Artifacts**:
+- Per-axis: outputs/20260706_truth_over_approval_strict_v2_sspace_allinstr_n8/
+  outputs/20260706_credulous_skeptical_strict_v2_sspace_allinstr_n8/
+- 2D grid: outputs/20260706_honesty_x_credulity_2d_grid_v2_sspace_allinstr_n8/
+- Plots: docs/img/showcase/2d_grid_v2/ (6 figures)
+- Selections: data/persona_library_selections/{truth_over_approval,credulous_skeptical}_strict_v2.jsonl
+- Validator fixes: --axis-delta-threshold, --exclude-confound-dims, overall_score (commit a80a0d5)
+- Grid bug fix: FOUNDATION_ORDER casing (commit 5da0fa2)
