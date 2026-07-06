@@ -34,7 +34,10 @@ from tinymfv import get_instrument
 from tinymfv.administer import administer
 
 ORDINAL_INSTRUMENTS = ["mfq2", "big5", "humor_styles"]
-FOUNDATION_ORDER = ["care", "fairness", "loyalty", "authority", "sanctity", "liberty"]
+# FOUNDATION_ORDER imported from foundations.py: ["Care", "Sanctity", "Authority",
+# "Loyalty", "Fairness", "Liberty", "Social Norms"]. Do NOT override with lowercase -
+# baseline_logit_per_foundation returns capitalized keys, so a lowercase override
+# causes KeyError on the first MFV cell.
 
 
 def _administer_profile(model, tok, instr, *, batch_size, max_think_tokens,
