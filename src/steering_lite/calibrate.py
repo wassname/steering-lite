@@ -218,13 +218,18 @@ def measure_kl(
                 # (demo_iter -1/None) print in FULL; the intermediate bisection iters collapse
                 # to one head...tail table row each, so calibration does not flood the log.
                 if demo_iter is None or demo_iter <= 0:
+                    stage = ("FINAL operating point"
+                             if (demo_iter is not None and demo_iter < 0)
+                             else f"probe iter {demo_iter} (bracket point, NOT final)")
                     logger.info(
-                        f"EXPECT: same prompt under c=0 vs c={v.cfg.coeff:+.4f}; both coherent; "
-                        "steered should differ from base but not collapse.\n"
-                        f"\n=== CALIBRATE demo trace (T={T}, kl_p95_so_far) ===\n"
+                        f"\n=== {v.cfg.method} -> calibrate iso-KL -> {stage} "
+                        f"| c={v.cfg.coeff:+.4f} | T={T} tok/KL-probe (<=12 iters) ===\n"
+                        "WHAT: same held-out calib prompt at c=0 vs current c. This is the KL "
+                        "calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.\n"
+                        "EXPECT: both coherent; steered differs from base but does not collapse.\n"
                         f"--- BASE (c=0) ---\n{decoded_base}\n"
-                        f"\n--- STEER (c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
-                        f"=== /CALIBRATE ==="
+                        f"\n--- STEER ({v.cfg.method}, c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                        f"=== /{v.cfg.method} calibrate ==="
                     )
                 else:
                     oneline = " ".join(decoded_steer.split())
