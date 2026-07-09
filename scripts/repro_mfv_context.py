@@ -26,7 +26,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
-from tinymfv import evaluate, get_instrument, administer
+from moralmaps import evaluate, get_instrument, administer
 
 
 def _mfv(model, tok, tag: str, budget: int, bs: int) -> None:

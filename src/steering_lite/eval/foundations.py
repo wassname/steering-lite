@@ -49,7 +49,7 @@ _FOUNDATION_TO_PROBE: dict[str, str] = {v: k for k, v in _PROBE_TO_FOUNDATION.it
 def foundation_map(name: str) -> dict[str, str]:
     """vid → foundation_coarse. Loads from tinymfv data. Cached: load_vignettes
     does HF dataset I/O (~3s per call); aggregator hits this many times."""
-    from tinymfv.data import load_vignettes
+    from moralmaps.data import load_vignettes
     return {v["id"]: v["foundation_coarse"] for v in load_vignettes(name)}
 
 

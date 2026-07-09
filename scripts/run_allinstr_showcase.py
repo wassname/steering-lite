@@ -48,7 +48,7 @@ from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation, format_cell,
 )
 
-from tinymfv import get_instrument, administer
+from moralmaps import get_instrument, administer
 
 quiet_external_logs()
 logger.remove()

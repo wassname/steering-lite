@@ -24,7 +24,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
-from tinymfv import get_instrument, administer
+from moralmaps import get_instrument, administer
 
 
 def _profile(model, tok, instr, think: int, bs: int) -> tuple[np.ndarray, float]:

@@ -24,7 +24,7 @@ import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import FOUNDATION_ORDER, dlogit_per_foundation
-from tinymfv import get_instrument, administer
+from moralmaps import get_instrument, administer
 
 
 def _mfq2(model, tok, instr, bs):

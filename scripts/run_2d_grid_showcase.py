@@ -30,8 +30,8 @@ from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation,
 )
-from tinymfv import get_instrument
-from tinymfv.administer import administer
+from moralmaps import get_instrument
+from moralmaps.administer import administer
 
 ORDINAL_INSTRUMENTS = ["mfq2", "big5", "humor_styles"]
 # FOUNDATION_ORDER imported from foundations.py: ["Care", "Sanctity", "Authority",

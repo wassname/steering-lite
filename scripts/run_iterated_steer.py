@@ -173,7 +173,7 @@ def _fast_margin(v: Vector, model, tok, vignette_name: str, n: int) -> float:
     max_think_tokens=1 (minimal think; tinymfv requires >=1). Returns mean
     margin in nats. Healthy ~1-3, destroyed -> 0.
     """
-    from tinymfv.data import load_vignettes
+    from moralmaps.data import load_vignettes
     all_vigs = load_vignettes(vignette_name)
     subset = all_vigs[:n]
     with v(model):
@@ -488,7 +488,7 @@ def main() -> None:
 
     # Optional truncated vignette list for --smoke. None means full set.
     if args.smoke_n_vignettes:
-        from tinymfv.data import load_vignettes
+        from moralmaps.data import load_vignettes
         eval_vignettes = load_vignettes(args.vignettes)[: args.smoke_n_vignettes]
     else:
         eval_vignettes = None

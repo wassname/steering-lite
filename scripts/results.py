@@ -47,7 +47,7 @@ def _human_per_foundation(vignettes_name: str) -> dict[str, dict[str, float]]:
     `calibrated_<F>` mass (per-vignette normalised to sum=1 across foundations,
     matching `aggregate_flips._loadings_long`).
     """
-    from tinymfv import load_vignettes
+    from moralmaps import load_vignettes
     from aggregate_flips import LOADING_COL_FOR_FOUNDATION
     vigs = load_vignettes(vignettes_name)
     out: dict[str, dict[str, float]] = {}
@@ -90,7 +90,7 @@ def _human_loadings_per_foundation(vignettes_name: str) -> dict[str, float]:
     is at stake on this benchmark". Different from per-foundation wrongness
     means (which only count vignettes whose foundation_coarse matches f).
     """
-    from tinymfv import load_vignettes
+    from moralmaps import load_vignettes
     col = {
         "Care": "calibrated_Care",
         "Sanctity": "calibrated_Sanctity",

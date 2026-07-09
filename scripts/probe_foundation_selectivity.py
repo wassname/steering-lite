@@ -30,7 +30,7 @@ from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation,
 )
-from tinymfv import get_instrument, administer
+from moralmaps import get_instrument, administer
 
 
 def _mfq2(model, tok, instr, bs, think):

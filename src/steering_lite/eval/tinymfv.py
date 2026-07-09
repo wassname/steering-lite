@@ -25,8 +25,8 @@ import numpy as np
 import torch
 from loguru import logger
 
-from tinymfv import evaluate as _tinymfv_evaluate
-from tinymfv.guided import (
+from moralmaps import evaluate as _tinymfv_evaluate
+from moralmaps.guided import (
     _DEFAULT_FORCED_FOUNDATIONS,
     guided_rollout_forced_choice,
 )
@@ -72,7 +72,7 @@ def _log_eval_demo_trace(model, tok, name: str, max_think_tokens: int,
     """
     if not log_demo:
         return
-    from tinymfv.data import load_vignettes
+    from moralmaps.data import load_vignettes
 
     vignettes = load_vignettes(name)
     if not vignettes:

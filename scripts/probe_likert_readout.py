@@ -29,9 +29,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_REGISTRY
-from tinymfv import get_instrument
-from tinymfv.read import read_items, resolve_answer_ids
-from tinymfv.instrument import per_item_categorical
+from moralmaps import get_instrument
+from moralmaps.read import read_items, resolve_answer_ids
+from moralmaps.instrument import per_item_categorical
 
 
 def score_profile(model, tok, instr, *, batch_size: int, max_think_tokens: int) -> dict:

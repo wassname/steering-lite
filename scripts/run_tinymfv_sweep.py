@@ -197,8 +197,8 @@ def _authority_demo_msgs(vignettes: str = "classic", n: int = 2) -> list[str]:
     affects the exact question type being measured, rather than generic prompts
     that don't invoke the authority axis.
     """
-    from tinymfv.data import load_vignettes
-    from tinymfv import CONDITIONS
+    from moralmaps.data import load_vignettes
+    from moralmaps import CONDITIONS
     vigs = load_vignettes(vignettes)
     auth = [v for v in vigs if v.get("foundation") == "Authority"]
     cond = next(iter(CONDITIONS))  # first condition, e.g. other_violate

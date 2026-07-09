@@ -104,7 +104,7 @@ def _load_long_frame(sweep_dir: Path, bare_name: str) -> tuple[pl.DataFrame, dic
 
 def _wrongness_table(df: pl.DataFrame) -> pl.DataFrame:
     """Long-format wrongness w per (method, sign, vid, cond), pmass-gated."""
-    from tinymfv import CONDITIONS
+    from moralmaps import CONDITIONS
     polarity = {cond: 1.0 for cond in CONDITIONS}  # all conditions are violations
 
     df = df.with_columns(
@@ -136,7 +136,7 @@ def _loadings_long(vignettes: str) -> pl.DataFrame:
     over foundations so each cell contributes 1.0 of mass total across the 7
     foundations (rather than {0,1} on argmax).
     """
-    from tinymfv.data import load_vignettes
+    from moralmaps.data import load_vignettes
     rows = []
     for v in load_vignettes(vignettes):
         loads = {f: float(v.get(col) or 0.0) for f, col in LOADING_COL_FOR_FOUNDATION.items()}
