@@ -6,7 +6,10 @@
 
 from .edge import (
     ANSWER_MASS_FRACTION,
+    DECEPTIVE_STATEMENTS,
     DIGIT,
+    HONEST_STATEMENTS,
+    HONESTY_DILEMMA,
     REP_LIMIT,
     YESNO,
     five_coefficients,
@@ -17,7 +20,10 @@ from .edge import (
 
 __all__ = [
     "ANSWER_MASS_FRACTION",
+    "DECEPTIVE_STATEMENTS",
     "DIGIT",
+    "HONEST_STATEMENTS",
+    "HONESTY_DILEMMA",
     "REP_LIMIT",
     "YESNO",
     "five_coefficients",
