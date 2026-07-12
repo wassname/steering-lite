@@ -13,6 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite import Vector
+from steering_lite.eval.edge import summarize_anchors
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
@@ -179,3 +180,29 @@ def test_multi_round_natural_fail(method, tiny_model):
     _cfg, v1, v2 = _train_two(method, model, tok)
     with pytest.raises(ValueError, match="shared"):
         _ = v1 + v2
+
+
+def test_edge_summary_matches_frozen_meandiff():
+    anchors = [
+        {"coefficient": -0.188, "answer": 0.03963884338736534,
+         "repetition": 0.03508771929824561, "answer_mass": 0.5762189626693726,
+         "display_generation": "</think>"},
+        {"coefficient": -0.094, "answer": 0.027585284784436226,
+         "repetition": 0.005952380952380931, "answer_mass": 0.5515086054801941,
+         "display_generation": "</think>"},
+        {"coefficient": 0.0, "answer": 0.10669060051441193,
+         "repetition": 0.0, "answer_mass": 0.561994731426239,
+         "display_generation": "</think>"},
+        {"coefficient": 0.16, "answer": 0.04742587357759476,
+         "repetition": 0.0, "answer_mass": 0.5931493639945984,
+         "display_generation": "</think>"},
+        {"coefficient": 0.319, "answer": 0.08509904146194458,
+         "repetition": 0.023809523809523836, "answer_mass": 0.5284072756767273,
+         "display_generation": "</think>"},
+    ]
+    summary = summarize_anchors("meandiff(base)", anchors)
+    assert summary["swing"] == pytest.approx(0.04546019807457924)
+    assert summary["score"] == pytest.approx(0.04018959275043036)
+    assert summary["am_edge/base"] == pytest.approx(0.9402352830480042)
+    assert summary["at_budget"] is True
+    assert summary["readout_ok"] is True
