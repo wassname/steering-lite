@@ -102,7 +102,8 @@ def measure_readout(
         token_ids.append(ids[0])
     ids_tensor = torch.tensor(token_ids, device=logits.device)
     values = torch.tensor(readout["values"], device=logits.device, dtype=torch.float32)
-    answer = float((logits[ids_tensor].softmax(0) * values).sum())
+    answer_logits = logits[ids_tensor]
+    answer = float((answer_logits.softmax(0) * values).sum())
     answer_mass = float(logits.softmax(0)[ids_tensor].sum())
     return {
         "prompt": prompt,
@@ -110,6 +111,7 @@ def measure_readout(
         "thought": thought,
         "forced_prompt": forced_prompt,
         "answer": answer,
+        "answer_token_logits": answer_logits.tolist(),
         "repetition": repetition_fraction(thought),
         "answer_mass": answer_mass,
     }
