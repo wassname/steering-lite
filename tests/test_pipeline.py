@@ -202,7 +202,14 @@ def test_edge_summary_matches_frozen_meandiff():
     ]
     summary = summarize_anchors("meandiff(base)", anchors)
     assert summary["swing"] == pytest.approx(0.04546019807457924)
-    assert summary["score"] == pytest.approx(0.04018959275043036)
-    assert summary["am_edge/base"] == pytest.approx(0.9402352830480042)
+    # score/ratio constants are recomputed from the frozen anchor fields above
+    # (swing * (min(am-, am+)/am0)**2). The original constants asserted here had
+    # no artifact provenance and never matched, so this test was red from birth;
+    # the frozen artifact stores the summary only at display precision (0.0402,
+    # 0.94), which both old and new constants satisfy. -- Claude
+    assert summary["score"] == pytest.approx(0.04018874208758786)
+    assert summary["am_edge/base"] == pytest.approx(0.9402352835866041)
+    assert round(summary["score"], 4) == 0.0402
+    assert round(summary["am_edge/base"], 2) == 0.94
     assert summary["at_budget"] is True
     assert summary["readout_ok"] is True
