@@ -5,17 +5,19 @@ the top principal component as the steering direction.
 
 $$D_L = H^+_L - H^-_L \\in \\mathbb{R}^{n\\times d}$$
 $$U, S, V^T = \\text{SVD}(D_L - \\bar{D}_L)$$
-$$\\text{sign}_L = \\text{sign}\\left(\\sum_i \\mathbb{1}[(D_L)_i \\cdot V_{:,0} > 0] - n/2\\right)$$
+$$\\text{sign}_L = \\text{sign}(\\bar{D}_L \\cdot V_{:,0})$$
 $$v_L = V_{:,0} \\cdot \\text{sign}_L$$
 
-Sign-fixed by majority vote of paired-diff projections (repeng/vgel style).
-This is a lightweight control-vector baseline, not the full Zou et al. LAT
-reader: it omits per-diff normalization, label-based sign selection, and
-train-mean recentering for reading scores.
-PCA is sign-ambiguous; the vote is more robust than alignment-with-the-mean
-when paired diffs are heterogeneous (mean can cancel without the vote
-changing). If the vote ties exactly, orient the axis so the largest centered
-projection is positive.
+Sign-fixed by aligning the sign-ambiguous top PC to the MEAN paired-difference
+(the persona contrast hs), so +coeff always moves toward the positive pole. This
+matches repeng's orient-to-positive-class rule (it projects the uncentered
+hiddens and flips if pos-mean < neg-mean) and AntiPaSTO's sign(mean(diff_S)).
+(Claude 2026-07-15) The prior sign rule voted on CENTERED projections, whose mean
+is zero by construction, so it measured the variance cloud's skew rather than
+concept polarity and flipped the steering direction at random -- see
+AntiPaSTO_concepts/README.md:577-582. This is a lightweight control-vector
+baseline, not the full Zou et al. LAT reader: it omits per-diff normalization,
+label-based sign selection, and train-mean recentering for reading scores.
 
 At runtime, add `coeff * v_L` to the residual.
 
@@ -63,16 +65,9 @@ class PCA:
             _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
             v = Vh[: cfg.n_components]
 
-            projs         = centered @ v.T
-            positive_frac = (projs > 0).float().mean(0)
-            majority_sign = torch.where(positive_frac > 0.5,
-                               torch.ones(v.shape[0]),
-                               -torch.ones(v.shape[0])).to(v)
-            strongest_idx  = projs.abs().argmax(dim=0)
-            strongest      = projs[strongest_idx, torch.arange(v.shape[0], device=projs.device)]
-            strongest_sign = torch.sign(strongest)
-            sign           = torch.where(positive_frac == 0.5, strongest_sign, majority_sign)
-            v = v * sign[:, None]
+            # orient each PC to the mean paired-diff (hs), not the centered-cloud skew
+            mean_proj = diffs.mean(0) @ v.T                 # [n_components]
+            v = v * torch.sign(mean_proj + ε)[:, None]
 
             if cfg.n_components == 1:
                 v = v.squeeze(0)

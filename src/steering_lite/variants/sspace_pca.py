@@ -40,12 +40,14 @@ def _pca_direction(diffs: Tensor, normalize: bool) -> Tensor:
     centered = diffs - diffs.mean(0, keepdim=True)
     _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
     v = Vh[0]
-    projs = centered @ v
-    positive_frac = (projs > 0).float().mean()
-    majority_sign = torch.tensor(1.0 if positive_frac > 0.5 else -1.0, dtype=v.dtype, device=v.device)
-    strongest_sign = torch.sign(projs[projs.abs().argmax()])
-    sign = strongest_sign if positive_frac == 0.5 else majority_sign
-    v = v * sign
+    # (Claude 2026-07-15) Orient the sign-ambiguous top PC to the persona contrast
+    # itself: sign(mean(diffs) . v), so +coeff always moves toward the positive pole.
+    # The old vote was on CENTERED projections (mean-zero by construction), so it
+    # measured the variance cloud's skew, not concept polarity, and flipped the
+    # steering direction at random (sspace_pca landed on-axis<0, corda_pca on-axis>0
+    # from this same fn). This is the AntiPaSTO/repeng "align to hs" rule:
+    # AntiPaSTO_concepts/README.md:577-582 saliency = sign(mean(diff_S)) * std(diff_S).
+    v = v * torch.sign(diffs.mean(0) @ v + eps)
     if normalize:
         v = v / (v.norm() + eps)
     return v.contiguous()
