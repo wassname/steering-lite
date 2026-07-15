@@ -253,6 +253,10 @@ def measure_kl(
         return float(torch.tensor(xs).quantile(q)) if xs else 0.0
     return {
         "kl_mean": float(cat.mean()),
+        # kl_rms = sqrt(mean(KL^2)): whole-distribution calibration target, tail-sensitive
+        # via the square but far less noisy than a p95 quantile over few tokens (wassname).
+        # Additive: adding it does not change any kl_p95-calibrated run. (Claude 2026-07-15)
+        "kl_rms": float(cat.pow(2).mean().sqrt()),
         "kl_p50": float(cat.quantile(0.50)),
         "kl_p90": float(cat.quantile(0.90)),
         "kl_p95": float(cat.quantile(0.95)),
