@@ -121,7 +121,7 @@ class SuperSSpace:
         cfg: SuperSSpaceC,
         *,
         model,
-    ) -> dict[int, dict[str, Tensor]]:
+    ) -> dict[int, dict[str, dict[str, Tensor]]]:
         layer_indices = tuple(pos_acts.keys())
         U_super, Σ_super = SuperSSpace._build_super_basis(model, layer_indices, cfg.role)
         sqrtΣ = Σ_super.sqrt().clamp_min(ε)               # [d_model]; clamp avoids /0 for zero modes
