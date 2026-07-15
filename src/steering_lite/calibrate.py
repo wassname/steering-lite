@@ -388,7 +388,7 @@ def calibrate_iso_kl(
                 and not any(h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl
                             for h in history[:-1])):
             logger.info(
-                f"POST-ELBOW: c={sign*c:+.4f} kl_{target_stat}={m[target_stat]:.3f} "
+                f"POST-ELBOW: c={sign*c:+.4f} {target_stat}={m[target_stat]:.3f} "
                 f"> {POST_ELBOW_RATIO}x target ({target_kl}). Demo logged above."
             )
         iter_idx["n"] += 1
