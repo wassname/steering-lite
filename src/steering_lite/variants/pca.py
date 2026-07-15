@@ -51,7 +51,7 @@ class PCA:
         pos_acts: dict[int, Float[Tensor, "n d"]],
         neg_acts: dict[int, Float[Tensor, "n d"]],
         cfg: PCAC,
-    ) -> dict[int, dict[str, Tensor]]:
+    ) -> dict[int, dict[str, dict[str, Tensor]]]:
         out = {}
         for li in pos_acts:
             if pos_acts[li].shape[0] != neg_acts[li].shape[0]:
