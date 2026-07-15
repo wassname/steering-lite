@@ -71,7 +71,7 @@ with v(model):
 | S-space damp-amp  | [sspace_damp_amp.py](src/steering_lite/variants/sspace_damp_amp.py)   | damp NEG mass + amplify POS mass in S-space                            |
 | Super S-space     | [super_sspace.py](src/steering_lite/variants/super_sspace.py)         | pooled-Gram residual-stream basis (one block-level hook, ~4× faster than per-Linear sspace) |
 | S-space PCA       | [sspace_pca.py](src/steering_lite/variants/sspace_pca.py)             | PCA on paired diffs in whitened weight-SVD S-space (clean ablation vs residual PCA / cosine-gated S-space) |
-| CorDA PCA         | [corda_pca.py](src/steering_lite/variants/corda_pca.py)               | PCA in CorDA context-oriented decomposition space (Yang+ 2024; arXiv link TBD) |
+| CorDA PCA         | [corda_pca.py](src/steering_lite/variants/corda_pca.py)               | PCA in CorDA context-oriented decomposition space ([Yang+ 2024](https://arxiv.org/abs/2406.05223)) |
 | S-space signed    | [sspace.py](src/steering_lite/variants/sspace.py) (`gate="signed"`)   | sspace with a signed gate instead of cosine |
 | Directional ablation | [directional_ablation.py](src/steering_lite/variants/directional_ablation.py) | [Arditi+ 2024](https://arxiv.org/abs/2406.11717)                |
 | Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)               | ungated core of [Spherical Steering](https://arxiv.org/abs/2602.08169) |
