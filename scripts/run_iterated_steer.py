@@ -17,10 +17,10 @@ Each round:
      Uses fast next-token eval (max_think_tokens=0, small vignette subset).
      `margin` = mean forced-choice top1-vs-top2 score gap in nats; healthy
      model ~1-3 nats, destroyed ~0. If no valid C found, stop iteration.
-  5. Full eval at ±C, pick sign with lower Authority Δlogit. Commit.
+  5. Full eval at ±C, pick sign with lower Authority Δclr. Commit.
 
 Outputs:
-  - rounds.tsv         BLUF table: round, ±, axis, dlogit_<F>, margin, top1
+  - rounds.tsv         BLUF table: round, ±, axis, dclr_<F>, margin, top1
   - round_NN.json      raw_logratios + per-row diagnostics for offline plotting
   - meta.json          full run config + rounds summary
 """
@@ -45,7 +45,7 @@ from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
 from steering_lite.eval.tinymfv import evaluate_with_vector
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    baseline_logit_per_foundation, dlogit_per_foundation,
+    baseline_clr_per_foundation, dclr_per_foundation,
     axis_shift, _mean_margin,
 )
 from steering_lite.vector import Vector
@@ -217,8 +217,8 @@ def _calibrate_combined_margin(
     return None, margin
 
 
-def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -> None:
-    """2D path plot: Auth vs SocN absolute logit(wrongness) with round arrows.
+def _save_plot(round_summaries: list[dict], base_clr_per_f: dict, out: Path) -> None:
+    """2D path plot: Auth vs SocN absolute clr(wrongness) with round arrows.
 
     Each point is one round's position in (Auth, SocN) space. Arrows show the
     trajectory. If the model moves mostly along one axis the path is near-1D;
@@ -233,12 +233,12 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
         logger.warning("matplotlib not available, skipping plot")
         return
 
-    auth_base = base_logit_per_f["Authority"]["mean"]
-    socn_base = base_logit_per_f["Social Norms"]["mean"]
+    auth_base = base_clr_per_f["Authority"]["mean"]
+    socn_base = base_clr_per_f["Social Norms"]["mean"]
 
-    # Absolute positions: bare + cumulative dlogit
-    auth_pts = [auth_base] + [auth_base + s["dlogit_per_f"]["Authority"] for s in round_summaries]
-    socn_pts = [socn_base] + [socn_base + s["dlogit_per_f"]["Social Norms"] for s in round_summaries]
+    # Absolute positions: bare + cumulative dclr
+    auth_pts = [auth_base] + [auth_base + s["dclr_per_f"]["Authority"] for s in round_summaries]
+    socn_pts = [socn_base] + [socn_base + s["dclr_per_f"]["Social Norms"] for s in round_summaries]
     rounds = list(range(len(auth_pts)))
     margins = [s["margin"] for s in round_summaries]
     top1s = [s["top1_acc"] for s in round_summaries]
@@ -261,8 +261,8 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
                      xytext=(5, 4), fontsize=8)
     ax1.axhline(0, color="lightgray", linewidth=0.7)
     ax1.axvline(0, color="lightgray", linewidth=0.7)
-    ax1.set_xlabel("Authority  logit(p[Auth])")
-    ax1.set_ylabel("Social Norms  logit(p[SocN])")
+    ax1.set_xlabel("Authority  clr[Auth]")
+    ax1.set_ylabel("Social Norms  clr[SocN]")
     ax1.set_title("Steering trajectory (Auth vs SocN)")
     fig.colorbar(sc, ax=ax1, label="round")
 
@@ -287,7 +287,7 @@ def _save_plot(round_summaries: list[dict], base_logit_per_f: dict, out: Path) -
     logger.info(f"plot: {plot_path}")
 
 
-def _write_report(args, round_summaries: list[dict], base_report, base_logit_per_f: dict,
+def _write_report(args, round_summaries: list[dict], base_report, base_clr_per_f: dict,
                   demo_r0: str, out: Path) -> None:
     """Write report.md summarising the full run."""
     from datetime import date
@@ -314,13 +314,13 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
         f"accumulated vector. Calibrate magnitude via iso-KL (gives C_init), then bisect "
         f"on forced-choice margin of the combined vector (fast next-token eval, "
         f"{args.pmass_n_vignettes} vignettes) until margin >= {args.target_margin} nats. "
-        f"Full tinymfv eval at ±C; commit sign with lower Authority Δlogit. Accumulate "
+        f"Full tinymfv eval at ±C; commit sign with lower Authority Δclr. Accumulate "
         f"via Vector + Vector (linear sum, coeff baked in).",
         f"",
         f"## Results",
         f"",
-        f"Foundation columns are absolute logit(p[f]) from the K-way forced-choice "
-        f"softmax over moral foundations (rounds 1+ = bare + Δlogit). "
+        f"Foundation columns are absolute clr[f] from the K-way forced-choice "
+        f"softmax over moral foundations (rounds 1+ = bare + Δclr). "
         f"`wrongness` = mean (1 - p[social]) across rows ∈ [0,1].",
         f"",
     ]
@@ -329,11 +329,11 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     hdr = ["r", "±"] + [FOUNDATION_SHORT[f] for f in FOUNDATION_ORDER] + ["wrongness", "margin", "top1"]
     sep = [":--", ":--"] + ["--:"] * (len(FOUNDATION_ORDER) + 3)
     rows_md = [
-        ["0", "—"] + [f"{base_logit_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER]
+        ["0", "—"] + [f"{base_clr_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER]
         + [f"{bare_wrongness:.3f}", f"{bare_margin:.2f}", f"{bare_top1:.2f}"]
     ]
     for s in round_summaries:
-        abs_l = {f: base_logit_per_f[f]["mean"] + s["dlogit_per_f"][f] for f in FOUNDATION_ORDER}
+        abs_l = {f: base_clr_per_f[f]["mean"] + s["dclr_per_f"][f] for f in FOUNDATION_ORDER}
         rows_md.append(
             [str(s["round"]), s["sign"]]
             + [f"{abs_l[f]:+.2f}" for f in FOUNDATION_ORDER]
@@ -366,9 +366,9 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     lines += [
         f"## Notes",
         f"",
-        f"Per-foundation logits come from a K-way forced-choice softmax over MFT "
+        f"Per-foundation clr comes from a K-way forced-choice softmax over MFT "
         f"foundations (care/fairness/loyalty/authority/sanctity/liberty/social). "
-        f"Negative Δlogit on Authority means the steered model assigns lower "
+        f"Negative Δclr on Authority means the steered model assigns lower "
         f"probability to authority-violation as the picked option. Free-text demo "
         f"responses may diverge — the steering shifts latent activations but "
         f"surface rhetoric can compensate.",
@@ -386,8 +386,8 @@ def _write_report(args, round_summaries: list[dict], base_report, base_logit_per
     logger.info(f"report: {out / 'report.md'}")
 
 
-def _auth_logit(dlogit_per_f) -> float:
-    return dlogit_per_f["Authority"]["mean"]
+def _auth_clr(dclr_per_f) -> float:
+    return dclr_per_f["Authority"]["mean"]
 
 
 def main() -> None:
@@ -460,7 +460,7 @@ def main() -> None:
         f"target_kl={args.target_kl} vignettes={args.vignettes}"
     )
     logger.info(
-        "SHOULD: Authority Δlogit drops further each round (cumulative); margin "
+        "SHOULD: Authority Δclr drops further each round (cumulative); margin "
         "stays >= target. ELSE: signal exhausted (round 2 saw nothing) or model "
         "went OOD (margin<target)."
     )
@@ -498,22 +498,22 @@ def main() -> None:
                                     vignettes=eval_vignettes, **kw)
 
     def _eval_with(v_running, v_scaled_fresh, base_report_):
-        """Eval at v_running + v_scaled_fresh. Returns (dlogit, report)."""
+        """Eval at v_running + v_scaled_fresh. Returns (dclr, report)."""
         v_combined = v_scaled_fresh if v_running is None else v_running + v_scaled_fresh
         with v_combined(model):
             report = _eval(model, max_think_tokens=args.max_think_tokens, vector=v_combined)
-        return dlogit_per_foundation(base_report_, report, args.vignettes), report
+        return dclr_per_foundation(base_report_, report), report
 
     # Round 0: bare reference.
     logger.info("\n=== round 0 (bare) ===")
     t0 = time.time()
     base_report = _eval(model, max_think_tokens=args.max_think_tokens)
-    base_logit_per_f = baseline_logit_per_foundation(base_report, args.vignettes)
+    base_clr_per_f = baseline_clr_per_foundation(base_report)
     base_margin = _mean_margin(base_report)
     base_top1 = _top1_acc(base_report)
     logger.info(
         f"[bare] margin={base_margin:.2f}nat  top1={base_top1:.2f}  "
-        f"Auth={base_logit_per_f['Authority']['mean']:+.3f}±{base_logit_per_f['Authority']['std']:.2f} "
+        f"Auth={base_clr_per_f['Authority']['mean']:+.3f}±{base_clr_per_f['Authority']['std']:.2f} "
         f"({time.time() - t0:.1f}s)"
     )
     demo_r0 = _demo_response(model, tok, None, "r0 bare")
@@ -526,13 +526,13 @@ def main() -> None:
     )
     calib_prompts = _calib_prompts(tok)  # 8 diverse OOD prompts (see _DEFAULT_MESSAGES_RAW)
 
-    # All rows use ABSOLUTE logit(wrongness) per foundation so units are consistent.
-    # bare logit(w) ≈ +2 means model strongly judges scenario as wrong.
-    # steered absolute = bare_logit + Δlogit; drops toward 0 or negative = less wrong.
+    # All rows use ABSOLUTE clr(wrongness) per foundation so units are consistent.
+    # bare clr(w) ≈ +2 means model strongly judges scenario as wrong.
+    # steered absolute = bare_clr + Δclr; drops toward 0 or negative = less wrong.
     rows: list[list] = []
     rows.append([
         "0", "—",
-        *(f"{base_logit_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER),
+        *(f"{base_clr_per_f[f]['mean']:+.2f}" for f in FOUNDATION_ORDER),
         f"{base_margin:.2f}", f"{base_top1:.2f}", "0",
     ])
 
@@ -604,20 +604,20 @@ def main() -> None:
             break
         logger.info(f"  [margin] accepted C={C:.4f} margin={margin_calib:.3f}")
 
-        # Step 4: full eval at ±C, pick sign with lower Authority Δlogit.
-        pos_dlogit, pos_report = _eval_with(v_running, +C * v_fresh_unit, base_report)
-        neg_dlogit, neg_report = _eval_with(v_running, -C * v_fresh_unit, base_report)
-        auth_pos, auth_neg = _auth_logit(pos_dlogit), _auth_logit(neg_dlogit)
+        # Step 4: full eval at ±C, pick sign with lower Authority Δclr.
+        pos_dclr, pos_report = _eval_with(v_running, +C * v_fresh_unit, base_report)
+        neg_dclr, neg_report = _eval_with(v_running, -C * v_fresh_unit, base_report)
+        auth_pos, auth_neg = _auth_clr(pos_dclr), _auth_clr(neg_dclr)
         if auth_pos <= auth_neg:
-            sign, signed_C, chosen_dlogit, chosen_report = "+", +C, pos_dlogit, pos_report
+            sign, signed_C, chosen_dclr, chosen_report = "+", +C, pos_dclr, pos_report
             signed_fresh = +C * v_fresh_unit
         else:
-            sign, signed_C, chosen_dlogit, chosen_report = "-", -C, neg_dlogit, neg_report
+            sign, signed_C, chosen_dclr, chosen_report = "-", -C, neg_dclr, neg_report
             signed_fresh = -C * v_fresh_unit
         logger.info(f"  Auth Δ: +C={auth_pos:+.3f}  -C={auth_neg:+.3f}  → chose {sign}C")
-        tbl = [[f, f"{chosen_dlogit[f]['mean']:+.3f}", f"{chosen_dlogit[f]['std']:.2f}"]
-               for f in FOUNDATION_ORDER if f in chosen_dlogit]
-        logger.info("  foundations (chosen):\n" + tabulate(tbl, headers=["foundation", "Δlogit", "std"], tablefmt="plain"))
+        tbl = [[f, f"{chosen_dclr[f]['mean']:+.3f}", f"{chosen_dclr[f]['std']:.2f}"]
+               for f in FOUNDATION_ORDER if f in chosen_dclr]
+        logger.info("  foundations (chosen):\n" + tabulate(tbl, headers=["foundation", "Δclr", "std"], tablefmt="plain"))
 
         v_running = signed_fresh if v_running is None else v_running + signed_fresh
 
@@ -633,20 +633,20 @@ def main() -> None:
 
         elapsed = time.time() - t_round
 
-        abs_logit = {f: base_logit_per_f[f]["mean"] + chosen_dlogit[f]["mean"]
+        abs_clr = {f: base_clr_per_f[f]["mean"] + chosen_dclr[f]["mean"]
                      for f in FOUNDATION_ORDER}
         rows.append([
             str(r), sign,
-            *(f"{abs_logit[f]:+.2f}" for f in FOUNDATION_ORDER),
+            *(f"{abs_clr[f]:+.2f}" for f in FOUNDATION_ORDER),
             f"{round_margin:.2f}", f"{round_top1:.2f}", f"{elapsed:.0f}",
         ])
 
         (args.out / f"round_{r:02d}.json").write_text(json.dumps({
             "round": r, "sign": sign, "calibrated_C": C, "signed_C": signed_C,
             "kl_p95_at_calib": kl_hit,
-            "dlogit_per_foundation": chosen_dlogit,
-            "axis_shift": axis_shift(chosen_dlogit),
-            "auth_logit_pos": auth_pos, "auth_logit_neg": auth_neg,
+            "dclr_per_foundation": chosen_dclr,
+            "axis_shift": axis_shift(chosen_dclr),
+            "auth_clr_pos": auth_pos, "auth_clr_neg": auth_neg,
             "mean_margin": round_margin, "top1_acc": round_top1,
             "wrongness": chosen_report["wrongness"],
             "raw_logratios": chosen_report["raw_logratios"],
@@ -656,9 +656,9 @@ def main() -> None:
 
         round_summaries.append({
             "round": r, "sign": sign, "signed_C": signed_C,
-            "auth_dlogit_mean": _auth_logit(chosen_dlogit),
-            "axis_shift": axis_shift(chosen_dlogit),
-            "dlogit_per_f": {f: chosen_dlogit[f]["mean"] for f in FOUNDATION_ORDER},
+            "auth_dclr_mean": _auth_clr(chosen_dclr),
+            "axis_shift": axis_shift(chosen_dclr),
+            "dclr_per_f": {f: chosen_dclr[f]["mean"] for f in FOUNDATION_ORDER},
             "wrongness": chosen_report["wrongness"],
             "margin": round_margin, "top1_acc": round_top1, "elapsed_s": elapsed,
             "demo_response": demo_text,
@@ -673,19 +673,19 @@ def main() -> None:
                + ["margin", "top1", "t_s"])
     tsv = tabulate(rows, headers=headers, tablefmt="tsv", floatfmt="+.2f")
     (args.out / "rounds.tsv").write_text(tsv)
-    _save_plot(round_summaries, base_logit_per_f, args.out)
+    _save_plot(round_summaries, base_clr_per_f, args.out)
 
     (args.out / "meta.json").write_text(json.dumps({
         "meta": meta, "args": vars(args), "layers": list(layers),
         "rounds": round_summaries,
         "bare": {
             "margin": base_margin, "top1_acc": base_top1,
-            "logit_per_foundation": base_logit_per_f,
+            "clr_per_foundation": base_clr_per_f,
         },
     }, indent=2, default=str))
     append_run(args.out, {**meta, "kind": "iterated_steer", "rounds": round_summaries})
 
-    _write_report(args, round_summaries, base_report, base_logit_per_f,
+    _write_report(args, round_summaries, base_report, base_clr_per_f,
                   demo_r0, args.out)
 
     logger.info(f"\nout: {args.out}")

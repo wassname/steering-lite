@@ -19,8 +19,6 @@ on it still gets a real OOD signal.
 """
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import torch
 from loguru import logger
@@ -30,14 +28,25 @@ from moralmaps.guided import (
     _DEFAULT_FORCED_FOUNDATIONS,
     guided_rollout_forced_choice,
 )
+from moralmaps.readouts import clr  # shared readout; import (not reimplement) so the two repos can't silently re-diverge
 
 
 def _per_row_to_multibool(per_row: list[dict]) -> tuple[
     dict[str, dict[str, float]], dict[str, float], list[float], list[float]
 ]:
-    """Translate per_row 7-vec p into multibool-shaped (raw_logratios, raw_pmass).
+    """Translate per_row 7-vec score into multibool-shaped (raw_logratios, raw_pmass).
 
-    raw_logratios[vid|cond][f_lower] = logit(p[f])
+    raw_logratios[vid|cond][f_lower] = clr(score)[f] = score_f - mean_j(score_j)
+
+    clr (centered log-ratio) is tinymfv's gauge-free per-category selectivity
+    readout (moralmaps.readouts.clr, commit 9237aa9). It replaces the old
+    one-vs-rest logit(p_f) = score_f - logsumexp(score_{j!=f}), whose logsumexp
+    is dominated by the top category: a steer concentrating evidence on ONE
+    foundation then mechanically depressed every OTHER foundation's readout and
+    fabricated off-axis collateral, inflating SI broke_rate (job 95). clr spreads
+    a single-category shift as +(1-1/K) on that category and -1/K on each other,
+    so genuine selectivity survives. -- Claude
+
     raw_pmass[vid|cond|f_lower] = margin (broadcast; all foundations share it
     since forced-choice gives a single margin per row).
     """
@@ -49,11 +58,8 @@ def _per_row_to_multibool(per_row: list[dict]) -> tuple[
     soc_idx = foundations.index("social")
     for r in per_row:
         key = f"{r['id']}|{r['condition']}"
-        d: dict[str, float] = {}
-        for fi, fname in enumerate(foundations):
-            p_f = float(r["p"][fi])
-            p_clip = max(1e-3, min(1 - 1e-3, p_f))
-            d[fname] = math.log(p_clip / (1.0 - p_clip))
+        cl = clr(np.asarray(r["score"], dtype=float))  # aligned to `foundations` order
+        d: dict[str, float] = {fname: float(cl[fi]) for fi, fname in enumerate(foundations)}
         raw_logratios[key] = d
         m = float(r["margin"])
         margins.append(m)
@@ -119,7 +125,7 @@ def evaluate_with_vector(
     """Run forced-choice eval with whatever steering is currently attached.
 
     Returns a multibool-shaped report:
-      - raw_logratios: {vid|cond: {f_lower: logit(p[f])}}  (7 foundations incl. social)
+      - raw_logratios: {vid|cond: {f_lower: clr(score)[f]}}  (7 foundations incl. social)
       - raw_pmass:     {vid|cond|f: margin}                (margin in nats; OOD proxy)
       - wrongness:     mean (1 - p[social]) across rows  ∈ [0,1]
       - mean_margin:   mean margin over rows (nats)        -- main OOD signal
@@ -144,6 +150,7 @@ def evaluate_with_vector(
         "raw_pmass": raw_pmass,
         "wrongness": wrongness,
         "mean_margin": mean_margin,
+        "mean_pmass_allowed": rep["mean_pmass_allowed"],  # coherence: mass on valid answer tokens (gate input)
         "informedness": rep["informedness"],
         "top1_acc": rep["top1_acc"],
         "table": rep["table"],

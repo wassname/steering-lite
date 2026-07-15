@@ -28,7 +28,7 @@ import steering_lite as sl
 from steering_lite.vector import Vector
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
-    FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation,
+    FOUNDATION_ORDER, baseline_clr_per_foundation, dclr_per_foundation,
 )
 from moralmaps import get_instrument
 from moralmaps.administer import administer
@@ -36,7 +36,7 @@ from moralmaps.administer import administer
 ORDINAL_INSTRUMENTS = ["mfq2", "big5", "humor_styles"]
 # FOUNDATION_ORDER imported from foundations.py: ["Care", "Sanctity", "Authority",
 # "Loyalty", "Fairness", "Liberty", "Social Norms"]. Do NOT override with lowercase -
-# baseline_logit_per_foundation returns capitalized keys, so a lowercase override
+# baseline_clr_per_foundation returns capitalized keys, so a lowercase override
 # causes KeyError on the first MFV cell.
 
 
@@ -229,7 +229,7 @@ def main():
                     "mean_pmass_allowed": i["mean_pmass_allowed"], "mean_nll_prefill": i["mean_nll_prefill"]}
         # base report (hc=0, cc=0)
         base_report = evaluate_multibool(model, tok, **mfv_kw)
-        base_logit = baseline_logit_per_foundation(base_report)
+        base_clr = baseline_clr_per_foundation(base_report)
         rows = []
         for hc in hc_grid:
             for cc in cc_grid:
@@ -250,22 +250,22 @@ def main():
                 else:
                     rep = base_report
                 cinfo = coh(rep)
-                dl = (dlogit_per_foundation(base_report, rep) if ctx is not None
+                dl = (dclr_per_foundation(base_report, rep) if ctx is not None
                       else {f: {"mean": 0.0, "std": 0.0, "sem": 0.0} for f in FOUNDATION_ORDER})
                 logger.info(f"  mfv hc={hc:+.1f} cc={cc:+.1f}: margin={cinfo['mean_margin']:+.2f}nat "
                             f"unscorable={cinfo['frac_unscorable']:.3f} pmass={cinfo['mean_pmass_allowed']:.3f}")
                 for f in FOUNDATION_ORDER:
                     rows.append({"foundation": f, "honesty_c": hc, "credulity_c": cc,
-                                 "mean": base_logit[f]["mean"] + dl[f]["mean"],
-                                 "dlogit": dl[f]["mean"], "dlogit_sd": dl[f]["std"],
-                                 "dlogit_sem": dl[f]["sem"],
+                                 "mean": base_clr[f]["mean"] + dl[f]["mean"],
+                                 "dclr": dl[f]["mean"], "dclr_sd": dl[f]["std"],
+                                 "dclr_sem": dl[f]["sem"],
                                  "pmass": cinfo["mean_pmass_allowed"],
                                  "mean_margin": cinfo["mean_margin"],
                                  "frac_unscorable": cinfo["frac_unscorable"],
                                  "mean_nll_prefill": cinfo["mean_nll_prefill"]})
         with open(args.out / "mfv_profiles.csv", "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=["foundation", "honesty_c", "credulity_c",
-                                               "mean", "dlogit", "dlogit_sd", "dlogit_sem",
+                                               "mean", "dclr", "dclr_sd", "dclr_sem",
                                                "pmass", "mean_margin", "frac_unscorable",
                                                "mean_nll_prefill"])
             w.writeheader()

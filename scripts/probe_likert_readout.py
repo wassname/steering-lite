@@ -1,7 +1,7 @@
 """Does the bounded-expectation Likert readout (E in [1,5]) wash out steer direction that an
 unbounded log-odds readout keeps? Hypothesis: steering raises the entropy of the within-5-token
 answer distribution p, so E -> 3 (mid-scale) for every foundation regardless of direction, while
-pmass (mass on the 5 digits) stays ~1.0 and hides it. MFV is clean only because dlogit is unbounded.
+pmass (mass on the 5 digits) stays ~1.0 and hides it. MFV is clean only because dclr is unbounded.
 
 We reuse the PRODUCTION readout (read_items + per_item_categorical -> frame-averaged forward p per
 item), then score each item three ways and pool per foundation (reverse-keyed):

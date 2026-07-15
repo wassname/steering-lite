@@ -9,7 +9,7 @@ the Authority/Care persona axis) and run it through BOTH tinymfv eval paths:
   - ordinal surveys (mfq2, big5, 16pf, humor_styles) via `tinymfv.administer`
     -> per-factor profile on the 1-5/1-7 scale, with a coherence pmass check.
   - nominal MFV vignettes (mfv == "classic") via `evaluate_multibool`
-    -> per-foundation Delta-logit vs bare.
+    -> per-foundation Delta-clr vs bare.
 
 We extract + iso-KL calibrate the vector ONCE, then for each instrument
 administer at coeff 0 (bare), +C, -C. Output is per-instrument profile CSVs
@@ -45,7 +45,7 @@ from steering_lite.data import (
 )
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
-    FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation, format_cell,
+    FOUNDATION_ORDER, baseline_clr_per_foundation, dclr_per_foundation, format_cell,
 )
 
 from moralmaps import get_instrument, administer
@@ -380,22 +380,22 @@ def main() -> None:
                         f"unscorable={c['frac_unscorable']:.3f} pmass={c['mean_pmass_allowed']:.3f} "
                         f"nll_prefill={c['mean_nll_prefill']:.2f}")
         base_report = mfv_reports["base"]
-        base_logit = baseline_logit_per_foundation(base_report)
-        mfv_dlogit = {
-            tag: ({f: {"mean": 0.0, "std": 0.0, "sem": 0.0, "n": base_logit[f]["n"],
-                       "n_total": base_logit[f]["n_total"]} for f in FOUNDATION_ORDER}
-                  if tag == "base" else dlogit_per_foundation(base_report, rep))
+        base_clr = baseline_clr_per_foundation(base_report)
+        mfv_dclr = {
+            tag: ({f: {"mean": 0.0, "std": 0.0, "sem": 0.0, "n": base_clr[f]["n"],
+                       "n_total": base_clr[f]["n_total"]} for f in FOUNDATION_ORDER}
+                  if tag == "base" else dclr_per_foundation(base_report, rep))
             for tag, rep in mfv_reports.items()
         }
         rows = []
         for tag, _coeff, cm in poles:
             cinfo = coh(mfv_reports[tag])
             for f in FOUNDATION_ORDER:
-                dl = mfv_dlogit[tag][f]
+                dl = mfv_dclr[tag][f]
                 rows.append({
                     "foundation": f, "pole": tag, "c": cm,
-                    "mean": base_logit[f]["mean"] + dl["mean"],
-                    "dlogit": dl["mean"], "dlogit_sd": dl["std"], "dlogit_sem": dl["sem"],
+                    "mean": base_clr[f]["mean"] + dl["mean"],
+                    "dclr": dl["mean"], "dclr_sd": dl["std"], "dclr_sem": dl["sem"],
                     "pmass": cinfo["mean_pmass_allowed"],
                     "mean_margin": cinfo["mean_margin"],
                     "frac_unscorable": cinfo["frac_unscorable"],
@@ -403,19 +403,19 @@ def main() -> None:
                 })
         with open(args.out / "mfv_profiles.csv", "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=[
-                "foundation", "pole", "c", "mean", "dlogit", "dlogit_sd", "dlogit_sem",
+                "foundation", "pole", "c", "mean", "dclr", "dclr_sd", "dclr_sem",
                 "pmass", "mean_margin", "frac_unscorable", "mean_nll_prefill"])
             w.writeheader()
             w.writerows(rows)
         for tag, rep in mfv_reports.items():
             c = coh(rep)
             logger.info(f"  MFV summary {tag}: margin={c['mean_margin']:+.2f}nat pmass={c['mean_pmass_allowed']:.3f}")
-        logger.info("  MFV base logit: " + ", ".join(f"{f}={format_cell(base_logit[f])}" for f in FOUNDATION_ORDER))
+        logger.info("  MFV base clr: " + ", ".join(f"{f}={format_cell(base_clr[f])}" for f in FOUNDATION_ORDER))
         assert "pos1" in mfv_reports and "neg1" in mfv_reports, "mfv.json compatibility needs c-grid to include 1"
         (args.out / "mfv.json").write_text(json.dumps({
-            "base_logit_per_foundation": base_logit,
-            "pos": {"coeff": +C, "dlogit_per_foundation": mfv_dlogit["pos1"]},
-            "neg": {"coeff": -C, "dlogit_per_foundation": mfv_dlogit["neg1"]},
+            "base_clr_per_foundation": base_clr,
+            "pos": {"coeff": +C, "dclr_per_foundation": mfv_dclr["pos1"]},
+            "neg": {"coeff": -C, "dclr_per_foundation": mfv_dclr["neg1"]},
             "foundation_order": list(FOUNDATION_ORDER),
             "coherence": {"base": coh(base_report), "pos": coh(mfv_reports["pos1"]), "neg": coh(mfv_reports["neg1"])},
         }, indent=2))

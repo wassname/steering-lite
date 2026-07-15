@@ -4,7 +4,7 @@ magnitude on the two headline instruments (mfq2 ordinal, MFV nominal), so we can
 pick the LARGEST C that still reads coherently at BOTH poles.
 
   mfq2: administer base/+C/-C -> pmass + mean|profile delta| (1-5 scale)
-  MFV : evaluate_multibool +C/-C -> pmass + mean|dlogit| (nats)
+  MFV : evaluate_multibool +C/-C -> pmass + mean|dclr| (nats)
 
 "Coherent" = pmass stays high (>= ~0.9) at both poles AND the profile is not pinned
 to the neutral midpoint (the degeneracy seen on side instruments at strong -C).
@@ -23,7 +23,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY
 from steering_lite.eval.tinymfv import evaluate_multibool
-from steering_lite.eval.foundations import FOUNDATION_ORDER, dlogit_per_foundation
+from steering_lite.eval.foundations import FOUNDATION_ORDER, dclr_per_foundation
 from moralmaps import get_instrument, administer
 
 
@@ -65,7 +65,7 @@ def main() -> None:
         model, tok, name="classic", log_demo=False, verbose=0,
         max_think_tokens=256, batch_size=args.eval_batch_size)
     logger.info(f"base mfq2 pmass={base_pm:.3f}")
-    logger.info("  C   | mfq2 pmass+/-  mfq2|d| | MFV pmass+/-  MFV|dlogit|  (pick largest C coherent both poles)")
+    logger.info("  C   | mfq2 pmass+/-  mfq2|d| | MFV pmass+/-  MFV|dclr|  (pick largest C coherent both poles)")
     for C in args.cs:
         with v(model, C=+C):
             pp, pm_p = _mfq2(model, tok, instr, args.admin_batch_size)
@@ -81,8 +81,8 @@ def main() -> None:
         if args.skip_mfv:
             logger.info(f" {C:+.1f} | {pm_p:.3f}/{pm_n:.3f}  {d_ord:.3f}  | (mfv skipped)")
             continue
-        dl_p = dlogit_per_foundation(base_report, mfv_p)
-        dl_n = dlogit_per_foundation(base_report, mfv_n)
+        dl_p = dclr_per_foundation(base_report, mfv_p)
+        dl_n = dclr_per_foundation(base_report, mfv_n)
         d_mfv = float(np.mean([abs(dl_p[f]["mean"]) + abs(dl_n[f]["mean"]) for f in FOUNDATION_ORDER])) / 2
         mfv_pm_p = float(mfv_p["info"]["mean_pmass_allowed"])
         mfv_pm_n = float(mfv_n["info"]["mean_pmass_allowed"])

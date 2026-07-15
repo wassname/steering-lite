@@ -3,7 +3,7 @@
 Runs https://github.com/vgel/repeng on the same persona-branching pairs the
 sweep uses, at the same layer set, but WITHOUT iso-KL calibration. The
 purpose is to show what unprincipled coefficient choice looks like next to
-the calibrated steering-lite methods. Compare side-by-side via Δlogit per
+the calibrated steering-lite methods. Compare side-by-side via Δclr per
 foundation.
 
 Why no calibration: vgel/repeng ships with `coeff=1.0` (sometimes 1.5 or 2.0
@@ -15,7 +15,7 @@ Pipeline:
     2. train repeng `ControlVector` on the same pair list.
     3. wrap model with `ControlModel`, apply control at args.coeff (default 1.5).
     4. eval on tinymfv clifford vignettes.
-    5. paired Δlogit vs cached bare baseline; same JSON schema as sweep methods.
+    5. paired Δclr vs cached bare baseline; same JSON schema as sweep methods.
 
 install: `uv sync --extra baseline` (adds repeng to deps).
 """
@@ -38,7 +38,7 @@ from steering_lite.data import (
 )
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    axis_shift, cue, dlogit_per_foundation, format_cell,
+    axis_shift, cue, dclr_per_foundation, format_cell,
 )
 from steering_lite.eval.tinymfv import evaluate_with_vector
 
@@ -120,7 +120,7 @@ def main() -> None:
     logger.info(f"BLUF: repeng baseline coeff={args.coeff} (uncalibrated) "
                 f"on {args.model} with persona-branching pairs.")
     logger.info("EXPECT: nonzero axis_shift but unpredictable magnitude (no KL bound). "
-                "If vector is bad, expect saturation -> gibberish -> Δlogit≈0 across all "
+                "If vector is bad, expect saturation -> gibberish -> Δclr≈0 across all "
                 "foundations because pmass collapses.")
 
     dtype = getattr(torch, args.torch_dtype)
@@ -169,9 +169,9 @@ def main() -> None:
     elapsed = time.time() - t0
     cmodel.reset()
 
-    # --- 5. Δlogit + axis_shift -------------------------------------------
-    dlogit = dlogit_per_foundation(base_report, steer_report, args.vignettes)
-    axis = axis_shift(dlogit)
+    # --- 5. Δclr + axis_shift -------------------------------------------
+    dclr = dclr_per_foundation(base_report, steer_report)
+    axis = axis_shift(dclr)
 
     # --- 6. persist + print row -------------------------------------------
     out_path = args.out / "repeng.json"
@@ -184,7 +184,7 @@ def main() -> None:
         "n_pairs": args.n_pairs,
         "calibrated": False,
         "vignettes": args.vignettes,
-        "dlogit_per_foundation": dlogit,
+        "dclr_per_foundation": dclr,
         "axis_shift": axis,
         "raw_p_true": steer_report["raw"],
         "raw_pmass": steer_report["raw_pmass"],
@@ -200,7 +200,7 @@ def main() -> None:
                + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
                + ["t"])
     row = [cue(axis), f"{axis:+.2f}", "repeng_raw", f"{args.coeff:+.2f}"]
-    row += [format_cell(dlogit[f]) for f in FOUNDATION_ORDER]
+    row += [format_cell(dclr[f]) for f in FOUNDATION_ORDER]
     row.append(f"{elapsed:.0f}s")
     logger.info("\n" + tabulate([row], headers=headers, tablefmt="tsv"))
     logger.info(f"out: {out_path}")

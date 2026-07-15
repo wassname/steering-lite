@@ -6,7 +6,7 @@ traditionalism), built from the persona-steering-template-library's rules (short
 poles) + its top template ("Use the priorities of a {persona} person.").
 
 Per persona: train ONE mean_diff vector (the headline method), then at +C / -C report the per-
-foundation shift on MFQ-2 (1-5 endorsement) and MFV (dlogit), plus pmass coherence. Read by eye
+foundation shift on MFQ-2 (1-5 endorsement) and MFV (dclr), plus pmass coherence. Read by eye
 (bayesian): keep the persona whose named foundation moves and whose off-target foundations don't.
 Only the winners go to the full method sweep + all-instrument showcase + README.
 
@@ -28,7 +28,7 @@ import steering_lite as sl
 from steering_lite.data import make_persona_pairs, PERSONA_REGISTRY
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
-    FOUNDATION_ORDER, baseline_logit_per_foundation, dlogit_per_foundation,
+    FOUNDATION_ORDER, baseline_clr_per_foundation, dclr_per_foundation,
 )
 from moralmaps import get_instrument, administer
 
@@ -69,11 +69,11 @@ def main() -> None:
                   batch_size=args.eval_batch_size)
     base_prof, base_pm = _mfq2(model, tok, instr, args.admin_batch_size, args.admin_think)
     base_mfv = evaluate_multibool(model, tok, **mfv_kw)
-    base_logit = baseline_logit_per_foundation(base_mfv)
+    base_clr = baseline_clr_per_foundation(base_mfv)
     logger.info(f"BASE mfq2 pmass={base_pm:.3f} | mfq2={dict(zip(mfq2_dims, base_prof.round(2)))}")
 
     results = {"model": args.model, "C": args.C, "base_mfq2": dict(zip(mfq2_dims, base_prof.tolist())),
-               "base_mfv_logit": {f: base_logit[f]["mean"] for f in FOUNDATION_ORDER}, "personas": {}}
+               "base_mfv_clr": {f: base_clr[f]["mean"] for f in FOUNDATION_ORDER}, "personas": {}}
     logger.info("SHOULD: each persona's NAMED foundation moves most; off-target small; pmass>=0.9 both poles.")
     for pname in args.personas:
         pairs, template = PERSONA_REGISTRY[pname]
@@ -88,16 +88,16 @@ def main() -> None:
             with v(model, C=C):
                 prof, pm = _mfq2(model, tok, instr, args.admin_batch_size, args.admin_think)
                 mfv = evaluate_multibool(model, tok, **mfv_kw)
-            dl = dlogit_per_foundation(base_mfv, mfv)
+            dl = dclr_per_foundation(base_mfv, mfv)
             cell[sign] = {
                 "mfq2_delta": dict(zip(mfq2_dims, (prof - base_prof).round(3).tolist())),
                 "mfq2_pmass": round(pm, 3),
-                "mfv_dlogit": {f: round(dl[f]["mean"], 3) for f in FOUNDATION_ORDER},
+                "mfv_dclr": {f: round(dl[f]["mean"], 3) for f in FOUNDATION_ORDER},
                 "mfv_pmass": round(float(mfv["info"]["mean_pmass_allowed"]), 3),
             }
         results["personas"][pname] = cell
         mq = "  ".join(f"{d}{cell['pos']['mfq2_delta'][d]:+.2f}/{cell['neg']['mfq2_delta'][d]:+.2f}" for d in mfq2_dims)
-        mv = "  ".join(f"{f.split()[0]}{cell['pos']['mfv_dlogit'][f]:+.2f}/{cell['neg']['mfv_dlogit'][f]:+.2f}" for f in FOUNDATION_ORDER)
+        mv = "  ".join(f"{f.split()[0]}{cell['pos']['mfv_dclr'][f]:+.2f}/{cell['neg']['mfv_dclr'][f]:+.2f}" for f in FOUNDATION_ORDER)
         logger.info(f"\n=== {pname} ({pairs[0][0]} / {pairs[0][1]}) {time.time()-t0:.0f}s "
                     f"pmass +{cell['pos']['mfq2_pmass']}/-{cell['neg']['mfq2_pmass']} ===")
         logger.info(f"  mfq2 d(+C/-C): {mq}")

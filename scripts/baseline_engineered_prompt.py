@@ -2,7 +2,7 @@
 
 Bidirectional: injects two GPT-4o-generated system prompts (POS = Auth↓, NEG =
 Auth↑), runs the same tinymfv clifford eval as the sweep, and reports paired
-Δlogit per foundation vs a cached bare baseline. Output JSON shape mirrors
+Δclr per foundation vs a cached bare baseline. Output JSON shape mirrors
 sweep methods (`pos` and `neg` sub-reports) so the aggregator handles it
 without special-casing.
 
@@ -32,7 +32,7 @@ from steering_lite._quiet import quiet_external_logs
 from _meta import make_metadata, append_run
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    axis_shift, cue, dlogit_per_foundation, format_cell,
+    axis_shift, cue, dclr_per_foundation, format_cell,
 )
 from steering_lite.eval.tinymfv import evaluate_with_vector
 
@@ -94,10 +94,10 @@ def _eval_with_prompt(model, tok, sys_prompt, vignettes, max_think_tokens):
 
 
 def _sub_report(base_report, eng_report, vignettes):
-    dlogit = dlogit_per_foundation(base_report, eng_report, vignettes)
+    dclr = dclr_per_foundation(base_report, eng_report)
     return {
-        "dlogit_per_foundation": dlogit,
-        "axis_shift": axis_shift(dlogit),
+        "dclr_per_foundation": dclr,
+        "axis_shift": axis_shift(dclr),
         "raw_logratios": eng_report["raw_logratios"],
         "raw_pmass": eng_report.get("raw_pmass", {}),
     }
@@ -196,7 +196,7 @@ def main() -> None:
     ]:
         ax = sub["axis_shift"]
         row = [cue(ax), f"{ax:+.2f}", label]
-        row += [format_cell(sub["dlogit_per_foundation"][f]) for f in FOUNDATION_ORDER]
+        row += [format_cell(sub["dclr_per_foundation"][f]) for f in FOUNDATION_ORDER]
         row.append(f"{sub_elapsed:.0f}s")
         rows.append(row)
     logger.info("\n" + tabulate(rows, headers=headers, tablefmt="tsv"))

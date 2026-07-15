@@ -87,7 +87,7 @@ def main() -> None:
 
     print("\nMFV Authority direction over paired c values")
     print(tabulate(
-        instrument_rows("MFV", mfv, "dlogit"),
+        instrument_rows("MFV", mfv, "dclr"),
         headers=["instrument", "axis", "readout", "c", "base", "delta(+c)", "delta(-c)", "signed direction"],
         tablefmt="pipe",
         floatfmt="+.3f",

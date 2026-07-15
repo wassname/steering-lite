@@ -1,4 +1,4 @@
-"""tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δlogit ± std.
+"""tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δclr ± std.
 
 Three baseline modalities + 11 calibrated steering methods, all targeting the
 Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv clifford
@@ -12,15 +12,16 @@ POS = ethical-pushback/stakeholder-care, NEG = unquestioning-compliance. Both
 foundations move together (questions authority *because* of harm to people)
 so the steering direction is interpretable.
 
-Eval: tinymfv guided CoT, 64 think tokens; per-foundation Δlogit (paired by
-(vid, cond)) ± std across pairs. Bidirectional: every method's |C| is iso-KL
-calibrated once, then we eval at +C and -C and save both reports. The
-aggregator picks SI_best per foundation across signs; eval (not a probe)
-decides direction.
+Eval: tinymfv guided CoT (--max-think-tokens, default 256); per-foundation Δclr
+(paired by (vid, cond)) ± std across pairs. Bidirectional: every method's |C| is
+iso-KL calibrated once, then we eval at +C and -C and save both reports.
+results.py picks the persona-aligned sign per method (the one that moves ΔAuth
+down); eval (not a probe) decides direction.
 
-Composite metric: axis_shift = ΔlogitSanctity - ΔlogitCare nats (legacy
-Care/Sanctity composite kept for cross-axis comparison; the new headline is
-Auth+Care, computed by the aggregator).
+Composite row metric: axis_shift = ΔclrCare - ΔclrAuthority nats (the
+Forethought AI-character axis; +ve = moved toward the Care↑/Auth↓ persona).
+This is only the inline monitoring row -- the headline is gated_selectivity +
+si_flips, computed in scripts/results.py from the saved raw_logratios.
 
 Refs:
   calibration: https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7
@@ -33,6 +34,7 @@ import json
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 from loguru import logger
 from tabulate import tabulate
@@ -46,26 +48,58 @@ from steering_lite.data import make_persona_pairs, PERSONA_PAIRS_AUTHORITY, PROM
 from steering_lite.eval.tinymfv import evaluate_multibool
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
-    baseline_logit_per_foundation, dlogit_per_foundation,
-    flips_per_foundation, axis_shift, format_cell, cue,
+    baseline_clr_per_foundation, dclr_per_foundation,
+    axis_shift, format_cell, cue,
 )
 
 
-def _row_steer(label: str, dlogit_per_f: dict, *,
+def _save_traces(path: Path, report: dict) -> None:
+    """Persist full per-row reasoning + forced-choice diagnostics as JSONL.
+
+    One line per (vignette, condition): id, condition, label, top1, margin,
+    pmass_allowed (answer-slot mass = pmass_ans), nll_prefill, the 7-vec p, and
+    the full decoded gen_text / gen_text_rev reasoning. This is the "save all"
+    trace stream -- browsable, greppable, one file per eval. -- Claude
+    """
+    def _np(o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        if isinstance(o, (np.floating, np.integer)):
+            return o.item()
+        raise TypeError(f"not JSON serializable: {type(o)}")
+
+    rows = report.get("per_row") or []
+    with path.open("w") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, default=_np) + "\n")
+
+
+def _scalar_metrics(report: dict) -> dict:
+    """Cheap headline scalars worth persisting next to the raw arrays."""
+    return {
+        "mean_margin": report.get("mean_margin"),
+        "mean_pmass_allowed": report.get("mean_pmass_allowed"),  # coherence-gate input for gated_selectivity
+        "informedness": report.get("informedness"),
+        "top1_acc": report.get("top1_acc"),
+        "wrongness": report.get("wrongness"),
+    }
+
+
+def _row_steer(label: str, dclr_per_f: dict, *,
                coeff: str = "n/a", kl: str = "n/a", elapsed_s: float = 0.0) -> list:
-    """Row for prompt_only / steer_* / repeng / engineered_prompt: paired Δlogit cells."""
-    axis = axis_shift(dlogit_per_f)
+    """Row for prompt_only / steer_* / repeng / engineered_prompt: paired Δclr cells."""
+    axis = axis_shift(dclr_per_f)
     cells = [cue(axis), f"{axis:+.2f}", label, coeff, kl]
-    cells += [format_cell(dlogit_per_f[f]) for f in FOUNDATION_ORDER]
+    cells += [format_cell(dclr_per_f[f]) for f in FOUNDATION_ORDER]
     cells.append(f"{elapsed_s:.0f}s")
     return cells
 
 
-def _row_bare(absolute_logit_per_f: dict, *, elapsed_s: float = 0.0) -> list:
-    """Bare row shows absolute logit(wrongness) per foundation -- the reference,
+def _row_bare(absolute_clr_per_f: dict, *, elapsed_s: float = 0.0) -> list:
+    """Bare row shows absolute clr(wrongness) per foundation -- the reference,
     not a Δ. High Care + low Sanctity is the expected starting point."""
     cells = ["⚪", "ref", "bare", "n/a", "n/a"]
-    cells += [format_cell(absolute_logit_per_f[f]) for f in FOUNDATION_ORDER]
+    cells += [format_cell(absolute_clr_per_f[f]) for f in FOUNDATION_ORDER]
     cells.append(f"{elapsed_s:.0f}s")
     return cells
 
@@ -247,6 +281,8 @@ def main() -> None:
     ap.add_argument("--calib-iters", type=int, default=9)
     ap.add_argument("--max-think-tokens", type=int, default=256)
     ap.add_argument("--vignettes", default="classic")
+    ap.add_argument("--n-vignettes", type=int, default=None,
+                    help="keep only first N vignettes (smoke/debug). None = all.")
     ap.add_argument("--sspace-r", type=int, default=-1,
                     help="rank for sspace* variants. -1 = full rank.")
     ap.add_argument("--sspace-target-submodule", default=None,
@@ -276,8 +312,8 @@ def main() -> None:
                 f"vignettes={args.vignettes} max_think={args.max_think_tokens}")
     logger.info(f"EXPECT: 3 modalities x {args.vignettes} vignettes. (1) bare baseline, (2) prompt_only "
                 "with POS persona as system prompt, (3) 11 calibrated steering methods.")
-    logger.info("EXPECT: axis_shift = ΔlogitSanctity - ΔlogitCare nats (legacy composite). "
-                "Headline axis is Auth↓ -- aggregate_flips.py reports SI on Authority.")
+    logger.info("EXPECT: axis_shift = ΔclrCare - ΔclrAuthority nats (inline monitoring row). "
+                "Headline is gated_selectivity + si_flips on the Auth↓/Care↑ axis -- computed by results.py.")
     logger.info(f"persona axis: POS='{PERSONA_PAIRS_AUTHORITY[0][0]}' vs "
                 f"NEG='{PERSONA_PAIRS_AUTHORITY[0][1]}' "
                 f"(+{len(PERSONA_PAIRS_AUTHORITY)-1} paraphrase pairs)")
@@ -326,25 +362,28 @@ def main() -> None:
     logger.info("\n=== bare baseline (no system prompt, no steering) ===")
     base_t0 = time.time()
     base_report = evaluate_multibool(model, tok, name=args.vignettes,
+                                     n_vignettes=args.n_vignettes,
                                      max_think_tokens=args.max_think_tokens,
                                      batch_size=args.eval_batch_size)
-    base_logit_per_f = baseline_logit_per_foundation(base_report)
+    base_clr_per_f = baseline_clr_per_foundation(base_report)
     bare_elapsed = time.time() - base_t0
     logger.info("bare per-foundation logratio ± std: " +
-                ", ".join(f"{f}={format_cell(base_logit_per_f[f])}" for f in FOUNDATION_ORDER))
+                ", ".join(f"{f}={format_cell(base_clr_per_f[f])}" for f in FOUNDATION_ORDER))
     logger.info(f"bare elapsed={bare_elapsed:.1f}s")
-    rows.append(_row_bare(base_logit_per_f, elapsed_s=bare_elapsed))
+    rows.append(_row_bare(base_clr_per_f, elapsed_s=bare_elapsed))
 
     (args.out / "bare.json").write_text(json.dumps({
         "label": "bare",
         "meta": meta,
         "model": args.model, "vignettes": args.vignettes,
         "max_think_tokens": args.max_think_tokens,
-        "absolute_logit_per_foundation": base_logit_per_f,
+        "absolute_clr_per_foundation": base_clr_per_f,
         "raw_logratios": base_report["raw_logratios"],
         "raw_pmass": base_report["raw_pmass"],
+        **_scalar_metrics(base_report),
         "elapsed_s": bare_elapsed,
     }, indent=2))
+    _save_traces(args.out / "bare.traces.jsonl", base_report)
     method_summaries.append({"label": "bare", "elapsed_s": bare_elapsed})
 
     # === (2) prompt_only baseline: POS persona as user-message prefix ======
@@ -355,25 +394,28 @@ def main() -> None:
         wrapped_tok = _UserPrefixTok(tok, persona_prefix)
         pb_t0 = time.time()
         pb_report = evaluate_multibool(model, wrapped_tok, name=args.vignettes,
+                                       n_vignettes=args.n_vignettes,
                                        max_think_tokens=args.max_think_tokens,
                                        batch_size=args.eval_batch_size)
-        pb_dlogit = dlogit_per_foundation(base_report, pb_report)
+        pb_dclr = dclr_per_foundation(base_report, pb_report)
         pb_elapsed = time.time() - pb_t0
-        rows.append(_row_steer("prompt_only", pb_dlogit, elapsed_s=pb_elapsed))
+        rows.append(_row_steer("prompt_only", pb_dclr, elapsed_s=pb_elapsed))
 
         (args.out / "prompt_only.json").write_text(json.dumps({
             "label": "prompt_only",
             "meta": meta,
             "model": args.model,
             "user_prefix": persona_prefix, "vignettes": args.vignettes,
-            "dlogit_per_foundation": pb_dlogit,
-            "axis_shift": axis_shift(pb_dlogit),
+            "dclr_per_foundation": pb_dclr,
+            "axis_shift": axis_shift(pb_dclr),
             "raw_logratios": pb_report["raw_logratios"],
             "raw_pmass": pb_report["raw_pmass"],
+            **_scalar_metrics(pb_report),
             "elapsed_s": pb_elapsed,
         }, indent=2))
+        _save_traces(args.out / "prompt_only.traces.jsonl", pb_report)
         method_summaries.append({"label": "prompt_only",
-                                 "axis_shift": axis_shift(pb_dlogit),
+                                 "axis_shift": axis_shift(pb_dclr),
                                  "elapsed_s": pb_elapsed})
 
     headers = (["cue", "axis", "row", "C_calib", "kl_p95"]
@@ -414,32 +456,35 @@ def main() -> None:
         v.cfg.coeff = +C
         with v(model):
             pos_report = evaluate_multibool(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
+                model, tok, name=args.vignettes, n_vignettes=args.n_vignettes,
+                max_think_tokens=args.max_think_tokens,
                 batch_size=args.eval_batch_size)
-        pos_dlogit = dlogit_per_foundation(base_report, pos_report)
-        pos_flips = {}  # flips not defined for continuous logratios
+        pos_dclr = dclr_per_foundation(base_report, pos_report)
 
         # -C eval (same |C|, flipped sign — no recalibration)
         v.cfg.coeff = -C
         with v(model):
             neg_report = evaluate_multibool(
-                model, tok, name=args.vignettes, max_think_tokens=args.max_think_tokens,
+                model, tok, name=args.vignettes, n_vignettes=args.n_vignettes,
+                max_think_tokens=args.max_think_tokens,
                 batch_size=args.eval_batch_size)
-        neg_dlogit = dlogit_per_foundation(base_report, neg_report)
-        neg_flips = {}
+        neg_dclr = dclr_per_foundation(base_report, neg_report)
 
         elapsed = time.time() - t0
-        # Pick the sign with larger |axis_shift| for the headline row; the JSON
-        # keeps both so the aggregator can compute SI_best per foundation.
-        ax_pos, ax_neg = axis_shift(pos_dlogit), axis_shift(neg_dlogit)
+        # Pick the sign with larger |axis_shift| for the inline monitoring row; the
+        # JSON keeps both +C/-C so results.py can pick the persona-aligned sign.
+        ax_pos, ax_neg = axis_shift(pos_dclr), axis_shift(neg_dclr)
         if abs(ax_pos) >= abs(ax_neg):
-            best_label, best_dlogit, best_C = f"steer_{method}[+]", pos_dlogit, +C
+            best_label, best_dclr, best_C = f"steer_{method}[+]", pos_dclr, +C
         else:
-            best_label, best_dlogit, best_C = f"steer_{method}[-]", neg_dlogit, -C
-        rows.append(_row_steer(best_label, best_dlogit,
+            best_label, best_dclr, best_C = f"steer_{method}[-]", neg_dclr, -C
+        rows.append(_row_steer(best_label, best_dclr,
                                coeff=f"{best_C:+.3f}", kl=f"{kl_hit:.2f}",
                                elapsed_s=elapsed))
 
+        # Headline metric (gated_selectivity + si_flips) is recomputed in results.py
+        # from raw_logratios + mean_pmass_allowed with persona-aligned sign selection,
+        # so nothing metric-shaped is persisted here beyond the raw ingredients.
         out_path = args.out / f"{method}.json"
         out_path.write_text(json.dumps({
             "label": f"steer_{method}",
@@ -449,21 +494,25 @@ def main() -> None:
             "kl_p95_at_calib": kl_hit,
             "pos": {
                 "coeff": +C,
-                "dlogit_per_foundation": pos_dlogit,
+                "dclr_per_foundation": pos_dclr,
                 "axis_shift": ax_pos,
                 "raw_logratios": pos_report["raw_logratios"],
                 "raw_pmass": pos_report["raw_pmass"],
+                **_scalar_metrics(pos_report),
             },
             "neg": {
                 "coeff": -C,
-                "dlogit_per_foundation": neg_dlogit,
+                "dclr_per_foundation": neg_dclr,
                 "axis_shift": ax_neg,
                 "raw_logratios": neg_report["raw_logratios"],
                 "raw_pmass": neg_report["raw_pmass"],
+                **_scalar_metrics(neg_report),
             },
             "n_pairs": args.n_pairs, "max_think_tokens": args.max_think_tokens,
             "vignettes": args.vignettes, "elapsed_s": elapsed,
         }, indent=2))
+        _save_traces(args.out / f"{method}.pos.traces.jsonl", pos_report)
+        _save_traces(args.out / f"{method}.neg.traces.jsonl", neg_report)
         method_summaries.append({
             "label": f"steer_{method}",
             "calibrated_C": C, "kl_p95_at_calib": kl_hit,
@@ -476,10 +525,10 @@ def main() -> None:
         # co-move=YES means dCare and dAuth move in the same direction (bad:
         # extracts moral-intensity not Auth↔Auth rotation).
         ts = time.strftime("%H:%M:%S")
-        dc_p = pos_dlogit.get("Care", {}).get("mean", float("nan"))
-        da_p = pos_dlogit.get("Authority", {}).get("mean", float("nan"))
-        dc_n = neg_dlogit.get("Care", {}).get("mean", float("nan"))
-        da_n = neg_dlogit.get("Authority", {}).get("mean", float("nan"))
+        dc_p = pos_dclr.get("Care", {}).get("mean", float("nan"))
+        da_p = pos_dclr.get("Authority", {}).get("mean", float("nan"))
+        dc_n = neg_dclr.get("Care", {}).get("mean", float("nan"))
+        da_n = neg_dclr.get("Authority", {}).get("mean", float("nan"))
         co_p = "co-move=YES" if (dc_p > 0) == (da_p > 0) else "co-move=no"
         co_n = "co-move=YES" if (dc_n > 0) == (da_n > 0) else "co-move=no"
         logger.info(
@@ -497,9 +546,10 @@ def main() -> None:
     logger.info("\n=== tinymfv sweep complete ===")
     logger.info(f"out: {args.out}")
     logger.info(f"runs.jsonl: {args.out / 'runs.jsonl'} (run_id={meta['run_id']})")
-    logger.info("SHOULD: bare row shows absolute logit(wrongness)±std per foundation; expect "
+    logger.info("SHOULD: bare row shows absolute clr(wrongness)±std per foundation; expect "
                 "Care high (model thinks care violations are wrong), Sanctity lower. Other rows "
-                "are paired Δlogit±std vs bare. axis_shift>0 means moved toward binding cluster.")
+                "are paired Δclr±std vs bare. axis_shift = ΔCare - ΔAuth > 0 means moved toward "
+                "the Care↑/Auth↓ persona intent.")
     logger.info("\n" + tabulate(rows, headers=headers, tablefmt="tsv"))
 
 
