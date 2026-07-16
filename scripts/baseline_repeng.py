@@ -150,9 +150,7 @@ def main() -> None:
     # --- 3. base report (reuse if present) --------------------------------
     if args.bare_json.exists():
         logger.info(f"reusing bare report from {args.bare_json}")
-        bare = json.loads(args.bare_json.read_text())
-        base_report = {"raw": bare["raw_p_true"],
-                       "raw_pmass": bare["raw_pmass"]}
+        base_report = json.loads(args.bare_json.read_text())
     else:
         logger.info("no cached bare report -- running bare eval (with control disabled)")
         cmodel.reset()
@@ -180,14 +178,14 @@ def main() -> None:
         "meta": meta,
         "model": args.model,
         "layers": layers,
-        "coeff_raw": args.coeff,
+        "coeff": args.coeff,
         "n_pairs": args.n_pairs,
         "calibrated": False,
         "vignettes": args.vignettes,
         "dclr_per_foundation": dclr,
         "axis_shift": axis,
-        "raw_p_true": steer_report["raw"],
-        "raw_pmass": steer_report["raw_pmass"],
+        "raw_logratios": steer_report["raw_logratios"],
+        "mean_pmass_allowed": steer_report["mean_pmass_allowed"],
         "max_think_tokens": args.max_think_tokens,
         "elapsed_s": elapsed,
     }, indent=2))

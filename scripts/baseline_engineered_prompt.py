@@ -93,13 +93,13 @@ def _eval_with_prompt(model, tok, sys_prompt, vignettes, max_think_tokens):
         model, wrapped_tok, name=vignettes, max_think_tokens=max_think_tokens)
 
 
-def _sub_report(base_report, eng_report, vignettes):
+def _sub_report(base_report, eng_report):
     dclr = dclr_per_foundation(base_report, eng_report)
     return {
         "dclr_per_foundation": dclr,
         "axis_shift": axis_shift(dclr),
         "raw_logratios": eng_report["raw_logratios"],
-        "raw_pmass": eng_report.get("raw_pmass", {}),
+        "mean_pmass_allowed": eng_report["mean_pmass_allowed"],
     }
 
 
@@ -163,8 +163,8 @@ def main() -> None:
     logger.info(f"NEG elapsed={neg_elapsed:.1f}s")
     elapsed = pos_elapsed + neg_elapsed
 
-    pos_sub = _sub_report(base_report, pos_report, args.vignettes)
-    neg_sub = _sub_report(base_report, neg_report, args.vignettes)
+    pos_sub = _sub_report(base_report, pos_report)
+    neg_sub = _sub_report(base_report, neg_report)
 
     out_path = args.out / "engineered_prompt.json"
     out_path.write_text(json.dumps({
