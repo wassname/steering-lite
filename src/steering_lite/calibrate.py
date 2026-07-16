@@ -222,7 +222,9 @@ def measure_kl(
         for i in range(n_gen):
             per_t[i].append(float(kls[i]))
         if idx == 0:  # cheap: gen already rolled out for the KL calc (Claude)
-            steer_tail = " ".join(tok.decode(gen, skip_special_tokens=True).split())[-70:]
+            # last ~160 chars of the rollout: long enough to show a repetition loop
+            # ("but but but") that only emerges deep into a long-T rollout.
+            steer_tail = " ".join(tok.decode(gen, skip_special_tokens=True).split())[-160:]
 
         # Demo: extra base-only gen for side-by-side text. One per measure_kl
         # call (idx==0) for stdout, all prompts for JSONL.
