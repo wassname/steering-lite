@@ -277,6 +277,12 @@ def main() -> None:
                          "lower if shared-GPU OOM)")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=0.5)
+    ap.add_argument("--target-stat", default="kl_p95",
+                    help="calibration statistic to hit target-kl: kl_p95 (tail quantile) "
+                         "or kl_rms (sqrt mean-square KL, whole-distribution, tail-weighted).")
+    ap.add_argument("--verbose-calib", action="store_true",
+                    help="print the full base-vs-steer demo at every C the bisection tries "
+                         "(diagnostic: read off where the trajectory breaks vs the calibrated point).")
     ap.add_argument("--calib-T", type=int, default=60)
     ap.add_argument("--calib-iters", type=int, default=9)
     ap.add_argument("--max-think-tokens", type=int, default=256)
@@ -445,12 +451,13 @@ def main() -> None:
             method_demo_path.write_text("")  # truncate per method per run
         coeff_calib, _hist = sl.calibrate_iso_kl(
             v, model, tok, calib_prompts,
-            target_kl=args.target_kl, T=args.calib_T,
+            target_kl=args.target_kl, target_stat=args.target_stat, T=args.calib_T,
             max_iters=args.calib_iters, device=args.device,
             bracket=(0.01, 1e6),
-            demo_log_path=method_demo_path,
+            demo_log_path=method_demo_path, verbose_demo=args.verbose_calib,
         )
-        kl_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
+        kl_hit = _hist[-1].get(args.target_stat, float("nan")) if _hist else float("nan")
+        kl_p95_hit = _hist[-1].get("kl_p95", float("nan")) if _hist else float("nan")
         C = float(coeff_calib)
 
         # +C eval
@@ -492,7 +499,8 @@ def main() -> None:
             "meta": meta,
             "method": method, "model": args.model, "layers": list(layers),
             "calibrated_C": C, "target_kl": args.target_kl,
-            "kl_p95_at_calib": kl_hit,
+            "target_stat": args.target_stat, "kl_at_calib": kl_hit,
+            "kl_p95_at_calib": kl_p95_hit,
             "pos": {
                 "coeff": +C,
                 "dclr_per_foundation": pos_dclr,
@@ -516,7 +524,7 @@ def main() -> None:
         _save_traces(args.out / f"{method}.neg.traces.jsonl", neg_report)
         method_summaries.append({
             "label": f"steer_{method}",
-            "calibrated_C": C, "kl_p95_at_calib": kl_hit,
+            "calibrated_C": C, "kl_p95_at_calib": kl_p95_hit, "kl_at_calib": kl_hit,
             "axis_shift_pos": ax_pos, "axis_shift_neg": ax_neg,
             "elapsed_s": elapsed,
         })

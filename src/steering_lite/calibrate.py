@@ -169,6 +169,7 @@ def measure_kl(
     log_demo: bool = False,
     demo_log_path: Path | None = None,
     demo_iter: int | None = None,
+    verbose_demo: bool = False,
 ) -> dict:
     """Roll out T tokens with steering attached, then score under base
     (detached) and steer (re-attached). Returns KL summary stats and per-token
@@ -217,7 +218,9 @@ def measure_kl(
                 # First bisection iter (demo_iter 0) and the final operating-point snapshot
                 # (demo_iter -1/None) print in FULL; the intermediate bisection iters collapse
                 # to one head...tail table row each, so calibration does not flood the log.
-                if demo_iter is None or demo_iter <= 0:
+                # verbose_demo forces the FULL print at every C (diagnostic: see the demo
+                # degrade as C climbs, so you can read off where the trajectory breaks). -- Claude
+                if verbose_demo or demo_iter is None or demo_iter <= 0:
                     stage = ("FINAL operating point"
                              if (demo_iter is not None and demo_iter < 0)
                              else f"probe iter {demo_iter} (bracket point, NOT final)")
@@ -288,6 +291,7 @@ def calibrate_iso_kl(
     sign_probe: Callable[[Vector], float] | None = None,
     sign_probe_c: float = 1.0,
     demo_log_path: Path | None = None,
+    verbose_demo: bool = False,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -367,12 +371,12 @@ def calibrate_iso_kl(
         post_elbow_hit_yet = any(
             h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl for h in history
         )
-        log_demo = is_first or not post_elbow_hit_yet
+        log_demo = verbose_demo or is_first or not post_elbow_hit_yet
         m = measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
-                       show_pbar=False, log_demo=log_demo,
+                       show_pbar=False, log_demo=log_demo, verbose_demo=verbose_demo,
                        demo_log_path=demo_log_path, demo_iter=iter_idx["n"])
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})
-        logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} "
+        logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} rms={m['kl_rms']:.4f} "
                      f"p90={m['kl_p90']:.4f} p95={m['kl_p95']:.5f} "
                      f"max={m['kl_max']:.4f} n={m['n_pos']}")
         pbar.update(1)
