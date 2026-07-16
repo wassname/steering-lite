@@ -65,9 +65,7 @@ def _orjson_loads(p: Path):
 # ── load sweep dir → canonical per-method measurements ────────────────────────
 
 def _pmass(report: dict) -> float:
-    """mean_pmass_allowed (coherence) for a sweep-JSON sub-report; NaN if absent (pre-metric sweeps)."""
-    v = report.get("mean_pmass_allowed")
-    return float(v) if v is not None else float("nan")
+    return float(report["mean_pmass_allowed"])
 
 
 def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, dict]:
@@ -114,7 +112,7 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             sif = si_flips(d["raw_logratios"], bare["raw_logratios"], INTENT)
             methods[method] = {
                 "bidirectional": False, "sign": +1,
-                "calibrated_C": d.get("coeff") or d.get("calibrated_C"),
+                "calibrated_C": d["coeff"],
                 "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
@@ -165,16 +163,15 @@ def base_vs_humans_table(bare: dict, vignettes_name: str) -> str:
         m_mean, m_std, n = r["mean"], r["std"], r["n"]
         sem = r.get("sem", float("nan"))
         t = (m_mean / sem) if sem and not math.isnan(sem) and sem > 0 else float("nan")
-        prob = 1.0 / (1.0 + math.exp(-m_mean)) if not math.isnan(m_mean) else float("nan")
         h = humans[f]
         h_str = f"{h['mean']:.2f}±{h['std']:.2f}" if not math.isnan(h["mean"]) else "n/a"
         rows.append([
             FOUNDATION_SHORT[f], f"{m_mean:+.2f}±{m_std:.2f}",
-            f"{prob*100:.0f}%", f"{t:+.1f}" if not math.isnan(t) else "n/a",
+            f"{t:+.1f}" if not math.isnan(t) else "n/a",
             h_str, f"{n}", f"{h['wsum']:.1f}",
         ])
-    return tabulate(rows, headers=["foundation", "model clr±σ", "p(wrong)",
-                                   "t-stat", "human wrong (1-5)±σ", "n", "Σw_h"],
+    return tabulate(rows, headers=["foundation", "model clr±σ", "t-stat",
+                                   "human wrong (1-5)±σ", "n", "Σw_h"],
                     tablefmt="pipe", floatfmt="+.2f")
 
 

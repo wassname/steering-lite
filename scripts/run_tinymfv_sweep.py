@@ -78,7 +78,7 @@ def _scalar_metrics(report: dict) -> dict:
     """Cheap headline scalars worth persisting next to the raw arrays."""
     return {
         "mean_margin": report.get("mean_margin"),
-        "mean_pmass_allowed": report.get("mean_pmass_allowed"),  # coherence-gate input for gated_selectivity
+        "mean_pmass_allowed": report["mean_pmass_allowed"],
         "informedness": report.get("informedness"),
         "top1_acc": report.get("top1_acc"),
         "wrongness": report.get("wrongness"),
@@ -405,6 +405,7 @@ def main() -> None:
             "label": "prompt_only",
             "meta": meta,
             "model": args.model,
+            "coeff": None,
             "user_prefix": persona_prefix, "vignettes": args.vignettes,
             "dclr_per_foundation": pb_dclr,
             "axis_shift": axis_shift(pb_dclr),

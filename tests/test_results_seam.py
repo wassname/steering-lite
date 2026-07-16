@@ -37,7 +37,7 @@ def _report(auth_shift: float, care_shift: float, pmass: float = 0.9) -> dict:
         lr[f"vid_auth{i}|other_violate"] = _lr(authority=b + auth_shift, care=-1.0)
     for i, b in enumerate(_BASE_CARE):
         lr[f"vid_care{i}|other_violate"] = _lr(care=b + care_shift, authority=-2.0)
-    return {"raw_logratios": lr, "raw_pmass": {}, "mean_margin": 1.5, "mean_pmass_allowed": pmass}
+    return {"raw_logratios": lr, "mean_margin": 1.5, "mean_pmass_allowed": pmass}
 
 
 def _write_sweep(tmp: Path) -> None:
@@ -47,6 +47,14 @@ def _write_sweep(tmp: Path) -> None:
         "calibrated_C": 1.0,
         "pos": _report(auth_shift=-3.5, care_shift=+3.5),
         "neg": _report(auth_shift=+3.5, care_shift=-3.5),
+    }))
+    (tmp / "repeng.json").write_text(json.dumps({
+        **_report(auth_shift=-3.5, care_shift=+3.5),
+        "coeff": 0.0,
+    }))
+    (tmp / "prompt_only.json").write_text(json.dumps({
+        **_report(auth_shift=-1.0, care_shift=+1.0),
+        "coeff": None,
     }))
 
 
@@ -65,8 +73,29 @@ def test_results_seam(tmp_path: Path) -> None:
     assert abs(sel["off"]) < 1e-9
     assert sel["coherence"] == 1.0
     assert -1.0 <= m["si_flips"] <= 1.0
+    assert methods["repeng"]["calibrated_C"] == 0.0
+    assert methods["prompt_only"]["calibrated_C"] is None
     # Selectivity + Δclr tables must render without raising.
     results.print_tables(methods)
+
+
+def test_missing_coherence_fails() -> None:
+    import results
+
+    with pytest.raises(KeyError, match="mean_pmass_allowed"):
+        results._pmass({})
+
+
+def test_base_table_does_not_invent_binary_probability(monkeypatch) -> None:
+    import results
+
+    humans = {
+        f: {"mean": 3.0, "std": 0.5, "wsum": 4.0, "n": 4}
+        for f in results.FOUNDATION_ORDER
+    }
+    monkeypatch.setattr(results, "_human_per_foundation", lambda _: humans)
+    table = results.base_vs_humans_table(_report(0.0, 0.0), "unused")
+    assert "p(wrong)" not in table
 
 
 def test_clr_readout_seam() -> None:
