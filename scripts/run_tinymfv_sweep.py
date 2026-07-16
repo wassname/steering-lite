@@ -140,11 +140,14 @@ logger.remove()
 logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format="{message}")
 
 
+# Ordered by research priority so a killed run still lands the most useful rows (Claude):
+# 1) CorDA/S-space keep-decision head-to-head, 2) the 3 methods still TODO in the README,
+# 3) rest of the sspace family, 4) remaining baselines.
 METHODS = [
-    "mean_diff", "cosine_gated", "pca", "topk_clusters",
-    "sspace", "sspace_pca", "corda_pca", "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
-    "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering",
+    "mean_diff", "pca", "corda_pca", "sspace_pca", "sspace", "directional_ablation",
+    "chars", "linear_act", "angular_steering",
+    "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+    "cosine_gated", "topk_clusters", "spherical",
 ]
 
 def _make_cfg(method: str, layers: tuple[int, ...], *,
@@ -277,9 +280,10 @@ def main() -> None:
                          "lower if shared-GPU OOM)")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--target-kl", type=float, default=0.5)
-    ap.add_argument("--target-stat", default="kl_p95",
-                    help="calibration statistic to hit target-kl: kl_p95 (tail quantile) "
-                         "or kl_rms (sqrt mean-square KL, whole-distribution, tail-weighted).")
+    ap.add_argument("--target-stat", default="kl_rms",
+                    help="calibration statistic to hit target-kl: kl_rms (sqrt mean-square KL "
+                         "in nats, whole-distribution, quadratically tail-weighted -- the default) "
+                         "or kl_p95 (single tail quantile, brittle).")
     ap.add_argument("--verbose-calib", action="store_true",
                     help="print the full base-vs-steer demo at every C the bisection tries "
                          "(diagnostic: read off where the trajectory breaks vs the calibrated point).")
@@ -425,7 +429,7 @@ def main() -> None:
                                  "axis_shift": axis_shift(pb_dclr),
                                  "elapsed_s": pb_elapsed})
 
-    headers = (["cue", "axis", "row", "C_calib", "kl_p95"]
+    headers = (["cue", "axis", "row", "C_calib", args.target_stat]
                + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
                + ["t"])
 
@@ -541,7 +545,7 @@ def main() -> None:
         co_p = "co-move=YES" if (dc_p > 0) == (da_p > 0) else "co-move=no"
         co_n = "co-move=YES" if (dc_n > 0) == (da_n > 0) else "co-move=no"
         logger.info(
-            f"[{ts}] DONE method={method}  C={C:+.4f}  kl_p95={kl_hit:.3f}  elapsed={elapsed:.0f}s\n"
+            f"[{ts}] DONE method={method}  C={C:+.4f}  {args.target_stat}={kl_hit:.3f}  elapsed={elapsed:.0f}s\n"
             f"  +C: axis_shift={ax_pos:+.3f}  dCare={dc_p:+.3f}  dAuth={da_p:+.3f}  {co_p}\n"
             f"  -C: axis_shift={ax_neg:+.3f}  dCare={dc_n:+.3f}  dAuth={da_n:+.3f}  {co_n}\n"
             "--- running table so far ---\n"
