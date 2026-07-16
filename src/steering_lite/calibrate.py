@@ -8,8 +8,12 @@ Two functions:
   regime, so log-log slope is ~2 and secant converges in ~3-5 iters (vs ~10 for
   pure bisection).
 
-Recommended: greedy decode with target_kl=1.0 nat, target_stat="kl_p95".
-Greedy makes the statistic deterministic so the solver doesn't fight noise.
+Recommended: greedy decode, target_stat="kl_rms".
+kl_rms = sqrt(mean per-token KL^2) in nats: whole-distribution, quadratically
+tail-weighted (the square inside penalizes tail tokens that derail reasoning),
+but reported in nats so it sits directly alongside kl_mean/p95/max rather than
+the nats^2 of a raw mean-square. Greedy makes the statistic deterministic so the
+solver doesn't fight noise.
 """
 from __future__ import annotations
 import json
@@ -35,13 +39,23 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
         return
     indexed = [(i, h) for i, h in enumerate(history)]
     indexed.sort(key=lambda ih: ih[1]["coeff"])
+    # include rms: it is the default calibration target (kl_rms), so the table shows the
+    # stat we actually solve for, not only mean/p90/p95/max. The steer tail (prompt-0
+    # rollout) rides along so degradation is visible in the always-on table, not just
+    # the verbose demo. (Claude 2026-07-16)
     rows = [
-        [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_p90']:.4f}",
-         f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos'])]
+        [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_rms']:.4f}",
+         f"{h['kl_p90']:.4f}", f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos']),
+         h["steer_tail"]]
         for i, h in indexed
     ]
-    table = tabulate(rows, headers=["i", "c", "mean", "p90", "p95", "max", "n"], tablefmt="plain")
-    logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
+    table = tabulate(rows, headers=["i", "c", "mean", "rms", "p90", "p95", "max", "n",
+                                    "steer tail (prompt 0)"], tablefmt="plain")
+    logger.info(
+        f"SHOULD: choose the highest C with a coherent tail; a repetition tail "
+        f"('but but but') or gibberish marks where the dose is too hot -- read that "
+        f"row's rms as the target_kl for future runs.\n"
+        f"--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
 def _log_per_t_profile(method: str, c: float, per_t_p50: list[float],
@@ -184,6 +198,7 @@ def measure_kl(
     prompts = _tokenize(prompts, tok)
     all_kls = []
     per_t = [[] for _ in range(T)]
+    steer_tail = ""  # prompt-0 steered rollout tail, for the always-on bracket table (Claude)
     need_base_gen = log_demo or demo_log_path is not None
 
     for idx, pids in enumerate(tqdm(prompts, desc="measure_kl",
@@ -206,6 +221,8 @@ def measure_kl(
         all_kls.append(kls)
         for i in range(n_gen):
             per_t[i].append(float(kls[i]))
+        if idx == 0:  # cheap: gen already rolled out for the KL calc (Claude)
+            steer_tail = " ".join(tok.decode(gen, skip_special_tokens=True).split())[-70:]
 
         # Demo: extra base-only gen for side-by-side text. One per measure_kl
         # call (idx==0) for stdout, all prompts for JSONL.
@@ -214,30 +231,23 @@ def measure_kl(
             base_full = torch.cat([pids.to(device), base_gen])
             decoded_base = tok.decode(base_full, skip_special_tokens=False)
             decoded_steer = tok.decode(full_ids, skip_special_tokens=False)
-            if log_demo and idx == 0:
-                # First bisection iter (demo_iter 0) and the final operating-point snapshot
-                # (demo_iter -1/None) print in FULL; the intermediate bisection iters collapse
-                # to one head...tail table row each, so calibration does not flood the log.
-                # verbose_demo forces the FULL print at every C (diagnostic: see the demo
-                # degrade as C climbs, so you can read off where the trajectory breaks). -- Claude
-                if verbose_demo or demo_iter is None or demo_iter <= 0:
-                    stage = ("FINAL operating point"
-                             if (demo_iter is not None and demo_iter < 0)
-                             else f"probe iter {demo_iter} (bracket point, NOT final)")
-                    logger.info(
-                        f"\n=== {v.cfg.method} -> calibrate iso-KL -> {stage} "
-                        f"| c={v.cfg.coeff:+.4f} | T={T} tok/KL-probe (<=12 iters) ===\n"
-                        "WHAT: same held-out calib prompt at c=0 vs current c. This is the KL "
-                        "calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.\n"
-                        "EXPECT: both coherent; steered differs from base but does not collapse.\n"
-                        f"--- BASE (c=0) ---\n{decoded_base}\n"
-                        f"\n--- STEER ({v.cfg.method}, c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
-                        f"=== /{v.cfg.method} calibrate ==="
-                    )
-                else:
-                    oneline = " ".join(decoded_steer.split())
-                    logger.info(f"| c={v.cfg.coeff:+.4f} kl_mean={float(kls.mean()):.2f} "
-                                f"| {oneline[:40]}...{oneline[-40:]} |")
+            is_final = demo_iter is not None and demo_iter < 0
+            # Full BASE vs STEER dump at the FINAL operating point (always) and at every
+            # bracket only under verbose_demo. Per-bracket steer tails already ride in the
+            # iso-KL table (steer_tail column), so intermediate probes need no console dump.
+            if log_demo and idx == 0 and (is_final or verbose_demo):
+                stage = ("FINAL operating point" if is_final
+                         else f"probe iter {demo_iter} (bracket point, NOT final)")
+                logger.info(
+                    f"\n=== {v.cfg.method} -> calibrate iso-KL -> {stage} "
+                    f"| c={v.cfg.coeff:+.4f} kl_rms={float(kls.pow(2).mean().sqrt()):.3f} | "
+                    f"T={T} tok/KL-probe (<=12 iters) ===\n"
+                    "WHAT: same held-out calib prompt at c=0 vs current c. KL calibration "
+                    "sweep, NOT the moral eval; c is a bracket point unless FINAL.\n"
+                    f"--- BASE (c=0) ---\n{decoded_base}\n"
+                    f"\n--- STEER ({v.cfg.method}, c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
+                    f"=== /{v.cfg.method} calibrate ==="
+                )
             if demo_log_path is not None:
                 with demo_log_path.open("a") as f:
                     f.write(json.dumps({
@@ -256,10 +266,12 @@ def measure_kl(
         return float(torch.tensor(xs).quantile(q)) if xs else 0.0
     return {
         "kl_mean": float(cat.mean()),
-        # kl_rms = sqrt(mean(KL^2)): whole-distribution calibration target, tail-sensitive
-        # via the square but far less noisy than a p95 quantile over few tokens (wassname).
-        # Additive: adding it does not change any kl_p95-calibrated run. (Claude 2026-07-15)
+        # kl_rms = sqrt(mean(KL^2)) in nats: default calibration target. Whole-distribution
+        # and quadratically tail-weighted (the square penalizes tail tokens that derail
+        # reasoning), but far less noisy than a p95 quantile over few tokens. Reported in
+        # nats so target_kl and the table columns are all one unit. (wassname + Claude)
         "kl_rms": float(cat.pow(2).mean().sqrt()),
+        "steer_tail": steer_tail,
         "kl_p50": float(cat.quantile(0.50)),
         "kl_p90": float(cat.quantile(0.90)),
         "kl_p95": float(cat.quantile(0.95)),
@@ -281,7 +293,7 @@ def calibrate_iso_kl(
     prompts: list[str] | list[Tensor] | None = None,
     *,
     target_kl: float = 0.5,
-    target_stat: str = "kl_p95",
+    target_stat: str = "kl_rms",
     bracket: tuple[float, float] = (0.001, 256.0),
     tol: float = 0.05,
     max_iters: int = 12,
