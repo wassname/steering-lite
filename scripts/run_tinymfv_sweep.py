@@ -279,7 +279,9 @@ def main() -> None:
                     help="batch size for eval forward passes (tinymfv default is 16; "
                          "lower if shared-GPU OOM)")
     ap.add_argument("--max-length", type=int, default=384)
-    ap.add_argument("--target-kl", type=float, default=0.5)
+    # 0.8 = highest-coherent-tail dose from the pca kl_rms bracket (job 117, T=60):
+    # tails stay coherent through rms~0.9 (c=3.13), drift at rms=3.17, break at rms=5.18 (Claude).
+    ap.add_argument("--target-kl", type=float, default=0.8)
     ap.add_argument("--target-stat", default="kl_rms",
                     help="calibration statistic to hit target-kl: kl_rms (sqrt mean-square KL "
                          "in nats, whole-distribution, quadratically tail-weighted -- the default) "

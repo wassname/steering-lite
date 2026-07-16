@@ -294,7 +294,7 @@ def calibrate_iso_kl(
     tok,
     prompts: list[str] | list[Tensor] | None = None,
     *,
-    target_kl: float = 0.5,
+    target_kl: float = 0.8,  # highest-coherent-tail kl_rms dose (pca bracket, job 117) (Claude)
     target_stat: str = "kl_rms",
     bracket: tuple[float, float] = (0.001, 256.0),
     tol: float = 0.05,
