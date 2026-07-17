@@ -97,10 +97,20 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
                 aligned["raw_logratios"], opp["raw_logratios"], INTENT,
                 pmass_pos=_pmass(aligned), pmass_neg=_pmass(opp), pmass_base=bare_pmass)
             sif = si_flips(aligned["raw_logratios"], opp["raw_logratios"], INTENT)
+            # Per-direction diagnostic: each arm vs bare (one-sided). A real axis move
+            # is asymmetric (+C toward intent, -C away); if BOTH score positive that is
+            # the generic-disruption signature (any push helps), not steering. (Claude)
+            sel_pos = gated_selectivity(
+                pos["raw_logratios"], bare["raw_logratios"], INTENT,
+                pmass_pos=_pmass(pos), pmass_neg=bare_pmass, pmass_base=bare_pmass)
+            sel_neg = gated_selectivity(
+                neg["raw_logratios"], bare["raw_logratios"], INTENT,
+                pmass_pos=_pmass(neg), pmass_neg=bare_pmass, pmass_base=bare_pmass)
             methods[method] = {
                 "bidirectional": True, "sign": sign,
                 "calibrated_C": d.get("calibrated_C"),
                 "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
+                "sel_pos": sel_pos["sel_gated"], "sel_neg": sel_neg["sel_gated"],
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
             }
@@ -192,19 +202,24 @@ def print_tables(methods: dict) -> None:
     sel_rows = []
     for m in methods:
         s = methods[m]["sel"]
+        sp, sn = methods[m].get("sel_pos"), methods[m].get("sel_neg")
+        smin = min(sp, sn) if (sp is not None and sn is not None) else None
         sel_rows.append([f"{m}{tag(m)}", s["sel_gated"], s["on"], s["off"],
                          s["coherence"], methods[m]["si_flips"],
-                         f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]"])
+                         f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]", sp, sn, smin])
     sel_rows.sort(key=lambda r: (-1e9 if (isinstance(r[1], float) and math.isnan(r[1])) else r[1]),
                   reverse=True)
-    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4], 3), _fmt(r[5]), r[6]]
-                for r in sel_rows]
+    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4], 3), _fmt(r[5]), r[6],
+                 _fmt(r[7]), _fmt(r[8]), _fmt(r[9])] for r in sel_rows]
     print("\n## Gated selectivity (headline; shared with j-steer via moralmaps.metrics)\n")
-    print(tabulate(sel_rows, headers=["method", "sel_gated", "on", "off", "coh", "si_flips", "CI95"],
+    print(tabulate(sel_rows, headers=["method", "sel_gated", "on", "off", "coh", "si_flips",
+                                      "CI95", "s(+C)", "s(-C)", "min"],
                    tablefmt="pipe"))
     print(f"\nsel_gated = (on − {OFF_WEIGHT}·off)·coh²; on = mean signed Δclr on {list(INTENT)} "
           "(Auth↓,Care↑), off = mean|Δclr| over the other 5, coh = min(1, min-arm pmass / base). "
-          "si_flips = signed argmax pick-rate change (behavioral, bounded). CI95 = 2000× row bootstrap.")
+          "si_flips = signed argmax pick-rate change (behavioral, bounded). CI95 = 2000× row bootstrap.\n"
+          "s(+C)/s(-C) = each arm's one-sided sel_gated vs bare; min = the weaker arm (robustness). "
+          "Both arms positive is the generic-disruption signature (any push helps), not a specific axis move.")
 
     # --- Δclr table ---
     dl_rows = []
