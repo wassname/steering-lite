@@ -26,6 +26,7 @@ from .variants.directional_ablation import DirectionalAblationC
 from .variants.chars import CHaRSC
 from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
+from .variants.random import RandomC
 
 __all__ = [
     "SteeringConfig",
@@ -44,6 +45,7 @@ __all__ = [
     "CHaRSC",
     "LinearAcTC",
     "AngularSteeringC",
+    "RandomC",
     "record_activations",
     "train",
     "attach",
