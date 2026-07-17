@@ -300,8 +300,6 @@ def make_persona_pairs(
     rng = random.Random(seed)
     if persona_pairs is None:
         persona_pairs = PERSONA_PAIRS_AUTHORITY
-    pos_personas = [p for p, _ in persona_pairs]
-    neg_personas = [n for _, n in persona_pairs]
     entries = load_suffixes(thinking=thinking)
     n = min(n_pairs, len(entries))
     sampled = rng.sample(entries, n)
@@ -311,8 +309,10 @@ def make_persona_pairs(
     for entry in sampled:
         suffix = entry["suffix"]
         user_msg = entry["user_msg"]
-        pos_user = template.format(persona=rng.choice(pos_personas)) + "\n\n" + user_msg
-        neg_user = template.format(persona=rng.choice(neg_personas)) + "\n\n" + user_msg
+        # draw one tuple so the pair is matched, not roster-crossed (Claude)
+        pos_persona, neg_persona = rng.choice(persona_pairs)
+        pos_user = template.format(persona=pos_persona) + "\n\n" + user_msg
+        neg_user = template.format(persona=neg_persona) + "\n\n" + user_msg
         pos_texts.append(tok.apply_chat_template(
             [{"role": "user", "content": pos_user},
              {"role": "assistant", "content": suffix}],
