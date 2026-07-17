@@ -151,8 +151,9 @@ METHODS = [
 ]
 
 def _make_cfg(method: str, layers: tuple[int, ...], *,
-              sspace_r: int = -1, sspace_target_submodule: str | None = None) -> sl.SteeringConfig:
-    common = dict(layers=layers, coeff=1.0, dtype=torch.bfloat16, seed=0)
+              sspace_r: int = -1, sspace_target_submodule: str | None = None,
+              seed: int = 0) -> sl.SteeringConfig:
+    common = dict(layers=layers, coeff=1.0, dtype=torch.bfloat16, seed=seed)
     sspace_kw: dict = {"r": sspace_r}
     if sspace_target_submodule is not None:
         sspace_kw["target_submodule"] = sspace_target_submodule
@@ -173,6 +174,7 @@ def _make_cfg(method: str, layers: tuple[int, ...], *,
         "chars":                 sl.CHaRSC(**common, k=4),
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
+        "random":                sl.RandomC(**common),
     }
     return table[method]
 
@@ -291,6 +293,9 @@ def main() -> None:
                          "(diagnostic: read off where the trajectory breaks vs the calibrated point).")
     ap.add_argument("--calib-T", type=int, default=60)
     ap.add_argument("--calib-iters", type=int, default=9)
+    ap.add_argument("--seed", type=int, default=0,
+                    help="vector-extraction seed (only the random null uses it; vary to draw "
+                         "the null distribution across seeds).")
     ap.add_argument("--max-think-tokens", type=int, default=256)
     ap.add_argument("--vignettes", default="classic")
     ap.add_argument("--n-vignettes", type=int, default=None,
@@ -398,37 +403,49 @@ def main() -> None:
     _save_traces(args.out / "bare.traces.jsonl", base_report)
     method_summaries.append({"label": "bare", "elapsed_s": bare_elapsed})
 
-    # === (2) prompt_only baseline: POS persona as user-message prefix ======
+    # === (2) prompt_only baseline: persona prefix, BOTH directions ==========
+    # Bidirectional to match the steering rows: POS persona (defy authority) vs
+    # NEG persona (defer to authority), each vs bare. results.py picks the
+    # Auth-aligned arm and scores aligned-minus-opposite, same as steer_*. This
+    # makes prompt_only comparable instead of the weaker persona-vs-bare contrast. (Claude)
     if args.prompt_baseline:
-        pos_persona = PERSONA_PAIRS_AUTHORITY[0][0]
-        persona_prefix = PROMPT_TEMPLATE.format(persona=pos_persona)
-        logger.info(f"\n=== prompt_only (user_prefix='{persona_prefix}') ===")
-        wrapped_tok = _UserPrefixTok(tok, persona_prefix)
+        pos_persona, neg_persona = PERSONA_PAIRS_AUTHORITY[0]
         pb_t0 = time.time()
-        pb_report = evaluate_multibool(model, wrapped_tok, name=args.vignettes,
-                                       n_vignettes=args.n_vignettes,
-                                       max_think_tokens=args.max_think_tokens,
-                                       batch_size=args.eval_batch_size)
-        pb_dclr = dclr_per_foundation(base_report, pb_report)
+        arms: dict[str, dict] = {}
+        for tag, persona in (("pos", pos_persona), ("neg", neg_persona)):
+            persona_prefix = PROMPT_TEMPLATE.format(persona=persona)
+            logger.info(f"\n=== prompt_only[{tag}] (user_prefix='{persona_prefix}') ===")
+            wrapped_tok = _UserPrefixTok(tok, persona_prefix)
+            report = evaluate_multibool(model, wrapped_tok, name=args.vignettes,
+                                        n_vignettes=args.n_vignettes,
+                                        max_think_tokens=args.max_think_tokens,
+                                        batch_size=args.eval_batch_size)
+            dclr = dclr_per_foundation(base_report, report)
+            arms[tag] = {
+                "coeff": None, "persona": persona,
+                "dclr_per_foundation": dclr,
+                "axis_shift": axis_shift(dclr),
+                "raw_logratios": report["raw_logratios"],
+                "raw_pmass": report["raw_pmass"],
+                **_scalar_metrics(report),
+            }
+            _save_traces(args.out / f"prompt_only.{tag}.traces.jsonl", report)
         pb_elapsed = time.time() - pb_t0
-        rows.append(_row_steer("prompt_only", pb_dclr, elapsed_s=pb_elapsed))
+        # inline monitoring row: the POS-persona arm (the intended defy-authority direction)
+        rows.append(_row_steer("prompt_only", arms["pos"]["dclr_per_foundation"],
+                               elapsed_s=pb_elapsed))
 
         (args.out / "prompt_only.json").write_text(json.dumps({
             "label": "prompt_only",
-            "meta": meta,
-            "model": args.model,
-            "coeff": None,
-            "user_prefix": persona_prefix, "vignettes": args.vignettes,
-            "dclr_per_foundation": pb_dclr,
-            "axis_shift": axis_shift(pb_dclr),
-            "raw_logratios": pb_report["raw_logratios"],
-            "raw_pmass": pb_report["raw_pmass"],
-            **_scalar_metrics(pb_report),
+            "meta": meta, "model": args.model,
+            "calibrated_C": None, "coeff": None,
+            "vignettes": args.vignettes,
+            "pos": arms["pos"], "neg": arms["neg"],
             "elapsed_s": pb_elapsed,
         }, indent=2))
-        _save_traces(args.out / "prompt_only.traces.jsonl", pb_report)
         method_summaries.append({"label": "prompt_only",
-                                 "axis_shift": axis_shift(pb_dclr),
+                                 "axis_shift_pos": arms["pos"]["axis_shift"],
+                                 "axis_shift_neg": arms["neg"]["axis_shift"],
                                  "elapsed_s": pb_elapsed})
 
     headers = (["cue", "axis", "row", "C_calib", args.target_stat]
@@ -443,7 +460,8 @@ def main() -> None:
     for method in tqdm(args.methods, desc="methods", mininterval=60):
         cfg = _make_cfg(method, layers,
                         sspace_r=args.sspace_r,
-                        sspace_target_submodule=args.sspace_target_submodule)
+                        sspace_target_submodule=args.sspace_target_submodule,
+                        seed=args.seed)
         logger.info(f"\n=== steer_{method} ===")
         t0 = time.time()
         v = sl.train(model, tok, pos_prompts, neg_prompts, cfg,
