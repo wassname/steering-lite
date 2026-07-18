@@ -28,6 +28,16 @@ from .config import SteeringConfig
 from .vector import Vector
 
 
+def _ngram_rep(ids: list[int], n: int = 3) -> float:
+    """Fraction of n-grams in a rollout that are repeats (0 = all unique, ->1 = looping).
+    Mirrors the signal NoRepeatNGramLogitsProcessor acts on: a -C dose that collapses into
+    'I should not ...' x200 shows rep ~1. (Claude, wassname request 2026-07-18)"""
+    if len(ids) < n + 1:
+        return 0.0
+    grams = [tuple(ids[i:i + n]) for i in range(len(ids) - n + 1)]
+    return 1.0 - len(set(grams)) / len(grams)
+
+
 def _log_kl_history(method: str, history: list[dict]) -> None:
     """Tabulate the iso-KL bracket trace once at end of calibrate. Sorted by c
     so monotonicity is visually obvious; 'i' column preserves eval order."""
@@ -36,12 +46,17 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
     indexed = [(i, h) for i, h in enumerate(history)]
     indexed.sort(key=lambda ih: ih[1]["coeff"])
     rows = [
-        [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_p90']:.4f}",
-         f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos'])]
+        [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}",
+         f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}",
+         f"{h['rep']:.2f}", f"{h['gen_len']:.0f}", str(h['n_pos'])]
         for i, h in indexed
     ]
-    table = tabulate(rows, headers=["i", "c", "mean", "p90", "p95", "max", "n"], tablefmt="plain")
-    logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
+    table = tabulate(rows, headers=["i", "c", "mean", "p95", "max", "rep", "len", "n"],
+                     tablefmt="plain")
+    logger.info(f"\n--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n"
+                "SHOULD: rep (worst 3-gram repeat frac over calib rollouts) near bare; a jump "
+                "means the dose drives a repetition loop. len = mean rollout tokens before EOS.\n"
+                f"{table}")
 
 
 def _log_per_t_profile(method: str, c: float, per_t_p50: list[float],
@@ -182,6 +197,7 @@ def measure_kl(
     """
     prompts = _tokenize(prompts, tok)
     all_kls = []
+    gen_lens, reps = [], []          # per-prompt rollout length + 3-gram repetition
     per_t = [[] for _ in range(T)]
     need_base_gen = log_demo or demo_log_path is not None
 
@@ -192,6 +208,8 @@ def measure_kl(
         n_gen = gen.shape[0]
         if n_gen == 0:
             continue
+        gen_lens.append(n_gen)
+        reps.append(_ngram_rep(gen.tolist()))
         full_ids = torch.cat([pids.to(device), gen])
         full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
@@ -253,6 +271,8 @@ def measure_kl(
         "kl_p95": float(cat.quantile(0.95)),
         "kl_max": float(cat.max()),
         "n_pos": int(cat.numel()),
+        "gen_len": (sum(gen_lens) / len(gen_lens)) if gen_lens else 0.0,
+        "rep": max(reps) if reps else 0.0,   # worst-prompt 3-gram repetition (loop tail)
         "per_t_mean": [sum(xs) / len(xs) if xs else 0.0 for xs in per_t],
         "per_t_p50":  [_q(xs, 0.50) for xs in per_t],
         "per_t_p90":  [_q(xs, 0.90) for xs in per_t],
