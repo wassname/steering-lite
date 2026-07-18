@@ -45,12 +45,13 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
     # the verbose demo. (Claude 2026-07-16)
     rows = [
         [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_rms']:.4f}",
-         f"{h['kl_r4ms4e']:.4f}", f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos']),
+         f"{h['kl_r4ms4e']:.4f}", f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}",
+         f"{h.get('rep', 0.0):.2f}", f"{h.get('gen_len', 0.0):.0f}", str(h['n_pos']),
          h["steer_tail"]]
         for i, h in indexed
     ]
-    table = tabulate(rows, headers=["i", "c", "mean", "rms", "r4ms4e", "p95", "max", "n",
-                                    "steer tail (prompt 0)"], tablefmt="plain")
+    table = tabulate(rows, headers=["i", "c", "mean", "rms", "r4ms4e", "p95", "max",
+                                    "rep", "len", "n", "steer tail (prompt 0)"], tablefmt="plain")
     logger.info(
         f"SHOULD: choose the highest C with a coherent tail; a repetition tail "
         f"('but but but') or gibberish marks where the dose is too hot -- read that "
@@ -158,6 +159,16 @@ def _kl_per_pos(logp_steer: Tensor, logp_base: Tensor) -> Tensor:
     return (p_s * (logp_steer - logp_base)).sum(dim=-1)
 
 
+def _ngram_rep(ids: list[int], n: int = 3) -> float:
+    """Fraction of repeated n-grams in a token id list: 1 - unique/total. ~1.0 for a
+    degenerate 'but but but' loop, ~0 for varied text. Mirrors what NoRepeatNGramLogits-
+    Processor acts on, so a -C dose that collapses into repetition is visible pre-eval."""
+    grams = [tuple(ids[i:i + n]) for i in range(len(ids) - n + 1)]
+    if not grams:
+        return 0.0
+    return 1.0 - len(set(grams)) / len(grams)
+
+
 @torch.no_grad()
 def _generate(model, prompt_ids, T, tok, do_sample, device):
     pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
@@ -198,6 +209,7 @@ def measure_kl(
     prompts = _tokenize(prompts, tok)
     all_kls = []
     per_t = [[] for _ in range(T)]
+    gen_lens, reps = [], []  # per-prompt rollout length + worst 3-gram repetition fraction
     steer_tail = ""  # prompt-0 steered rollout tail, for the always-on bracket table (Claude)
     need_base_gen = log_demo or demo_log_path is not None
 
@@ -208,6 +220,8 @@ def measure_kl(
         n_gen = gen.shape[0]
         if n_gen == 0:
             continue
+        gen_lens.append(n_gen)
+        reps.append(_ngram_rep(gen.tolist()))
         full_ids = torch.cat([pids.to(device), gen])
         full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
@@ -285,6 +299,8 @@ def measure_kl(
         "kl_p95": float(cat.quantile(0.95)),
         "kl_max": float(cat.max()),
         "n_pos": int(cat.numel()),
+        "gen_len": (sum(gen_lens) / len(gen_lens)) if gen_lens else 0.0,  # mean rollout length
+        "rep": max(reps) if reps else 0.0,   # worst-prompt 3-gram repetition (loop tail)
         "per_t_mean": [sum(xs) / len(xs) if xs else 0.0 for xs in per_t],
         "per_t_p50":  [_q(xs, 0.50) for xs in per_t],
         "per_t_p90":  [_q(xs, 0.90) for xs in per_t],
