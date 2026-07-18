@@ -45,16 +45,16 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
     # the verbose demo. (Claude 2026-07-16)
     rows = [
         [str(i), f"{h['coeff']:+.4f}", f"{h['kl_mean']:.4f}", f"{h['kl_rms']:.4f}",
-         f"{h['kl_p90']:.4f}", f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos']),
+         f"{h['kl_r4ms4e']:.4f}", f"{h['kl_p95']:.5f}", f"{h['kl_max']:.4f}", str(h['n_pos']),
          h["steer_tail"]]
         for i, h in indexed
     ]
-    table = tabulate(rows, headers=["i", "c", "mean", "rms", "p90", "p95", "max", "n",
+    table = tabulate(rows, headers=["i", "c", "mean", "rms", "r4ms4e", "p95", "max", "n",
                                     "steer tail (prompt 0)"], tablefmt="plain")
     logger.info(
         f"SHOULD: choose the highest C with a coherent tail; a repetition tail "
         f"('but but but') or gibberish marks where the dose is too hot -- read that "
-        f"row's rms as the target_kl for future runs.\n"
+        f"row's r4ms4e as the target_kl for future runs.\n"
         f"--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
@@ -273,6 +273,12 @@ def measure_kl(
         # reasoning), but far less noisy than a p95 quantile over few tokens. Reported in
         # nats so target_kl and the table columns are all one unit. (wassname + Claude)
         "kl_rms": float(cat.pow(2).mean().sqrt()),
+        # kl_r4ms4e = (mean(KL^4))^(1/4) in nats: like kl_rms but quartically tail-weighted,
+        # so a localized front/tail spike that rms dilutes across all tokens still shows. The
+        # 4th root keeps the nats scale (no shrink near 0), and it equals max(mean, rms, l4) by
+        # the power-mean inequality. New default target: catches the derail spike rms averages
+        # away, without a noisy p95 quantile. (wassname + Claude 2026-07-18)
+        "kl_r4ms4e": float(cat.pow(4).mean().pow(0.25)),
         "steer_tail": steer_tail,
         "kl_p50": float(cat.quantile(0.50)),
         "kl_p90": float(cat.quantile(0.90)),
