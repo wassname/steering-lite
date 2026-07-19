@@ -130,6 +130,7 @@ def evaluate_with_vector(
       - wrongness:     mean (1 - p[social]) across rows  ∈ [0,1]
       - mean_margin:   mean margin over rows (nats)        -- main OOD signal
       - informedness:  macro Youden's J vs label argmax, in [-1,1] (None if no labels)
+      - T:             fitted readout temperature (50 means the fit hit its cap)
       - top1_acc:      argmax-match vs label argmax        (None if no labels)
       - table:         per-foundation pandas DataFrame from tinymfv
       - info:          diagnostics dict
@@ -152,6 +153,7 @@ def evaluate_with_vector(
         "mean_margin": mean_margin,
         "mean_pmass_allowed": rep["mean_pmass_allowed"],  # coherence: mass on valid answer tokens (gate input)
         "informedness": rep["informedness"],
+        "T": rep["T"],
         "top1_acc": rep["top1_acc"],
         "table": rep["table"],
         "info": rep["info"],

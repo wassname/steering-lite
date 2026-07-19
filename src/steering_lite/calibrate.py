@@ -377,26 +377,25 @@ def calibrate_iso_kl(
     POST_ELBOW_RATIO = 5.0  # log demo when this iter blew past target
 
     def _finalize(returned_coeff: float):
-        """Log bracket trace + per-t profile for the returned coeff, close
+        """Measure and persist the returned coeff, log its profile, then close
         progress bar. Per-t profile lets us see whether KL is front-loaded
         (T calibration generalizes) or ramping (T calibration undershoots
         long-form inference)."""
-        _log_kl_history(v.cfg.method, history)
-        match = next((h for h in history if abs(h["coeff"] - returned_coeff) < 1e-9), None)
-        if match is None and history:
-            match = min(history, key=lambda h: abs(h["coeff"] - returned_coeff))
-        if match is not None and "per_t_p95" in match:
-            _log_per_t_profile(
-                v.cfg.method, match["coeff"],
-                match["per_t_p50"], match["per_t_p90"],
-                match["per_t_p95"], match["per_t_max"], match["per_t_n"],
-            )
-        # Demo at the calibrated coeff (1x target) -- the most useful snapshot.
-        # The post-elbow demo above shows collapse; this shows the operating point.
+        # Claude 2026-07-19: this call already existed for the final demo, but its
+        # metrics were discarded and callers reported the nearest bracket row instead.
         v.cfg.coeff = returned_coeff
-        measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
-                   show_pbar=False, log_demo=True, demo_log_path=demo_log_path,
-                   demo_iter=-1)
+        final = measure_kl(
+            v, model, tok, prompts, T=T, do_sample=True, device=device,
+            show_pbar=False, log_demo=True, demo_log_path=demo_log_path, demo_iter=-1)
+        match = {"coeff": returned_coeff, "coeff_abs": abs(returned_coeff),
+                 "sign": sign, "final": True, **final}
+        history.append(match)
+        _log_kl_history(v.cfg.method, history)
+        _log_per_t_profile(
+            v.cfg.method, match["coeff"],
+            match["per_t_p50"], match["per_t_p90"],
+            match["per_t_p95"], match["per_t_max"], match["per_t_n"],
+        )
         pbar.close()
 
     def eval_at(c: float) -> float:
