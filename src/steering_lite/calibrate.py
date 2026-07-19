@@ -577,6 +577,10 @@ def _chk_json_ans4(t: str) -> bool:
 
 
 def _chk_yes_no(t: str) -> bool:
+    # deliberately lenient (yes/no ANYWHERE, not the first word the probe asks for): a
+    # thinking model emits <think> reasoning first, so "first word" is not literally YES/NO.
+    # Cost: an incidental "no" in reasoning passes, so this probe rarely flags a regression;
+    # it is diversity, the rep/conf/len guards and the two JSON probes carry the gate.
     return re.search(r"\b(yes|no)\b", t, re.I) is not None
 
 
@@ -693,7 +697,9 @@ def _log_dose_trace(method: str, history: list[dict], pick: float) -> None:
         "SHOULD: verdict PASS up to the pick, FAIL above it (correctly bounded). A FAIL at "
         "the smallest dose = vector is degenerate; all-PASS to bracket top = intervention "
         "weaker than budget. repx=(1+rep)/(1+rep_base), confx=conf/conf_base (self-confidence), "
-        "lenx=len/len_base; complete = probes whose format check passed.\n"
+        "lenx=len/len_base; complete = probes whose format check passed. LIMIT: confx only "
+        "flags confidence DROPS -- a confident non-repeating drift (rep low, conf high) can "
+        "slip PASS, so read the picked-dose demo, do not trust the verdict alone.\n"
         f"{table}\npick: c={pick:+.4f} (largest PASS)")
 
 
@@ -766,11 +772,17 @@ def calibrate_dose(
         c *= grow
 
     if first_fail is None:                 # never failed: intervention weaker than budget
+        # the grow-ladder stops at the largest lo*grow^k <= hi, which is < hi (e.g.
+        # 0.001*4^8~65 for the default bracket), so report the actual max coherent dose
+        # tested (last_pass), not hi -- the top ~grow-x of the bracket was never probed.
         pick = sign * (last_pass if last_pass is not None else hi)
-        logger.warning(f"calibrate_dose {v.cfg.method}: every dose up to bracket top "
-                       f"c={hi:.2f} PASSED -- intervention weaker than the coherence budget; "
-                       "returning bracket-top.")
+        logger.warning(f"calibrate_dose {v.cfg.method}: every ladder dose up to c={last_pass:.3f} "
+                       f"(largest lo*grow^k <= hi={hi:.1f}) PASSED -- intervention weaker than the "
+                       "coherence budget; returning that dose (a higher one may also be coherent).")
     elif last_pass is None:                # failed at the very first (smallest) dose
+        # NB: run_sweep._achieved reads the final row by `final` only, so this suspect floor
+        # dose flows downstream like a normal calibration -- but its achieved kl_rms ~= 0 and
+        # C ~= lo self-signal the degeneracy in the artifact. Warning also lands in run.log.
         pick = sign * lo
         logger.warning(f"calibrate_dose {v.cfg.method}: FAILED at the smallest dose "
                        f"c={lo:.4f} ({history[-1]['verdict']}) -- vector degrades behavior at "
