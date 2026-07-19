@@ -8,12 +8,13 @@ Two functions:
   regime, so log-log slope is ~2 and secant converges in ~3-5 iters (vs ~10 for
   pure bisection).
 
-Recommended: greedy decode, target_stat="kl_rms".
+Recommended: seeded sampling with the same random stream at every bracket point,
+target_stat="kl_rms". This exposes sampled rollout basins without making the solver
+chase unrelated decode noise. (Claude, 2026-07-19)
 kl_rms = sqrt(mean per-token KL^2) in nats: whole-distribution, quadratically
 tail-weighted (the square inside penalizes tail tokens that derail reasoning),
 but reported in nats so it sits directly alongside kl_mean/p95/max rather than
-the nats^2 of a raw mean-square. Greedy makes the statistic deterministic so the
-solver doesn't fight noise.
+the nats^2 of a raw mean-square.
 """
 from __future__ import annotations
 import json
@@ -195,6 +196,7 @@ def measure_kl(
     demo_log_path: Path | None = None,
     demo_iter: int | None = None,
     verbose_demo: bool = False,
+    seed: int | None = None,
 ) -> dict:
     """Roll out T tokens with steering attached, then score under base
     (detached) and steer (re-attached). Returns KL summary stats and per-token
@@ -205,6 +207,7 @@ def measure_kl(
       demo_log_path  : if set, append one JSONL line per (iter, prompt) with
                        full base text, steer text, and per-position KL.
       demo_iter      : iteration index, written into JSONL records (cosmetic).
+      seed           : pair each prompt's sampled RNG stream across calls. (Claude)
     """
     prompts = _tokenize(prompts, tok)
     all_kls = []
@@ -215,6 +218,8 @@ def measure_kl(
 
     for idx, pids in enumerate(tqdm(prompts, desc="measure_kl",
                                     mininterval=60, disable=not show_pbar)):
+        if seed is not None:
+            torch.manual_seed(seed + idx)
         with v(model):
             gen = _generate(model, pids, T, tok, do_sample, device)
         n_gen = gen.shape[0]
@@ -328,6 +333,7 @@ def calibrate_iso_kl(
     sign_probe_c: float = 1.0,
     demo_log_path: Path | None = None,
     verbose_demo: bool = False,
+    seed: int = 0,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -355,6 +361,9 @@ def calibrate_iso_kl(
     JSONL line per prompt with the full base/steer text and per-position KL.
     Lets us inspect *what* the model output looks like across the calibration
     sweep — useful for spotting where format collapse begins.
+
+    `seed`: every bracket and final measurement starts from this same RNG state,
+    pairing sampled rollouts across coefficients. (Claude, 2026-07-19)
     """
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
@@ -386,7 +395,8 @@ def calibrate_iso_kl(
         v.cfg.coeff = returned_coeff
         final = measure_kl(
             v, model, tok, prompts, T=T, do_sample=True, device=device,
-            show_pbar=False, log_demo=True, demo_log_path=demo_log_path, demo_iter=-1)
+            show_pbar=False, log_demo=True, demo_log_path=demo_log_path, demo_iter=-1,
+            seed=seed)
         match = {"coeff": returned_coeff, "coeff_abs": abs(returned_coeff),
                  "sign": sign, "final": True, **final}
         history.append(match)
@@ -409,7 +419,7 @@ def calibrate_iso_kl(
         log_demo = verbose_demo or is_first or not post_elbow_hit_yet
         m = measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
                        show_pbar=False, log_demo=log_demo, verbose_demo=verbose_demo,
-                       demo_log_path=demo_log_path, demo_iter=iter_idx["n"])
+                       demo_log_path=demo_log_path, demo_iter=iter_idx["n"], seed=seed)
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})
         logger.debug(f"  c={sign * c:+.4f} mean={m['kl_mean']:.4f} rms={m['kl_rms']:.4f} "
                      f"p90={m['kl_p90']:.4f} p95={m['kl_p95']:.5f} "
