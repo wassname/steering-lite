@@ -299,6 +299,7 @@ def calibrate_iso_kl(
     sign_probe: Callable[[Vector], float] | None = None,
     sign_probe_c: float = 1.0,
     demo_log_path: Path | None = None,
+    do_sample: bool = False,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -365,7 +366,7 @@ def calibrate_iso_kl(
         # Demo at the calibrated coeff (1x target) -- the most useful snapshot.
         # The post-elbow demo above shows collapse; this shows the operating point.
         v.cfg.coeff = returned_coeff
-        measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
+        measure_kl(v, model, tok, prompts, T=T, do_sample=do_sample, device=device,
                    show_pbar=False, log_demo=True, demo_log_path=demo_log_path,
                    demo_iter=-1)
         pbar.close()
@@ -379,7 +380,13 @@ def calibrate_iso_kl(
             h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl for h in history
         )
         log_demo = is_first or not post_elbow_hit_yet
-        m = measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
+        # do_sample defaults False (greedy/argmax): the module docstring's own
+        # recommendation, previously contradicted by a hardcoded True here. Unseeded
+        # sampling gave each coefficient a DIFFERENT random trajectory set, so the
+        # solver chased noise and could settle on a lucky-low draw. Greedy makes
+        # stat(C) deterministic; greedy loops are a known cost and correlate with
+        # sampled instability anyway (wassname 2026-07-19).
+        m = measure_kl(v, model, tok, prompts, T=T, do_sample=do_sample, device=device,
                        show_pbar=False, log_demo=log_demo,
                        demo_log_path=demo_log_path, demo_iter=iter_idx["n"])
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})
