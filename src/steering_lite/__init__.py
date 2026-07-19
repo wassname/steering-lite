@@ -7,7 +7,7 @@ if _os.environ.get("BEARTYPE"):
 from .config import SteeringConfig, REGISTRY, register
 from .extract import record_activations
 from .attach import attach, detach, save, load, train
-from .calibrate import measure_kl, calibrate_iso_kl
+from .calibrate import measure_kl, calibrate_iso_kl, calibrate_dose
 from . import variants  # noqa: F401  triggers method + config registration
 from .vector import Vector
 
@@ -54,6 +54,7 @@ __all__ = [
     "load",
     "measure_kl",
     "calibrate_iso_kl",
+    "calibrate_dose",
     "REGISTRY",
     "register",
     "Vector",
