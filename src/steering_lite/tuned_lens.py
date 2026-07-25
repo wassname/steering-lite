@@ -23,43 +23,38 @@ from loguru import logger
 from torch import Tensor, nn
 
 
-@torch.no_grad()
-def collect_pairs(
-    model: nn.Module,
-    tok,
-    texts: list[str],
-    layers: tuple[int, ...],
-    *,
-    batch_size: int = 8,
-    max_length: int = 128,
-) -> tuple[dict[int, Tensor], Tensor]:
-    """Residuals at each layer and at the end, one row per real token position."""
-    device = next(model.parameters()).device
-    per_layer: dict[int, list[Tensor]] = {layer: [] for layer in layers}
-    finals: list[Tensor] = []
-    for start in range(0, len(texts), batch_size):
-        batch = texts[start : start + batch_size]
-        enc = tok(
-            batch, return_tensors="pt", padding=True, truncation=True, max_length=max_length
-        ).to(device)
-        hidden = model(**enc, output_hidden_states=True).hidden_states
-        keep = enc["attention_mask"].bool().flatten()
-        for layer in layers:
-            per_layer[layer].append(hidden[layer].flatten(0, 1)[keep].float().cpu())
-        finals.append(hidden[-1].flatten(0, 1)[keep].float().cpu())
-    return {l: torch.cat(rows) for l, rows in per_layer.items()}, torch.cat(finals)
+class RidgeAccumulator:
+    """Sufficient statistics for Y ~ X A^T + b, so nothing has to hold the activations.
 
+    Storing them is what makes this run out of memory: 6 layers of 65k tokens at d=3584 is 5.6GB,
+    doubled by the concatenate. The normal equations only need X^T X and X^T Y, which are d x d
+    regardless of how many tokens go through.
+    """
 
-def fit_ridge(
-    X: Float[Tensor, "n d"], Y: Float[Tensor, "n d"], ridge: float = 1.0
-) -> tuple[Tensor, Tensor]:
-    """Least-squares A, b with Y ~ X A^T + b, solved on the centred covariance."""
-    x_mean, y_mean = X.mean(0), Y.mean(0)
-    Xc, Yc = X - x_mean, Y - y_mean
-    gram = Xc.T @ Xc
-    gram.diagonal().add_(ridge * gram.diagonal().mean())
-    A = torch.linalg.solve(gram, Xc.T @ Yc).T
-    return A, y_mean - A @ x_mean
+    def __init__(self, d: int, device: str = "cpu"):
+        self.xtx = torch.zeros(d, d, dtype=torch.float64, device=device)
+        self.xty = torch.zeros(d, d, dtype=torch.float64, device=device)
+        self.sum_x = torch.zeros(d, dtype=torch.float64, device=device)
+        self.sum_y = torch.zeros(d, dtype=torch.float64, device=device)
+        self.n = 0
+
+    def update(self, X: Float[Tensor, "n d"], Y: Float[Tensor, "n d"]) -> None:
+        X, Y = X.to(self.xtx.dtype), Y.to(self.xtx.dtype)
+        self.xtx += X.T @ X
+        self.xty += X.T @ Y
+        self.sum_x += X.sum(0)
+        self.sum_y += Y.sum(0)
+        self.n += X.shape[0]
+
+    def solve(self, ridge: float = 1.0) -> tuple[Tensor, Tensor]:
+        if self.n == 0:
+            raise ValueError("no rows reached the fit; holdout_rows swallowed the whole corpus")
+        mean_x, mean_y = self.sum_x / self.n, self.sum_y / self.n
+        gram = self.xtx - self.n * torch.outer(mean_x, mean_x)
+        cross = self.xty - self.n * torch.outer(mean_x, mean_y)
+        gram.diagonal().add_(ridge * gram.diagonal().mean())
+        A = torch.linalg.solve(gram, cross).T
+        return A.float().cpu(), (mean_y - A @ mean_x).float().cpu()
 
 
 class TunedLens:
@@ -69,6 +64,7 @@ class TunedLens:
         self.translators = translators
 
     @classmethod
+    @torch.no_grad()
     def fit(
         cls,
         model: nn.Module,
@@ -79,21 +75,50 @@ class TunedLens:
         batch_size: int = 8,
         max_length: int = 128,
         ridge: float = 1.0,
+        holdout_rows: int = 4096,
     ) -> "TunedLens":
-        per_layer, finals = collect_pairs(
-            model, tok, texts, layers, batch_size=batch_size, max_length=max_length
-        )
+        device = next(model.parameters()).device
+        d_model = model.config.hidden_size
+        accumulators = {layer: RidgeAccumulator(d_model, device=str(device)) for layer in layers}
+        held: dict[int, list[Tensor]] = {layer: [] for layer in layers}
+        held_final: list[Tensor] = []
+        held_rows = 0
+
+        for start in range(0, len(texts), batch_size):
+            batch = texts[start : start + batch_size]
+            enc = tok(
+                batch, return_tensors="pt", padding=True, truncation=True, max_length=max_length
+            ).to(device)
+            hidden = model(**enc, output_hidden_states=True).hidden_states
+            keep = enc["attention_mask"].bool().flatten()
+            final = hidden[-1].flatten(0, 1)[keep].float()
+            # The first batches are held out, so r2 is measured on rows the fit never saw.
+            to_holdout = held_rows < holdout_rows
+            if to_holdout:
+                held_final.append(final.cpu())
+                held_rows += final.shape[0]
+            for layer in layers:
+                rows = hidden[layer].flatten(0, 1)[keep].float()
+                if to_holdout:
+                    held[layer].append(rows.cpu())
+                else:
+                    accumulators[layer].update(rows, final)
+
         translators = {}
         logger.info(
-            "SHOULD: r2 rises with depth and is well above 0 at every layer, since a later residual "
-            "predicts the final one better. ELSE the fit is rank-starved and the readout is noise."
+            "SHOULD: held-out r2 is well above 0 at every layer and rises with depth, since a later "
+            "residual predicts the final one better. ELSE the fit is rank-starved and reads as noise."
         )
+        Y_held = torch.cat(held_final)
         for layer in layers:
-            X, Y = per_layer[layer], finals
-            A, b = fit_ridge(X, Y, ridge=ridge)
-            residual = Y - (X @ A.T + b)
-            r2 = 1.0 - residual.var(0).sum().item() / Y.var(0).sum().item()
-            logger.info(f"  layer {layer:>3}  n={len(X):>7}  r2={r2:+.3f}")
+            A, b = accumulators[layer].solve(ridge=ridge)
+            X_held = torch.cat(held[layer])
+            residual = Y_held - (X_held @ A.T + b)
+            r2 = 1.0 - residual.var(0).sum().item() / Y_held.var(0).sum().item()
+            logger.info(
+                f"  layer {layer:>3}  n_fit={accumulators[layer].n:>7}  "
+                f"n_held={len(X_held):>6}  r2={r2:+.3f}"
+            )
             translators[layer] = (A, b)
         return cls(translators)
 
