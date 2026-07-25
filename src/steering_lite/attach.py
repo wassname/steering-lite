@@ -199,7 +199,17 @@ def train(
     if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
         cfg.target_submodule = method.default_target_submodule
     targets = find_targets(model, cfg)
-    if cfg.target_submodule is not None:
+    if getattr(method, "extract_from_prompts", False):
+        extracted = method.extract(
+            model,
+            tok,
+            pos_prompts,
+            neg_prompts,
+            cfg,
+            batch_size=batch_size,
+            max_length=max_length,
+        )
+    elif cfg.target_submodule is not None:
         from .extract_linear import record_linear_inputs, record_linear_outputs
         name_to_module = {full_name: mod for full_name, mod, _ in targets}
         recorder = record_linear_inputs if getattr(method, "record_linear_inputs", False) else record_linear_outputs

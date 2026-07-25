@@ -20,7 +20,7 @@ METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random",
+    "angular_steering", "random", "vjp_delta",
 ]
 
 POS = [
@@ -58,6 +58,9 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
         "random":                sl.RandomC(**common),
+        "vjp_delta":             sl.VjpDeltaC(
+            **(common | {"layers": (0,)}), target_layer=-1, skip_first=0
+        ),
     }
     return table[method]
 
@@ -122,7 +125,7 @@ def test_pipeline(method, tiny_model, tmp_path):
 
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
 MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_damp_amp",
-            "super_sspace", "topk_clusters", "random"]
+            "super_sspace", "topk_clusters", "random", "vjp_delta"]
 # methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
 MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
               "chars", "linear_act", "angular_steering", "corda_pca"]

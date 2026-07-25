@@ -27,6 +27,7 @@ from .variants.chars import CHaRSC
 from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
 from .variants.random import RandomC
+from .variants.vjp_delta import VjpDeltaC
 
 __all__ = [
     "SteeringConfig",
@@ -46,6 +47,7 @@ __all__ = [
     "LinearAcTC",
     "AngularSteeringC",
     "RandomC",
+    "VjpDeltaC",
     "record_activations",
     "train",
     "attach",
