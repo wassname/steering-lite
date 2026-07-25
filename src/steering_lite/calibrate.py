@@ -335,6 +335,7 @@ def calibrate_iso_kl(
     demo_log_path: Path | None = None,
     verbose_demo: bool = False,
     seed: int = 0,
+    do_sample: bool = True,
 ) -> tuple[float, list[dict]]:
     """Find coeff C such that stat(C) ~= target_kl using log-log Illinois
     (regula falsi with stale-endpoint reweighting) within a guarded bracket.
@@ -364,7 +365,8 @@ def calibrate_iso_kl(
     sweep — useful for spotting where format collapse begins.
 
     `seed`: every bracket and final measurement starts from this same RNG state,
-    pairing sampled rollouts across coefficients. (Claude, 2026-07-19)
+    pairing sampled rollouts across coefficients when `do_sample=True`.
+    (Claude 2026-07-19; sampling qualification Codex 2026-07-25)
     """
     prompts = _tokenize(prompts, tok)
     history: list[dict] = []
@@ -395,7 +397,7 @@ def calibrate_iso_kl(
         # metrics were discarded and callers reported the nearest bracket row instead.
         v.cfg.coeff = returned_coeff
         final = measure_kl(
-            v, model, tok, prompts, T=T, do_sample=True, device=device,
+            v, model, tok, prompts, T=T, do_sample=do_sample, device=device,
             show_pbar=False, log_demo=True, demo_log_path=demo_log_path, demo_iter=-1,
             seed=seed)
         match = {"coeff": returned_coeff, "coeff_abs": abs(returned_coeff),
@@ -418,7 +420,7 @@ def calibrate_iso_kl(
             h.get(target_stat, 0.0) > POST_ELBOW_RATIO * target_kl for h in history
         )
         log_demo = verbose_demo or is_first or not post_elbow_hit_yet
-        m = measure_kl(v, model, tok, prompts, T=T, do_sample=True, device=device,
+        m = measure_kl(v, model, tok, prompts, T=T, do_sample=do_sample, device=device,
                        show_pbar=False, log_demo=log_demo, verbose_demo=verbose_demo,
                        demo_log_path=demo_log_path, demo_iter=iter_idx["n"], seed=seed)
         history.append({"coeff": sign * c, "coeff_abs": c, "sign": sign, **m})

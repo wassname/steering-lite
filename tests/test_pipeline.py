@@ -96,7 +96,7 @@ def test_pipeline(method, tiny_model, tmp_path):
     coeff, _hist = sl.calibrate_iso_kl(
         v, model, tok, calib_ids,
         target_kl=1.0, T=5, max_iters=4,
-        bracket=(0.05, 4.0), device="cpu",
+        bracket=(0.05, 4.0), device="cpu", do_sample=False,
     )
     assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
 
