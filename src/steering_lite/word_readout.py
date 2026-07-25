@@ -34,7 +34,9 @@ def _residual_directions(v, layer, name, tensor, d_model, stacked):
     matrices in `shared` are bases, not directions, so they stay out.
     """
     direction = tensor.sum(0) if stacked else tensor
-    shared = v.shared[layer]
+    # A layer with no shared parts is absent after a save/load round-trip, present as {} when freshly
+    # built. Only the sspace family reads this at all.
+    shared = v.shared.get(layer, {})
     if name == "dS" and {"U_r", "sqrtS"} <= set(shared):
         direction = (direction * shared["sqrtS"]) @ shared["U_r"].T
     if direction.ndim == 1 and direction.numel() == d_model:
