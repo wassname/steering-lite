@@ -25,6 +25,10 @@ def is_word_token(text: str) -> bool:
     )
 
 
+# Entries in `shared` that are [d_model] but are not residual directions.
+NOT_DIRECTIONS = {"sqrtS", "sigma", "p"}
+
+
 def _residual_directions(v, layer, name, tensor, d_model, stacked):
     """Every readable [d_model] row this tensor carries, as (suffix, direction) pairs.
 
@@ -33,6 +37,10 @@ def _residual_directions(v, layer, name, tensor, d_model, stacked):
     once (topk_clusters' C is one row per cluster, angular_steering's b1/b2 span a plane). Square
     matrices in `shared` are bases, not directions, so they stay out.
     """
+    # sqrtS is a per-coordinate scale in S-space, not a direction in residual space, so lensing it
+    # produces words that mean nothing. Shape alone cannot tell the two apart: both are [d_model].
+    if not stacked and name in NOT_DIRECTIONS:
+        return []
     direction = tensor.sum(0) if stacked else tensor
     # A layer with no shared parts is absent after a save/load round-trip, present as {} when freshly
     # built. Only the sspace family reads this at all.
