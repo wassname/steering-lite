@@ -102,7 +102,9 @@ class TunedLens:
                 held_final.append(final.cpu())
                 held_rows += final.shape[0]
             for layer in layers:
-                rows = hidden[layer].flatten(0, 1)[keep].float()
+                # hidden_states[i] is the output of block i-1, while extraction hooks block i's
+                # forward OUTPUT, so a vector labelled layer i lives at hidden_states[i+1].
+                rows = hidden[layer + 1].flatten(0, 1)[keep].float()
                 if to_holdout:
                     held[layer].append(rows.cpu())
                 else:
