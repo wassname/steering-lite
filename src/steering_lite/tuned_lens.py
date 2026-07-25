@@ -74,7 +74,7 @@ class TunedLens:
         *,
         batch_size: int = 8,
         max_length: int = 128,
-        ridge: float = 1.0,
+        ridge: tuple[float, ...] = (1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0),
         holdout_rows: int = 4096,
     ) -> "TunedLens":
         device = next(model.parameters()).device
@@ -107,17 +107,24 @@ class TunedLens:
         translators = {}
         logger.info(
             "SHOULD: held-out r2 is well above 0 at every layer and rises with depth, since a later "
-            "residual predicts the final one better. ELSE the fit is rank-starved and reads as noise."
+            "residual predicts the final one better. The chosen ridge should be interior to the "
+            "sweep. ELSE at the top of the range the map is shrunk to zero and the lens just "
+            "predicts the mean token; at the bottom it is unregularised and overfits."
         )
         Y_held = torch.cat(held_final)
+        denominator = Y_held.var(0).sum().item()
         for layer in layers:
-            A, b = accumulators[layer].solve(ridge=ridge)
             X_held = torch.cat(held[layer])
-            residual = Y_held - (X_held @ A.T + b)
-            r2 = 1.0 - residual.var(0).sum().item() / Y_held.var(0).sum().item()
+            scored = []
+            for value in ridge:
+                A, b = accumulators[layer].solve(ridge=value)
+                residual = Y_held - (X_held @ A.T + b)
+                scored.append((1.0 - residual.var(0).sum().item() / denominator, value, A, b))
+            r2, best, A, b = max(scored, key=lambda row: row[0])
+            sweep = "  ".join(f"{v:.0e}:{s:+.3f}" for s, v, _, _ in scored)
             logger.info(
-                f"  layer {layer:>3}  n_fit={accumulators[layer].n:>7}  "
-                f"n_held={len(X_held):>6}  r2={r2:+.3f}"
+                f"  layer {layer:>3}  n_fit={accumulators[layer].n:>7}  n_held={len(X_held):>6}  "
+                f"ridge={best:.0e}  r2={r2:+.3f}   [{sweep}]"
             )
             translators[layer] = (A, b)
         return cls(translators)
