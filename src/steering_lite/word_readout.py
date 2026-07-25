@@ -114,9 +114,12 @@ def format_readout(readout: dict) -> str:
     return (
         f"VECTOR READOUT ({readout['method']}) -- words associated with +v and -v "
         "through final_norm + unembedding; no prompt, stem, or axis word list\n"
-        "TODO validate: coherent opposite semantic fields support an axis interpretation. "
-        "Junk, identical poles, or an unrelated field indicate a weak or off-axis direction; "
-        "this diagnostic alone does not establish downstream behavior.\n"
+        "SHOULD: the +v and -v lists are coherent words and read as opposites of each other.\n"
+        "Punctuation/fragments or the two sides looking alike = this direction is not aligned\n"
+        "with the unembedding AT THAT LAYER (common in early layers, and expected for\n"
+        "erase-only delivery where the applied delta is data-dependent). That is a fact about\n"
+        "the logit lens at that depth, NOT evidence that the vector is weak: judge the vector\n"
+        "by its effect on the output distribution instead.\n"
         + rows
         + skipped
     )
