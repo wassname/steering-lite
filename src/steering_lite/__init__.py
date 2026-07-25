@@ -8,6 +8,8 @@ from .config import SteeringConfig, REGISTRY, register
 from .extract import record_activations
 from .attach import attach, detach, save, load, train
 from .calibrate import measure_kl, calibrate_iso_kl, calibrate_dose
+from .word_readout import readout_words, format_readout, readout_effect, format_effect
+from .tuned_lens import TunedLens
 from . import variants  # noqa: F401  triggers method + config registration
 from .vector import Vector
 
@@ -57,6 +59,11 @@ __all__ = [
     "measure_kl",
     "calibrate_iso_kl",
     "calibrate_dose",
+    "readout_words",
+    "format_readout",
+    "readout_effect",
+    "format_effect",
+    "TunedLens",
     "REGISTRY",
     "register",
     "Vector",

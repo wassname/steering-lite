@@ -8,6 +8,8 @@ so the readout sees its applied residual direction rather than S coordinates.
 """
 from __future__ import annotations
 
+import contextlib
+
 import torch
 
 
@@ -46,12 +48,16 @@ def _residual_directions(v, layer, name, tensor, d_model, stacked):
 
 
 @torch.no_grad()
-def readout_words(model, tok, v, k=8) -> dict:
-    """Logit-lens each readable vector direction into its associated word tokens.
+def readout_words(model, tok, v, k=8, lens=None) -> dict:
+    """Lens each readable vector direction into its associated word tokens.
 
     Top-k words are associated with the +v pole and bottom-k words with -v. This
     is a property of the vector and model only: there is no prompt, axis rubric,
     coefficient, stem, or supplied word list.
+
+    Pass a fitted `TunedLens` whenever the vector lives below the last few layers. Without one this
+    falls back to the plain logit lens, which cannot read a layer-12 direction at all: on
+    Qwen2.5-7B the real hidden state answering ' Tokyo' lenses to Chinese boilerplate until layer 25.
     """
     W_U, final_norm = model.lm_head.weight, model.model.norm
     vocab = min(len(tok), W_U.shape[0])
@@ -79,6 +85,8 @@ def readout_words(model, tok, v, k=8) -> dict:
                     skipped.append(f"{layer}.{name}{list(tensor.shape)}")
                     continue
                 for suffix, direction in found:
+                    if lens is not None and isinstance(layer, int):
+                        direction = lens.to_final(direction.float().cpu(), layer)
                     normalized = final_norm(direction.to(W_U.dtype).to(W_U.device))
                     logits = W_U[:vocab].float() @ normalized.float()
 
@@ -122,4 +130,80 @@ def format_readout(readout: dict) -> str:
         "by its effect on the output distribution instead.\n"
         + rows
         + skipped
+    )
+
+
+@torch.no_grad()
+def _final_logprobs(model, tok, W_U, final_norm, vocab, prompt, ctx):
+    enc = tok(prompt, return_tensors="pt", add_special_tokens=False).to(W_U.device)
+    with ctx:
+        h = model(**enc, output_hidden_states=True).hidden_states[-1][0, -1]
+    logits = W_U[:vocab].float() @ final_norm(h.to(W_U.dtype)).float()
+    return torch.log_softmax(logits, dim=-1)
+
+
+@torch.no_grad()
+def readout_effect(model, tok, v, c_pos, c_neg, stems, k=8) -> dict:
+    """What each pole does to the OUTPUT distribution, in nats, summed over stems.
+
+    Restores the pre-6425e33 j-steer-dev readout. A vector built at layer 12 is not readable by
+    logit-lensing the direction itself, because the unembedding cannot read the residual stream at
+    that depth (measured on Qwen2.5-7B: the hidden state that answers ' Tokyo' lenses to Chinese
+    boilerplate until layer 25). Applying the vector and reading the final layer lets layers 13-28
+    do their job first, and the bare-subtracted difference is a log ratio, so it reports what the
+    steering changed rather than what the model says most often.
+
+    `stems` are supplied by the caller and printed in the output, because what a vector promotes is
+    only defined relative to what it was asked. Keep them generic: axis-specific stems are the knob
+    that made a sycophancy run print authority words.
+    """
+    W_U, final_norm = model.lm_head.weight, model.model.norm
+    vocab = min(len(tok), W_U.shape[0])
+
+    def _clean(token_id):
+        text = tok.decode([token_id], clean_up_tokenization_spaces=False)
+        return is_word_token(text) and text.strip().isascii() and text.strip().isalpha()
+
+    word_mask = torch.tensor([_clean(t) for t in range(vocab)], device=W_U.device)
+    pos_dlogp = torch.zeros(vocab, device=W_U.device)
+    neg_dlogp = torch.zeros(vocab, device=W_U.device)
+    bare_abs = torch.zeros(vocab, device=W_U.device)
+
+    for stem in stems:
+        lp_bare = _final_logprobs(model, tok, W_U, final_norm, vocab, stem, contextlib.nullcontext())
+        lp_pos = _final_logprobs(model, tok, W_U, final_norm, vocab, stem, v(model, C=+c_pos))
+        lp_neg = _final_logprobs(model, tok, W_U, final_norm, vocab, stem, v(model, C=-abs(c_neg)))
+        pos_dlogp += lp_pos - lp_bare
+        neg_dlogp += lp_neg - lp_bare
+        bare_abs += lp_bare
+
+    def _top(scores, largest, n=k):
+        fill = float("-inf") if largest else float("inf")
+        idx = scores.masked_fill(~word_mask, fill).topk(n, largest=largest).indices.tolist()
+        return [tok.decode([i]).strip() for i in idx]
+
+    return {
+        "method": v.cfg.method,
+        "c_pos": c_pos,
+        "c_neg": c_neg,
+        "n_stems": len(stems),
+        "stems": list(stems),
+        "bare": _top(bare_abs, True),
+        "promotes": {"pos": _top(pos_dlogp, True), "neg": _top(neg_dlogp, True)},
+        "removes": {"pos": _top(pos_dlogp, False), "neg": _top(neg_dlogp, False)},
+    }
+
+
+def format_effect(readout: dict) -> str:
+    return (
+        f"VECTOR EFFECT READOUT ({readout['method']}, read +{readout['c_pos']:.3f}/"
+        f"-{abs(readout['c_neg']):.3f} over {readout['n_stems']} stems)\n"
+        "Change in final-layer logprob vs unsteered, in nats, summed over stems.\n"
+        "SHOULD: the two poles promote opposing word fields, and neither matches the unsteered\n"
+        "top-k. ELSE the poles agree = unsigned perturbation, or they match bare = no effect.\n"
+        f"  unsteered  : {readout['bare']}\n"
+        f"  +C promotes: {readout['promotes']['pos']}\n"
+        f"  -C promotes: {readout['promotes']['neg']}\n"
+        f"  +C removes : {readout['removes']['pos']}\n"
+        f"  -C removes : {readout['removes']['neg']}"
     )
