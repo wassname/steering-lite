@@ -86,9 +86,12 @@ def readout_words(model, tok, v, k=8, lens=None) -> dict:
                     continue
                 for suffix, direction in found:
                     if lens is not None and isinstance(layer, int):
-                        direction = lens.to_final(direction.float().cpu(), layer)
-                    normalized = final_norm(direction.to(W_U.dtype).to(W_U.device))
-                    logits = W_U[:vocab].float() @ normalized.float()
+                        # A already lands in the normalised final space the unembedding reads, and
+                        # RMSNorm of a difference of hidden states means nothing, so do not re-norm.
+                        readable = lens.to_final(direction.float().cpu(), layer).to(W_U.device)
+                    else:
+                        readable = final_norm(direction.to(W_U.dtype).to(W_U.device))
+                    logits = W_U[:vocab].float() @ readable.float()
 
                     def top_words(largest):
                         fill = float("-inf") if largest else float("inf")

@@ -79,6 +79,7 @@ class TunedLens:
     ) -> "TunedLens":
         device = next(model.parameters()).device
         d_model = model.config.hidden_size
+        final_norm = model.model.norm
         accumulators = {layer: RidgeAccumulator(d_model, device=str(device)) for layer in layers}
         held: dict[int, list[Tensor]] = {layer: [] for layer in layers}
         held_final: list[Tensor] = []
@@ -91,7 +92,10 @@ class TunedLens:
             ).to(device)
             hidden = model(**enc, output_hidden_states=True).hidden_states
             keep = enc["attention_mask"].bool().flatten()
-            final = hidden[-1].flatten(0, 1)[keep].float()
+            # Target the NORMALISED final residual, which is what the unembedding actually consumes.
+            # Fitting raw h_final instead spends the fit on the large scale that RMSNorm throws away,
+            # and the resulting lens decoded every layer as ' the' at r2=0.45.
+            final = final_norm(hidden[-1]).flatten(0, 1)[keep].float()
             # The first batches are held out, so r2 is measured on rows the fit never saw.
             to_holdout = held_rows < holdout_rows
             if to_holdout:
