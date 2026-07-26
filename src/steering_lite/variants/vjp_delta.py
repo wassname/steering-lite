@@ -17,13 +17,15 @@ to layer $L$: it identifies source-layer changes that locally produce movement
 along $c$ at the target. The full Jacobian is never materialized. We compute
 pullbacks for both prompt classes, then subtract their class means:
 
-$$v_L = \mathbb E_{x^+}[J_{L \to T}(x^+)^\top c]
-      - \mathbb E_{x^-}[J_{L \to T}(x^-)^\top c].$$
+$$\tilde v_L = \mathbb E_{x^+}[J_{L \to T}(x^+)^\top c]
+             - \mathbb E_{x^-}[J_{L \to T}(x^-)^\top c].$$
 
-The resulting $v_L$ is normalized and used as the steering direction at that
-source layer. This port preserves j-steer's prompt masks and reductions. Local
-forward hooks perform the same VJP without adding `jacobian-lens` as a runtime
-dependency.
+This raw separation gradient is unchanged if the two class labels are swapped.
+We therefore choose one global sign across all source layers so that its mean
+layerwise cosine with $\bar h_L^+ - \bar h_L^-$ is positive. The resulting
+$v_L$ is normalized and used as the steering direction. This port preserves
+j-steer's prompt masks and reductions. Local forward hooks perform the same VJP
+without adding `jacobian-lens` as a runtime dependency.
 """
 from __future__ import annotations
 
@@ -95,6 +97,32 @@ def _unit_vector(vector: Tensor) -> Tensor:
     if norm.item() == 0:
         raise ValueError("cannot normalize a zero vjp_delta direction")
     return vector / norm.to(vector)
+
+
+def orient_vjp_delta(
+    per_layer: dict[int, Tensor],
+    activation_axis: dict[int, Tensor],
+) -> tuple[dict[int, Tensor], dict[int, float], float, bool]:
+    raw_axis_cosines = {
+        layer: F.cosine_similarity(
+            per_layer[layer].float().cpu(),
+            activation_axis[layer].float().cpu(),
+            dim=0,
+        ).item()
+        for layer in per_layer
+    }
+    orientation_score = sum(raw_axis_cosines.values()) / len(raw_axis_cosines)
+    if orientation_score == 0:
+        raise ValueError(
+            "vjp_delta has exactly zero chosen/rejected orientation score"
+        )
+    orientation_flipped = orientation_score < 0
+    oriented = (
+        {layer: -vector for layer, vector in per_layer.items()}
+        if orientation_flipped
+        else per_layer
+    )
+    return oriented, raw_axis_cosines, orientation_score, orientation_flipped
 
 
 def _valid_mask(attention_mask: Tensor, skip_first: int) -> Tensor:
@@ -383,6 +411,24 @@ class VjpDelta:
         mean = {
             layer: 0.5 * (pos[layer] + neg[layer]) for layer in source_layers
         }
+        activation_axis = {
+            layer: pos_acts[layer] - neg_acts[layer] for layer in source_layers
+        }
+        delta, raw_axis_cosines, orientation_score, orientation_flipped = (
+            orient_vjp_delta(delta, activation_axis)
+        )
+        logger.info(
+            "vjp_delta chosen/rejected orientation: "
+            f"mean raw cos={orientation_score:+.3f} "
+            f"{'(GLOBAL FLIP)' if orientation_flipped else '(kept)'}; "
+            + " ".join(
+                f"l{layer}={raw_axis_cosines[layer]:+.2f}"
+                for layer in source_layers
+            )
+            + "\nSHOULD: mean raw cos far from 0 gives a stable global sign; near 0 "
+              "means the VJP separation gradient is nearly orthogonal to the "
+              "activation contrast"
+        )
         rows = []
         reliabilities = []
         for layer in source_layers:
@@ -391,7 +437,7 @@ class VjpDelta:
             ).item()
             reliabilities.append(reliability)
             axis_cosine = F.cosine_similarity(
-                delta[layer], pos_acts[layer] - neg_acts[layer], dim=0
+                delta[layer], activation_axis[layer], dim=0
             ).item()
             delta_norm = delta[layer].norm()
             mean_norm = mean[layer].norm()

@@ -14,6 +14,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import steering_lite as sl
 from steering_lite import Vector
 from steering_lite.eval.edge import summarize_anchors
+from steering_lite.variants.vjp_delta import orient_vjp_delta
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
@@ -121,6 +122,37 @@ def test_pipeline(method, tiny_model, tmp_path):
             l2 = model(prompt).logits.detach().float()
     err = (l1 - l2).abs().max().item()
     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"
+
+
+def test_vjp_delta_label_swap_flips_oriented_vector(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    cfg = _make_cfg("vjp_delta")
+    chosen = sl.train(
+        model, tok, POS, NEG, cfg, batch_size=2, max_length=64
+    ).stacked[0]["v"]
+    swapped = sl.train(
+        model, tok, NEG, POS, cfg, batch_size=2, max_length=64
+    ).stacked[0]["v"]
+    torch.testing.assert_close(chosen, -swapped, rtol=1e-4, atol=1e-5)
+
+
+def test_vjp_delta_orientation_uses_one_sign_across_layers():
+    raw = {
+        1: torch.tensor([1.0, 0.0]),
+        2: torch.tensor([-1.0, 0.0]),
+    }
+    activation_axis = {
+        1: torch.tensor([-1.0, 0.0]),
+        2: torch.tensor([-0.5, 3**0.5 / 2]),
+    }
+    oriented, cosines, score, flipped = orient_vjp_delta(raw, activation_axis)
+
+    assert cosines == pytest.approx({1: -1.0, 2: 0.5})
+    assert score == pytest.approx(-0.25)
+    assert flipped
+    torch.testing.assert_close(oriented[1], -raw[1])
+    torch.testing.assert_close(oriented[2], -raw[2])
 
 
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
