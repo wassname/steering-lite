@@ -215,7 +215,12 @@ def measure_kl(
     per_t = [[] for _ in range(T)]
     gen_lens, reps = [], []  # per-prompt rollout length + worst 3-gram repetition fraction
     steer_tail = ""  # prompt-0 steered rollout tail, for the always-on bracket table (Claude)
-    need_base_gen = log_demo or demo_log_path is not None
+    # The base rollout is display-only: the KL is computed from logp_base vs logp_steer over the
+    # SAME steered token ids, so this generation never reaches a statistic. It was produced for
+    # every prompt while only prompt 0 is ever printed, so with the usual log_demo=True and no
+    # JSONL path, 7 of 8 full T-token rollouts per probe were generated and discarded -- and a
+    # probe is the unit calibration spends all its time in. Predicate moved to the use site.
+    need_base_gen = demo_log_path is not None or log_demo
 
     for idx, pids in enumerate(tqdm(prompts, desc="measure_kl",
                                     mininterval=60, disable=not show_pbar)):
@@ -247,8 +252,9 @@ def measure_kl(
             steer_tail = " ".join(tok.decode(gen, skip_special_tokens=True).split())[-160:]
 
         # Demo: extra base-only gen for side-by-side text. One per measure_kl
-        # call (idx==0) for stdout, all prompts for JSONL.
-        if need_base_gen:
+        # call (idx==0) for stdout, all prompts for JSONL. Generate it only when it is actually
+        # consumed -- stdout reads prompt 0 only, the JSONL reads all of them.
+        if need_base_gen and (demo_log_path is not None or idx == 0):
             base_gen = _generate(model, pids, T, tok, do_sample, device)
             base_full = torch.cat([pids.to(device), base_gen])
             decoded_base = tok.decode(base_full, skip_special_tokens=False)

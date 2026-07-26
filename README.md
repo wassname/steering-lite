@@ -72,13 +72,24 @@ with v(model):
 | Super S-space     | [super_sspace.py](src/steering_lite/variants/super_sspace.py)         | pooled-Gram residual-stream basis (one block-level hook, ~4× faster than per-Linear sspace) |
 | S-space PCA       | [sspace_pca.py](src/steering_lite/variants/sspace_pca.py)             | PCA on paired diffs in whitened weight-SVD S-space (clean ablation vs residual PCA / cosine-gated S-space) |
 | CorDA PCA         | [corda_pca.py](src/steering_lite/variants/corda_pca.py)               | PCA in CorDA context-oriented decomposition space ([Yang+ 2024](https://arxiv.org/abs/2406.05223)) |
-| VJP delta         | [vjp_delta.py](src/steering_lite/variants/vjp_delta.py)               | Persona cotangent pulled through class-conditioned Jacobians |
+| VJP delta         | [vjp_delta.py](src/steering_lite/variants/vjp_delta.py)               | Wassname's [Jacobian-Lens](https://github.com/anthropics/jacobian-lens) steering adaptation: pull the usual contrastive cotangent back to selected source layers with class-conditioned VJPs ([public reference](https://github.com/wassname/j-steer-dev/blob/main/src/jsteer/variants/vjp.py)) |
 | S-space signed    | [sspace.py](src/steering_lite/variants/sspace.py) (`gate="signed"`)   | sspace with a signed gate instead of cosine |
 | Directional ablation | [directional_ablation.py](src/steering_lite/variants/directional_ablation.py) | [Arditi+ 2024](https://arxiv.org/abs/2406.11717)                |
 | Spherical (slerp) | [spherical.py](src/steering_lite/variants/spherical.py)               | ungated core of [Spherical Steering](https://arxiv.org/abs/2602.08169) |
 | CHaRS             | [chars.py](src/steering_lite/variants/chars.py)                       | [Abdullaev+ 2026](https://arxiv.org/abs/2603.02237)                    |
 | Linear-AcT        | [linear_act.py](src/steering_lite/variants/linear_act.py)             | [Rodriguez+ 2025](https://openreview.net/forum?id=l2zFn6TIQi)          |
 | Angular Steering  | [angular_steering.py](src/steering_lite/variants/angular_steering.py) | [Vu+ 2025](https://arxiv.org/abs/2510.26243)                           |
+
+### Vector word readout
+
+`readout_words(model, tokenizer, vector)` decodes each readable steering
+direction through the model's final norm and unembedding. It reports words
+associated with the +v and -v poles without using a prompt, axis-specific
+stem, coefficient, or supplied word list. This is wassname's
+[public j-steer readout](https://github.com/wassname/j-steer-dev/blob/main/src/jsteer/word_readout.py),
+ported as a method-independent debugging diagnostic. It helps detect vectors
+that point toward an unrelated semantic field or have incoherent poles; it is
+not a behavioral success metric.
 
 ## Eval
 

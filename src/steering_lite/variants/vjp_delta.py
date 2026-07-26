@@ -1,19 +1,29 @@
-r"""Class-contrast vector-Jacobian-product steering.
+r"""Wassname's Jacobian-Lens steering method.
 
-The target-layer persona contrast is used as a cotangent:
+This adapts Anthropic's public `jacobian-lens` project to activation steering:
+https://github.com/anthropics/jacobian-lens
+
+The public reference implementation lives in `wassname/j-steer-dev`:
+https://github.com/wassname/j-steer-dev/blob/main/src/jsteer/variants/vjp.py
+
+Start with the ordinary contrastive vector used in activation steering, measured
+at target layer $T$. Treat it as a cotangent:
 
 $$c = \bar h_T^+ - \bar h_T^-.$$
 
-For each source layer, pull that cotangent through positive and negative
-prompt classes, then subtract the class-mean pullbacks:
+For each requested source layer $L$, autograd computes the vector-Jacobian
+product $J_{L \to T}(x)^\top c$. This is the pullback of the target contrast
+to layer $L$: it identifies source-layer changes that locally produce movement
+along $c$ at the target. The full Jacobian is never materialized. We compute
+pullbacks for both prompt classes, then subtract their class means:
 
 $$v_L = \mathbb E_{x^+}[J_{L \to T}(x^+)^\top c]
       - \mathbb E_{x^-}[J_{L \to T}(x^-)^\top c].$$
 
-The vector is normalized per layer and added to every residual position.
-This is the `vjp_delta` implementation copied from j-steer-dev by CODEX,
-with its prompt masks and reductions preserved. Local forward hooks replace
-j-steer's Jacobian-lens recorder so steering-lite gains no new dependency.
+The resulting $v_L$ is normalized and used as the steering direction at that
+source layer. This port preserves j-steer's prompt masks and reductions. Local
+forward hooks perform the same VJP without adding `jacobian-lens` as a runtime
+dependency.
 """
 from __future__ import annotations
 
@@ -26,6 +36,7 @@ import torch
 import torch.nn.functional as F
 from jaxtyping import Float
 from loguru import logger
+from tabulate import tabulate
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
@@ -369,23 +380,48 @@ class VjpDelta:
         half_1 = {
             layer: pos_half_1[layer] - neg_half_1[layer] for layer in source_layers
         }
+        mean = {
+            layer: 0.5 * (pos[layer] + neg[layer]) for layer in source_layers
+        }
         rows = []
+        reliabilities = []
         for layer in source_layers:
             reliability = F.cosine_similarity(
                 half_0[layer], half_1[layer], dim=0
             ).item()
+            reliabilities.append(reliability)
             axis_cosine = F.cosine_similarity(
                 delta[layer], pos_acts[layer] - neg_acts[layer], dim=0
             ).item()
-            rows.append(
-                f"layer={layer} norm={delta[layer].norm():.3f} "
-                f"split_half_cos={reliability:+.3f} axis_cos={axis_cosine:+.3f}"
-            )
+            delta_norm = delta[layer].norm()
+            mean_norm = mean[layer].norm()
+            rows.append([
+                layer,
+                delta_norm,
+                mean_norm,
+                delta_norm / (mean_norm + ε),
+                reliability,
+                axis_cosine,
+            ])
         logger.info(
-            "vjp_delta diagnostics\n"
-            + "\n".join(rows)
-            + "\nSHOULD: finite nonzero norms; split_half_cos near +1 means the "
-            "direction is reproducible; axis_cos near 0 means a derived amplifier"
+            "vjp_delta pullback diagnostics\n"
+            + tabulate(
+                rows,
+                headers=[
+                    "layer",
+                    "|delta|",
+                    "|mean|",
+                    "|d|/|m|",
+                    "split_half_cos",
+                    "axis_cos",
+                ],
+                tablefmt="tsv",
+                floatfmt=".3f",
+            )
+            + f"\nmean split_half_cos={sum(reliabilities) / len(reliabilities):+.3f}"
+            "\nTODO validate: positive split-half cosine means the class contrast is "
+            "reproducible; a tiny |delta|/|mean| means common-mode pullback dominates; "
+            "axis_cos near zero means the VJP points away from the source-layer persona axis."
         )
 
         return {
