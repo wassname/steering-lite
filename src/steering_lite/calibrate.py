@@ -268,10 +268,14 @@ def measure_kl(
                          else f"probe iter {demo_iter} (bracket point, NOT final)")
                 logger.info(
                     f"\n=== {v.cfg.method} -> calibrate iso-KL -> {stage} "
-                    f"| c={v.cfg.coeff:+.4f} kl_rms={float(kls.pow(2).mean().sqrt()):.3f} | "
+                    f"| c={v.cfg.coeff:+.4f} kl_rms[this prompt only]="
+                    f"{float(kls.pow(2).mean().sqrt()):.3f} | "
                     f"T={T} tok/KL-probe (<=12 iters) ===\n"
                     "WHAT: same held-out calib prompt at c=0 vs current c. KL calibration "
                     "sweep, NOT the moral eval; c is a bracket point unless FINAL.\n"
+                    "The kl_rms above is this one prompt; the value the solver matched to "
+                    "target_kl is the whole-prompt-set rms in the bracket table below, and "
+                    "the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).\n"
                     f"--- BASE (c=0) ---\n{decoded_base}\n"
                     f"\n--- STEER ({v.cfg.method}, c={v.cfg.coeff:+.4f}) ---\n{decoded_steer}\n"
                     f"=== /{v.cfg.method} calibrate ==="
