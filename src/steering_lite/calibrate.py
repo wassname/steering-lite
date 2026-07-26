@@ -388,11 +388,21 @@ def calibrate_iso_kl(
         v.cfg.coeff = -sign_probe_c
         score_neg = sign_probe(v)
         chosen = +1.0 if score_pos >= score_neg else -1.0
+        gap = abs(score_pos - score_neg)
         logger.info(
             f"sign_probe: +c={sign_probe_c:+.2f} -> {score_pos:+.3f} | "
             f"-c={-sign_probe_c:+.2f} -> {score_neg:+.3f} | "
-            f"chosen sign={chosen:+.0f} (gap={abs(score_pos - score_neg):.3f})"
+            f"chosen sign={chosen:+.0f} (gap={gap:.3f})\n"
+            "SHOULD: gap clearly above the probe's own resolution. A near-zero gap means the "
+            "sign is being read off noise and the tie-break silently picks +1."
         )
+        if gap < SIGN_PROBE_MIN_GAP:
+            logger.warning(
+                f"sign_probe gap {gap:.3f} < {SIGN_PROBE_MIN_GAP}: the two signs are "
+                "indistinguishable on this probe, so +C/-C labels are NOT certified. This is the "
+                "failure that inverted vjp_delta job 172 relative to job 160 when the sign came "
+                "from a 0.078 geometric projection instead."
+            )
         sign = sign * chosen
 
     iter_idx = {"n": 0}
@@ -559,6 +569,10 @@ def calibrate_iso_kl(
 # demoted to a reported readout (kl_rms), not the target. Same seeded-sampling
 # rollout instrument as iso-KL, so the two are comparable at a given |C|.
 # ============================================================================
+
+# Below this, the two signs scored the same and the tie-break is arbitrary. A rate-style probe
+# over n items resolves 1/n, so this is "at least two items apart" for the usual n=10.
+SIGN_PROBE_MIN_GAP = 0.15
 
 DOSE_TOL = 0.10                # rep may rise / confidence may drop by at most this fraction
 DOSE_LEN_BAND = (0.5, 2.0)     # rollout-length ratio band; wider than tol because length
