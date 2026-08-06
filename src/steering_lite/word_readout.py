@@ -12,6 +12,8 @@ import contextlib
 
 import torch
 
+from .tuned_lens import IdentityLens
+
 
 def is_word_token(text: str) -> bool:
     stripped = text.strip()
@@ -219,4 +221,166 @@ def format_effect(readout: dict) -> str:
         f"  -C promotes: {readout['promotes']['neg']}\n"
         f"  +C removes : {readout['removes']['pos']}\n"
         f"  -C removes : {readout['removes']['neg']}"
+    )
+
+
+@torch.no_grad()
+def midpoint_states(model, tok, pos_prompts, neg_prompts, layers, *, batch_size=8, max_length=384):
+    """Per-PAIR contrast midpoints, {layer: [n_pairs, d]}, the base point a readout reads at.
+
+    `make_persona_pairs` pairs one-to-one: same user message, same suffix, different persona only.
+    So (h_pos_i + h_neg_i)/2 differs from a state the model really visits only in the persona
+    clause, and it sits between the two poles by construction.
+
+    One row per PAIR rather than one mean over all of them, because the decoder is nonlinear:
+    unembed(mean(h)) is not mean(unembed(h)). Average after decoding instead, which
+    `readout_at_point` does.
+    """
+    from jlens.hooks import ActivationRecorder
+
+    def last_states(prompts):
+        out = {layer: [] for layer in layers}
+        for start in range(0, len(prompts), batch_size):
+            enc = tok(prompts[start:start + batch_size], return_tensors="pt", padding=True,
+                      truncation=True, max_length=max_length, padding_side="left",
+                      add_special_tokens=False).to(model.device)
+            with ActivationRecorder(model.model.layers, at=list(layers)) as rec:
+                model(**enc)
+            for layer in layers:
+                out[layer].append(rec.activations[layer][:, -1].float().detach().cpu())
+        return {layer: torch.cat(rows) for layer, rows in out.items()}
+
+    if len(pos_prompts) != len(neg_prompts):
+        raise ValueError(f"pairs must be one-to-one: {len(pos_prompts)} pos, {len(neg_prompts)} neg")
+    pos, neg = last_states(pos_prompts), last_states(neg_prompts)
+    return {layer: 0.5 * (pos[layer] + neg[layer]) for layer in layers}
+
+
+@torch.no_grad()
+def readout_at_point(model, tok, v, hs_mid, *, coeff, lens=None, k=8, apply_fn=None) -> dict:
+    """Words the vector promotes and suppresses at a real operating point, in nats.
+
+    A steering vector is a displacement, not a state, so it has no words of its own. The decoder
+    is `unembed(x) = lm_head(final_norm(x))`, and `final_norm` divides by x's own magnitude, so
+    feeding it a bare direction ranks whichever token embeddings are outliers. That is how a
+    readout ends up looking like an "explicit content" axis whatever the vector does.
+
+    So read TWO states and difference them, based at the contrast midpoint:
+
+        gain(t) = logsoftmax(unembed(lens(hs_mid + C v)))_t - logsoftmax(unembed(lens(hs_mid)))_t
+
+    where `hs_mid` is the per-pair midpoint of the contrast set the vector came from, and +C and
+    -C land on the two poles: `hs_mid + C v` toward positive, `hs_mid - C v` toward negative.
+    The model's own `final_norm` is applied here rather than folded into the lens, because it is
+    the only nonlinearity in the path: without it the base point cancels algebraically and you
+    are back to reading a bare direction.
+
+    Two knobs decide whether the output means anything.
+
+    `coeff` is a READING dose and is not the steering dose. At the calibrated breakdown dose the
+    probe point sits far from anywhere the model visits, and the words revert to outlier junk;
+    measured on Qwen3.5-4B at ~3 nats/token, every method read as NSFW and multilingual
+    fragments. Start well below it and raise until the words move.
+
+    `lens` maps a mid-layer state into final-layer coordinates: TunedLens (fitted, any model),
+    JacobianLens (published, two models), or None for the plain logit lens, which is honest only
+    in the last few layers.
+    """
+    W_U, final_norm = model.lm_head.weight, model.model.norm
+    vocab = min(len(tok), W_U.shape[0])
+    d_model = W_U.shape[1]
+    lens = lens or IdentityLens()
+    apply_fn = apply_fn or (lambda direction, layer, h, c: h + c * direction.to(h.device, h.dtype))
+
+    def _clean(token_id):
+        text = tok.decode([token_id], clean_up_tokenization_spaces=False)
+        return is_word_token(text) and text.strip().isascii() and text.strip().isalpha()
+
+    word_mask = torch.tensor([_clean(t) for t in range(vocab)], device=W_U.device)
+
+    def _logprobs(hidden, at_layer):
+        """[n, vocab] log-probs for a batch of states, decoded one state at a time."""
+        predicted = lens.at_point(hidden.float().cpu(), at_layer).to(W_U.device)
+        logits = final_norm(predicted.to(W_U.dtype)).float() @ W_U[:vocab].float().T
+        return torch.log_softmax(logits, dim=-1)
+
+    def _top(delta, largest, is_shift=True):
+        """Top-k words by MEAN value, with the fraction of base points agreeing on the sign.
+
+        `is_shift=False` for the unsteered base row, whose values are log-probs rather than
+        shifts. Sign agreement is meaningless there, since every log-prob is negative, so it
+        reports agreement on being in this row's own top-k instead.
+        """
+        mean = delta.mean(0)
+        fill = float("-inf") if largest else float("inf")
+        idx = mean.masked_fill(~word_mask, fill).topk(k, largest=largest).indices
+        if is_shift:
+            agree = (delta > 0).float().mean(0)
+        else:
+            per_row_top = delta.masked_fill(~word_mask, fill).topk(k, largest=largest, dim=-1).indices
+            agree = torch.zeros_like(mean)
+            for row in per_row_top:
+                agree[row] += 1.0 / delta.shape[0]
+        return [(tok.decode([i]).strip(), round(mean[i].item(), 2), round(agree[i].item(), 2))
+                for i in idx.tolist()]
+
+    layers, skipped = {}, []
+    for stacked, tree in ((True, v.stacked), (False, v.shared)):
+        for key in sorted(k2 for k2 in tree if isinstance(k2, int)):
+            if key not in hs_mid:
+                continue
+            for name, tensor in tree[key].items():
+                found = _residual_directions(v, key, name, tensor, d_model, stacked)
+                if not found:
+                    skipped.append(f"{key}.{name}{list(tensor.shape)}")
+                    continue
+                for suffix, direction in found:
+                    base = hs_mid[key]
+                    lp_base = _logprobs(base, key)
+                    lp_pos = _logprobs(apply_fn(direction, key, base, +coeff), key)
+                    lp_neg = _logprobs(apply_fn(direction, key, base, -coeff), key)
+                    layers[f"{key}.{name}{suffix}"] = {
+                        "base_top": _top(lp_base, True, is_shift=False),
+                        "pos_promotes": _top(lp_pos - lp_base, True),
+                        "pos_removes": _top(lp_pos - lp_base, False),
+                        "neg_promotes": _top(lp_neg - lp_base, True),
+                        "max_gain_nats": float((lp_pos - lp_base).mean(0).max()),
+                    }
+    if not layers:
+        raise ValueError(f"{v.cfg.method!r} has no readable direction at these layers: {skipped}")
+    return {"method": v.cfg.method, "coeff": coeff, "lens": type(lens).__name__,
+            "n_base": len(next(iter(hs_mid.values()))), "layers": layers, "skipped": skipped}
+
+
+def format_at_point(readout: dict) -> str:
+    def words(entries):
+        return "  ".join(f"{w}({d:+.2f},{a:.0%})" for w, d, a in entries)
+
+    rows = "\n".join(
+        f"  {key:<12} base             : {words(row['base_top'])}\n"
+        f"  {'':<12} +C makes likelier: {words(row['pos_promotes'])}"
+        f"  (max {row['max_gain_nats']:+.2f} nats)\n"
+        f"  {'':<12} +C makes rarer   : {words(row['pos_removes'])}\n"
+        f"  {'':<12} -C makes likelier: {words(row['neg_promotes'])}"
+        for key, row in readout["layers"].items()
+    )
+    skipped = (f"\n  (no readable direction for {readout['skipped']})"
+               if readout["skipped"] else "")
+    return (
+        f"VECTOR READOUT AT A BASE POINT ({readout['method']}) C={readout['coeff']:+.4f} "
+        f"lens={readout['lens']} over {readout['n_base']} contrast midpoints\n"
+        "Change in log-prob at the midpoint of the contrast set, in nats. Each entry is\n"
+        "word(mean shift, fraction of base points agreeing on the sign).\n"
+        "SHOULD: +C and -C promote OPPOSING fields, and both differ from the base row.\n"
+        "ELSE, two named failures. +C and -C promote the SAME words: the direction is\n"
+        "unsigned, so it is a magnitude effect and not an axis. Subword fragments, or NSFW\n"
+        "and multilingual junk: read the OTHER layers before you judge the vector. Each\n"
+        "method has its own narrow readable window and the rest of the range is junk\n"
+        "(measured on Qwen3.5-4B layers 6-24: mean_diff reads over 10-24, vjp_stem only over\n"
+        "17-18). Junk at every layer means the lens is not transporting -- swap it.\n"
+        "Do NOT reach for the coeff to fix junk. Over 0.1x to 1.0x of the calibrated ceiling\n"
+        "the top words do not move and the gain scales linearly, so that whole span is one\n"
+        "linear regime; coeff sets the nats, not which words you see.\n"
+        "Agreement below ~80% means the word comes from a few base points, not the direction.\n"
+        + rows + skipped
     )

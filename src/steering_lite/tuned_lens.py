@@ -92,10 +92,11 @@ class TunedLens:
             ).to(device)
             hidden = model(**enc, output_hidden_states=True).hidden_states
             keep = enc["attention_mask"].bool().flatten()
-            # Target the NORMALISED final residual, which is what the unembedding actually consumes.
-            # Fitting raw h_final instead spends the fit on the large scale that RMSNorm throws away,
-            # and the resulting lens decoded every layer as ' the' at r2=0.45.
-            final = final_norm(hidden[-1]).flatten(0, 1)[keep].float()
+            # Target the RAW final residual and let the caller apply the model's own final_norm.
+            # Normalising here would fold RMSNorm into the linear map, and that nonlinearity is the
+            # only reason a base point matters: without it, reading (h + cv) and h and differencing
+            # gives exactly c*A*v, so the base point cancels and the readout has no operating point.
+            final = hidden[-1].flatten(0, 1)[keep].float()
             # The first batches are held out, so r2 is measured on rows the fit never saw.
             to_holdout = held_rows < holdout_rows
             if to_holdout:
@@ -136,9 +137,26 @@ class TunedLens:
         return cls(translators)
 
     def to_final(self, direction: Float[Tensor, "d"], layer: int) -> Float[Tensor, "d"]:
-        """A direction is a difference of hidden states, so only the linear part carries over."""
+        """A direction is a difference of hidden states, so only the linear part carries over.
+
+        Reading this on its own is a poor idea: the map is affine, so a difference read in isolation
+        has no base point, and the unembedding then ranks whichever token embeddings are outliers
+        rather than whichever tokens the steering makes likely. Prefer `at_point`.
+        """
         A, _ = self.translators[layer]
         return A.to(direction.device, direction.dtype) @ direction
+
+    def at_point(self, hidden: Float[Tensor, "*batch d"], layer: int) -> Float[Tensor, "*batch d"]:
+        """Predict the final residual from an actual residual, bias included.
+
+        This is the affine map applied to a point, which is what a lens is for. The base point only
+        changes anything downstream because the model's final RMSNorm is nonlinear: read two points
+        and difference the logprobs, and the difference reports what the steering did at a state the
+        model actually visits.
+        """
+        A, b = self.translators[layer]
+        A, b = A.to(hidden.device, hidden.dtype), b.to(hidden.device, hidden.dtype)
+        return hidden @ A.T + b          # batched: a readout bases on many midpoints at once
 
     def save(self, path: str | Path) -> None:
         from safetensors.torch import save_file
@@ -155,3 +173,47 @@ class TunedLens:
         flat = load_file(str(path))
         layers = sorted({int(key.split(".")[0]) for key in flat})
         return cls({layer: (flat[f"{layer}.A"], flat[f"{layer}.b"]) for layer in layers})
+
+
+class JacobianLens:
+    """The published averaged transport J_l = E[dh_final / dh_l], as a lens.
+
+    Same interface as TunedLens so a caller passes either without branching. The difference that
+    matters when you choose:
+
+      TunedLens   fitted here, minutes, ANY model. Affine (A h + b), fitted to predict h_final.
+      JacobianLens  downloaded, instant, only models with a published lens. Linear, no bias: it
+                  is a derivative, so it transports displacements about a point rather than
+                  predicting the point itself.
+
+    Reference implementation and the published lenses: https://github.com/... jacobian-lens,
+    `lens_l(h) = unembed(J_l @ h)`.
+    """
+
+    def __init__(self, jacobians: dict[int, Tensor]):
+        self.jacobians = {layer: J.float() for layer, J in jacobians.items()}
+
+    @classmethod
+    def from_pretrained(cls, path: str | Path, layers: tuple[int, ...]) -> "JacobianLens":
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
+        missing = sorted(set(layers) - set(checkpoint["source_layers"]))
+        if missing:
+            raise ValueError(f"lens has no transport for layers {missing}; "
+                             f"it fits {checkpoint['source_layers']}")
+        return cls({layer: checkpoint["J"][layer] for layer in layers})
+
+    def at_point(self, hidden: Float[Tensor, "*batch d"], layer: int) -> Float[Tensor, "*batch d"]:
+        """Transport a residual into final-layer coordinates. No bias term: J is a derivative."""
+        return hidden @ self.jacobians[layer].to(hidden.device, hidden.dtype).T
+
+
+class IdentityLens:
+    """No transport: the plain logit lens, `unembed(h)`.
+
+    Honest at the last few layers and misleading below them, which is the whole reason the other
+    two exist. Named rather than left as `lens=None` so a readout header can say which of the
+    three produced it.
+    """
+
+    def at_point(self, hidden: Float[Tensor, "*batch d"], layer: int) -> Float[Tensor, "*batch d"]:
+        return hidden
