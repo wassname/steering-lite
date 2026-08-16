@@ -75,11 +75,7 @@ PERSONA_REGISTRY: dict[str, tuple[list[tuple[str, str]], str]] = {
 
 
 def _data_path() -> Path:
-    # src/steering_lite/data/personas.py -> repo root is parents[3].
-    # Filtered subset (top-200 by POS-vs-NEG persona divergence under
-    # the active PROMPT_TEMPLATE+PERSONA_PAIRS_AUTHORITY); regenerate via
-    # `scripts/filter_branching_suffixes.py` if the persona/template change.
-    return Path(__file__).resolve().parents[3] / "data" / "branching_suffixes_filt.json"
+    return Path(__file__).with_name("branching_suffixes_filt.json")
 
 
 def load_suffixes(thinking: bool = True) -> list[dict]:
