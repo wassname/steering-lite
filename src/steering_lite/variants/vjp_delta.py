@@ -59,7 +59,7 @@ class VjpDeltaC(SteeringConfig):
     cotangent_scope: Literal["all_valid", "last_token"] = "all_valid"
     source_scope: Literal["all_valid", "last_token"] = "all_valid"
     normalize: bool = True
-    apply_mode: Literal["add", "damp_amp"] = "add"
+    apply_mode: Literal["add", "gate_gain", "damp_amp"] = "add"
 
 
 @contextmanager
@@ -494,6 +494,23 @@ class VjpDelta:
         vector = stacked["v"].to(y).sum(dim=0)
         if cfg.apply_mode == "add":
             return y + cfg.coeff * vector
+        if cfg.apply_mode == "gate_gain":
+            # Gated MLPs compute down(SiLU(gate(x)) * up(x)), so the local gain of an
+            # injection at the up_proj output is SiLU(gate(x)) elementwise. Scale the
+            # offset by that gain so the injected dose matches what reaches down_proj.
+            # Valid only at mlp.up_proj targets; attach stashes the sibling gate_proj.
+            gate_mod = getattr(_mod, "_steering_gate_mod", None)
+            if gate_mod is None or not getattr(_mod, "_steering_module_name", "").endswith(
+                "mlp.up_proj"
+            ):
+                raise ValueError(
+                    f"apply_mode='gate_gain' needs an mlp.up_proj target with a stashed "
+                    f"gate sibling, got {getattr(_mod, '_steering_module_name', None)!r}"
+                )
+            with torch.no_grad():
+                g = gate_mod(_x)
+            gain = (g.float() * torch.sigmoid(g.float())).to(y.dtype)
+            return y + cfg.coeff * gain * vector
         if cfg.apply_mode == "damp_amp":
             unit = vector / (vector.norm() + ε)
             projection = (y * unit).sum(dim=-1, keepdim=True)

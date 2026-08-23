@@ -23,7 +23,7 @@ from torch import nn
 from torch.utils.hooks import RemovableHandle
 
 from .config import SteeringConfig, REGISTRY
-from .target import find_targets
+from .target import find_targets, _get_blocks
 from .extract import record_activations
 
 
@@ -124,6 +124,18 @@ def attach(
         mod._steering_method = method
         if requires_linear:
             mod._steering_module_name = full_name
+            if getattr(cfg, "apply_mode", None) == "gate_gain":
+                # Gated-MLP injection needs the sibling gate_proj at apply time; resolve it
+                # here where we still have the model. Fail fast on anything but up_proj.
+                name_in_block = full_name.split(".", 2)[2]
+                if not name_in_block.endswith("mlp.up_proj"):
+                    raise ValueError(
+                        f"apply_mode='gate_gain' targets {full_name!r}; only mlp.up_proj "
+                        "has a gate sibling"
+                    )
+                mod._steering_gate_mod = _get_blocks(model)[li].get_submodule(
+                    name_in_block.replace("mlp.up_proj", "mlp.gate_proj")
+                )
             hooked_modules.append(mod)
             handles.append(mod.register_forward_hook(_linear_hook))
         else:
