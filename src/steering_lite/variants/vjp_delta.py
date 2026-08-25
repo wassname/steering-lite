@@ -59,7 +59,7 @@ class VjpDeltaC(SteeringConfig):
     cotangent_scope: Literal["all_valid", "last_token"] = "all_valid"
     source_scope: Literal["all_valid", "last_token"] = "all_valid"
     normalize: bool = True
-    apply_mode: Literal["add", "gate_gain", "damp_amp"] = "add"
+    apply_mode: Literal["add", "gate_gain", "damp_amp", "pre_write"] = "add"
 
 
 @contextmanager
@@ -511,6 +511,12 @@ class VjpDelta:
                 g = gate_mod(_x)
             gain = (g.float() * torch.sigmoid(g.float())).to(y.dtype)
             return y + cfg.coeff * gain * vector
+        if cfg.apply_mode == "pre_write":
+            # The vector was read at this Linear's INPUT, so push it through the weight:
+            # a delta d on the input reaches the output as W d. Lets a readout live in a
+            # pre-write space (o_proj/out_proj input) that a forward hook cannot write to.
+            W = _mod.weight
+            return y + cfg.coeff * (vector.to(W) @ W.T).to(y)
         if cfg.apply_mode == "damp_amp":
             unit = vector / (vector.norm() + ε)
             projection = (y * unit).sum(dim=-1, keepdim=True)
