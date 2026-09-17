@@ -55,39 +55,48 @@ The older results below used the 95th percentile of token KL at a target of 0.50
 
 Can we make a model treat disobedience to authority as less morally significant, while giving more weight to care? We test this with [moralmaps](https://github.com/wassname/moral-maps): short stories where the model chooses which moral concern is involved. We measure intended changes and changes to the other concerns.
 
-This table is from Qwen3-4B, using 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. Run `82d4c8319de5`, code `514b97e`, 2026-07-16. Thirteen of sixteen steering methods had results; the three TODO rows remain pending in this table.
-
-The existing score is selectivity weighted by a valid-answer probability check, not $F_\beta$:
+We want steering to have a precise, bidirectional effect: pushing one way should increase the target concept, and pushing the other way should decrease it, without changing unrelated answers. We measure this with *steering selectivity*, comparing the logprobs in the two steering directions:
 
 $$
-\mathrm{sel\_gated} = (\mathrm{on} - 0.1\,\mathrm{off})\,\mathrm{coh}^2.
+\text{selectivity} = \text{intended movement} - 0.1\,\text{unintended movement}.
 $$
 
-It rewards movement toward Authority-down and Care-up, and subtracts a smaller penalty for movement on the other foundations. Higher is better. These are changes in centered log-probabilities, not percentages of answers changed.
+Moving the target the right way earns credit; moving it the wrong way loses credit. Side effects count at one tenth the weight. Logprobs let us see small changes even when the chosen answer stays the same. [Scoring function](https://github.com/wassname/moral-maps/blob/main/src/moralmaps/metrics.py#L80).
 
-| method | score↑ | on↑ | off↓ | coh↑ | flips↑ | 95% interval |
-|---|---:|---:|---:|---:|---:|:---|
-| pca[+] | **+2.12** | **+2.17** | 0.54 | 1.00 | +0.06 | [+1.67,+2.60] |
-| sspace_pca[+] | +1.54 | +1.60 | 0.66 | 1.00 | **+0.09** | [+1.02,+2.12] |
-| corda_pca[+] | +1.50 | +1.71 | 2.12 | 1.00 | +0.05 | [+1.01,+1.98] |
-| sspace_signed[-] | +1.49 | +1.58 | 0.89 | 1.00 | +0.06 | [+1.00,+1.97] |
-| topk_clusters[-] | +0.31 | +0.35 | 0.45 | 1.00 | +0.01 | [-0.03,+0.63] |
-| super_sspace[-] | +0.24 | +0.28 | 0.38 | 1.00 | +0.02 | [-0.02,+0.50] |
-| sspace_damp_amp[+] | +0.17 | +0.25 | 0.75 | 1.00 | -0.03 | [-0.24,+0.58] |
-| mean_diff[-] | +0.10 | +0.24 | 1.37 | 1.00 | -0.02 | [-0.29,+0.51] |
-| cosine_gated[+] | -0.13 | -0.09 | 0.42 | 1.00 | -0.02 | [-0.40,+0.13] |
-| directional_ablation[-] | -0.14 | -0.14 | **0.09** | 1.00 | -0.02 | [-0.56,+0.27] |
-| spherical[-] | -0.49 | -0.41 | 0.82 | 1.00 | -0.00 | [-0.86,-0.10] |
-| sspace_ablate[-] | -0.56 | -0.41 | 1.52 | 1.00 | -0.01 | [-1.08,-0.08] |
-| sspace[-] | -0.72 | -0.52 | 1.99 | 1.00 | -0.03 | [-1.36,-0.11] |
-| *prompt_only* | -1.80 | -1.66 | 1.40 | 1.00 | -0.07 | [-2.30,-1.30] |
-| chars | TODO | | | | | |
-| linear_act | TODO | | | | | |
-| angular_steering | TODO | | | | | |
+Here are the results for Qwen3-4B. Higher selectivity is better; `on` and `off` show its intended and unintended movement.
 
-`on` is the mean signed change on the two intended foundations; `off` is the mean absolute change on the other five. `coh` measures valid-answer probability mass relative to base, capped at 1. It is 1 throughout this run, so the format check does not distinguish methods. `flips` is the signed change in answer-pick rates on the intended foundations, averaged over those foundations. Intervals use 2,000 row-bootstrap samples.
+| method | selectivity↑ | on↑ | off↓ | 95% interval |
+| --- | ---: | ---: | ---: | :--- |
+| pca[+] | **+2.12** | **+2.17** | 0.54 | [+1.67,+2.60] |
+| sspace_pca[+] | +1.54 | +1.60 | 0.66 | [+1.02,+2.12] |
+| corda_pca[+] | +1.50 | +1.71 | 2.12 | [+1.01,+1.98] |
+| sspace_signed[-] | +1.49 | +1.58 | 0.89 | [+1.00,+1.97] |
+| topk_clusters[-] | +0.31 | +0.35 | 0.45 | [-0.03,+0.63] |
+| super_sspace[-] | +0.24 | +0.28 | 0.38 | [-0.02,+0.50] |
+| sspace_damp_amp[+] | +0.17 | +0.25 | 0.75 | [-0.24,+0.58] |
+| mean_diff[-] | +0.10 | +0.24 | 1.37 | [-0.29,+0.51] |
+| cosine_gated[+] | -0.13 | -0.09 | 0.42 | [-0.40,+0.13] |
+| directional_ablation[-] | -0.14 | -0.14 | **0.09** | [-0.56,+0.27] |
+| spherical[-] | -0.49 | -0.41 | 0.82 | [-0.86,-0.10] |
+| sspace_ablate[-] | -0.56 | -0.41 | 1.52 | [-1.08,-0.08] |
+| sspace[-] | -0.72 | -0.52 | 1.99 | [-1.36,-0.11] |
+| *prompt_only* | -1.80 | -1.66 | 1.40 | [-2.30,-1.30] |
+| chars | TODO | | | |
+| linear_act | TODO | | | |
+| angular_steering | TODO | | | |
 
-The `[+]` or `[-]` direction was selected on the evaluation: whichever decreased Authority most. Steering rows compare that direction with its opposite; `prompt_only` compares a single prompt with base. That difference limits direct comparisons with prompting, and this is an exploratory ranking rather than a held-out test. [Metric definition](https://github.com/wassname/moral-maps#measurement) · [Table code](scripts/results.py)
+<details>
+<summary>Measurement details and run settings</summary>
+
+`on` is the mean signed change toward Authority-down and Care-up; `off` is the mean absolute change on the other foundations. Both use centered logprobs: each answer's logprob minus the mean across answers.
+
+The code reports `sel_gated`, which multiplies selectivity by `coh²`, a valid-answer probability check relative to base, capped at 1 and using the weaker of the two directions. It is 1 throughout this run, so the table follows the equation above without adjustment.
+
+The `[+]` or `[-]` direction was selected on the evaluation: whichever decreased Authority most. The score compares opposite directions; it does not require each to move to opposite sides of base. `prompt_only` instead compares a single prompt with base, so it is not a matched bidirectional comparison.
+
+This run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. Run `82d4c8319de5`, code `514b97e`, 2026-07-16. Intervals use 2,000 row-bootstrap samples. The three TODO rows were pending. [Table code](scripts/results.py).
+
+</details>
 
 TODO: regenerate the moral-map plot for this full run. The previous README contained only a broken image placeholder. The separate [Authority survey plots](https://github.com/wassname/moral-maps#can-we-steer-these-values) are available in moralmaps.
 
@@ -99,16 +108,6 @@ just results outputs/tinymfv_sweep_4b_fc_v2
 ```
 
 Use Qwen3-4B here: the forced-choice evaluator's KV-cache branching is incompatible with Qwen3.5-4B's hybrid attention. The [research journal](docs/RESEARCH_JOURNAL.md) and [earlier README](https://github.com/wassname/steering-lite/blob/ff9b5c6d386026fd65acec95bd5ea6ee3694c7ee/README.md) retain the per-foundation tables, older sweeps, and example traces.
-
-### A simpler score?
-
-We want some answers to change and others to stay the same. Steering $F_\beta$ would count desired changes as true positives, missed desired changes as false negatives, and unwanted changes as false positives:
-
-$$
-F_\beta = \frac{(1+\beta^2)TP}{(1+\beta^2)TP+\beta^2 FN+FP}.
-$$
-
-This is a proposal. We still need to choose $\beta$, the relative weight of target and control questions, and how logprob movement becomes a count or partial credit. Smaller $\beta$ favours precision; downweighting a large set of control questions is a separate choice. None of the table above has been rescored as $F_\beta$.
 
 ## Methods and debugging
 
