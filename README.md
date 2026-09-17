@@ -94,17 +94,18 @@ The code reports `sel_gated`, which multiplies selectivity by `coh²`, a valid-a
 
 The `[+]` or `[-]` direction was selected on the evaluation: whichever decreased Authority most. The score compares opposite directions; it does not require each to move to opposite sides of base. `prompt_only` instead compares a single prompt with base, so it is not a matched bidirectional comparison.
 
-This run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. Run `82d4c8319de5`, [code `514b97e`](https://github.com/wassname/steering-lite/tree/514b97e), 2026-07-16. Intervals use 2,000 row-bootstrap samples. The three TODO rows were pending. [Table code at that revision](https://github.com/wassname/steering-lite/blob/514b97e/scripts/results.py).
+This run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. Run `82d4c8319de5`, [run code `514b97e`](https://github.com/wassname/steering-lite/tree/514b97e), 2026-07-16. Intervals use 2,000 row-bootstrap samples. The three TODO rows were pending. The saved outputs were rescored with the [selectivity table code](https://github.com/wassname/steering-lite/blob/bba61e6/scripts/results.py).
 
 </details>
 
 TODO: regenerate the moral-map plot for this full run. The previous README contained only a broken image placeholder. The separate [Authority survey plots](https://github.com/wassname/moral-maps#can-we-steer-these-values) are available in moralmaps.
 
-Reproduce from the result's code revision with the benchmark dependencies installed:
+Reproduce the run, then score its saved outputs:
 
 ```bash
 git checkout 514b97e
 just sweep Qwen/Qwen3-4B outputs/tinymfv_sweep_4b_fc_v2
+git checkout bba61e6
 just results outputs/tinymfv_sweep_4b_fc_v2
 ```
 
