@@ -1,7 +1,7 @@
 """Regression guard for the sweep -> results measurement seam.
 
 `results.py` reads each sweep JSON's `raw_logratios` (= clr) + `mean_pmass_allowed`
-and feeds the shared `moralmaps.metrics` headline (gated_selectivity + si_flips).
+and feeds the shared `moralmaps.metrics` headline (`gated_selectivity`).
 This exercises that path on synthetic sweep JSONs, no model, so the seam (and the
 persona-aligned sign selection) can't silently rot again. -- Claude
 """
@@ -72,7 +72,6 @@ def test_results_seam(tmp_path: Path) -> None:
     assert not math.isnan(sel["sel_gated"]) and sel["sel_gated"] > 0
     assert abs(sel["off"]) < 1e-9
     assert sel["coherence"] == 1.0
-    assert -1.0 <= m["si_flips"] <= 1.0
     assert methods["repeng"]["calibrated_C"] == 0.0
     assert methods["prompt_only"]["calibrated_C"] is None
     # Selectivity + Δclr tables must render without raising.

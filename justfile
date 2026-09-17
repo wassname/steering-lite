@@ -20,7 +20,7 @@ sweep model="Qwen/Qwen3-0.6B" out="outputs/tinymfv_sweep":
 		--demo-log-path {{out}}/demo/calib.jsonl \
 		--device cuda --torch-dtype bfloat16
 
-# Render README-ready tables (base vs humans, gated selectivity + si_flips,
+# Render README-ready tables (base vs humans, gated selectivity,
 # Δclr ± σ) and a moral-map PNG (PCA scatter + ΔAuth-vs-ΔCare surgical view).
 results sweep_dir="outputs/tinymfv_sweep" vignettes="classic":
 	uv run --extra benchmark --with matplotlib --with textalloc python scripts/results.py \

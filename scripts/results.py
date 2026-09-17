@@ -1,14 +1,13 @@
 """README-ready tables + moral map from a sweep output dir.
 
 Headline metric lives in ONE place, `moralmaps.metrics` (imported, not
-reforked): `gated_selectivity` (primary, continuous) + `si_flips` (secondary,
-behavioral). This script feeds them the per-method `raw_logratios`
+reforked): `gated_selectivity`. This script feeds it the per-method `raw_logratios`
 (per-(vid,cond) clr(score)[f]) + `mean_pmass_allowed` each sweep JSON stores,
 with persona-aligned sign selection.
 
 Emits:
   - Base model clr per foundation, t-stat, vs human calibrated wrongness.
-  - Gated-selectivity table (sel_gated, on, off, coherence, si_flips, CI)
+  - Gated-selectivity table (sel_gated, on, off, coherence, CI)
     + Δclr-with-σ table.
   - Moral map: 7-foundation absolute-clr profiles, PCA → 2D scatter of
     base + each method (persona-aligned sign) + human reference.
@@ -31,7 +30,7 @@ import numpy as np
 from loguru import logger
 from tabulate import tabulate
 
-from moralmaps import gated_selectivity, si_flips, OFF_WEIGHT
+from moralmaps import gated_selectivity, OFF_WEIGHT
 from steering_lite.eval.foundations import (
     FOUNDATION_ORDER, FOUNDATION_SHORT,
     baseline_clr_per_foundation, dclr_per_foundation,
@@ -66,7 +65,7 @@ def _pmass(report: dict) -> float:
 
 def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, dict]:
     """Returns (bare_report, methods) where methods[m] carries the persona-aligned
-    sign, Δclr dicts, the shared gated_selectivity + si_flips, abs-clr profiles."""
+    sign, Δclr dicts, the shared gated_selectivity, and abs-clr profiles."""
     bare = _orjson_loads(sweep_dir / bare_name)
     base_abs = baseline_clr_per_foundation(bare)
     bare_pmass = _pmass(bare)
@@ -92,7 +91,6 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             sel = gated_selectivity(
                 aligned["raw_logratios"], opp["raw_logratios"], INTENT,
                 pmass_pos=_pmass(aligned), pmass_neg=_pmass(opp), pmass_base=bare_pmass)
-            sif = si_flips(aligned["raw_logratios"], opp["raw_logratios"], INTENT)
             # Per-direction diagnostic: each arm vs bare (one-sided). A real axis move
             # is asymmetric (+C toward intent, -C away); if BOTH score positive that is
             # the generic-disruption signature (any push helps), not steering. (Claude)
@@ -105,7 +103,7 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             methods[method] = {
                 "bidirectional": True, "sign": sign,
                 "calibrated_C": d.get("calibrated_C"),
-                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
+                "dclr": dl, "sel": sel,
                 "sel_pos": sel_pos["sel_gated"], "sel_neg": sel_neg["sel_gated"],
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
@@ -115,11 +113,10 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             sel = gated_selectivity(
                 d["raw_logratios"], bare["raw_logratios"], INTENT,
                 pmass_pos=_pmass(d), pmass_neg=bare_pmass, pmass_base=bare_pmass)
-            sif = si_flips(d["raw_logratios"], bare["raw_logratios"], INTENT)
             methods[method] = {
                 "bidirectional": False, "sign": +1,
                 "calibrated_C": d["coeff"],
-                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
+                "dclr": dl, "sel": sel,
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
             }
@@ -181,7 +178,7 @@ def base_vs_humans_table(bare: dict, vignettes_name: str) -> str:
                     tablefmt="pipe", floatfmt="+.2f")
 
 
-# ── SI / Δclr / sign tables (canonical foundations source) ──────────────────
+# ── selectivity / Δclr tables (canonical foundations source) ───────────────
 
 def _fmt(v, digits: int = 2) -> str:
     if v is None or (isinstance(v, float) and math.isnan(v)):
@@ -201,19 +198,18 @@ def print_tables(methods: dict) -> None:
         sp, sn = methods[m].get("sel_pos"), methods[m].get("sel_neg")
         smin = min(sp, sn) if (sp is not None and sn is not None) else None
         sel_rows.append([f"{m}{tag(m)}", s["sel_gated"], s["on"], s["off"],
-                         s["coherence"], methods[m]["si_flips"],
-                         f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]", sp, sn, smin])
+                         s["coherence"], f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]", sp, sn, smin])
     sel_rows.sort(key=lambda r: (-1e9 if (isinstance(r[1], float) and math.isnan(r[1])) else r[1]),
                   reverse=True)
-    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4], 3), _fmt(r[5]), r[6],
-                 _fmt(r[7]), _fmt(r[8]), _fmt(r[9])] for r in sel_rows]
+    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4], 3), r[5],
+                 _fmt(r[6]), _fmt(r[7]), _fmt(r[8])] for r in sel_rows]
     print("\n## Gated selectivity (headline; shared with j-steer via moralmaps.metrics)\n")
-    print(tabulate(sel_rows, headers=["method", "sel_gated", "on", "off", "coh", "si_flips",
-                                      "CI95", "s(+C)", "s(-C)", "min"],
+    print(tabulate(sel_rows, headers=["method", "sel_gated", "on", "off", "coh", "CI95",
+                                      "s(+C)", "s(-C)", "min"],
                    tablefmt="pipe"))
     print(f"\nsel_gated = (on − {OFF_WEIGHT}·off)·coh²; on = mean signed Δclr on {list(INTENT)} "
           "(Auth↓,Care↑), off = mean|Δclr| over the other 5, coh = min(1, min-arm pmass / base). "
-          "si_flips = signed argmax pick-rate change (behavioral, bounded). CI95 = 2000× row bootstrap.\n"
+          "CI95 = 2000× row bootstrap.\n"
           "s(+C)/s(-C) = each arm's one-sided sel_gated vs bare; min = the weaker arm (robustness). "
           "Both arms positive is the generic-disruption signature (any push helps), not a specific axis move.")
 

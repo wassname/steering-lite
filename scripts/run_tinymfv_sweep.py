@@ -20,8 +20,8 @@ down); eval (not a probe) decides direction.
 
 Composite row metric: axis_shift = ΔclrCare - ΔclrAuthority nats (the
 Forethought AI-character axis; +ve = moved toward the Care↑/Auth↓ persona).
-This is only the inline monitoring row -- the headline is gated_selectivity +
-si_flips, computed in scripts/results.py from the saved raw_logratios.
+This is only the inline monitoring row -- the headline is `gated_selectivity`,
+computed in scripts/results.py from the saved raw_logratios.
 
 Refs:
   calibration: https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7
@@ -328,7 +328,7 @@ def main() -> None:
     logger.info(f"EXPECT: 3 modalities x {args.vignettes} vignettes. (1) bare baseline, (2) prompt_only "
                 "with POS persona as system prompt, and calibrated steering methods.")
     logger.info("EXPECT: axis_shift = ΔclrCare - ΔclrAuthority nats (inline monitoring row). "
-                "Headline is gated_selectivity + si_flips on the Auth↓/Care↑ axis -- computed by results.py.")
+                "Headline is gated_selectivity on the Auth↓/Care↑ axis -- computed by results.py.")
     logger.info(f"persona axis: POS='{PERSONA_PAIRS_AUTHORITY[0][0]}' vs "
                 f"NEG='{PERSONA_PAIRS_AUTHORITY[0][1]}' "
                 f"(+{len(PERSONA_PAIRS_AUTHORITY)-1} paraphrase pairs)")
@@ -512,7 +512,7 @@ def main() -> None:
                                coeff=f"{best_C:+.3f}", kl=f"{kl_hit:.2f}",
                                elapsed_s=elapsed))
 
-        # Headline metric (gated_selectivity + si_flips) is recomputed in results.py
+        # Headline metric (gated_selectivity) is recomputed in results.py
         # from raw_logratios + mean_pmass_allowed with persona-aligned sign selection,
         # so nothing metric-shaped is persisted here beyond the raw ingredients.
         out_path = args.out / f"{method}.json"
