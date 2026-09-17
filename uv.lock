@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-09T21:56:37.727591784Z"
+exclude-newer = "2026-09-12T10:44:15.133383659Z"
 exclude-newer-span = "P5D"
 
 [[package]]
@@ -2677,7 +2677,9 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "safetensors" },
+    { name = "tabulate" },
     { name = "torch" },
+    { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
@@ -2691,7 +2693,6 @@ benchmark = [
     { name = "datasets" },
     { name = "moral-maps" },
     { name = "scikit-learn" },
-    { name = "tabulate" },
     { name = "transformers" },
     { name = "tyro" },
 ]
@@ -2705,7 +2706,6 @@ hf-test = [
 test = [
     { name = "beartype" },
     { name = "pytest" },
-    { name = "tabulate" },
 ]
 
 [package.metadata]
@@ -2726,9 +2726,9 @@ requires-dist = [
     { name = "repeng", marker = "extra == 'baseline'", git = "https://github.com/vgel/repeng.git" },
     { name = "safetensors", specifier = ">=0.5" },
     { name = "scikit-learn", marker = "extra == 'benchmark'", specifier = ">=1.4" },
-    { name = "tabulate", marker = "extra == 'benchmark'" },
-    { name = "tabulate", marker = "extra == 'test'" },
+    { name = "tabulate", specifier = ">=0.9" },
     { name = "torch", specifier = ">=2.1" },
+    { name = "tqdm", specifier = ">=4.66" },
     { name = "transformers", marker = "extra == 'benchmark'", specifier = ">=4.51" },
     { name = "transformers", marker = "extra == 'hf-test'", specifier = ">=4.51" },
     { name = "twine", marker = "extra == 'build'", specifier = ">=6" },

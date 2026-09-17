@@ -63,7 +63,7 @@ $$
 
 Moving the target the right way earns credit; moving it the wrong way loses credit. Side effects count at one tenth the weight. Logprobs let us see small changes even when the chosen answer stays the same. [Scoring function](https://github.com/wassname/moral-maps/blob/main/src/moralmaps/metrics.py#L80).
 
-Here are the results for Qwen3-4B. Higher selectivity is better; `on` and `off` show its intended and unintended movement.
+Here are the saved Qwen3-4B results. Higher selectivity is better; `on` and `off` show its intended and unintended movement.
 
 | method | selectivity↑ | on↑ | off↓ | 95% interval |
 | --- | ---: | ---: | ---: | :--- |
@@ -81,41 +81,23 @@ Here are the results for Qwen3-4B. Higher selectivity is better; `on` and `off` 
 | sspace_ablate[-] | -0.56 | -0.41 | 1.52 | [-1.08,-0.08] |
 | sspace[-] | -0.72 | -0.52 | 1.99 | [-1.36,-0.11] |
 | *prompt_only* | -1.80 | -1.66 | 1.40 | [-2.30,-1.30] |
-| chars | TODO | | | |
-| linear_act | TODO | | | |
-| angular_steering | TODO | | | |
 
-<details>
-<summary>Measurement details and run settings</summary>
+These values are exploratory. The run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. It ran on 2026-07-16 as `82d4c8319de5` with code `514b97e`, calibrated at `0.5 kl_p95`, and used 2,000 row-bootstrap samples. The table was rescored by `bba61e6`. It predates the matched-pair correction `055bd94`; do not treat its ranking as a corrected comparison. `random` is an equal-KL evaluation null, but has no saved result and is not in this table.
 
-`on` is the mean signed change toward Authority-down and Care-up; `off` is the mean absolute change on the other foundations. Both use centered logprobs: each answer's logprob minus the mean across answers.
+`on` is the mean signed change toward Authority-down and Care-up; `off` is the mean absolute change on the other foundations. Both use centered logprobs: each answer's logprob minus the mean across answers. The maintained scorer calls `moralmaps.gated_selectivity`; `tests/test_results_seam.py` checks that input seam.
 
-The code reports `sel_gated`, which multiplies selectivity by `coh²`, a valid-answer probability check relative to base, capped at 1 and using the weaker of the two directions. It is 1 throughout this run, so the table follows the equation above without adjustment.
-
-The `[+]` or `[-]` direction was selected on the evaluation: whichever decreased Authority most. The score compares opposite directions; it does not require each to move to opposite sides of base. `prompt_only` instead compares a single prompt with base, so it is not a matched bidirectional comparison.
-
-This run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. Run `82d4c8319de5`, code `514b97e`, 2026-07-16. Intervals use 2,000 row-bootstrap samples. The three TODO rows were pending. [Table code](scripts/results.py).
-
-</details>
-
-TODO: regenerate the moral-map plot for this full run. The previous README contained only a broken image placeholder. The separate [Authority survey plots](https://github.com/wassname/moral-maps#can-we-steer-these-values) are available in moralmaps.
-
-Reproduce from a checkout with the benchmark dependencies installed:
+To produce a new table with the current code:
 
 ```bash
-just sweep Qwen/Qwen3-4B outputs/tinymfv_sweep_4b_fc_v2
-just results outputs/tinymfv_sweep_4b_fc_v2
+just sweep Qwen/Qwen3-4B outputs/tinymfv_sweep_4b
+just results outputs/tinymfv_sweep_4b
 ```
-
-Use Qwen3-4B here: the forced-choice evaluator's KV-cache branching is incompatible with Qwen3.5-4B's hybrid attention. The [research journal](docs/RESEARCH_JOURNAL.md) and [earlier README](https://github.com/wassname/steering-lite/blob/ff9b5c6d386026fd65acec95bd5ea6ee3694c7ee/README.md) retain the per-foundation tables, older sweeps, and example traces.
 
 ## Methods and debugging
 
-Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, angular steering, and [VJP delta](src/steering_lite/variants/vjp_delta.py).
+Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). The new variants are [S-space PCA](src/steering_lite/variants/sspace_pca.py) and [CorDA PCA](src/steering_lite/variants/corda_pca.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
 
-`readout_words(model, tokenizer, vector)` decodes the vector's two directions into associated words. This can help spot an unrelated or incoherent direction before an evaluation. It is a debugging aid, not evidence that behaviour changed. See [word readout](src/steering_lite/word_readout.py).
-
-Open issues from the older sweeps include calibration NaNs for `directional_ablation` and `angular_steering`. Per-method calibration sweeps, MoE support, and multi-token aggregation remain future work.
+The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 
 See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
 
@@ -129,5 +111,3 @@ See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AI
   url = {https://github.com/wassname/steering-lite}
 }
 ```
-
-<!-- PI/gpt-6-astra: shortened from the existing README and wassname's steering-score explanation; saved result values retained. -->

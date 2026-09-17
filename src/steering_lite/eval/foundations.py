@@ -18,8 +18,7 @@ Why pair on (vid, cond): every vignette is its own random effect (some are
 just easier than others). Pairing removes that variance — std across pairs
 is what we actually care about.
 
-Used by the sweep (`scripts/run_tinymfv_sweep.py`), iterated steer
-(`scripts/run_iterated_steer.py`), and baseline scripts.
+Used by the maintained sweep (`scripts/run_tinymfv_sweep.py`).
 """
 from __future__ import annotations
 

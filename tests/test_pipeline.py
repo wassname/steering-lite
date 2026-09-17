@@ -1,6 +1,6 @@
 """Functional pipeline test: extract -> calibrate -> steer -> save/load.
 
-Tiny random model, CPU, all 11 methods. ~30s total. No HF network beyond the
+Tiny random model, CPU, every registered method. No HF network beyond the
 hf-internal-testing tiny LlamaForCausalLM (cached).
 """
 from __future__ import annotations
@@ -13,15 +13,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import steering_lite as sl
 from steering_lite import Vector
-from steering_lite.eval.edge import summarize_anchors
-from steering_lite.variants.vjp_delta import orient_vjp_delta
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random", "vjp_delta",
+    "angular_steering", "random",
 ]
 
 POS = [
@@ -59,9 +57,6 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
         "random":                sl.RandomC(**common),
-        "vjp_delta":             sl.VjpDeltaC(
-            **(common | {"layers": (0,)}), target_layer=-1, skip_first=0
-        ),
     }
     return table[method]
 
@@ -124,40 +119,9 @@ def test_pipeline(method, tiny_model, tmp_path):
     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"
 
 
-def test_vjp_delta_label_swap_flips_oriented_vector(tiny_model):
-    model, tok = tiny_model
-    sl.detach(model)
-    cfg = _make_cfg("vjp_delta")
-    chosen = sl.train(
-        model, tok, POS, NEG, cfg, batch_size=2, max_length=64
-    ).stacked[0]["v"]
-    swapped = sl.train(
-        model, tok, NEG, POS, cfg, batch_size=2, max_length=64
-    ).stacked[0]["v"]
-    torch.testing.assert_close(chosen, -swapped, rtol=1e-4, atol=1e-5)
-
-
-def test_vjp_delta_orientation_uses_one_sign_across_layers():
-    raw = {
-        1: torch.tensor([1.0, 0.0]),
-        2: torch.tensor([-1.0, 0.0]),
-    }
-    activation_axis = {
-        1: torch.tensor([-1.0, 0.0]),
-        2: torch.tensor([-0.5, 3**0.5 / 2]),
-    }
-    oriented, cosines, score, flipped = orient_vjp_delta(raw, activation_axis)
-
-    assert cosines == pytest.approx({1: -1.0, 2: 0.5})
-    assert score == pytest.approx(-0.25)
-    assert flipped
-    torch.testing.assert_close(oriented[1], -raw[1])
-    torch.testing.assert_close(oriented[2], -raw[2])
-
-
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
 MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_damp_amp",
-            "super_sspace", "topk_clusters", "random", "vjp_delta"]
+            "super_sspace", "topk_clusters", "random"]
 # methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
 MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
               "chars", "linear_act", "angular_steering", "corda_pca"]
@@ -216,36 +180,3 @@ def test_multi_round_natural_fail(method, tiny_model):
     _cfg, v1, v2 = _train_two(method, model, tok)
     with pytest.raises(ValueError, match="shared"):
         _ = v1 + v2
-
-
-def test_edge_summary_matches_frozen_meandiff():
-    anchors = [
-        {"coefficient": -0.188, "answer": 0.03963884338736534,
-         "repetition": 0.03508771929824561, "answer_mass": 0.5762189626693726,
-         "display_generation": "</think>"},
-        {"coefficient": -0.094, "answer": 0.027585284784436226,
-         "repetition": 0.005952380952380931, "answer_mass": 0.5515086054801941,
-         "display_generation": "</think>"},
-        {"coefficient": 0.0, "answer": 0.10669060051441193,
-         "repetition": 0.0, "answer_mass": 0.561994731426239,
-         "display_generation": "</think>"},
-        {"coefficient": 0.16, "answer": 0.04742587357759476,
-         "repetition": 0.0, "answer_mass": 0.5931493639945984,
-         "display_generation": "</think>"},
-        {"coefficient": 0.319, "answer": 0.08509904146194458,
-         "repetition": 0.023809523809523836, "answer_mass": 0.5284072756767273,
-         "display_generation": "</think>"},
-    ]
-    summary = summarize_anchors("meandiff(base)", anchors)
-    assert summary["swing"] == pytest.approx(0.04546019807457924)
-    # score/ratio constants are recomputed from the frozen anchor fields above
-    # (swing * (min(am-, am+)/am0)**2). The original constants asserted here had
-    # no artifact provenance and never matched, so this test was red from birth;
-    # the frozen artifact stores the summary only at display precision (0.0402,
-    # 0.94), which both old and new constants satisfy. -- Claude
-    assert summary["score"] == pytest.approx(0.04018874208758786)
-    assert summary["am_edge/base"] == pytest.approx(0.9402352835866041)
-    assert round(summary["score"], 4) == 0.0402
-    assert round(summary["am_edge/base"], 2) == 0.94
-    assert summary["at_budget"] is True
-    assert summary["readout_ok"] is True

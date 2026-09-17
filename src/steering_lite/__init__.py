@@ -8,9 +8,6 @@ from .config import SteeringConfig, REGISTRY, register
 from .extract import record_activations
 from .attach import attach, detach, save, load, train
 from .calibrate import measure_kl, calibrate_iso_kl
-from .word_readout import (readout_words, format_readout, readout_effect, format_effect,
-                           midpoint_states, readout_at_point, format_at_point)
-from .tuned_lens import IdentityLens, JacobianLens, TunedLens
 from . import variants  # noqa: F401  triggers method + config registration
 from .vector import Vector
 
@@ -30,7 +27,6 @@ from .variants.chars import CHaRSC
 from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
 from .variants.random import RandomC
-from .variants.vjp_delta import VjpDeltaC
 
 __all__ = [
     "SteeringConfig",
@@ -50,7 +46,6 @@ __all__ = [
     "LinearAcTC",
     "AngularSteeringC",
     "RandomC",
-    "VjpDeltaC",
     "record_activations",
     "train",
     "attach",
@@ -59,16 +54,6 @@ __all__ = [
     "load",
     "measure_kl",
     "calibrate_iso_kl",
-    "readout_words",
-    "format_readout",
-    "readout_effect",
-    "format_effect",
-    "midpoint_states",
-    "readout_at_point",
-    "format_at_point",
-    "TunedLens",
-    "JacobianLens",
-    "IdentityLens",
     "REGISTRY",
     "register",
     "Vector",

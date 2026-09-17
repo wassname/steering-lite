@@ -1,6 +1,6 @@
 """tinymfv sweep: extract -> calibrate -> eval. Per-foundation Δclr ± std.
 
-Three baseline modalities + 11 calibrated steering methods, all targeting the
+Baseline conditions and calibrated steering methods, all targeting the
 Authority↓ + Care↑ axis (Forethought "AI character" framing) on tinymfv clifford
 vignettes:
   1. bare        -- no system prompt, no steering vector
@@ -140,14 +140,12 @@ logger.remove()
 logger.add(lambda x: tqdm.write(x, end=""), level="INFO", colorize=False, format="{message}")
 
 
-# Ordered by research priority so a killed run still lands the most useful rows (Claude):
-# 1) CorDA/S-space keep-decision head-to-head, 2) the 3 methods still TODO in the README,
-# 3) rest of the sspace family, 4) remaining baselines.
+# The maintained method set, including the random evaluation null.
 METHODS = [
     "mean_diff", "pca", "corda_pca", "sspace_pca", "sspace", "directional_ablation",
     "chars", "linear_act", "angular_steering",
     "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
-    "cosine_gated", "topk_clusters", "spherical",
+    "cosine_gated", "topk_clusters", "spherical", "random",
 ]
 
 def _make_cfg(method: str, layers: tuple[int, ...], *,
@@ -273,7 +271,7 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--torch-dtype", default="bfloat16")
     ap.add_argument("--n-pairs", type=int, default=256,
-                    help="contrastive pairs from data/branching_suffixes.json (~550 max)")
+                    help="contrastive pairs from the packaged branching suffix corpus")
     ap.add_argument("--prompt-baseline", action=argparse.BooleanOptionalAction, default=True,
                     help="include a persona-as-system-prompt baseline row (no steering vector)")
     ap.add_argument("--batch-size", type=int, default=8)
@@ -328,7 +326,7 @@ def main() -> None:
     logger.info(f"BLUF: model={args.model} methods={len(args.methods)} target_kl={args.target_kl} "
                 f"vignettes={args.vignettes} max_think={args.max_think_tokens}")
     logger.info(f"EXPECT: 3 modalities x {args.vignettes} vignettes. (1) bare baseline, (2) prompt_only "
-                "with POS persona as system prompt, (3) 11 calibrated steering methods.")
+                "with POS persona as system prompt, and calibrated steering methods.")
     logger.info("EXPECT: axis_shift = ΔclrCare - ΔclrAuthority nats (inline monitoring row). "
                 "Headline is gated_selectivity + si_flips on the Auth↓/Care↑ axis -- computed by results.py.")
     logger.info(f"persona axis: POS='{PERSONA_PAIRS_AUTHORITY[0][0]}' vs "
@@ -452,7 +450,7 @@ def main() -> None:
                + [f"Δ{FOUNDATION_SHORT[f]}" for f in FOUNDATION_ORDER]
                + ["t"])
 
-    # === (3) 11 calibrated steering methods =================================
+    # === (3) calibrated steering methods ====================================
     # Bidirectional: calibrate |C| at +sign, then run eval at +C and -C. Lets the
     # eval (not a sign-probe) decide which direction is the intended one. KL at
     # -C is not exactly the same as at +C, but at target_kl=1.0 the asymmetry is

@@ -19,10 +19,6 @@ Usage:
 
 Or via justfile: `just results outputs/tinymfv_sweep_4b_fc`.
 
-History: the flip-based SI (`si_per_foundation`) was retired 2026-07 in favour
-of the continuous `gated_selectivity` shared with j-steer -- clr's 0 is not a
-decision boundary, so per-foundation flip counts across it were meaningless.
--- Claude
 """
 from __future__ import annotations
 

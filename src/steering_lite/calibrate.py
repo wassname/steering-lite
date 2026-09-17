@@ -332,7 +332,7 @@ def calibrate_iso_kl(
     tok,
     prompts: list[str] | list[Tensor] | None = None,
     *,
-    target_kl: float = 0.8,  # highest-coherent-tail kl_rms dose (pca bracket, job 117) (Claude)
+    target_kl: float = 1.0,
     target_stat: str = "kl_rms",
     bracket: tuple[float, float] = (0.001, 256.0),
     tol: float = 0.05,
@@ -399,9 +399,7 @@ def calibrate_iso_kl(
         if gap < SIGN_PROBE_MIN_GAP:
             logger.warning(
                 f"sign_probe gap {gap:.3f} < {SIGN_PROBE_MIN_GAP}: the two signs are "
-                "indistinguishable on this probe, so +C/-C labels are NOT certified. This is the "
-                "failure that inverted vjp_delta job 172 relative to job 160 when the sign came "
-                "from a 0.078 geometric projection instead."
+                "indistinguishable on this probe, so +C/-C labels are not certified."
             )
         sign = sign * chosen
 

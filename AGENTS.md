@@ -13,6 +13,4 @@ Inherits conventions from sibling project `lora-lite`. Read [../lora-lite/AGENTS
 
 ## Verify
 
-`just smoke` -> 6/6 methods pass full extract -> attach -> generate -> save/load loop on tiny-random-Llama. Asserts non-zero state, nonzero residual delta, save/load round-trip < 1e-4.
-
-`just bench MODEL METHOD COEFF` -> JSON to `outputs/daily_dilemmas/` with surgical informedness.
+`just smoke` -> every registered method passes extract -> attach -> generate -> save/load on tiny-random-Llama. It asserts non-zero state, a non-zero residual delta, and a save/load round-trip below `1e-4`.

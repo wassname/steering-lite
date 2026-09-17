@@ -11,6 +11,8 @@ dependencies = [
     "jaxtyping>=0.2.34",
     "safetensors>=0.5",
     "loguru>=0.7",
+    "tabulate>=0.9",
+    "tqdm>=4.66",
     "matplotlib>=3.10.9",
 ]
 keywords = ["steering", "activation-steering", "representation-engineering", "pytorch", "llm"]
@@ -29,9 +31,9 @@ Issues = "https://github.com/wassname/steering-lite/issues"
 
 [project.optional-dependencies]
 build = ["twine>=6"]
-test = ["pytest", "tabulate", "beartype>=0.18"]
+test = ["pytest", "beartype>=0.18"]
 hf-test = ["accelerate>=1.6", "transformers>=4.51"]
-benchmark = ["accelerate>=1.6", "datasets>=3.6", "tabulate", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4", "moral-maps"]
+benchmark = ["accelerate>=1.6", "datasets>=3.6", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4", "moral-maps"]
 baseline = ["repeng", "openrouter-wrapper", "python-dotenv"]
 
 [build-system]
