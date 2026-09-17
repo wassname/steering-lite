@@ -50,7 +50,7 @@ exclude-newer = "5 days"
 [tool.uv.sources]
 # DEV: pointing to local sibling clone for live-edit. Switch back to the git
 # spec below once changes are pushed and the upstream ref is bumped.
-moral-maps = { path = "../tinymfv", editable = true }
+moral-maps = { path = "../moralmaps", editable = true }
 # moral-maps = { git = "https://github.com/wassname/moral-maps.git", branch = "feat/batched-guided-rollout" }
 repeng = { git = "https://github.com/vgel/repeng.git" }
 openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper.git" }

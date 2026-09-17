@@ -1324,7 +1324,7 @@ wheels = [
 [[package]]
 name = "moral-maps"
 version = "0.1.0"
-source = { editable = "../tinymfv" }
+source = { editable = "../moralmaps" }
 dependencies = [
     { name = "loguru" },
     { name = "numpy" },
@@ -2718,7 +2718,7 @@ requires-dist = [
     { name = "jaxtyping", specifier = ">=0.2.34" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "matplotlib", specifier = ">=3.10.9" },
-    { name = "moral-maps", marker = "extra == 'benchmark'", editable = "../tinymfv" },
+    { name = "moral-maps", marker = "extra == 'benchmark'", editable = "../moralmaps" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "openrouter-wrapper", marker = "extra == 'baseline'", git = "https://github.com/wassname/openrouter_wrapper.git" },
     { name = "pytest", marker = "extra == 'test'" },
