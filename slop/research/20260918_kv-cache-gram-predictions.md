@@ -18,4 +18,6 @@ Expected runtime cost: fitting performs ordinary cached forwards plus CPU float6
 
 The result must be audited from the complete calibration and generation logs before adding a numeric README row.
 
+Queued as pueue job 1704 from commit `efd74bb`. It runs only `kv_cache_gram` on `Qwen/Qwen3-4B` with rank 16 and the existing full-sweep defaults (`target_kl=0.8`, `kl_rms`, 256 contrast pairs, classic vignettes). The prompt-only baseline is omitted because the comparable frozen sweep already has it; this job still recomputes bare.
+
 -- PI/OpenAI
