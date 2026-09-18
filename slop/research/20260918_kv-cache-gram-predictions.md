@@ -1,0 +1,21 @@
+# KV-cache Gram leaderboard prediction
+
+Question: does a contrastive direction in the high-energy value-cache subspace steer the moral axis at matched output-distribution drift without losing more selectivity than residual methods?
+
+Novel part: the intervention changes actual cached values per KV head. Extraction uses no gradients or optimizer. The existing bare, prompt-only, residual PCA, CorDA, S-space, and random rows are the controls.
+
+| outcome | prior | distinguishing result |
+|---|---:|---|
+| It steers the intended axis with usable selectivity | 40% | positive held-out gated selectivity and intended movement at calibrated KL |
+| It changes behaviour but loses selectivity | 30% | intended movement with comparable or larger unintended movement |
+| It is too weak after rank-16 projection | 15% | calibration reaches its coefficient ceiling below the KL target |
+| It becomes incoherent before useful movement | 10% | calibration trace shows repetition or broken generations before axis movement |
+| Implementation or evaluation bug | 5% | impossible cache shapes, non-finite values, cache path mismatch, or failure of saved software invariants |
+
+I would drop this exact rank-16 implementation if it has no intended movement at the largest coherent calibrated coefficient while the existing methods move on the same evaluation. That would not rule out other cache edit rules, key editing, cache VJP extraction, or different ranks.
+
+Expected runtime cost: fitting performs ordinary cached forwards plus CPU float64 Gram accumulation and per-head eigendecomposition. Inference adds one rank-independent projection per stored value and extracted direction at selected full-attention layers. No backward graph is retained.
+
+The result must be audited from the complete calibration and generation logs before adding a numeric README row.
+
+-- PI/OpenAI

@@ -95,7 +95,7 @@ just results outputs/tinymfv_sweep_4b
 
 ## Methods and debugging
 
-Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). The new variants are [S-space PCA](src/steering_lite/variants/sspace_pca.py) and [CorDA PCA](src/steering_lite/variants/corda_pca.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
+Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). [KV-cache Gram](src/steering_lite/variants/kv_cache_gram.py) steers the attention value cache instead of a residual stream. [S-space PCA](src/steering_lite/variants/sspace_pca.py) and [CorDA PCA](src/steering_lite/variants/corda_pca.py) steer in weight-derived spaces. [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
 
 The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 

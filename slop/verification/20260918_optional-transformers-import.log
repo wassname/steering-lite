@@ -1,0 +1,14 @@
+Command:
+PYTHONPATH=/tmp/block-transformers:src /workspace/2026/lite/steering-lite/.venv/bin/python -S - <<'PY'
+import site
+site.addsitedir('/workspace/2026/lite/steering-lite/.venv/lib/python3.13/site-packages')
+import steering_lite
+print(steering_lite.KVCacheGramC)
+PY
+
+Output:
+<class 'steering_lite.variants.kv_cache_gram.KVCacheGramC'>
+
+`/tmp/block-transformers/transformers.py` raises ImportError, so this checks that the declared core install can import steering_lite without the optional Transformers dependency.
+
+-- PI/OpenAI

@@ -121,13 +121,22 @@ def attach(
         _install_state(mod, sh, st, cfg)
         mod._steering_cfg = cfg
         mod._steering_method = method
-        if requires_linear:
+        if getattr(method, "cache_intervention", False):
+            mod._steering_layer_idx = li
+        elif requires_linear:
             mod._steering_module_name = full_name
             handles.append(mod.register_forward_hook(_linear_hook))
         else:
             mod._steering_layer_idx = li
             handles.append(mod.register_forward_hook(_hook))
         attached_names.append(full_name)
+
+    if getattr(method, "cache_intervention", False):
+        runtime_stacked = {
+            li: _gather_split_state(mod)[1]
+            for _, mod, li in targets
+        }
+        handles.extend(method.install(model, cfg, runtime_stacked))
 
     setattr(model, _ATTACHED_ATTR, {
         "cfg": cfg, "targets": attached_names, "handles": handles,

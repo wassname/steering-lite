@@ -145,12 +145,12 @@ METHODS = [
     "mean_diff", "pca", "corda_pca", "sspace_pca", "sspace", "directional_ablation",
     "chars", "linear_act", "angular_steering",
     "sspace_signed", "sspace_ablate", "sspace_damp_amp", "super_sspace",
-    "cosine_gated", "topk_clusters", "spherical", "random",
+    "kv_cache_gram", "cosine_gated", "topk_clusters", "spherical", "random",
 ]
 
 def _make_cfg(method: str, layers: tuple[int, ...], *,
               sspace_r: int = -1, sspace_target_submodule: str | None = None,
-              seed: int = 0) -> sl.SteeringConfig:
+              kv_cache_r: int = 16, seed: int = 0) -> sl.SteeringConfig:
     common = dict(layers=layers, coeff=1.0, dtype=torch.bfloat16, seed=seed)
     sspace_kw: dict = {"r": sspace_r}
     if sspace_target_submodule is not None:
@@ -173,6 +173,7 @@ def _make_cfg(method: str, layers: tuple[int, ...], *,
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
         "random":                sl.RandomC(**common),
+        "kv_cache_gram":         sl.KVCacheGramC(**common, r=kv_cache_r),
     }
     return table[method]
 
@@ -303,6 +304,8 @@ def main() -> None:
     ap.add_argument("--sspace-target-submodule", default=None,
                     help="regex matched against block.named_modules() for sspace* variants. "
                          "None uses the variant default (residual writers: mlp.down_proj + self_attn.o_proj).")
+    ap.add_argument("--kv-cache-r", type=int, default=16,
+                    help="rank of the per-head value-cache Gram basis")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--demo-only", action="store_true",
                     help="run persona demo, then exit before bare/sweep")
@@ -456,9 +459,21 @@ def main() -> None:
     # -C is not exactly the same as at +C, but at target_kl=1.0 the asymmetry is
     # small; revisit with dual calibration if it bites.
     for method in tqdm(args.methods, desc="methods", mininterval=60):
-        cfg = _make_cfg(method, layers,
+        method_layers = layers
+        if method == "kv_cache_gram":
+            text_cfg = getattr(model.config, "text_config", model.config)
+            layer_types = getattr(text_cfg, "layer_types", None)
+            if layer_types is not None:
+                method_layers = tuple(
+                    layer_idx for layer_idx in layers
+                    if layer_types[layer_idx] == "full_attention"
+                )
+                if not method_layers:
+                    raise ValueError("kv_cache_gram selected no full-attention layers")
+        cfg = _make_cfg(method, method_layers,
                         sspace_r=args.sspace_r,
                         sspace_target_submodule=args.sspace_target_submodule,
+                        kv_cache_r=args.kv_cache_r,
                         seed=args.seed)
         logger.info(f"\n=== steer_{method} ===")
         t0 = time.time()

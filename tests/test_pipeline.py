@@ -9,17 +9,24 @@ from dataclasses import replace
 
 import pytest
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedConfig
+from transformers.cache_utils import DynamicCache
+from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
 import steering_lite as sl
 from steering_lite import Vector
+from steering_lite.variants.kv_cache_gram import (
+    SteeredDynamicCache,
+    _CacheSteeringLease,
+)
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random",
+    "angular_steering", "random", "kv_cache_gram",
 ]
 
 POS = [
@@ -57,6 +64,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "linear_act":            sl.LinearAcTC(**common),
         "angular_steering":      sl.AngularSteeringC(**common),
         "random":                sl.RandomC(**common),
+        "kv_cache_gram":         sl.KVCacheGramC(**common, r=2),
     }
     return table[method]
 
@@ -121,7 +129,7 @@ def test_pipeline(method, tiny_model, tmp_path):
 
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
 MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_damp_amp",
-            "super_sspace", "topk_clusters", "random"]
+            "super_sspace", "topk_clusters", "random", "kv_cache_gram"]
 # methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
 MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
               "chars", "linear_act", "angular_steering", "corda_pca"]
@@ -180,3 +188,197 @@ def test_multi_round_natural_fail(method, tiny_model):
     _cfg, v1, v2 = _train_two(method, model, tok)
     with pytest.raises(ValueError, match="shared"):
         _ = v1 + v2
+
+
+def test_kv_cache_gram_edits_values_not_keys(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    cfg = sl.KVCacheGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.float32)
+    vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+    prompt = tok("Tell me the truth.", return_tensors="pt")
+
+    with torch.no_grad():
+        base = model(**prompt, use_cache=True).past_key_values
+    with vector(model, C=1.0):
+        with torch.no_grad():
+            steered = model(**prompt, use_cache=True).past_key_values
+
+    torch.testing.assert_close(steered.layers[1].keys, base.layers[1].keys, rtol=0, atol=0)
+    assert not torch.equal(steered.layers[1].values, base.layers[1].values)
+    torch.testing.assert_close(steered.layers[0].values, base.layers[0].values, rtol=0, atol=0)
+
+
+def test_kv_cache_gram_zero_and_signed_symmetry(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(
+        model, tok, POS, NEG,
+        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        batch_size=2, max_length=64,
+    )
+    prompt = tok("Tell me the truth.", return_tensors="pt")
+    with torch.no_grad():
+        base = model(**prompt, use_cache=True).past_key_values.layers[1].values
+    caches = {}
+    for coeff in (0.0, 1.0, -1.0):
+        with vector(model, C=coeff):
+            with torch.no_grad():
+                caches[coeff] = model(**prompt, use_cache=True).past_key_values.layers[1].values
+    torch.testing.assert_close(caches[0.0], base, rtol=0, atol=0)
+    torch.testing.assert_close(
+        caches[1.0] - base, -(caches[-1.0] - base), rtol=1e-5, atol=1e-6
+    )
+
+
+def test_kv_cache_gram_batch_invariant_and_label_swap(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    cfg = sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32)
+    batch1 = sl.train(model, tok, POS, NEG, cfg, batch_size=1, max_length=64)
+    batch2 = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+    swapped = sl.train(model, tok, NEG, POS, cfg, batch_size=2, max_length=64)
+    torch.testing.assert_close(
+        batch1.stacked[1]["c"], batch2.stacked[1]["c"], rtol=1e-5, atol=1e-6
+    )
+    torch.testing.assert_close(
+        batch2.stacked[1]["c"], -swapped.stacked[1]["c"], rtol=1e-5, atol=1e-6
+    )
+
+
+def test_kv_cache_gram_promotes_existing_prefix_and_detaches(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(
+        model, tok, POS, NEG,
+        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        batch_size=2, max_length=64,
+    )
+    prefix = tok("Tell me", return_tensors="pt")
+    with torch.no_grad():
+        ordinary = model(**prefix, use_cache=True).past_key_values
+    original_keys = ordinary.layers[1].keys.clone()
+    original_values = ordinary.layers[1].values.clone()
+    next_token = tok(" the", add_special_tokens=False, return_tensors="pt").input_ids[:, :1]
+    with vector(model, C=1.0):
+        with torch.no_grad():
+            promoted = model(
+                input_ids=next_token, past_key_values=ordinary, use_cache=True
+            ).past_key_values
+    torch.testing.assert_close(
+        promoted.layers[1].keys[..., :-1, :], original_keys, rtol=0, atol=0
+    )
+    assert not torch.equal(promoted.layers[1].values[..., :-1, :], original_values)
+    torch.testing.assert_close(ordinary.layers[1].values, original_values, rtol=0, atol=0)
+
+    steered_history = promoted.layers[1].values.clone()
+    captured = []
+    attention = model.model.layers[1].self_attn
+    v_proj = attention.v_proj
+    handle = v_proj.register_forward_hook(lambda _m, _a, output: captured.append(output))
+    try:
+        with torch.no_grad():
+            detached = model(
+                input_ids=next_token, past_key_values=promoted, use_cache=True
+            ).past_key_values
+    finally:
+        handle.remove()
+    raw_value = captured[0].view(
+        1, 1, attention.config.num_key_value_heads, attention.head_dim
+    ).transpose(1, 2)
+    torch.testing.assert_close(detached.layers[1].values[..., :-1, :], steered_history)
+    torch.testing.assert_close(detached.layers[1].values[..., -1:, :], raw_value, rtol=0, atol=0)
+
+
+def test_kv_cache_gram_same_vector_can_reattach(tiny_model):
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(
+        model, tok, POS, NEG,
+        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        batch_size=2, max_length=64,
+    )
+    prompt = tok("Tell me", return_tensors="pt")
+    next_token = tok(" the", add_special_tokens=False, return_tensors="pt").input_ids[:, :1]
+    with vector(model, C=1.0):
+        with torch.no_grad():
+            cache = model(**prompt, use_cache=True).past_key_values
+    history = cache.layers[1].values.clone()
+    with vector(model, C=1.0):
+        with torch.no_grad():
+            continued = model(
+                input_ids=next_token, past_key_values=cache, use_cache=True
+            ).past_key_values
+    torch.testing.assert_close(continued.layers[1].values[..., :-1, :], history, rtol=0, atol=0)
+
+
+def test_kv_cache_gram_formula_and_empty_hybrid_promotion():
+    config = PreTrainedConfig(
+        num_hidden_layers=2,
+        layer_types=["linear_attention", "full_attention"],
+    )
+    ordinary = DynamicCache(config=config)
+    direction = torch.tensor([[[3.0, 4.0]]])
+    directions = {1: direction}
+    lease = _CacheSteeringLease()
+    cache = SteeredDynamicCache.promote(
+        ordinary, config=config, directions=directions, coeff=0.5, lease=lease
+    )
+    values = torch.tensor([[[[2.0, -1.0], [-3.0, 4.0]]]])
+    unit = direction / direction.norm(dim=-1, keepdim=True)
+    projection = torch.einsum("bhtd,khd->bhtk", values, unit)
+    scale = projection.abs() * direction.norm(dim=-1).T[None, :, None, :]
+    expected = values + 0.5 * torch.einsum("bhtk,khd->bhtd", scale, unit)
+    torch.testing.assert_close(cache._edit(values, 1), expected)
+
+
+def test_kv_cache_gram_hybrid_generate():
+    config = Qwen3_5TextConfig(
+        vocab_size=101,
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=4,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=8,
+        linear_key_head_dim=8,
+        linear_value_head_dim=8,
+        linear_num_key_heads=4,
+        linear_num_value_heads=4,
+        layer_types=[
+            "linear_attention", "linear_attention", "linear_attention", "full_attention",
+        ],
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=2,
+    )
+    model = Qwen3_5ForCausalLM(config).eval()
+    cfg = sl.KVCacheGramC(layers=(3,), r=2, coeff=0.2, dtype=torch.float32)
+    vector = Vector(cfg, {3: {}}, {3: {"c": torch.randn(1, 2, 8)}})
+    with vector(model):
+        output = model.generate(
+            torch.tensor([[1, 4, 5]]), max_new_tokens=2, do_sample=False
+        )
+    assert output.shape == (1, 5)
+
+
+def test_kv_cache_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_path):
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(
+        model, tok, POS, NEG,
+        sl.KVCacheGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.bfloat16),
+        batch_size=2, max_length=64,
+    )
+    prompt = tok("Tell me the truth.", return_tensors="pt")
+    path = str(tmp_path / "kv_cache_attached.safetensors")
+    with vector(model):
+        with torch.no_grad():
+            expected = model(**prompt).logits.float()
+        sl.save(model, path)
+    sl.load(model, path)
+    try:
+        with torch.no_grad():
+            actual = model(**prompt).logits.float()
+    finally:
+        sl.detach(model)
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
