@@ -6,7 +6,7 @@ Novel part: the intervention changes actual cached values per KV head. Extractio
 
 | outcome | prior | distinguishing result |
 |---|---:|---|
-| It steers the intended axis with usable selectivity | 40% | positive held-out gated selectivity and intended movement at calibrated KL |
+| It steers the intended axis with usable selectivity | 40% | positive held-out steering selectivity and intended movement at calibrated KL |
 | It changes behaviour but loses selectivity | 30% | intended movement with comparable or larger unintended movement |
 | It is too weak after rank-16 projection | 15% | calibration reaches its coefficient ceiling below the KL target |
 | It becomes incoherent before useful movement | 10% | calibration trace shows repetition or broken generations before axis movement |
