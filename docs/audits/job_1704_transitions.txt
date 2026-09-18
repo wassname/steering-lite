@@ -1,0 +1,17 @@
+true_foundation | n | bare_social | +C_social | -C_social | +C_top1_counts
+authority    | 17 |  3 | 11 |  1 | {'authority': 6, 'social': 11}
+care         | 32 |  1 | 27 |  3 | {'care': 5, 'social': 27}
+fairness     | 17 |  0 | 12 |  0 | {'fairness': 5, 'social': 12}
+liberty      | 17 |  5 | 16 |  4 | {'fairness': 1, 'social': 16}
+loyalty      | 16 |  7 | 16 |  7 | {'social': 16}
+sanctity     | 17 |  1 | 17 |  4 | {'social': 17}
+socialnorms  | 16 | 16 | 16 | 14 | {'social': 16}
+
+bare_top1 -> +C_top1
+authority  n=20: {'authority': 5, 'social': 15}
+care       n=33: {'care': 5, 'social': 28}
+fairness   n=21: {'fairness': 6, 'social': 15}
+liberty    n= 7: {'social': 7}
+loyalty    n= 4: {'social': 4}
+sanctity   n=14: {'social': 14}
+social     n=33: {'authority': 1, 'social': 32}

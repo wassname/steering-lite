@@ -20,4 +20,6 @@ The result must be audited from the complete calibration and generation logs bef
 
 Queued as pueue job 1704 from commit `efd74bb`. It runs only `kv_cache_gram` on `Qwen/Qwen3-4B` with rank 16 and the existing full-sweep defaults (`target_kl=0.8`, `kl_rms`, 256 contrast pairs, classic vignettes). The prompt-only baseline is omitted because the comparable frozen sweep already has it; this job still recomputes bare.
 
+Result: credible negative for this implementation. The canonical selectivity was -1.16 (95% interval [-1.85,-0.45]); +C selected the `social` / not-morally-wrong category on 115/132 rows. The README row condition was not met. See [job 1704 audit](../../docs/audits/job_1704.md).
+
 -- PI/OpenAI
