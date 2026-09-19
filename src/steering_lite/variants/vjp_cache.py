@@ -41,13 +41,14 @@ class ValueGradientCache(_CacheBase):
             # Seed the autograd graph at the earliest selected layer. The model
             # and input parameters are frozen, so the only graph root is a
             # value-cache input: detaching and re-requiring grad on
-            # min(selected)'s incoming value makes that one stored tensor a
-            # leaf. DynamicCache.update concatenates storage, so every returned
-            # `values` tensor (including the earliest layer's) is actually a
-            # non-leaf intermediate. Later selected values stay graph-connected
-            # intermediates that autograd.grad accepts directly; we must NOT
-            # detach them, because that would sever the legitimate forward
-            # influence of earlier selected layers on this layer's cache.
+            # min(selected)'s incoming value seeds the frozen-model autograd
+            # graph. DynamicCache.update concatenates storage, so every returned
+            # `values` tensor (including the earliest layer's) is a valid
+            # non-leaf autograd input, not a leaf. Later selected values stay
+            # graph-connected intermediates that autograd.grad accepts
+            # directly; we must NOT detach them, because that would sever the
+            # legitimate forward influence of earlier selected layers on this
+            # layer's cache.
             if layer_idx == min(self.selected):
                 value_states = value_states.detach().requires_grad_(True)
         keys, values = super().update(key_states, value_states, layer_idx, cache_kwargs)

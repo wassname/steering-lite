@@ -404,7 +404,9 @@ def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
             f"layer {layer}: zero gradient through the real value cache"
 
     # Confirms the returned source is the same tensor DynamicCache stored, and
-    # that the graph root (requires_grad leaf) is that stored cache value.
+    # that the graph root is the detached earliest selected incoming value that
+    # seeds the frozen-model autograd graph; the stored cache value itself is a
+    # valid non-leaf autograd input.
     cache = ValueGradientCache(model.config.get_text_config(), layers)
     with torch.enable_grad(), _activations(model, (target_layer,)) as found:
         model(**encoded, past_key_values=cache, use_cache=True)
