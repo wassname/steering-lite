@@ -10,7 +10,7 @@ from dataclasses import replace
 import pytest
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedConfig
-from transformers.cache_utils import DynamicCache
+from transformers.cache_utils import DynamicCache, DynamicLayer
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
@@ -415,6 +415,83 @@ def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
             grad_outputs=torch.ones_like(found[target_layer]),
         )[0]
         assert grad.norm().item() > 0
+
+
+def test_vjp_cache_two_source_real_storage_hybrid_exclusion(tiny_model):
+    """Two preceding full-attention source layers and a later target.
+
+    A direct real-model observation (3 full-attention layers) showed that
+    DynamicCache.update returns concatenated storage, so even the earliest
+    selected layer's returned tensor is a non-leaf intermediate; both returned
+    cache tensors are still valid `autograd.grad` inputs with finite nonzero
+    VJPs. We therefore assert real-storage identity, finite/nonzero gradients
+    and expected shapes, and selected/non-selected exclusion - not `is_leaf`.
+    The Qwen3.5 hybrid proves non-selected recurrent (linear-attention) layers
+    stay excluded while full-attention layers remain the only valid sources.
+    """
+    _, tok = tiny_model
+    config = Qwen3_5TextConfig(
+        vocab_size=len(tok),
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=8,
+        linear_key_head_dim=8,
+        linear_value_head_dim=8,
+        linear_num_key_heads=4,
+        linear_num_value_heads=4,
+        layer_types=[
+            "full_attention", "full_attention", "linear_attention",
+            "full_attention", "linear_attention",
+        ],
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=2,
+    )
+    model = Qwen3_5ForCausalLM(config).eval()
+    sl.detach(model)
+    model.requires_grad_(False)
+    prompt = POS[:1]
+    # Two preceding full-attention source layers (0,1) plus a third (3) all
+    # feed the later target; layer 2 is a non-selected recurrent layer sitting
+    # between the sources and the target and must stay excluded.
+    layers, target_layer = (0, 1, 3), 4
+
+    encoded = _encode(model, tok, prompt, 64)
+    expected_shape = (
+        1, config.num_key_value_heads, encoded["input_ids"].shape[1], config.head_dim,
+    )
+
+    cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
+    gradients, _valid, sources = _cache_gradients(
+        model, tok, prompt, layers, target_layer, cotangent, 0, 64,
+    )
+    assert set(sources) == set(layers), \
+        "non-selected recurrent layers must not become cache sources"
+    for layer in layers:
+        g = gradients[layer].float()
+        assert tuple(g.shape) == expected_shape, \
+            f"layer {layer}: expected VJP shape {expected_shape}, got {tuple(g.shape)}"
+        assert torch.isfinite(g).all(), f"layer {layer}: nonfinite VJP"
+        assert g.norm().item() > 0, \
+            f"layer {layer}: zero VJP through the real value cache"
+
+    # The returned tensors are the actual DynamicLayer storage DynamicCache
+    # keeps, and only full-attention selected layers are differentiated.
+    cache = ValueGradientCache(model.config.get_text_config(), layers)
+    with torch.enable_grad(), _activations(model, (target_layer,)) as found:
+        model(**encoded, past_key_values=cache, use_cache=True)
+        assert set(cache.sources) == set(layers)
+        for layer in layers:
+            assert type(cache.layers[layer]) is DynamicLayer, \
+                f"layer {layer}: VJP source must be a full-attention DynamicLayer"
+            assert cache.sources[layer] is cache.layers[layer].values, \
+                f"layer {layer}: returned tensor is not the DynamicCache storage"
+        # recurrent (linear-attention) layers are excluded from the source set
+        assert type(cache.layers[2]) is not DynamicLayer
+        assert 2 not in cache.sources and 4 not in cache.sources
 
 
 def test_vjp_registration_and_config_roundtrip():

@@ -1,0 +1,57 @@
+=== Follow-up: multi-source VJP-cache regression (real DynamicCache storage) ===
+HEAD: 2a5ddd372b7b2fe64a8e853553178fbde2cdc6d4 (parent checkpoint, untouched)
+
+Scope: documentation + focused regression only. No computation-graph change.
+The suspected leafness bug was reviewed and disproved on a real 3-layer model:
+DynamicCache.update returns concatenated storage, so every returned source
+(including the earliest selected layer) is a non-leaf intermediate; both
+returned cache tensors are valid autograd.grad inputs with finite nonzero VJPs.
+Per the parent re-scope we DO NOT alter the graph for leafness and DO NOT
+assert is_leaf.
+
+Change:
+- src/steering_lite/variants/vjp_cache.py: concise comment in
+  ValueGradientCache.update explaining why only min(selected) incoming value is
+  detached (seeds the graph; later selected values remain graph-connected
+  intermediates accepted by autograd.grad) and why later values must NOT be
+  detached (would sever earlier-layer forward influence).
+- tests/test_pipeline.py: test_vjp_cache_two_source_real_storage_hybrid_exclusion
+  - Qwen3.5 hybrid, 5 layers: [full, full, linear, full, linear]
+  - selected sources (0,1,3), target 4; layer 2 is a non-selected recurrent
+    (linear-attention) layer sitting between sources and target.
+  - proves both returned cache tensors are actual DynamicLayer storage
+    (cache.sources[l] is cache.layers[l].values), finite nonzero VJPs of shape
+    (batch, kv_heads, seq, head_dim), and selected/non-selected exclusion
+    (linear layers 2/4 never appear in sources). No is_leaf assertion.
+
+=== Command: focused regression (direct) ===
+pytest tests/test_pipeline.py::test_vjp_cache_two_source_real_storage_hybrid_exclusion \
+  tests/test_pipeline.py::test_vjp_cache_gradient_flows_through_real_cache_values -q -p no:cacheprovider
+..                                                                       [100%]
+2 passed in 4.69s
+=== EXIT: 0 ===
+
+=== Command: focused pipeline suite ===
+pytest tests/test_pipeline.py -q -p no:cacheprovider
+................................................                         [100%]
+48 passed in 8.61s
+(47 pre-existing + 1 new regression)
+=== EXIT: 0 ===
+
+=== Live real-model probe (evidence) ===
+layer 0 DynamicLayer reqgrad True is_leaf False is storage True
+layer 1 DynamicLayer reqgrad True is_leaf False is storage True
+layer 3 DynamicLayer reqgrad True is_leaf False is storage True
+linear 2 LinearAttentionLayer | linear 4 LinearAttentionLayer
+single autograd.grad over all sources (retain-free, as _cache_gradients):
+layer 0 grad shape (1,2,6,8) finite True norm 0.9391
+layer 1 grad shape (1,2,6,8) finite True norm 0.9121
+layer 3 grad shape (1,2,6,8) finite True norm 0.9083
+set(cache.sources) == {0,1,3} -> layers 2/4 (recurrent) excluded.
+
+=== git diff --check ===
+code-only (excluding slop/**): PASS (exit 0)
+full repo: reports pre-existing trailing whitespace in the byte-exact approved
+plan (slop/plans/20260919_bsbench-rewrite-approved.md lines 19, 26) and in raw
+test-log copies; this is the expected, known limitation - the code-only check
+is clean.
