@@ -1,0 +1,10 @@
+=== Command: cache-value gradient path proof ===
+[transformers] Model config: pad_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got -1. This may result in unexpected behavior.
+[transformers] The following generation flags are not valid and may be ignored: ['pad_token_id']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+Loading weights:   0%|          | 0/21 [00:00<?, ?it/s]Loading weights: 100%|██████████| 21/21 [00:00<00:00, 13437.13it/s]
+target.requires_grad with hook only: False
+layer0 grad_norm: 0.02331792749464512
+sources[0] == cache.layers[0].values: True | sources[0] is cache.layers[0].values: True
+cache.layers[0].values.requires_grad: True
+direct autograd.grad w.r.t. real cache values norm: 1.229723334312439
+=== EXIT: 0 ===

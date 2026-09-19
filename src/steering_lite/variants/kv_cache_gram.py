@@ -290,7 +290,7 @@ class KVCacheGram:
         return out
 
     @staticmethod
-    def install(model: nn.Module, cfg: KVCacheGramC, stacked: dict[int, dict[str, Tensor]]):
+    def install(model: nn.Module, cfg: KVCacheGramC, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
         decoder = getattr(model, "model", model)
         if not hasattr(decoder, "layers"):
             language_model = getattr(decoder, "language_model", None)
@@ -306,16 +306,18 @@ class KVCacheGram:
             kwargs["use_cache"] = True
             cache = kwargs.get("past_key_values")
             if cache is None:
-                kwargs["past_key_values"] = SteeredDynamicCache(
+                kwargs["past_key_values"] = cache_type(
                     config=config, directions=directions, coeff=cfg.coeff, lease=lease
                 )
-            elif isinstance(cache, SteeredDynamicCache):
+            elif type(cache) is cache_type:
                 if not cache.matches(directions, cfg.coeff):
                     raise RuntimeError("past_key_values belongs to a different kv_cache_gram attachment")
                 cache._steering_directions = directions
                 cache._steering_lease = lease
+            elif isinstance(cache, SteeredDynamicCache):
+                raise RuntimeError("past_key_values belongs to a different cache intervention")
             elif isinstance(cache, DynamicCache):
-                kwargs["past_key_values"] = SteeredDynamicCache.promote(
+                kwargs["past_key_values"] = cache_type.promote(
                     cache, config=config, directions=directions, coeff=cfg.coeff, lease=lease
                 )
             else:

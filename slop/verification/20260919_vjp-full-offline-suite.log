@@ -1,0 +1,161 @@
+=== Command: full offline suite pytest tests/ ===
+......................................................FFFF               [100%]
+=================================== FAILURES ===================================
+______________________________ test_results_seam _______________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-16/test_results_seam0')
+
+    def test_results_seam(tmp_path: Path) -> None:
+>       import results
+
+tests/test_results_seam.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """README-ready tables + moral map from a sweep output dir.
+    
+    Headline metric lives in ONE place, `moralmaps.metrics` (imported, not
+    reforked): `gated_selectivity`. This script feeds it the per-method `raw_logratios`
+    (per-(vid,cond) clr(score)[f]) + `mean_pmass_allowed` each sweep JSON stores,
+    with persona-aligned sign selection.
+    
+    Emits:
+      - Base model clr per foundation, t-stat, vs human calibrated wrongness.
+      - Gated-selectivity table (sel_gated, on, off, coherence, CI)
+        + Δclr-with-σ table.
+      - Moral map: 7-foundation absolute-clr profiles, PCA → 2D scatter of
+        base + each method (persona-aligned sign) + human reference.
+    
+    Usage:
+        uv run --extra benchmark python scripts/results.py \\
+            --sweep-dir outputs/tinymfv_sweep_4b_fc --vignettes classic
+    
+    Or via justfile: `just results outputs/tinymfv_sweep_4b_fc`.
+    
+    """
+    from __future__ import annotations
+    
+    import argparse
+    import json
+    import math
+    from pathlib import Path
+    
+    import numpy as np
+    from loguru import logger
+    from tabulate import tabulate
+    
+>   from moralmaps import gated_selectivity, OFF_WEIGHT
+E   ModuleNotFoundError: No module named 'moralmaps'
+
+scripts/results.py:33: ModuleNotFoundError
+_________________________ test_missing_coherence_fails _________________________
+
+    def test_missing_coherence_fails() -> None:
+>       import results
+
+tests/test_results_seam.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """README-ready tables + moral map from a sweep output dir.
+    
+    Headline metric lives in ONE place, `moralmaps.metrics` (imported, not
+    reforked): `gated_selectivity`. This script feeds it the per-method `raw_logratios`
+    (per-(vid,cond) clr(score)[f]) + `mean_pmass_allowed` each sweep JSON stores,
+    with persona-aligned sign selection.
+    
+    Emits:
+      - Base model clr per foundation, t-stat, vs human calibrated wrongness.
+      - Gated-selectivity table (sel_gated, on, off, coherence, CI)
+        + Δclr-with-σ table.
+      - Moral map: 7-foundation absolute-clr profiles, PCA → 2D scatter of
+        base + each method (persona-aligned sign) + human reference.
+    
+    Usage:
+        uv run --extra benchmark python scripts/results.py \\
+            --sweep-dir outputs/tinymfv_sweep_4b_fc --vignettes classic
+    
+    Or via justfile: `just results outputs/tinymfv_sweep_4b_fc`.
+    
+    """
+    from __future__ import annotations
+    
+    import argparse
+    import json
+    import math
+    from pathlib import Path
+    
+    import numpy as np
+    from loguru import logger
+    from tabulate import tabulate
+    
+>   from moralmaps import gated_selectivity, OFF_WEIGHT
+E   ModuleNotFoundError: No module named 'moralmaps'
+
+scripts/results.py:33: ModuleNotFoundError
+______________ test_base_table_does_not_invent_binary_probability ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f0bd672c050>
+
+    def test_base_table_does_not_invent_binary_probability(monkeypatch) -> None:
+>       import results
+
+tests/test_results_seam.py:89: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """README-ready tables + moral map from a sweep output dir.
+    
+    Headline metric lives in ONE place, `moralmaps.metrics` (imported, not
+    reforked): `gated_selectivity`. This script feeds it the per-method `raw_logratios`
+    (per-(vid,cond) clr(score)[f]) + `mean_pmass_allowed` each sweep JSON stores,
+    with persona-aligned sign selection.
+    
+    Emits:
+      - Base model clr per foundation, t-stat, vs human calibrated wrongness.
+      - Gated-selectivity table (sel_gated, on, off, coherence, CI)
+        + Δclr-with-σ table.
+      - Moral map: 7-foundation absolute-clr profiles, PCA → 2D scatter of
+        base + each method (persona-aligned sign) + human reference.
+    
+    Usage:
+        uv run --extra benchmark python scripts/results.py \\
+            --sweep-dir outputs/tinymfv_sweep_4b_fc --vignettes classic
+    
+    Or via justfile: `just results outputs/tinymfv_sweep_4b_fc`.
+    
+    """
+    from __future__ import annotations
+    
+    import argparse
+    import json
+    import math
+    from pathlib import Path
+    
+    import numpy as np
+    from loguru import logger
+    from tabulate import tabulate
+    
+>   from moralmaps import gated_selectivity, OFF_WEIGHT
+E   ModuleNotFoundError: No module named 'moralmaps'
+
+scripts/results.py:33: ModuleNotFoundError
+____________________________ test_clr_readout_seam _____________________________
+
+    def test_clr_readout_seam() -> None:
+        """Guard the score->clr conversion in the tinymfv wrapper (the OTHER seam).
+    
+        tinymfv commit 9237aa9 replaced one-vs-rest logit(p_f) with clr(score)_f to
+        stop a single-category steer fabricating off-axis collateral (job 95). The
+        wrapper must consume `score`, emit gauge-free clr, and keep sum=0. -- Claude
+        """
+        import numpy as np
+    
+>       from moralmaps.guided import _DEFAULT_FORCED_FOUNDATIONS
+E       ModuleNotFoundError: No module named 'moralmaps'
+
+tests/test_results_seam.py:109: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_results_seam.py::test_results_seam - ModuleNotFoundError: N...
+FAILED tests/test_results_seam.py::test_missing_coherence_fails - ModuleNotFo...
+FAILED tests/test_results_seam.py::test_base_table_does_not_invent_binary_probability
+FAILED tests/test_results_seam.py::test_clr_readout_seam - ModuleNotFoundErro...
+4 failed, 54 passed in 8.72s
+=== EXIT: 1 ===

@@ -28,6 +28,8 @@ from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
 from .variants.random import RandomC
 from .variants.kv_cache_gram import KVCacheGramC
+from .variants.vjp_delta import VjpDeltaC
+from .variants.vjp_cache import VjpCacheC
 
 __all__ = [
     "SteeringConfig",
@@ -48,6 +50,8 @@ __all__ = [
     "AngularSteeringC",
     "RandomC",
     "KVCacheGramC",
+    "VjpDeltaC",
+    "VjpCacheC",
     "record_activations",
     "train",
     "attach",

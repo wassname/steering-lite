@@ -33,7 +33,7 @@ Issues = "https://github.com/wassname/steering-lite/issues"
 build = ["twine>=6"]
 test = ["pytest", "beartype>=0.18"]
 hf-test = ["accelerate>=1.6", "transformers>=4.51"]
-benchmark = ["accelerate>=1.6", "datasets>=3.6", "transformers>=4.51", "tyro>=0.9", "scikit-learn>=1.4", "moral-maps"]
+benchmark = ["accelerate>=1.6", "transformers>=5.12", "openai>=1.82", "plotly>=6.0", "kaleido==0.2.1", "modal>=1.5.4", "python-dotenv>=1.2.3"]
 baseline = ["repeng", "openrouter-wrapper", "python-dotenv"]
 
 [build-system]
@@ -44,15 +44,11 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-steering_lite = ["data/*.json"]
+steering_lite = ["data/*.json", "benchmark/data/*.jsonl"]
 
 [tool.uv]
-exclude-newer = "5 days"
+exclude-newer = "8 days"
 
 [tool.uv.sources]
-# DEV: pointing to local sibling clone for live-edit. Switch back to the git
-# spec below once changes are pushed and the upstream ref is bumped.
-moral-maps = { path = "../moralmaps", editable = true }
-# moral-maps = { git = "https://github.com/wassname/moral-maps.git", branch = "feat/batched-guided-rollout" }
 repeng = { git = "https://github.com/vgel/repeng.git" }
 openrouter-wrapper = { git = "https://github.com/wassname/openrouter_wrapper.git" }

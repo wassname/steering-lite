@@ -16,17 +16,20 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
 import steering_lite as sl
 from steering_lite import Vector
+from steering_lite.config import REGISTRY, _CONFIG_REGISTRY
 from steering_lite.variants.kv_cache_gram import (
     SteeredDynamicCache,
     _CacheSteeringLease,
 )
+from steering_lite.variants.vjp_cache import ValueGradientCache, _cache_gradients
+from steering_lite.variants.vjp_delta import _activations, _encode, _target_mean
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random", "kv_cache_gram",
+    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache",
 ]
 
 POS = [
@@ -65,6 +68,8 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "angular_steering":      sl.AngularSteeringC(**common),
         "random":                sl.RandomC(**common),
         "kv_cache_gram":         sl.KVCacheGramC(**common, r=2),
+        "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+        "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
     }
     return table[method]
 
@@ -331,9 +336,11 @@ def test_kv_cache_gram_formula_and_empty_hybrid_promotion():
     torch.testing.assert_close(cache._edit(values, 1), expected)
 
 
-def test_kv_cache_gram_hybrid_generate():
+@pytest.mark.parametrize("method", ["kv_cache_gram", "vjp_cache"])
+def test_cache_hybrid_generate(method, tiny_model):
+    _, tok = tiny_model
     config = Qwen3_5TextConfig(
-        vocab_size=101,
+        vocab_size=len(tok),
         hidden_size=32,
         intermediate_size=64,
         num_hidden_layers=4,
@@ -345,20 +352,84 @@ def test_kv_cache_gram_hybrid_generate():
         linear_num_key_heads=4,
         linear_num_value_heads=4,
         layer_types=[
-            "linear_attention", "linear_attention", "linear_attention", "full_attention",
+            "linear_attention", "linear_attention", "full_attention", "linear_attention",
         ],
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
     )
     model = Qwen3_5ForCausalLM(config).eval()
-    cfg = sl.KVCacheGramC(layers=(3,), r=2, coeff=0.2, dtype=torch.float32)
-    vector = Vector(cfg, {3: {}}, {3: {"c": torch.randn(1, 2, 8)}})
+    cfg = (
+        sl.VjpCacheC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32)
+        if method == "vjp_cache" else sl.KVCacheGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32)
+    )
+    vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     with vector(model):
         output = model.generate(
             torch.tensor([[1, 4, 5]]), max_new_tokens=2, do_sample=False
         )
     assert output.shape == (1, 5)
+
+
+def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
+    """VJP-cache differentiates the target through the actual values returned by
+    DynamicCache.update, not through a projection/activation hook.
+
+    The activation hook below never marks any activation as requiring grad (the
+    model is detached), so the only graph root is the value-cache input set by
+    ValueGradientCache. A nonzero gradient w.r.t. the stored cache tensor is
+    therefore proof the path runs through the real full-attention value cache.
+    """
+    model, tok = tiny_model
+    sl.detach(model)
+    model.requires_grad_(False)
+    prompt = POS[:1]
+    layers, target_layer = (0,), 1
+
+    # Discriminator: with only the activation hook (no value-cache graph root)
+    # the target cannot require grad, so no hook-only gradient exists.
+    encoded = _encode(model, tok, prompt, 64)
+    with _activations(model, (target_layer,)) as found:
+        model(**encoded)
+    assert not found[target_layer].requires_grad, \
+        "activation hook must not create a gradient path on its own"
+
+    cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
+    gradients, _valid, sources = _cache_gradients(
+        model, tok, prompt, layers, target_layer, cotangent, 0, 64,
+    )
+    for layer in layers:
+        # The differentiated sources are the real DynamicCache.update storage.
+        assert gradients[layer].float().norm().item() > 0, \
+            f"layer {layer}: zero gradient through the real value cache"
+
+    # Confirms the returned source is the same tensor DynamicCache stored, and
+    # that the graph root (requires_grad leaf) is that stored cache value.
+    cache = ValueGradientCache(model.config.get_text_config(), layers)
+    with torch.enable_grad(), _activations(model, (target_layer,)) as found:
+        model(**encoded, past_key_values=cache, use_cache=True)
+        assert cache.sources[0] is cache.layers[0].values
+        assert cache.layers[0].values.requires_grad
+        grad = torch.autograd.grad(
+            found[target_layer], [cache.sources[0]],
+            grad_outputs=torch.ones_like(found[target_layer]),
+        )[0]
+        assert grad.norm().item() > 0
+
+
+def test_vjp_registration_and_config_roundtrip():
+    """VJP methods are registered and importable with a working config
+    round-trip, and the config classes are exported from the package root.
+    """
+    for name, cfg_cls in (("vjp_delta", sl.VjpDeltaC), ("vjp_cache", sl.VjpCacheC)):
+        assert name in REGISTRY, f"{name} missing from runtime REGISTRY"
+        assert name in _CONFIG_REGISTRY, f"{name} missing from config registry"
+        cfg = cfg_cls(layers=(0,), target_layer=1, skip_first=0, coeff=0.2)
+        restored = sl.SteeringConfig.from_dict(cfg.to_dict())
+        assert restored.method == name
+        assert restored.layers == (0,)
+        assert restored.target_layer == 1
+        assert restored.skip_first == 0
 
 
 def test_kv_cache_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_path):

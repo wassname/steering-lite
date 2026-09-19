@@ -1,0 +1,147 @@
+..F.........                                                             [100%]                                   
+=================================== FAILURES ===================================
+___________________________ test_pipeline[vjp_cache] ___________________________
+
+method = 'vjp_cache'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-7/test_pipeline_vjp_cache_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, tiny_model, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = tiny_model
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+        v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+        assert isinstance(v, Vector)
+        all_tensors = (
+            [t for d in v.shared.values()  for t in d.values()] +
+            [t for d in v.stacked.values() for t in d.values()]
+        )
+        assert any(t.norm().item() > 0 for t in all_tensors), \
+            f"{method}: all-zero state -- extract broken"
+    
+        # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.
+        # Pre-tokenize: the tiny-random Llama tokenizer has no chat template.
+        calib_ids = [tok(POS[0], return_tensors="pt").input_ids[0]]
+>       coeff, _hist = sl.calibrate_iso_kl(
+            v, model, tok, calib_ids,
+            target_kl=1.0, T=5, max_iters=4,
+            bracket=(0.05, 4.0), device="cpu", do_sample=False,
+        )
+
+tests/test_pipeline.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/calibrate.py:472: in calibrate_iso_kl
+    v_mid = eval_at(mid)
+            ^^^^^^^^^^^^
+src/steering_lite/calibrate.py:441: in eval_at
+    m = measure_kl(v, model, tok, prompts, T=T, do_sample=do_sample, device=device,
+.venv/lib/python3.13/site-packages/torch/utils/_contextlib.py:124: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/calibrate.py:230: in measure_kl
+    gen = _generate(model, pids, T, tok, do_sample, device)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/utils/_contextlib.py:124: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/calibrate.py:178: in _generate
+    out = model.generate(
+.venv/lib/python3.13/site-packages/torch/utils/_contextlib.py:124: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/generation/utils.py:2584: in generate
+    result = decoding_method(
+.venv/lib/python3.13/site-packages/transformers/generation/utils.py:2784: in _sample
+    outputs = self._prefill(
+.venv/lib/python3.13/site-packages/transformers/generation/utils.py:3830: in _prefill
+    return self(**model_inputs, return_dict=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1779: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1790: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/utils/generic.py:907: in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/models/llama/modeling_llama.py:474: in forward
+    outputs: BaseModelOutputWithPast = self.model(
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1779: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1885: in _call_impl
+    return inner()
+           ^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1833: in inner
+    result = forward_call(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/utils/generic.py:1036: in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py:252: in wrapper
+    outputs = func(self, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/models/llama/modeling_llama.py:411: in forward
+    hidden_states = decoder_layer(
+.venv/lib/python3.13/site-packages/transformers/modeling_layers.py:93: in __call__
+    return super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1779: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1790: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/models/llama/modeling_llama.py:316: in forward
+    hidden_states, _ = self.self_attn(
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1779: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1790: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/transformers/models/llama/modeling_llama.py:270: in forward
+    key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/variants/kv_cache_gram.py:130: in update
+    value_states = self._edit(value_states, layer_idx)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = AdditiveValueCache(layers=[DynamicLayer, DynamicLayer])
+values = tensor([[[[ 0.0278, -0.0284,  0.0015,  0.1413],
+          [ 0.1449, -0.0525,  0.1047, -0.0719],
+          [-0.0332, -0...,  0.0431, -0.0351],
+          [-0.1212, -0.1104, -0.0382, -0.0024],
+          [-0.0741, -0.1656,  0.0472,  0.0734]]]])
+directions = 0
+
+    def _edit(self, values, directions):
+>       return values + self._steering_coeff * directions.to(values).sum(dim=0)[None, :, None, :]
+                                               ^^^^^^^^^^^^^
+E       AttributeError: 'int' object has no attribute 'to'
+
+src/steering_lite/variants/vjp_cache.py:50: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-19 13:01:17.548 | INFO     | steering_lite.attach:_log_extract_demo:172 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+2026-09-19 13:01:17.571 | INFO     | steering_lite.variants.vjp_cache:extract:126 - VJP-cache global activation orientation score=-0.1501787304878235 flipped=True cosines={0: -0.1501787304878235}; heuristic, not behavioral validation
+calib vjp_cache: 0it [00:00, ?it/s]
+=========================== short test summary info ============================
+FAILED tests/test_pipeline.py::test_pipeline[vjp_cache] - AttributeError: 'in...
+1 failed, 11 passed, 32 deselected in 114.29s (0:01:54)

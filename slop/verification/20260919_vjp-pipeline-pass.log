@@ -1,0 +1,4 @@
+=== Command: pytest tests/test_pipeline.py (VJP smoke) ===
+...............................................                          [100%]
+47 passed in 10.12s
+=== EXIT: 0 ===
