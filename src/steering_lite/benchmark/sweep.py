@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import math
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from .dose_search import (
 )
 from .generation import cohort_identity, read_dev_cohort
 from .pipeline import METHODS
+from .transfer_data import PromptRecord, load_transfer_records, transfer_provenance, transfer_records_identity
 
 MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
@@ -160,27 +162,18 @@ def case_identity(case) -> dict:
     return {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}
 
 
-def unavailable_default_transfer_data() -> dict[str, list[str]]:
-    """Name the default transfer records absent from the checked-in cohort."""
-    available = {row["question_id"] for row in read_dev_cohort()}
-    return {
-        case.dataset: list(case.prompt_ids)
-        for case in TRANSFER_CASES
-        if not set(case.prompt_ids).issubset(available)
-    }
-
-
 def phase_b_budget_stages() -> tuple[dict, ...]:
-    """Reserve the blocked vector-method final sweep without inventing stage identities."""
-    item_count = sum(len(case.prompt_ids) for case in TRANSFER_CASES) * len(FINAL_DOSE_MULTIPLIERS)
-    blocked_by = unavailable_default_transfer_data()
+    """Reserve the offline-described vector-method final sweep; this never dispatches."""
+    records = load_transfer_records()
+    item_count = sum(len(records[case.case_id]) for case in TRANSFER_CASES) * len(FINAL_DOSE_MULTIPLIERS)
+    provenance = transfer_records_identity(records)
     return tuple(
         {
             "stage": stage,
             "runner": runner,
             "method": method,
             "item_count": item_count,
-            "dispatch_blocked_by_missing_transfer_data": blocked_by,
+            "transfer_provenance_sha256": content_key(provenance),
         }
         for method in METHODS
         if method not in {"bare", "prompting"}
@@ -199,7 +192,7 @@ def final_stages(
     vector_sha256: str,
     observed: list[dict],
     transfer_predictions: list[dict],
-    case_prompts: dict[str, list[str]],
+    case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
     prompt_spec: dict,
     transfer_cases: tuple[Case, ...] = TRANSFER_CASES,
 ) -> tuple[dict, ...]:
@@ -207,23 +200,28 @@ def final_stages(
     if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
         raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
     validate_cases(CALIBRATION_CASE, transfer_cases)
-    if transfer_cases == TRANSFER_CASES:
-        missing = unavailable_default_transfer_data()
-        if missing:
-            details = "; ".join(
-                f"{dataset}: {', '.join(prompt_ids)}"
-                for dataset, prompt_ids in missing.items()
-            )
-            raise ValueError(f"default transfer data are not loadable with auditable provenance: {details}")
-    if any("placeholder" in case.dataset for case in transfer_cases):
-        raise ValueError("placeholder transfer cases cannot dispatch")
-
     case_ids = [case.case_id for case in transfer_cases]
     if set(case_prompts) != set(case_ids):
-        raise ValueError("final stages require complete prompts for every transfer case")
-    actual_case_prompts = {case_id: case_prompts[case_id] for case_id in case_ids}
-    if any(not prompts for prompts in actual_case_prompts.values()):
-        raise ValueError("final stages require loadable prompts for every transfer case")
+        raise ValueError("final stages require complete prompt records for every transfer case")
+    actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+    for case in transfer_cases:
+        records = actual_case_records[case.case_id]
+        if not records or any(not isinstance(record, PromptRecord) for record in records):
+            raise ValueError("final stages require auditable PromptRecord transfer data")
+        if tuple(record.prompt_id for record in records) != case.prompt_ids:
+            raise ValueError("final stages require complete prompt records matching each transfer case")
+        if any(record.dataset != case.dataset for record in records):
+            raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+        if any(
+            not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+            or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+            for record in records
+        ):
+            raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+    actual_case_prompts = {
+        case_id: [record.prompt for record in records]
+        for case_id, records in actual_case_records.items()
+    }
 
     expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
     target_ids = set()
@@ -272,6 +270,10 @@ def final_stages(
         "final_dose_plans": ordered_plans,
         "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
         "case_prompt_hashes": prompt_hashes,
+        "case_prompt_provenance": {
+            case_id: transfer_provenance(records)
+            for case_id, records in actual_case_records.items()
+        },
         "prompt_spec": prompt_spec,
         "prompt_spec_sha256": content_key(prompt_spec),
     }
@@ -282,6 +284,10 @@ def final_stages(
         "config": config,
         "item_count": item_count,
         "case_prompts": actual_case_prompts,
+        "case_prompt_records": {
+            case_id: transfer_provenance(records)
+            for case_id, records in actual_case_records.items()
+        },
         "generation_plan": [
             {
                 "case": plan["case"],

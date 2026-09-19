@@ -44,7 +44,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-steering_lite = ["data/*.json", "benchmark/data/*.jsonl"]
+steering_lite = ["data/*.json", "benchmark/data/*.jsonl", "benchmark/data/*.json"]
 
 [tool.uv]
 exclude-newer = "8 days"

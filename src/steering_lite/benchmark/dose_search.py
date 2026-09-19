@@ -21,10 +21,10 @@ CALIBRATION_CASE = Case(
     ("BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"),
 )
 TRANSFER_CASES = (
-    Case("bsbench-v2-dev-transfer", "bsbench-v2-dev", ("BSV2-005", "BSV2-006", "BSV2-007", "BSV2-008")),
-    Case("bsbench-v2-heldout-transfer", "bsbench-v2-heldout", ("BSV2-H-001", "BSV2-H-002")),
-    Case("other-dataset-a-transfer", "other-dataset-a-placeholder", ("OTHER-A-001", "OTHER-A-002")),
-    Case("other-dataset-b-transfer", "other-dataset-b-placeholder", ("OTHER-B-001", "OTHER-B-002")),
+    Case("bsbench-v2-heldout-a", "bsbench-v2-heldout", ("BSV2-021", "BSV2-022")),
+    Case("bsbench-v2-heldout-b", "bsbench-v2-heldout", ("BSV2-023", "BSV2-024")),
+    Case("paper-native-false-claim-agreement-a", "paper-native-false-claim-agreement", ("PNFCA-001", "PNFCA-002")),
+    Case("paper-native-false-claim-agreement-b", "paper-native-false-claim-agreement", ("PNFCA-003", "PNFCA-004")),
 )
 
 

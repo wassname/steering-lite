@@ -44,9 +44,8 @@ def metrics(kl_rms: float) -> dict:
 def test_explicit_case_manifests_are_disjoint_and_include_other_datasets():
     validate_cases(CALIBRATION_CASE, TRANSFER_CASES)
     assert len(TRANSFER_CASES) == 4
-    assert {case.dataset for case in TRANSFER_CASES if "other-dataset" in case.dataset} == {
-        "other-dataset-a-placeholder",
-        "other-dataset-b-placeholder",
+    assert {case.dataset for case in TRANSFER_CASES if case.dataset != "bsbench-v2-heldout"} == {
+        "paper-native-false-claim-agreement",
     }
     with pytest.raises(ValueError, match="overlap"):
         validate_cases(Case("cal", "a", ("one",)), (Case("x", "b", ("two",)), Case("y", "c", ("two",))))

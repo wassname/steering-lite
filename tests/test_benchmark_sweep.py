@@ -1,3 +1,5 @@
+from dataclasses import replace
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,6 +15,7 @@ from steering_lite.benchmark.dose_search import (
     predict_transfer,
 )
 from steering_lite.benchmark.generation import read_dev_cohort
+from steering_lite.benchmark.transfer_data import PromptRecord, load_transfer_records
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.sweep import (
     BSBENCH_PERSONAS,
@@ -33,10 +36,14 @@ def _method_stages(manifest: dict, method: str) -> list[dict]:
     return [stage for stage in manifest["stages"] if stage["method"] == method]
 
 
+def _record(prompt_id: str, prompt: str, dataset: str = "synthetic") -> PromptRecord:
+    return PromptRecord(prompt_id, prompt, dataset, "test/source", "test-revision", "test-source-hash", hashlib.sha256(prompt.encode()).hexdigest())
+
+
 def _actual_transfer_cases() -> tuple[Case, ...]:
     return (
-        Case("bsbench-v2-heldout-transfer", "bsbench-v2-heldout", ("BSV2-H-001",)),
-        Case("other-dataset-transfer", "other-dataset", ("OTHER-001", "OTHER-002")),
+        Case("bsbench-v2-heldout-transfer", "synthetic", ("SYN-001",)),
+        Case("other-dataset-transfer", "synthetic", ("SYN-002", "SYN-003")),
     )
 
 
@@ -69,8 +76,8 @@ def _final_inputs() -> dict:
             _prediction(transfer_cases[1], -0.25),
         ],
         "case_prompts": {
-            transfer_cases[0].case_id: ["heldout prompt"],
-            transfer_cases[1].case_id: ["other prompt one", "other prompt two"],
+            transfer_cases[0].case_id: [_record("SYN-001", "heldout prompt")],
+            transfer_cases[1].case_id: [_record("SYN-002", "other prompt one"), _record("SYN-003", "other prompt two")],
         },
         "prompt_spec": {"template": "Answer plainly.", "max_new_tokens": 128},
         "transfer_cases": transfer_cases,
@@ -130,20 +137,17 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     phase_b = first["phase_b_budget_stages"]
     assert len(phase_b) == 24
     assert {(stage["stage"], stage["runner"], stage["item_count"]) for stage in phase_b} == {
-        ("final-generation", "modal_gpu", 30),
-        ("final-health", "local", 30),
-        ("final-aware", "local_judge_api", 30),
-        ("final-blind", "local_judge_api", 30),
+        ("final-generation", "modal_gpu", 24),
+        ("final-health", "local", 24),
+        ("final-aware", "local_judge_api", 24),
+        ("final-blind", "local_judge_api", 24),
     }
-    assert all(stage["dispatch_blocked_by_missing_transfer_data"] == {
-        "bsbench-v2-heldout": ["BSV2-H-001", "BSV2-H-002"],
-        "other-dataset-a-placeholder": ["OTHER-A-001", "OTHER-A-002"],
-        "other-dataset-b-placeholder": ["OTHER-B-001", "OTHER-B-002"],
-    } for stage in phase_b)
+    assert all("dispatch_blocked_by_missing_transfer_data" not in stage for stage in phase_b)
+    assert all("transfer_provenance_sha256" in stage for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 488,
-        "blind": 488,
+        "target_aware": 416,
+        "blind": 416,
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
@@ -179,10 +183,11 @@ def test_final_stages_carry_complete_data_flow_and_stable_identity():
         ("final-blind", "local_judge_api", 9),
     ]
     assert stages == reordered
-    assert stages[0]["case_prompts"] == inputs["case_prompts"]
+    assert stages[0]["case_prompts"] == {case_id: [record.prompt for record in records] for case_id, records in inputs["case_prompts"].items()}
+    assert stages[0]["case_prompt_records"]["bsbench-v2-heldout-transfer"][0]["source_revision"] == "test-revision"
     assert stages[0]["generation_plan"] == [
-        {"case": {"case_id": "bsbench-v2-heldout-transfer", "dataset": "bsbench-v2-heldout", "prompt_ids": ["BSV2-H-001"]}, "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
-        {"case": {"case_id": "other-dataset-transfer", "dataset": "other-dataset", "prompt_ids": ["OTHER-001", "OTHER-002"]}, "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
+        {"case": {"case_id": "bsbench-v2-heldout-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-001"]}, "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
+        {"case": {"case_id": "other-dataset-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-002", "SYN-003"]}, "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
     ]
     assert all("case_prompts" not in stage and "generation_plan" not in stage for stage in stages[1:])
     assert all(stage["input_stage"] == "final-generation" for stage in stages[1:])
@@ -192,8 +197,8 @@ def test_final_stages_carry_complete_data_flow_and_stable_identity():
     assert config["prompt_spec"] == inputs["prompt_spec"]
     assert config["prompt_spec_sha256"] == content_key(inputs["prompt_spec"])
     assert config["case_prompt_hashes"] == {
-        case_id: content_key({"prompts": prompts})
-        for case_id, prompts in inputs["case_prompts"].items()
+        case_id: content_key({"prompts": [record.prompt for record in records]})
+        for case_id, records in inputs["case_prompts"].items()
     }
     assert all(stage["config"] == config for stage in stages)
 
@@ -206,7 +211,7 @@ def test_final_stage_identity_invalidates_each_input_independently():
         {"observed": [{**inputs["observed"][0], "provenance": "different"}, inputs["observed"][1]]},
         {"observed": [{**inputs["observed"][0], "coefficient": 0.5}, inputs["observed"][1]]},
         {"transfer_predictions": [{**inputs["transfer_predictions"][0], "predicted_coefficient": 0.6}, inputs["transfer_predictions"][1]]},
-        {"case_prompts": inputs["case_prompts"] | {"other-dataset-transfer": ["changed prompt"]}},
+        {"case_prompts": inputs["case_prompts"] | {"other-dataset-transfer": [replace(inputs["case_prompts"]["other-dataset-transfer"][0], source_revision="changed"), inputs["case_prompts"]["other-dataset-transfer"][1]]}},
         {"prompt_spec": inputs["prompt_spec"] | {"template": "Answer directly."}},
     )
     for changed in changes:
@@ -221,22 +226,22 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
         ({"transfer_predictions": []}, "transfer predictions"),
         ({"case_prompts": {}}, "prompts"),
         ({"prompt_spec": {}}, "prompt spec"),
-        ({"case_prompts": {"bsbench-v2-heldout-transfer": ["only one"]}}, "complete prompts"),
+        ({"case_prompts": {"bsbench-v2-heldout-transfer": [_record("SYN-001", "only one")] }}, "complete prompt records"),
     ):
         with pytest.raises(ValueError, match=message):
             final_stages(**(inputs | changed))
+    with pytest.raises(ValueError, match="auditable PromptRecord"):
+        final_stages(**(inputs | {"case_prompts": {case.case_id: ["placeholder"] for case in inputs["transfer_cases"]}}))
 
-    with pytest.raises(
-        ValueError,
-        match="auditable provenance: bsbench-v2-heldout: BSV2-H-001, BSV2-H-002; other-dataset-a-placeholder: OTHER-A-001, OTHER-A-002; other-dataset-b-placeholder: OTHER-B-001, OTHER-B-002",
-    ):
-        final_stages(
-            **(inputs | {
-                "transfer_cases": TRANSFER_CASES,
-                "transfer_predictions": [_prediction(case, 0.5) for case in TRANSFER_CASES],
-                "case_prompts": {case.case_id: ["loadable"] for case in TRANSFER_CASES},
-            })
-        )
+    records = load_transfer_records()
+    default_stages = final_stages(
+        **(inputs | {
+            "transfer_cases": TRANSFER_CASES,
+            "transfer_predictions": [_prediction(case, 0.5) for case in TRANSFER_CASES],
+            "case_prompts": records,
+        })
+    )
+    assert default_stages[0]["item_count"] == 24
 
     predictions = inputs["transfer_predictions"]
     for changed, message in (
@@ -287,7 +292,7 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     )
     stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
-        transfer_predictions=[prediction], case_prompts={transfer_case.case_id: transfer_prompts},
+        transfer_predictions=[prediction], case_prompts={transfer_case.case_id: [_record(f"SYN-{number:03d}", prompt, "audited-synthetic") for number, prompt in enumerate(transfer_prompts, 1)]},
         prompt_spec={"max_new_tokens": 8}, transfer_cases=(transfer_case,),
     )
     post_generation = classify_transfer_boundary(
@@ -300,13 +305,13 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     changed_prediction = prediction | {"predicted_coefficient": 0.6}
     changed_stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
-        transfer_predictions=[changed_prediction], case_prompts={transfer_case.case_id: transfer_prompts},
+        transfer_predictions=[changed_prediction], case_prompts={transfer_case.case_id: [_record(f"SYN-{number:03d}", prompt, "audited-synthetic") for number, prompt in enumerate(transfer_prompts, 1)]},
         prompt_spec={"max_new_tokens": 8}, transfer_cases=(transfer_case,),
     )
     retargeted_stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
         transfer_predictions=[prediction | {"target_id": "changed-target"}],
-        case_prompts={transfer_case.case_id: transfer_prompts}, prompt_spec={"max_new_tokens": 8},
+        case_prompts={transfer_case.case_id: [_record(f"SYN-{number:03d}", prompt, "audited-synthetic") for number, prompt in enumerate(transfer_prompts, 1)]}, prompt_spec={"max_new_tokens": 8},
         transfer_cases=(transfer_case,),
     )
 
@@ -351,3 +356,31 @@ def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
     with pytest.raises(RuntimeError, match="at or above"):
         reserve_budget(tmp_path / "at-limit.jsonl", at_limit)
     assert not (tmp_path / "at-limit.jsonl").exists()
+
+
+def test_transfer_records_are_exact_provenanced_and_disjoint_from_calibration_and_eval():
+    from steering_lite.benchmark.transfer_data import (
+        BSBENCH_SOURCE_REVISION,
+        BSBENCH_SOURCE_SHA256,
+        PAPER_NATIVE_SOURCE_REVISION,
+        PAPER_NATIVE_SOURCE_SHA256,
+        TRANSFER_CASE_PROMPT_IDS,
+    )
+
+    records = load_transfer_records()
+    assert set(records) == set(TRANSFER_CASE_PROMPT_IDS)
+    assert {case.case_id: tuple(record.prompt_id for record in records[case.case_id]) for case in TRANSFER_CASES} == TRANSFER_CASE_PROMPT_IDS
+    protected = read_dev_cohort()
+    protected_ids = {row["question_id"] for row in protected}
+    protected_text = {row["prompt"] for row in protected}
+    assert not protected_ids.intersection(record.prompt_id for case_records in records.values() for record in case_records)
+    assert not protected_text.intersection(record.prompt for case_records in records.values() for record in case_records)
+    assert all(record.content_sha256 == hashlib.sha256(record.prompt.encode()).hexdigest() for case_records in records.values() for record in case_records)
+    bsbench = records["bsbench-v2-heldout-a"]
+    native = records["paper-native-false-claim-agreement-a"]
+    assert {(record.source_path, record.source_revision, record.source_sha256) for record in bsbench} == {
+        ("data/bullshit_bench_v2.jsonl", BSBENCH_SOURCE_REVISION, BSBENCH_SOURCE_SHA256)
+    }
+    assert {(record.source_path, record.source_revision, record.source_sha256) for record in native} == {
+        ("data/dev/paper_native_false_claim_agreement.json", PAPER_NATIVE_SOURCE_REVISION, PAPER_NATIVE_SOURCE_SHA256)
+    }
