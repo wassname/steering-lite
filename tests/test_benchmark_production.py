@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -74,6 +75,29 @@ def test_cli_imports_modal_receipt_without_remote_dispatch(tmp_path: Path):
     output = subprocess.run(command, cwd=Path(__file__).parents[1], check=True, capture_output=True, text=True)
     assert json.loads(output.stdout)["mode"] == "receipt-import"
     assert [json.loads(line)["event"] for line in ledger.read_text().splitlines()][-2:] == ["settled", "receipt_imported"]
+
+
+def test_sweep_recipe_exports_project_env_without_printing_key(tmp_path: Path):
+    root = Path(__file__).parents[1]
+    env_file = tmp_path / "project.env"
+    sentinel = "sentinel-openrouter-key"
+    env_file.write_text(f"OPENROUTER_API_KEY={sentinel}\n")
+    environment = os.environ.copy()
+    environment.pop("OPENROUTER_API_KEY", None)
+    command = [
+        "just", "sweep", "--check-openrouter-env", "Qwen/Qwen3.5-4B",
+        str(tmp_path / "check"), str(env_file),
+    ]
+    checked = subprocess.run(command, cwd=root, env=environment, check=True, capture_output=True, text=True)
+    assert json.loads(checked.stdout.splitlines()[-1]) == {
+        "mode": "check-openrouter-env", "openrouter_api_key_present": True,
+    }
+    assert sentinel not in checked.stdout + checked.stderr
+    absent = subprocess.run(
+        ["just", "sweep", "--dry-run", "Qwen/Qwen3.5-4B", str(tmp_path / "dry"), str(tmp_path / "missing.env")],
+        cwd=root, env=environment, check=True, capture_output=True, text=True,
+    )
+    assert json.loads(absent.stdout.splitlines()[-1])["paid_execution_enabled"] is False
 
 
 def test_modal_receipt_overage_is_detected_after_estimate(tmp_path: Path):

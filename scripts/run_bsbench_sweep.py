@@ -85,6 +85,7 @@ def main() -> None:
     mode.add_argument("--import-smoke", action="store_true")
     mode.add_argument("--import-receipt", type=Path)
     mode.add_argument("--run", action="store_true")
+    mode.add_argument("--check-openrouter-env", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
     parser.add_argument("--out", type=Path, default=Path("outputs/bsbench-v2"))
     parser.add_argument("--method", "--stage", dest="method", choices=METHODS, help="Run one condition for recovery or debugging; omit for the canonical full sweep.")
@@ -94,6 +95,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.dry_run:
         result = dry_manifest(args.out, args.model)
+    elif args.check_openrouter_env:
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            raise RuntimeError("OPENROUTER_API_KEY is not set")
+        result = {"mode": "check-openrouter-env", "openrouter_api_key_present": True}
     elif args.import_smoke:
         result = import_recorded_smoke(args.out, args.model)
     elif args.import_receipt:
