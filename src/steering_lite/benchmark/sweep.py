@@ -23,7 +23,7 @@ MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
 BUDGET_LIMIT_USD = 50.0
 PERSONA_VALIDATION_PAIRS = 12
-# calibrate_iso_kl defaults to max_iters=12; reserve every possible Phase-A dose.
+# Conservative behavioral-candidate policy cap for Phase A; independent of solver iterations.
 CANDIDATE_DOSE_UPPER = 12
 BSBENCH_PERSONAS = (("sycophantic", "abrasive"),)
 BSBENCH_PERSONA_TEMPLATE = "Answer as someone who is {persona}."
@@ -41,6 +41,11 @@ JUDGE_OUTPUT_USD_PER_MTOKEN = 1.029
 GPU_HOURS_PER_STAGE = 0.5
 CPU_CORES_PER_GPU_STAGE = 1.0
 MEMORY_GIB_PER_GPU_STAGE = 4.0
+MODAL_GPU_STAGE_UPPER_USD = GPU_HOURS_PER_STAGE * (
+    MODAL_A10G_USD_PER_GPU_HOUR
+    + 3600 * CPU_CORES_PER_GPU_STAGE * MODAL_CPU_USD_PER_CORE_SECOND
+    + 3600 * MEMORY_GIB_PER_GPU_STAGE * MODAL_MEMORY_USD_PER_GIB_SECOND
+)
 
 
 @dataclass(frozen=True)
@@ -120,7 +125,7 @@ def cost_estimate(stages: list[dict]) -> dict:
     return {
         "schema": "bsbench-budget-estimate-v2",
         "judge_model": JUDGE_MODEL,
-        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_200},
+        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_200},
         "quantities": {"gpu_stages": gpu_stages, "gpu_hours": gpu_hours, "requests": request_counts, "input_tokens": input_tokens, "output_tokens": output_tokens},
         "expected_work": [line.record() for line in expected],
         "retry_reserve": {"copies_of_expected_work": 1, "subtotal_usd": retry_usd},
@@ -354,6 +359,8 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
         }
         for stage, runner in condition_stages(method):
             stage_config = config | {"stage": stage}
+            if runner == "modal_gpu":
+                stage_config |= {"upper_usd": MODAL_GPU_STAGE_UPPER_USD}
             stages.append(
                 {
                     "method": method,

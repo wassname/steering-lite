@@ -7,23 +7,26 @@ import json
 from pathlib import Path
 from .cache import cached_stage, content_key, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
-from .sweep import BSBENCH_PERSONAS, BSBENCH_PERSONA_N_PAIRS, BSBENCH_PERSONA_SEED, BSBENCH_PERSONA_TEMPLATE, BSBENCH_PERSONA_THINKING, CANDIDATE_DOSE_UPPER, case_identity, final_stages
+from .sweep import BSBENCH_PERSONAS, BSBENCH_PERSONA_N_PAIRS, BSBENCH_PERSONA_SEED, BSBENCH_PERSONA_TEMPLATE, BSBENCH_PERSONA_THINKING, CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages
 from .transfer_data import load_transfer_records, transfer_provenance
 from .validation import numbered_requests, validate_persona_examples
 
 
-def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None) -> dict:
+def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None, dispatch_config=None) -> dict:
     """Dispatch only on a cache miss, after reserving its declared upper cost."""
     dispatched = False
+
     def compute() -> dict:
         nonlocal dispatched
         reservation = reserve(ledger, f"modal-{stage}-{method}", config["upper_usd"], limit_usd=50.0)
         dispatched = True
-        result = backend.gpu(stage=stage, method=method, config=config, prompts=prompts)
+        backend_config = config if dispatch_config is None else dispatch_config(config)
+        result = backend.gpu(stage=stage, method=method, config=backend_config, prompts=prompts)
         if validate_result:
             validate_result(result)
         settle(ledger, reservation, result["actual_usd"])
         return result | {"reservation": reservation}
+
     result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute)
     return result | {"reused": not dispatched}
 
@@ -62,7 +65,12 @@ def _load_sidecar(root: Path, artifact: dict) -> dict:
     path = root / artifact["path"]
     if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != artifact["sha256"]:
         raise RuntimeError("durable vector sidecar is missing or corrupt; refusing final dispatch")
-    return artifact | {"backend_path": str(path.resolve())}
+    return artifact
+
+
+def _dispatch_sidecar(root: Path, config: dict) -> dict:
+    artifact = _load_sidecar(root, config["vector_artifact"])
+    return config | {"vector_artifact": artifact | {"backend_path": str((root / artifact["path"]).resolve())}}
 
 
 def _local(root: Path, *, stage: str, model: dict, data: dict, method: str, prompts: list[str], config: dict, compute) -> dict:
@@ -117,7 +125,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
     """Cached direct bare/prompting path; it intentionally has no vector calibration."""
     if method not in {"bare", "prompting"}:
         raise ValueError("direct conditions are bare or prompting")
-    config = {"upper_usd": 0.01, "prompt_spec": prompt_spec, "condition": method}
+    config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": prompt_spec, "condition": method}
     generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
     identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"}), "fake": True}
     items = [{"prompt": prompt, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "response": answer, "fake": True} for prompt, answer in zip(prompts, generation["answers"], strict=True)]
@@ -137,7 +145,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     if {key: source[key] for key in expected_identity} != expected_identity:
         raise ValueError("vector calibration requires the fixed sycophantic/abrasive persona identity")
     records = transfer_records if transfer_records is not None else load_transfer_records()
-    calibration_config = {"upper_usd": 0.01, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec}
+    calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec}
     dispatched = False
     def candidate_compute() -> dict:
         nonlocal dispatched
@@ -172,8 +180,8 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
     executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
     plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
-    final_config = stages[0]["config"] | {"upper_usd": 0.01, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}
-    final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result))
+    final_config = stages[0]["config"] | {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}
+    final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result), dispatch_config=lambda config: _dispatch_sidecar(root, config))
     final_inputs = {"final_sha256": content_key({key: value for key, value in final.items() if key != "reused"}), "plan": executable_plan, "target": target}
     fake_records = [{**item, "response": answer, "fake": True, "non_experimental": True} for item, answer in zip(executable_plan, final["answers"], strict=True)]
     return {"paid_execution_enabled": False, "candidate": candidate, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final,

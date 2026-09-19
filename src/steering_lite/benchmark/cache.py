@@ -89,8 +89,11 @@ def reserve_many(
         handle.seek(0)
         records = [json.loads(line) for line in handle]
         settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
+        unresolved_overages = [row for row in records if row["event"] == "overage"]
         total = sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
         requested = sum(upper_usd for _, upper_usd in reservations)
+        if unresolved_overages:
+            raise RuntimeError("budget: unresolved overage requires audit before another reservation")
         if (
             not reservations
             or any(upper_usd <= 0 for _, upper_usd in reservations)
@@ -122,4 +125,5 @@ def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
         assert not any(row["event"] == "settled" and row["reservation"] == reservation for row in rows)
         handle.write(json.dumps({"event": "settled", "reservation": reservation, "actual_usd": actual_usd}) + "\n")
         if actual_usd > original["upper_usd"]:
+            handle.write(json.dumps({"event": "overage", "reservation": reservation, "actual_usd": actual_usd, "upper_usd": original["upper_usd"]}) + "\n")
             raise RuntimeError(f"actual cost ${actual_usd} exceeded reservation ${original['upper_usd']}; revise pricing before continuing")

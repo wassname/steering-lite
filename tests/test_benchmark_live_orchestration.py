@@ -1,19 +1,25 @@
+import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from dataclasses import replace
 
 import pytest
 
 from steering_lite.benchmark.dose_search import CALIBRATION_CASE
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.production import persona_source_identity, run_direct_condition, run_live_two_step
+from steering_lite.benchmark.sweep import MODAL_GPU_STAGE_UPPER_USD, dry_manifest
 from steering_lite.benchmark.transfer_data import load_transfer_records
 
 
 class FakeBackend:
-    def __init__(self): self.calls = []
+    def __init__(self):
+        self.calls = []
+        self.configs = []
+
     def gpu(self, *, stage, method, config, prompts):
         self.calls.append(stage)
+        self.configs.append(config)
         if stage == "calibration-candidates":
             coefficients = [0.2, 0.4]
             return {"actual_usd": 0.0, "vector_bytes": b"durable-test-vector", "candidate_coefficients": coefficients, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"answer-{coefficient}-{index}"} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"method": method}}
@@ -53,6 +59,11 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     assert artifact.is_file() and first["candidate"]["vector_sha256"] == first["candidate"]["vector_artifact"]["sha256"]
     run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     assert backend.calls == ["calibration-candidates", "final-generation"]
+    final_cache, = (tmp_path / "cache" / "final-generation").glob("*.json")
+    persisted_config = json.loads(final_cache.read_text())["identity"]["config"]
+    assert "backend_path" not in json.dumps(persisted_config)
+    final_dispatch_config = backend.configs[-1]
+    assert Path(final_dispatch_config["vector_artifact"]["backend_path"]).is_absolute()
 
 
 def test_candidate_item_coverage_and_observation_coefficients_fail_before_target(tmp_path: Path):
@@ -139,6 +150,62 @@ def test_invalidation_boundaries(tmp_path: Path):
     extraction = persona_source_identity() | {"test_extraction_revision": "two"}
     run_live_two_step(tmp_path, ledger, **(kwargs | {"extraction_identity": extraction}))
     assert backend.calls[-2:] == ["calibration-candidates", "final-generation"]
+
+
+def test_fake_production_reservations_use_shared_dry_stage_upper(tmp_path: Path):
+    backend = FakeBackend()
+    rows = read_dev_cohort()
+    direct = run_direct_condition(
+        tmp_path / "direct",
+        tmp_path / "direct-ledger.jsonl",
+        model={"id": "fake"},
+        data=cohort_identity(rows[:2]),
+        method="bare",
+        prompts=[row["prompt"] for row in rows[:2]],
+        backend=backend,
+        prompt_spec={"max_new_tokens": 8},
+    )
+    kwargs, _, _ = inputs(backend)
+    live = run_live_two_step(tmp_path / "vector", tmp_path / "vector-ledger.jsonl", **kwargs)
+
+    assert direct["generation"]["reused"] is False
+    assert live["candidate"]["reused"] is False and live["final"]["reused"] is False
+    assert [config["upper_usd"] for config in backend.configs] == [
+        MODAL_GPU_STAGE_UPPER_USD,
+        MODAL_GPU_STAGE_UPPER_USD,
+        MODAL_GPU_STAGE_UPPER_USD,
+    ]
+    manifest = dry_manifest(tmp_path / "dry")
+    assert manifest["cost_estimate"]["planning_assumptions"]["modal_gpu_stage_upper_usd"] == MODAL_GPU_STAGE_UPPER_USD
+
+
+def test_overage_is_auditable_not_cached_and_blocks_retry(tmp_path: Path):
+    class OverageBackend(FakeBackend):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            return result | {"actual_usd": MODAL_GPU_STAGE_UPPER_USD + 0.01}
+
+    backend = OverageBackend()
+    kwargs = {
+        "model": {"id": "fake"},
+        "data": {"sha256": "fake"},
+        "method": "bare",
+        "prompts": ["one"],
+        "backend": backend,
+        "prompt_spec": {"max_new_tokens": 8},
+    }
+    ledger = tmp_path / "ledger.jsonl"
+    with pytest.raises(RuntimeError, match="exceeded reservation"):
+        run_direct_condition(tmp_path, ledger, **kwargs)
+    assert backend.calls == ["generation"]
+    assert not list((tmp_path / "cache" / "generation").glob("*.json"))
+    records = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert [record["event"] for record in records] == ["reserved", "settled", "overage"]
+    assert records[-1]["actual_usd"] > records[-1]["upper_usd"]
+
+    with pytest.raises(RuntimeError, match="unresolved overage"):
+        run_direct_condition(tmp_path, ledger, **kwargs)
+    assert backend.calls == ["generation"]
 
 
 @pytest.mark.parametrize("method", ("bare", "prompting"))
