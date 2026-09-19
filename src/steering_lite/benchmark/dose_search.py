@@ -28,6 +28,9 @@ TRANSFER_CASES = (
 )
 
 
+FINAL_DOSE_MULTIPLIERS = (0.8, 1.0, 1.2)
+
+
 _HEALTH_FIELDS = (
     "rep",
     "gen_len",
@@ -125,17 +128,14 @@ def predict_transfer(
     prompts,
     target: dict,
     case: Case,
-    nearby_observed: list[dict],
     *,
     bracket: tuple[float, float],
     solver_kwargs: dict,
     solver=calibrate_iso_kl,
 ) -> dict:
-    """Use the fitted RMS-KL target to solve a coefficient on one new case."""
+    """Use the fitted RMS-KL target to solve a coefficient on disjoint prompts."""
     if target["target_stat"] != "kl_rms":
         raise ValueError("transfer requires an RMS-KL target")
-    if not nearby_observed:
-        raise ValueError("transfer needs nearby observed doses")
     coefficient, history = solver(
         vector,
         model,
@@ -154,10 +154,41 @@ def predict_transfer(
         "model": target["source"]["model"],
         "target_stat": "kl_rms",
         "target_rms": target["target_rms"],
+        "bracket": bracket,
         "predicted_coefficient": coefficient,
         "search_history": history,
-        "boundary": classify_boundary(history, nearby_observed, target["target_rms"], bracket),
+    }
+
+
+def classify_transfer_boundary(prediction: dict, nearby_observed: list[dict]) -> dict:
+    """Classify post-generation behavioral observations for one predicted transfer."""
+    if not nearby_observed:
+        raise ValueError("transfer boundary classification needs nearby observed doses")
+    return prediction | {
+        "boundary": classify_boundary(
+            prediction["search_history"],
+            nearby_observed,
+            prediction["target_rms"],
+            tuple(prediction["bracket"]),
+        ),
         "nearby_observed": nearby_observed,
+    }
+
+
+def final_dose_plan(prediction: dict) -> dict:
+    """Generate predicted coefficient plus fixed 0.8x and 1.2x nearby doses."""
+    coefficient = float(prediction["predicted_coefficient"])
+    if coefficient == 0.0:
+        raise ValueError("final dose plan requires a non-zero predicted coefficient")
+    coefficients = [round(coefficient * multiplier, 12) for multiplier in FINAL_DOSE_MULTIPLIERS]
+    if len(set(coefficients)) != len(coefficients):
+        raise ValueError("final dose plan requires distinct predicted and nearby doses")
+    return {
+        "schema": "bsbench-final-dose-plan-v1",
+        "case_id": prediction["case"]["case_id"],
+        "target_id": prediction["target_id"],
+        "predicted_coefficient": coefficient,
+        "coefficients": coefficients,
     }
 
 

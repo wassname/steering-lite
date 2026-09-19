@@ -5,7 +5,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .cache import cached_stage, committed, content_key, reserve_many, save_json
-from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, Case, validate_cases
+from .dose_search import (
+    CALIBRATION_CASE,
+    FINAL_DOSE_MULTIPLIERS,
+    TRANSFER_CASES,
+    Case,
+    final_dose_plan,
+    validate_cases,
+)
 from .generation import cohort_identity, read_dev_cohort
 from .pipeline import METHODS
 
@@ -164,7 +171,7 @@ def unavailable_default_transfer_data() -> dict[str, list[str]]:
 
 def phase_b_budget_stages() -> tuple[dict, ...]:
     """Reserve the blocked vector-method final sweep without inventing stage identities."""
-    item_count = sum(len(case.prompt_ids) for case in TRANSFER_CASES)
+    item_count = sum(len(case.prompt_ids) for case in TRANSFER_CASES) * len(FINAL_DOSE_MULTIPLIERS)
     blocked_by = unavailable_default_transfer_data()
     return tuple(
         {
@@ -190,13 +197,14 @@ def final_stages(
     method: str,
     vector_sha256: str,
     observed: list[dict],
+    transfer_predictions: list[dict],
     case_prompts: dict[str, list[str]],
     prompt_spec: dict,
     transfer_cases: tuple[Case, ...] = TRANSFER_CASES,
 ) -> tuple[dict, ...]:
     """Describe the post-judgment generation graph without dispatching it."""
-    if not vector_sha256 or not observed or not case_prompts or not prompt_spec:
-        raise ValueError("final stages require vector, observed records, prompts and prompt spec")
+    if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+        raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
     validate_cases(CALIBRATION_CASE, transfer_cases)
     if transfer_cases == TRANSFER_CASES:
         missing = unavailable_default_transfer_data()
@@ -217,17 +225,27 @@ def final_stages(
         raise ValueError("final stages require loadable prompts for every transfer case")
 
     ordered_observed = sorted(observed, key=content_key)
+    plans = [final_dose_plan(prediction) for prediction in transfer_predictions]
+    plans_by_case = {plan["case_id"]: plan for plan in plans}
+    if set(plans_by_case) != set(case_ids) or len(plans_by_case) != len(plans):
+        raise ValueError("final stages require one transfer prediction for every transfer case")
+    ordered_plans = [plans_by_case[case_id] for case_id in case_ids]
     prompt_hashes = {
         case_id: content_key({"prompts": prompts})
         for case_id, prompts in actual_case_prompts.items()
     }
-    item_count = sum(len(prompts) for prompts in actual_case_prompts.values())
+    item_count = sum(
+        len(actual_case_prompts[plan["case_id"]]) * len(plan["coefficients"])
+        for plan in ordered_plans
+    )
     config = {
         "schema": "bsbench-final-stage-v1",
         "method": method,
         "vector_sha256": vector_sha256,
         "observed_sha256": content_key({"observed": ordered_observed}),
         "candidate_coefficients": sorted(row["coefficient"] for row in ordered_observed),
+        "final_dose_plans": ordered_plans,
+        "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
         "case_prompt_hashes": prompt_hashes,
         "prompt_spec": prompt_spec,
         "prompt_spec_sha256": content_key(prompt_spec),
@@ -239,6 +257,14 @@ def final_stages(
         "config": config,
         "item_count": item_count,
         "case_prompts": actual_case_prompts,
+        "generation_plan": [
+            {
+                "case_id": plan["case_id"],
+                "prompts": actual_case_prompts[plan["case_id"]],
+                "coefficients": plan["coefficients"],
+            }
+            for plan in ordered_plans
+        ],
     }
     downstream = tuple(
         {

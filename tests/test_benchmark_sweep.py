@@ -4,7 +4,14 @@ from types import SimpleNamespace
 import pytest
 
 from steering_lite.benchmark.cache import content_key
-from steering_lite.benchmark.dose_search import CALIBRATION_CASE, Case, TRANSFER_CASES, fit_target, predict_transfer
+from steering_lite.benchmark.dose_search import (
+    CALIBRATION_CASE,
+    Case,
+    TRANSFER_CASES,
+    classify_transfer_boundary,
+    fit_target,
+    predict_transfer,
+)
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.sweep import (
@@ -41,6 +48,18 @@ def _final_inputs() -> dict:
         "observed": [
             {"coefficient": 0.4, "useful": True, "coherent": True, "provenance": "judge-b"},
             {"coefficient": -0.2, "useful": True, "coherent": True, "provenance": "judge-a"},
+        ],
+        "transfer_predictions": [
+            {
+                "target_id": "target-a",
+                "case": {"case_id": transfer_cases[0].case_id},
+                "predicted_coefficient": 0.5,
+            },
+            {
+                "target_id": "target-a",
+                "case": {"case_id": transfer_cases[1].case_id},
+                "predicted_coefficient": -0.25,
+            },
         ],
         "case_prompts": {
             transfer_cases[0].case_id: ["heldout prompt"],
@@ -104,10 +123,10 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     phase_b = first["phase_b_budget_stages"]
     assert len(phase_b) == 24
     assert {(stage["stage"], stage["runner"], stage["item_count"]) for stage in phase_b} == {
-        ("final-generation", "modal_gpu", 10),
-        ("final-health", "local", 10),
-        ("final-aware", "local_judge_api", 10),
-        ("final-blind", "local_judge_api", 10),
+        ("final-generation", "modal_gpu", 30),
+        ("final-health", "local", 30),
+        ("final-aware", "local_judge_api", 30),
+        ("final-blind", "local_judge_api", 30),
     }
     assert all(stage["dispatch_blocked_by_missing_transfer_data"] == {
         "bsbench-v2-heldout": ["BSV2-H-001", "BSV2-H-002"],
@@ -116,8 +135,8 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     } for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 248,
-        "blind": 248,
+        "target_aware": 488,
+        "blind": 488,
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
@@ -147,14 +166,18 @@ def test_final_stages_carry_complete_data_flow_and_stable_identity():
     reordered = final_stages(**reversed_inputs)
 
     assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in stages] == [
-        ("final-generation", "modal_gpu", 3),
-        ("final-health", "local", 3),
-        ("final-aware", "local_judge_api", 3),
-        ("final-blind", "local_judge_api", 3),
+        ("final-generation", "modal_gpu", 9),
+        ("final-health", "local", 9),
+        ("final-aware", "local_judge_api", 9),
+        ("final-blind", "local_judge_api", 9),
     ]
     assert stages == reordered
     assert stages[0]["case_prompts"] == inputs["case_prompts"]
-    assert all("case_prompts" not in stage for stage in stages[1:])
+    assert stages[0]["generation_plan"] == [
+        {"case_id": "bsbench-v2-heldout-transfer", "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
+        {"case_id": "other-dataset-transfer", "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
+    ]
+    assert all("case_prompts" not in stage and "generation_plan" not in stage for stage in stages[1:])
     assert all(stage["input_stage"] == "final-generation" for stage in stages[1:])
     config = stages[0]["config"]
     assert config["vector_sha256"] == "vector-a"
@@ -175,6 +198,7 @@ def test_final_stage_identity_invalidates_each_input_independently():
         {"vector_sha256": "vector-b"},
         {"observed": [{**inputs["observed"][0], "provenance": "different"}, inputs["observed"][1]]},
         {"observed": [{**inputs["observed"][0], "coefficient": 0.5}, inputs["observed"][1]]},
+        {"transfer_predictions": [{**inputs["transfer_predictions"][0], "predicted_coefficient": 0.6}, inputs["transfer_predictions"][1]]},
         {"case_prompts": inputs["case_prompts"] | {"other-dataset-transfer": ["changed prompt"]}},
         {"prompt_spec": inputs["prompt_spec"] | {"template": "Answer directly."}},
     )
@@ -187,6 +211,7 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
     for changed, message in (
         ({"vector_sha256": ""}, "vector"),
         ({"observed": []}, "observed"),
+        ({"transfer_predictions": []}, "transfer predictions"),
         ({"case_prompts": {}}, "prompts"),
         ({"prompt_spec": {}}, "prompt spec"),
         ({"case_prompts": {"bsbench-v2-heldout-transfer": ["only one"]}}, "complete prompts"),
@@ -201,12 +226,16 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
         final_stages(
             **(inputs | {
                 "transfer_cases": TRANSFER_CASES,
+                "transfer_predictions": [
+                    {"target_id": "target-a", "case": {"case_id": case.case_id}, "predicted_coefficient": 0.5}
+                    for case in TRANSFER_CASES
+                ],
                 "case_prompts": {case.case_id: ["loadable"] for case in TRANSFER_CASES},
             })
         )
 
 
-def test_synthetic_calibration_transfer_flow_uses_disjoint_prompts_and_invalidates_dependents():
+def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_classification():
     observed = [
         {"coefficient": 0.2, "useful": True, "coherent": True, "provenance": "candidate-1", "generation_health": {}},
         {"coefficient": 0.4, "useful": True, "coherent": True, "provenance": "candidate-2", "generation_health": {}},
@@ -218,7 +247,7 @@ def test_synthetic_calibration_transfer_flow_uses_disjoint_prompts_and_invalidat
         "per_t_max": [0.1], "per_t_n": [1],
     }
     calibration_prompts = ["calibration-only prompt"]
-    transfer_prompts = ["disjoint transfer prompt"]
+    transfer_prompts = ["disjoint transfer prompt one", "disjoint transfer prompt two"]
     measured_prompts = []
     solved_prompts = []
 
@@ -235,38 +264,50 @@ def test_synthetic_calibration_transfer_flow_uses_disjoint_prompts_and_invalidat
         vector, object(), object(), calibration_prompts, CALIBRATION_CASE, observed,
         method="vjp_cache", model_id="synthetic", measure_kwargs={}, measure=measure,
     )
-    transfer_case = Case("synthetic-transfer", "audited-synthetic", ("SYN-001",))
+    transfer_case = Case("synthetic-transfer", "audited-synthetic", ("SYN-001", "SYN-002"))
     prediction = predict_transfer(
         vector, object(), object(), transfer_prompts, target, transfer_case,
-        [{"coefficient": 0.7, "useful": True, "coherent": True, "provenance": "transfer-1", "generation_health": {}}],
         bracket=(0.1, 1.0), solver_kwargs={}, solver=solver,
     )
     stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
-        case_prompts={transfer_case.case_id: transfer_prompts}, prompt_spec={"max_new_tokens": 8},
-        transfer_cases=(transfer_case,),
+        transfer_predictions=[prediction], case_prompts={transfer_case.case_id: transfer_prompts},
+        prompt_spec={"max_new_tokens": 8}, transfer_cases=(transfer_case,),
     )
-    changed_observed = [{**observed[1], "coefficient": 0.5}, observed[0], observed[2]]
-    changed_target = fit_target(
-        SimpleNamespace(cfg=SimpleNamespace(coeff=0.0)), object(), object(), calibration_prompts,
-        CALIBRATION_CASE, changed_observed, method="vjp_cache", model_id="synthetic",
-        measure_kwargs={}, measure=measure,
+    post_generation = classify_transfer_boundary(
+        prediction,
+        [{"coefficient": 0.7, "useful": True, "coherent": True, "provenance": "transfer-1", "generation_health": {}}],
     )
+    changed_prediction = prediction | {"predicted_coefficient": 0.6}
     changed_stages = final_stages(
-        method="vjp_cache", vector_sha256="synthetic-vector", observed=changed_observed,
+        method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
+        transfer_predictions=[changed_prediction], case_prompts={transfer_case.case_id: transfer_prompts},
+        prompt_spec={"max_new_tokens": 8}, transfer_cases=(transfer_case,),
+    )
+    retargeted_stages = final_stages(
+        method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
+        transfer_predictions=[prediction | {"target_id": "changed-target"}],
         case_prompts={transfer_case.case_id: transfer_prompts}, prompt_spec={"max_new_tokens": 8},
         transfer_cases=(transfer_case,),
     )
 
-    assert measured_prompts == [calibration_prompts, calibration_prompts]
+    assert measured_prompts == [calibration_prompts]
     assert solved_prompts == [transfer_prompts]
     assert target["observed_boundary"]["coefficient"] == 0.4
     assert prediction["predicted_coefficient"] == 0.7
     assert prediction["predicted_coefficient"] != target["source"]["coefficient"]
     assert prediction["case"]["prompt_ids"] != list(CALIBRATION_CASE.prompt_ids)
-    assert stages[0]["case_prompts"] == {transfer_case.case_id: transfer_prompts}
-    assert changed_target["target_id"] != target["target_id"]
+    assert "boundary" not in prediction
+    assert stages[0]["item_count"] == 6
+    assert stages[0]["generation_plan"] == [{
+        "case_id": transfer_case.case_id,
+        "prompts": transfer_prompts,
+        "coefficients": [0.56, 0.7, 0.84],
+    }]
+    assert all(stage["item_count"] == 6 for stage in stages)
+    assert post_generation["boundary"] == "measured_useful_coherent_boundary"
     assert changed_stages[0]["config"] != stages[0]["config"]
+    assert retargeted_stages[0]["config"] != stages[0]["config"]
 
 
 def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):

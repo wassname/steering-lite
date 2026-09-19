@@ -9,6 +9,8 @@ from steering_lite.benchmark.dose_search import (
     Case,
     cached_search,
     classify_boundary,
+    classify_transfer_boundary,
+    final_dose_plan,
     fit_target,
     predict_transfer,
     validate_cases,
@@ -82,7 +84,7 @@ def test_fit_target_measures_observed_useful_coherent_boundary():
     assert target["calibration_health"]["per_t_p95"] == [0.2, 0.3]
 
 
-def test_predict_transfer_calls_solver_at_fitted_target_and_records_all_history():
+def test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_observations():
     calls = []
 
     def solver(*_args, **kwargs):
@@ -105,7 +107,6 @@ def test_predict_transfer_calls_solver_at_fitted_target_and_records_all_history(
         ["transfer prompt"],
         target,
         TRANSFER_CASES[0],
-        [observed(0.6, useful=True, coherent=True, provenance="transfer-judge")],
         bracket=(0.1, 4.0),
         solver_kwargs={"device": "cpu"},
         solver=solver,
@@ -113,7 +114,25 @@ def test_predict_transfer_calls_solver_at_fitted_target_and_records_all_history(
     assert calls == [{"target_kl": 1.25, "target_stat": "kl_rms", "bracket": (0.1, 4.0), "device": "cpu"}]
     assert record["predicted_coefficient"] == 0.7
     assert record["search_history"][-1]["final"] is True
-    assert record["boundary"] == "measured_useful_coherent_boundary"
+    assert "boundary" not in record
+    classified = classify_transfer_boundary(
+        record,
+        [observed(0.6, useful=True, coherent=True, provenance="transfer-judge")],
+    )
+    assert classified["boundary"] == "measured_useful_coherent_boundary"
+    with pytest.raises(ValueError, match="nearby observed"):
+        classify_transfer_boundary(record, [])
+
+
+def test_final_dose_plan_uses_predicted_plus_fixed_nearby_doses():
+    plan = final_dose_plan({
+        "target_id": "target-a",
+        "case": {"case_id": "transfer-a"},
+        "predicted_coefficient": -0.5,
+    })
+    assert plan["coefficients"] == [-0.4, -0.5, -0.6]
+    with pytest.raises(ValueError, match="non-zero"):
+        final_dose_plan({"target_id": "target-a", "case": {"case_id": "transfer-a"}, "predicted_coefficient": 0.0})
 
 
 def test_boundary_distinguishes_failure_from_solver_limit_including_final_point():
