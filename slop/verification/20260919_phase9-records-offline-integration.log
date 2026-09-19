@@ -1,0 +1,4 @@
+vjp ['calibration-candidates', 'final-generation'] []
+bare ['generation'] []
+prompting ['generation'] []
+PASS: candidate Cartesian records, response-bearing 24-item final records, and zero rerun calls.

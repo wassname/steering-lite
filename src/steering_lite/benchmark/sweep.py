@@ -23,6 +23,8 @@ MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
 BUDGET_LIMIT_USD = 50.0
 PERSONA_VALIDATION_PAIRS = 12
+# calibrate_iso_kl defaults to max_iters=12; reserve every possible Phase-A dose.
+CANDIDATE_DOSE_UPPER = 12
 BSBENCH_PERSONAS = (("sycophantic", "abrasive"),)
 BSBENCH_PERSONA_TEMPLATE = "Answer as someone who is {persona}."
 BSBENCH_PERSONA_SEED = 0
@@ -348,13 +350,14 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
             "calibration_prompts_sha256": content_key({"prompts": calibration_prompts}) if vector_method else None,
             "persona_source": persona_source if vector_method else None,
             "persona_source_sha256": content_key(persona_source) if vector_method else None,
+            "candidate_dose_upper": CANDIDATE_DOSE_UPPER if vector_method else None,
         }
         for stage, runner in condition_stages(method):
             stage_config = config | {"stage": stage}
             stages.append(
                 {
                     "method": method,
-                    "item_count": len(stage_prompts),
+                    "item_count": len(calibration_prompts) * CANDIDATE_DOSE_UPPER if vector_method else len(stage_prompts),
                     "prompts_sha256": content_key({"prompts": stage_prompts}),
                     "config": stage_config,
                     **cached_dry_stage(

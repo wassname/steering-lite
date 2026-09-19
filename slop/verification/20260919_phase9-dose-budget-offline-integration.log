@@ -1,0 +1,4 @@
+vjp ['calibration-candidates', 'final-generation'] []
+bare ['generation'] []
+prompting ['generation'] []
+PASS: 12-dose planning upper (4x12 items) and all fake reruns are cache-only.

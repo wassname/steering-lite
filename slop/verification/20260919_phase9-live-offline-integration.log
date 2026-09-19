@@ -1,0 +1,6 @@
+command: uv run python scripts/run_bsbench_sweep.py --run --backend fake --stage vjp_cache --out /tmp/bsbench-live --ledger /tmp/bsbench-live/ledger.jsonl
+mode: offline-fake-two-step
+not_experimental_results: True
+first_backend_calls: ['calibration-candidates', 'final-generation']
+immediate_rerun_backend_calls: []
+PASS: deterministic fake backend made two first-pass calls and zero immediate-rerun calls

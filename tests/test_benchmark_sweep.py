@@ -19,6 +19,7 @@ from steering_lite.benchmark.transfer_data import PromptRecord, load_transfer_re
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.sweep import (
     BSBENCH_PERSONAS,
+    CANDIDATE_DOSE_UPPER,
     BSBENCH_PERSONA_N_PAIRS,
     BSBENCH_PERSONA_SEED,
     BSBENCH_PERSONA_TEMPLATE,
@@ -121,10 +122,10 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     for method in vector_methods:
         stages = _method_stages(first, method)
         assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in stages] == [
-            ("calibration-candidates", "modal_gpu", 4),
-            ("candidate-health", "local", 4),
-            ("candidate-aware", "local_judge_api", 4),
-            ("candidate-blind", "local_judge_api", 4),
+            ("calibration-candidates", "modal_gpu", 4 * CANDIDATE_DOSE_UPPER),
+            ("candidate-health", "local", 4 * CANDIDATE_DOSE_UPPER),
+            ("candidate-aware", "local_judge_api", 4 * CANDIDATE_DOSE_UPPER),
+            ("candidate-blind", "local_judge_api", 4 * CANDIDATE_DOSE_UPPER),
         ]
         assert {stage["prompts_sha256"] for stage in stages} == {
             content_key({"prompts": calibration_prompts})
@@ -133,6 +134,7 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
         assert all(stage["config"]["calibration_prompts_sha256"] == content_key({"prompts": calibration_prompts}) for stage in stages)
         assert all(stage["config"]["persona_source"] == expected_persona_source for stage in stages)
         assert all(stage["config"]["persona_source_sha256"] == content_key(expected_persona_source) for stage in stages)
+        assert all(stage["config"]["candidate_dose_upper"] == CANDIDATE_DOSE_UPPER for stage in stages)
 
     phase_b = first["phase_b_budget_stages"]
     assert len(phase_b) == 24
@@ -146,8 +148,8 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert all("transfer_provenance_sha256" in stage for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 416,
-        "blind": 416,
+        "target_aware": 944,
+        "blind": 944,
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
@@ -342,7 +344,7 @@ def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
 
     assert no_gpu["total_upper_usd"] < full["total_upper_usd"]
     assert no_blind["quantities"]["requests"] == {
-        "target_aware": 128,
+        "target_aware": 656,
         "blind": 0,
         "persona_validation": 12,
     }

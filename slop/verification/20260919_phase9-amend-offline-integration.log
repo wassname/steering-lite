@@ -1,0 +1,4 @@
+vjp ['calibration-candidates', 'final-generation'] []
+bare ['generation'] []
+prompting ['generation'] []
+PASS: all fake routes use zero backend calls on immediate rerun; vector plan has 24 results.
