@@ -9,7 +9,7 @@ test:
 	uv run --extra test --extra hf-test --extra benchmark pytest -q
 
 smoke:
-	uv run --extra test --extra hf-test --extra benchmark pytest -q tests/test_pipeline.py
+	uv run --extra test --extra hf-test --extra benchmark pytest -q tests/test_pipeline.py tests/test_benchmark_pipeline.py
 
 # Full sweep: extract -> calibrate -> tinymfv guided CoT eval, one row per method.
 # Saves per-method raw_logratios (clr) + pmass + per-row reasoning traces

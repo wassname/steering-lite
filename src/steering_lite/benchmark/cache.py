@@ -1,0 +1,98 @@
+"""Content-addressed benchmark artifacts and a local spending ledger. — PI/OpenAI"""
+
+import fcntl
+import hashlib
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+from loguru import logger
+
+
+def content_key(value: dict) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
+def source_hash() -> str:
+    root = Path(__file__).parents[1]
+    return content_key({str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(root.rglob("*.py"))})
+
+
+def save_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
+    temporary.replace(path)
+
+
+def cached(root: Path, stage: str, identity: dict, compute) -> dict:
+    key = content_key(identity)
+    path = root / stage / f"{key}.json"
+    if path.exists():
+        record = json.loads(path.read_text())
+        if record.get("identity") != identity or content_key(record["identity"]) != key:
+            raise RuntimeError(f"cache identity mismatch at {path}")
+        logger.info("cache hit {} {}", stage, key[:12])
+        return record["result"]
+    logger.info("cache miss {} {}", stage, key[:12])
+    result = compute()
+    save_json(path, {"identity": identity, "result": result})
+    return result
+
+
+def cached_stage(
+    root: Path,
+    stage: str,
+    *,
+    model: dict,
+    data: dict,
+    method: str,
+    config: dict,
+    prompts: list[str],
+    compute,
+    code: str | None = None,
+) -> dict:
+    """Cache only when every result-relevant local input is named in the key."""
+    if not all((stage, model, data, method, config, prompts)):
+        raise ValueError("cached benchmark stage requires model, data, method, config and prompts")
+    identity = {
+        "schema": "bsbench-stage-v1",
+        "stage": stage,
+        "model": model,
+        "data": data,
+        "method": method,
+        "config": config,
+        "prompts_sha256": content_key({"prompts": prompts}),
+        "code_sha256": source_hash() if code is None else code,
+    }
+    return cached(root, stage, identity, compute)
+
+
+def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) -> str:
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    with ledger.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        records = [json.loads(line) for line in handle]
+        settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
+        total = sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
+        if upper_usd <= 0 or total + upper_usd > limit_usd:
+            raise RuntimeError(f"budget: ${total:.4f} committed + ${upper_usd:.4f} requested exceeds ${limit_usd:.2f}")
+        record = {"event": "reserved", "kind": kind, "upper_usd": upper_usd, "time": datetime.now(timezone.utc).isoformat()}
+        record["id"] = content_key(record)
+        handle.write(json.dumps(record) + "\n")
+        return record["id"]
+
+
+def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
+    if actual_usd < 0:
+        raise ValueError("negative cost")
+    with ledger.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        rows = [json.loads(line) for line in handle]
+        original, = [row for row in rows if row["event"] == "reserved" and row["id"] == reservation]
+        assert not any(row["event"] == "settled" and row["reservation"] == reservation for row in rows)
+        handle.write(json.dumps({"event": "settled", "reservation": reservation, "actual_usd": actual_usd}) + "\n")
+        if actual_usd > original["upper_usd"]:
+            raise RuntimeError(f"actual cost ${actual_usd} exceeded reservation ${original['upper_usd']}; revise pricing before continuing")
