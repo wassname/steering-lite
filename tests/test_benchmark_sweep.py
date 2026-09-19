@@ -40,6 +40,21 @@ def _actual_transfer_cases() -> tuple[Case, ...]:
     )
 
 
+def _prediction(case: Case, coefficient: float, *, target_id: str = "target-a", method: str = "vjp_cache") -> dict:
+    return {
+        "schema": "bsbench-rms-kl-transfer-v1",
+        "target_id": target_id,
+        "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)},
+        "method": method,
+        "model": "synthetic",
+        "target_stat": "kl_rms",
+        "target_rms": 1.25,
+        "bracket": (0.1, 1.0),
+        "predicted_coefficient": coefficient,
+        "search_history": [],
+    }
+
+
 def _final_inputs() -> dict:
     transfer_cases = _actual_transfer_cases()
     return {
@@ -50,16 +65,8 @@ def _final_inputs() -> dict:
             {"coefficient": -0.2, "useful": True, "coherent": True, "provenance": "judge-a"},
         ],
         "transfer_predictions": [
-            {
-                "target_id": "target-a",
-                "case": {"case_id": transfer_cases[0].case_id},
-                "predicted_coefficient": 0.5,
-            },
-            {
-                "target_id": "target-a",
-                "case": {"case_id": transfer_cases[1].case_id},
-                "predicted_coefficient": -0.25,
-            },
+            _prediction(transfer_cases[0], 0.5),
+            _prediction(transfer_cases[1], -0.25),
         ],
         "case_prompts": {
             transfer_cases[0].case_id: ["heldout prompt"],
@@ -174,8 +181,8 @@ def test_final_stages_carry_complete_data_flow_and_stable_identity():
     assert stages == reordered
     assert stages[0]["case_prompts"] == inputs["case_prompts"]
     assert stages[0]["generation_plan"] == [
-        {"case_id": "bsbench-v2-heldout-transfer", "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
-        {"case_id": "other-dataset-transfer", "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
+        {"case": {"case_id": "bsbench-v2-heldout-transfer", "dataset": "bsbench-v2-heldout", "prompt_ids": ["BSV2-H-001"]}, "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
+        {"case": {"case_id": "other-dataset-transfer", "dataset": "other-dataset", "prompt_ids": ["OTHER-001", "OTHER-002"]}, "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
     ]
     assert all("case_prompts" not in stage and "generation_plan" not in stage for stage in stages[1:])
     assert all(stage["input_stage"] == "final-generation" for stage in stages[1:])
@@ -226,13 +233,22 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
         final_stages(
             **(inputs | {
                 "transfer_cases": TRANSFER_CASES,
-                "transfer_predictions": [
-                    {"target_id": "target-a", "case": {"case_id": case.case_id}, "predicted_coefficient": 0.5}
-                    for case in TRANSFER_CASES
-                ],
+                "transfer_predictions": [_prediction(case, 0.5) for case in TRANSFER_CASES],
                 "case_prompts": {case.case_id: ["loadable"] for case in TRANSFER_CASES},
             })
         )
+
+    predictions = inputs["transfer_predictions"]
+    for changed, message in (
+        ({"transfer_predictions": [{**predictions[0], "schema": "wrong"}, predictions[1]]}, "RMS-KL"),
+        ({"transfer_predictions": [{**predictions[0], "method": "pca"}, predictions[1]]}, "requested method"),
+        ({"transfer_predictions": [{**predictions[0], "case": {"case_id": predictions[0]["case"]["case_id"]}}, predictions[1]]}, "case identities"),
+        ({"transfer_predictions": [predictions[0], {**predictions[1], "target_id": "other-target"}]}, "common transfer target"),
+        ({"transfer_predictions": [{**predictions[0], "predicted_coefficient": float("nan")}, predictions[1]]}, "finite non-zero"),
+        ({"transfer_predictions": [predictions[0], predictions[0]]}, "one transfer prediction"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            final_stages(**(inputs | changed))
 
 
 def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_classification():
@@ -276,7 +292,10 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     )
     post_generation = classify_transfer_boundary(
         prediction,
-        [{"coefficient": 0.7, "useful": True, "coherent": True, "provenance": "transfer-1", "generation_health": {}}],
+        [
+            {"case_id": transfer_case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "useful": True, "coherent": True, "provenance": "transfer-1", "generation_health": {}}
+            for coefficient in (0.56, 0.7, 0.84)
+        ],
     )
     changed_prediction = prediction | {"predicted_coefficient": 0.6}
     changed_stages = final_stages(
@@ -300,7 +319,7 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     assert "boundary" not in prediction
     assert stages[0]["item_count"] == 6
     assert stages[0]["generation_plan"] == [{
-        "case_id": transfer_case.case_id,
+        "case": {"case_id": transfer_case.case_id, "dataset": transfer_case.dataset, "prompt_ids": list(transfer_case.prompt_ids)},
         "prompts": transfer_prompts,
         "coefficients": [0.56, 0.7, 0.84],
     }]

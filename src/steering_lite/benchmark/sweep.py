@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import math
 from pathlib import Path
 
 from .cache import cached_stage, committed, content_key, reserve_many, save_json
@@ -224,9 +225,33 @@ def final_stages(
     if any(not prompts for prompts in actual_case_prompts.values()):
         raise ValueError("final stages require loadable prompts for every transfer case")
 
+    expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+    target_ids = set()
+    for prediction in transfer_predictions:
+        if not isinstance(prediction, dict):
+            raise ValueError("final stages require transfer prediction records")
+        if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+            raise ValueError("final stages require RMS-KL transfer prediction records")
+        if prediction.get("method") != method:
+            raise ValueError("final stages require transfer predictions for the requested method")
+        case = prediction.get("case")
+        if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+            raise ValueError("final stages require complete matching transfer case identities")
+        target_id = prediction.get("target_id")
+        if not isinstance(target_id, str) or not target_id:
+            raise ValueError("final stages require a transfer target ID")
+        target_ids.add(target_id)
+        try:
+            coefficient = float(prediction["predicted_coefficient"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("final stages require a numeric predicted coefficient") from error
+        if not math.isfinite(coefficient) or coefficient == 0.0:
+            raise ValueError("final stages require a finite non-zero predicted coefficient")
+    if len(target_ids) != 1:
+        raise ValueError("final stages require one common transfer target ID")
     ordered_observed = sorted(observed, key=content_key)
     plans = [final_dose_plan(prediction) for prediction in transfer_predictions]
-    plans_by_case = {plan["case_id"]: plan for plan in plans}
+    plans_by_case = {plan["case"]["case_id"]: plan for plan in plans}
     if set(plans_by_case) != set(case_ids) or len(plans_by_case) != len(plans):
         raise ValueError("final stages require one transfer prediction for every transfer case")
     ordered_plans = [plans_by_case[case_id] for case_id in case_ids]
@@ -235,7 +260,7 @@ def final_stages(
         for case_id, prompts in actual_case_prompts.items()
     }
     item_count = sum(
-        len(actual_case_prompts[plan["case_id"]]) * len(plan["coefficients"])
+        len(actual_case_prompts[plan["case"]["case_id"]]) * len(plan["coefficients"])
         for plan in ordered_plans
     )
     config = {
@@ -259,8 +284,8 @@ def final_stages(
         "case_prompts": actual_case_prompts,
         "generation_plan": [
             {
-                "case_id": plan["case_id"],
-                "prompts": actual_case_prompts[plan["case_id"]],
+                "case": plan["case"],
+                "prompts": actual_case_prompts[plan["case"]["case_id"]],
                 "coefficients": plan["coefficients"],
             }
             for plan in ordered_plans

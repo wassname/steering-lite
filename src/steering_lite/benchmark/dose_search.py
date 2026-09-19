@@ -149,7 +149,7 @@ def predict_transfer(
     return {
         "schema": "bsbench-rms-kl-transfer-v1",
         "target_id": target["target_id"],
-        "case": asdict(case),
+        "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)},
         "method": target["source"]["method"],
         "model": target["source"]["model"],
         "target_stat": "kl_rms",
@@ -161,9 +161,21 @@ def predict_transfer(
 
 
 def classify_transfer_boundary(prediction: dict, nearby_observed: list[dict]) -> dict:
-    """Classify post-generation behavioral observations for one predicted transfer."""
+    """Classify only the planned, identified post-generation transfer observations."""
     if not nearby_observed:
         raise ValueError("transfer boundary classification needs nearby observed doses")
+    plan = final_dose_plan(prediction)
+    required = {"case_id", "target_id", "coefficient"}
+    if any(not required.issubset(row) for row in nearby_observed):
+        raise ValueError("transfer observations require case_id, target_id and coefficient")
+    if any(
+        row["case_id"] != plan["case"]["case_id"] or row["target_id"] != plan["target_id"]
+        for row in nearby_observed
+    ):
+        raise ValueError("transfer observations must match the predicted case and target")
+    coefficients = {float(row["coefficient"]) for row in nearby_observed}
+    if coefficients != set(plan["coefficients"]):
+        raise ValueError("transfer observations must cover exactly the planned doses")
     return prediction | {
         "boundary": classify_boundary(
             prediction["search_history"],
@@ -185,8 +197,9 @@ def final_dose_plan(prediction: dict) -> dict:
         raise ValueError("final dose plan requires distinct predicted and nearby doses")
     return {
         "schema": "bsbench-final-dose-plan-v1",
-        "case_id": prediction["case"]["case_id"],
+        "case": prediction["case"],
         "target_id": prediction["target_id"],
+        "method": prediction["method"],
         "predicted_coefficient": coefficient,
         "coefficients": coefficients,
     }

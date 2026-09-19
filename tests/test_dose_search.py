@@ -115,24 +115,36 @@ def test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_obser
     assert record["predicted_coefficient"] == 0.7
     assert record["search_history"][-1]["final"] is True
     assert "boundary" not in record
-    classified = classify_transfer_boundary(
-        record,
-        [observed(0.6, useful=True, coherent=True, provenance="transfer-judge")],
-    )
+    planned_observations = [
+        {"case_id": record["case"]["case_id"], "target_id": record["target_id"], "coefficient": coefficient, "useful": True, "coherent": True, "provenance": "transfer-judge", "generation_health": {}}
+        for coefficient in (0.56, 0.7, 0.84)
+    ]
+    classified = classify_transfer_boundary(record, planned_observations)
     assert classified["boundary"] == "measured_useful_coherent_boundary"
     with pytest.raises(ValueError, match="nearby observed"):
         classify_transfer_boundary(record, [])
+    for changed, message in (
+        ([{**row, "case_id": "calibration"} for row in planned_observations], "case and target"),
+        ([{**row, "case_id": "other-case"} for row in planned_observations], "case and target"),
+        ([{key: value for key, value in row.items() if key != "target_id"} for row in planned_observations], "case_id, target_id and coefficient"),
+        ([{**row, "target_id": "other-target"} for row in planned_observations], "case and target"),
+        (planned_observations[:2], "planned doses"),
+        (planned_observations + [{**planned_observations[0], "coefficient": 0.9}], "planned doses"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            classify_transfer_boundary(record, changed)
 
 
 def test_final_dose_plan_uses_predicted_plus_fixed_nearby_doses():
     plan = final_dose_plan({
         "target_id": "target-a",
-        "case": {"case_id": "transfer-a"},
+        "method": "vjp_cache",
+        "case": {"case_id": "transfer-a", "dataset": "synthetic", "prompt_ids": ["SYN-001"]},
         "predicted_coefficient": -0.5,
     })
     assert plan["coefficients"] == [-0.4, -0.5, -0.6]
     with pytest.raises(ValueError, match="non-zero"):
-        final_dose_plan({"target_id": "target-a", "case": {"case_id": "transfer-a"}, "predicted_coefficient": 0.0})
+        final_dose_plan({"target_id": "target-a", "method": "vjp_cache", "case": {"case_id": "transfer-a", "dataset": "synthetic", "prompt_ids": ["SYN-001"]}, "predicted_coefficient": 0.0})
 
 
 def test_boundary_distinguishes_failure_from_solver_limit_including_final_point():
