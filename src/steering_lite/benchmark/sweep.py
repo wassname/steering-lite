@@ -152,6 +152,39 @@ def case_identity(case) -> dict:
     return {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}
 
 
+def unavailable_default_transfer_data() -> dict[str, list[str]]:
+    """Name the default transfer records absent from the checked-in cohort."""
+    available = {row["question_id"] for row in read_dev_cohort()}
+    return {
+        case.dataset: list(case.prompt_ids)
+        for case in TRANSFER_CASES
+        if not set(case.prompt_ids).issubset(available)
+    }
+
+
+def phase_b_budget_stages() -> tuple[dict, ...]:
+    """Reserve the blocked vector-method final sweep without inventing stage identities."""
+    item_count = sum(len(case.prompt_ids) for case in TRANSFER_CASES)
+    blocked_by = unavailable_default_transfer_data()
+    return tuple(
+        {
+            "stage": stage,
+            "runner": runner,
+            "method": method,
+            "item_count": item_count,
+            "dispatch_blocked_by_missing_transfer_data": blocked_by,
+        }
+        for method in METHODS
+        if method not in {"bare", "prompting"}
+        for stage, runner in (
+            ("final-generation", "modal_gpu"),
+            ("final-health", "local"),
+            ("final-aware", "local_judge_api"),
+            ("final-blind", "local_judge_api"),
+        )
+    )
+
+
 def final_stages(
     *,
     method: str,
@@ -165,6 +198,14 @@ def final_stages(
     if not vector_sha256 or not observed or not case_prompts or not prompt_spec:
         raise ValueError("final stages require vector, observed records, prompts and prompt spec")
     validate_cases(CALIBRATION_CASE, transfer_cases)
+    if transfer_cases == TRANSFER_CASES:
+        missing = unavailable_default_transfer_data()
+        if missing:
+            details = "; ".join(
+                f"{dataset}: {', '.join(prompt_ids)}"
+                for dataset, prompt_ids in missing.items()
+            )
+            raise ValueError(f"default transfer data are not loadable with auditable provenance: {details}")
     if any("placeholder" in case.dataset for case in transfer_cases):
         raise ValueError("placeholder transfer cases cannot dispatch")
 
@@ -271,13 +312,15 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
                     ),
                 }
             )
+    final_budget_stages = phase_b_budget_stages()
     manifest = {
         "schema": "bsbench-sweep-manifest-v1", "mode": "dry-run", "paid_execution_enabled": False,
         "model": model, "questions": [{"question_id": row["question_id"], "question_number": row["question_number"]} for row in rows],
         "data": data, "conditions": list(METHODS), "judge_model": JUDGE_MODEL, "target_aware_request_schema": "bsbench-judge-request-v1", "blind_request_schema": "bsbench-judge-request-v1",
-        "ledger": str(ledger), "production_cache": str(out / "cache"), "dry_plan_cache": str(cache_root), "stages": stages,
+        "ledger": str(ledger), "production_cache": str(out / "cache"), "dry_plan_cache": str(cache_root),
+        "stages": stages, "phase_b_budget_stages": list(final_budget_stages),
     }
-    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages))
+    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages + list(final_budget_stages)))
     save_json(out / "manifest.json", manifest)
     save_json(out / "cost-estimate.json", manifest["cost_estimate"])
     return manifest
