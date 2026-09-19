@@ -1,0 +1,778 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-WxrKHiF71k3yyx9C5UgBZ1
+Building image im-r2ZFYYnxTLjHFXf5KpBkJB
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+Getting image source signatures
+Copying blob sha256:8f02ace339f3b629967ce63fce6a69668edf19373e340d7a4568cbe0bdde6b59
+Copying blob sha256:c0e23073289ce84b0354f1ef327bc139e81436aa1a33880e206e32f63a13831a
+Copying config sha256:cf8fcbe0943d81a20a96badf23ea16e54bf77b988558a311d7e7bd33ea05c1c1
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M2WGG300797NSTPGD62VRFBB/registry-unpackt5BScr
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode einops==0.8.2 jaxtyping==0.3.9 loguru==0.7.3 safetensors==0.7.0 torch==2.11.0 tqdm==4.67.3 transformers==5.12.1
+Using Python 3.13.0 environment at: /usr/local
+Resolved 57 packages in 186ms
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading tokenizers (3.1MiB)
+Downloading hf-xet (4.3MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading numpy (15.9MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading triton (179.6MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading cuda-bindings (6.6MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading transformers (10.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading torch (506.1MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading pygments (1.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+ Downloaded nvidia-cufile
+ Downloaded tokenizers
+ Downloaded nvidia-cuda-runtime
+ Downloaded hf-xet
+ Downloaded cuda-bindings
+ Downloaded nvidia-cuda-cupti
+ Downloaded pygments
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded nvidia-nvjitlink
+ Downloaded numpy
+ Downloaded sympy
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded transformers
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Prepared 54 packages in 5.78s
+Installed 54 packages in 1.87s
+Bytecode compiled 8913 files in 3.15s
+ + annotated-doc==0.0.5
+ + anyio==4.14.2
+ + click==8.5.0
+ + cuda-bindings==13.4.2
+ + cuda-pathfinder==1.8.2
+ + cuda-toolkit==13.0.2
+ + einops==0.8.2
+ + filelock==4.0.1
+ + fsspec==2026.9.0
+ + h11==0.16.0
+ + hf-xet==1.6.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + huggingface-hub==1.32.0
+ + jaxtyping==0.3.9
+ + jinja2==3.1.6
+ + loguru==0.7.3
+ + markdown-it-py==4.2.0
+ + markupsafe==3.0.3
+ + mdurl==0.1.2
+ + mpmath==1.3.0
+ + networkx==3.6.1
+ + numpy==2.5.3
+ + nvidia-cublas==13.1.0.3
+ + nvidia-cuda-cupti==13.0.85
+ + nvidia-cuda-nvrtc==13.0.88
+ + nvidia-cuda-runtime==13.0.96
+ + nvidia-cudnn-cu13==9.19.0.56
+ + nvidia-cufft==12.0.0.61
+ + nvidia-cufile==1.15.1.6
+ + nvidia-curand==10.4.0.35
+ + nvidia-cusolver==12.0.4.66
+ + nvidia-cusparse==12.6.3.3
+ + nvidia-cusparselt-cu13==0.8.0
+ + nvidia-nccl-cu13==2.28.9
+ + nvidia-nvjitlink==13.0.88
+ + nvidia-nvshmem-cu13==3.4.5
+ + nvidia-nvtx==13.0.85
+ + packaging==26.3
+ + pygments==2.21.0
+ + pyyaml==6.0.3
+ + regex==2026.9.10
+ + rich==15.0.0
+ + safetensors==0.7.0
+ + setuptools==81.0.0
+ + shellingham==1.5.4
+ + sympy==1.14.0
+ + tokenizers==0.22.2
+ + torch==2.11.0
+ + tqdm==4.67.3
+ + transformers==5.12.1
+ + triton==3.6.0
+ + typer==0.27.2
+ + wadler-lindig==0.1.7
+Saving image...
+Image saved, took 3.42s
+
+Built image im-r2ZFYYnxTLjHFXf5KpBkJB in 17.21s
+
+
+Stopping app - uncaught exception raised locally: InvalidError('An image tried to run a build step after using `image.add_local_*` to include local files.\n\nRun `image.add_local_*` commands last in your image build to avoid rebuilding images with every local file change. Modal will then add these files to containers on startup instead, saving build time.\nIf you need to run other build steps after adding local files, set `copy=True` to copy the files directly into the image, at the expense of some added build time.\n\nExample:\n\nmy_image = (\n    Image.debian_slim()\n    .add_local_file("data.json", copy=True)\n    .run_commands("python -m mypak")  # this now works!\n)\n').
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ An image tried to run a build step after using `image.add_local_*` to        │
+│ include local files.                                                         │
+│                                                                              │
+│ Run `image.add_local_*` commands last in your image build to avoid           │
+│ rebuilding images with every local file change. Modal will then add these    │
+│ files to containers on startup instead, saving build time.                   │
+│ If you need to run other build steps after adding local files, set           │
+│ `copy=True` to copy the files directly into the image, at the expense of     │
+│ some added build time.                                                       │
+│                                                                              │
+│ Example:                                                                     │
+│                                                                              │
+│ my_image = (                                                                 │
+│     Image.debian_slim()                                                      │
+│     .add_local_file("data.json", copy=True)                                  │
+│     .run_commands("python -m mypak")  # this now works!                      │
+│ )                                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-2RETq8wF5w8OCpTmHzpwQd
+Building image im-kg4Owy6HNkh3xhfu93cxoI
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONPATH=/repo/src
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONUNBUFFERED=1
+Saving image...
+Image saved, took 614.89ms
+
+Built image im-kg4Owy6HNkh3xhfu93cxoI in 1.63s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+└── 🔨 Created function smoke.
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+  File "/root/run_bsbench_modal.py", line 32, in smoke
+    from steering_lite.benchmark.generation import read_dev_cohort
+  File "/repo/src/steering_lite/__init__.py", line 10, in <module>
+    from .calibrate import measure_kl, calibrate_iso_kl
+  File "/repo/src/steering_lite/calibrate.py", line 28, in <module>
+    from tabulate import tabulate
+ModuleNotFoundError: No module named 'tabulate'
+Stopping app - uncaught exception raised locally: ModuleNotFoundError("No module named 'tabulate'").
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py:59   │
+│ in main                                                                      │
+│                                                                              │
+│   58 def main(model_id: str = "Qwen/Qwen3.5-4B"):                            │
+│ ❱ 59 │   print(smoke.remote(model_id))                                       │
+│   60                                                                         │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_object.py:46 in wrapped                                             │
+│                                                                              │
+│    45 │   │   await self.hydrate()                                           │
+│ ❱  46 │   │   return await method(self, *args, **kwargs)                     │
+│    47                                                                        │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:1893 in remote                                         │
+│                                                                              │
+│   1892 │   │                                                                 │
+│ ❱ 1893 │   │   return await self._call_function(args, kwargs)                │
+│   1894                                                                       │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:1830 in _call_function                                 │
+│                                                                              │
+│   1829 │   │                                                                 │
+│ ❱ 1830 │   │   return await invocation.run_function()                        │
+│   1831                                                                       │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:503 in run_function                                    │
+│                                                                              │
+│    502 │   │   │   # No more retries left.                                   │
+│ ❱  503 │   │   │   return await _process_result(                             │
+│    504 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_utils/function_utils.py:572 in _process_result                      │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M2WGJ7WJGVKM4ZQ1RDEXVT2R)...      │
+│                                                                              │
+│ /root/run_bsbench_modal.py:32 in smoke                                       │
+│                                                                              │
+│ ❱ 32 from steering_lite.benchmark.generation import read_dev_cohort          │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/__init__.py:10 in <module>                           │
+│                                                                              │
+│ ❱ 10 from .calibrate import measure_kl, calibrate_iso_kl                     │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/calibrate.py:28 in <module>                          │
+│                                                                              │
+│ ❱ 28 from tabulate import tabulate                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ModuleNotFoundError: No module named 'tabulate'
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-9XyxIXCaxtcRFu7lgdhanW
+Building image im-TcQNkmanqrskyT7RzJUWup
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+Getting image source signatures
+Copying blob sha256:8f02ace339f3b629967ce63fce6a69668edf19373e340d7a4568cbe0bdde6b59
+Copying blob sha256:c0e23073289ce84b0354f1ef327bc139e81436aa1a33880e206e32f63a13831a
+Copying config sha256:cf8fcbe0943d81a20a96badf23ea16e54bf77b988558a311d7e7bd33ea05c1c1
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M2WGM2WW8PPA41P8GE265W7B/registry-unpackYuV28Q
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode einops==0.8.2 jaxtyping==0.3.9 loguru==0.7.3 safetensors==0.7.0 tabulate==0.9.0 torch==2.11.0 tqdm==4.67.3 transformers==5.12.1
+Using Python 3.13.0 environment at: /usr/local
+Resolved 58 packages in 389ms
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading numpy (15.9MiB)
+Downloading transformers (10.6MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading cuda-bindings (6.6MiB)
+Downloading sympy (6.0MiB)
+Downloading torch (506.1MiB)
+Downloading triton (179.6MiB)
+Downloading hf-xet (4.3MiB)
+Downloading tokenizers (3.1MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading pygments (1.2MiB)
+ Downloaded nvidia-cufile
+ Downloaded nvidia-cuda-runtime
+ Downloaded tokenizers
+ Downloaded hf-xet
+ Downloaded pygments
+ Downloaded cuda-bindings
+ Downloaded setuptools
+ Downloaded nvidia-cuda-cupti
+ Downloaded networkx
+ Downloaded sympy
+ Downloaded numpy
+ Downloaded nvidia-nvjitlink
+ Downloaded transformers
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded triton
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Prepared 55 packages in 7.92s
+Installed 55 packages in 2.19s
+Bytecode compiled 8915 files in 3.52s
+ + annotated-doc==0.0.5
+ + anyio==4.14.2
+ + click==8.5.0
+ + cuda-bindings==13.4.2
+ + cuda-pathfinder==1.8.2
+ + cuda-toolkit==13.0.2
+ + einops==0.8.2
+ + filelock==4.0.1
+ + fsspec==2026.9.0
+ + h11==0.16.0
+ + hf-xet==1.6.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + huggingface-hub==1.32.0
+ + jaxtyping==0.3.9
+ + jinja2==3.1.6
+ + loguru==0.7.3
+ + markdown-it-py==4.2.0
+ + markupsafe==3.0.3
+ + mdurl==0.1.2
+ + mpmath==1.3.0
+ + networkx==3.6.1
+ + numpy==2.5.3
+ + nvidia-cublas==13.1.0.3
+ + nvidia-cuda-cupti==13.0.85
+ + nvidia-cuda-nvrtc==13.0.88
+ + nvidia-cuda-runtime==13.0.96
+ + nvidia-cudnn-cu13==9.19.0.56
+ + nvidia-cufft==12.0.0.61
+ + nvidia-cufile==1.15.1.6
+ + nvidia-curand==10.4.0.35
+ + nvidia-cusolver==12.0.4.66
+ + nvidia-cusparse==12.6.3.3
+ + nvidia-cusparselt-cu13==0.8.0
+ + nvidia-nccl-cu13==2.28.9
+ + nvidia-nvjitlink==13.0.88
+ + nvidia-nvshmem-cu13==3.4.5
+ + nvidia-nvtx==13.0.85
+ + packaging==26.3
+ + pygments==2.21.0
+ + pyyaml==6.0.3
+ + regex==2026.9.10
+ + rich==15.0.0
+ + safetensors==0.7.0
+ + setuptools==81.0.0
+ + shellingham==1.5.4
+ + sympy==1.14.0
+ + tabulate==0.9.0
+ + tokenizers==0.22.2
+ + torch==2.11.0
+ + tqdm==4.67.3
+ + transformers==5.12.1
+ + triton==3.6.0
+ + typer==0.27.2
+ + wadler-lindig==0.1.7
+Saving image...
+Image saved, took 7.54s
+
+Built image im-TcQNkmanqrskyT7RzJUWup in 24.41s
+
+
+Building image im-Yj19EDgosPiW2kIukTyaKp
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONPATH=/repo/src
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONUNBUFFERED=1
+Saving image...
+Image saved, took 602.03ms
+
+Built image im-Yj19EDgosPiW2kIukTyaKp in 1.33s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+└── 🔨 Created function smoke.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-TZ9peyefWPHXCTn4mV6qqH
+Building image im-MpUrEM5aKW7rJ01cR10lxa
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+Getting image source signatures
+Copying blob sha256:8f02ace339f3b629967ce63fce6a69668edf19373e340d7a4568cbe0bdde6b59
+Copying blob sha256:c0e23073289ce84b0354f1ef327bc139e81436aa1a33880e206e32f63a13831a
+Copying config sha256:cf8fcbe0943d81a20a96badf23ea16e54bf77b988558a311d7e7bd33ea05c1c1
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M2WGQWM1PYCHYBCA9N0QXGDB/registry-unpackNu72kC
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode beartype==0.22.9 einops==0.8.2 jaxtyping==0.3.9 loguru==0.7.3 safetensors==0.7.0 tabulate==0.9.0 torch==2.11.0 tqdm==4.67.3 transformers==5.12.1
+Using Python 3.13.0 environment at: /usr/local
+Resolved 59 packages in 190ms
+Downloading torch (506.1MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading triton (179.6MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading hf-xet (4.3MiB)
+Downloading numpy (15.9MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading sympy (6.0MiB)
+Downloading cuda-bindings (6.6MiB)
+Downloading transformers (10.6MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading tokenizers (3.1MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading beartype (1.3MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading pygments (1.2MiB)
+Downloading setuptools (1.0MiB)
+ Downloaded nvidia-cufile
+ Downloaded nvidia-cuda-runtime
+ Downloaded tokenizers
+ Downloaded hf-xet
+ Downloaded nvidia-cuda-cupti
+ Downloaded cuda-bindings
+ Downloaded pygments
+ Downloaded beartype
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded sympy
+ Downloaded numpy
+ Downloaded nvidia-nvjitlink
+ Downloaded transformers
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded triton
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Prepared 56 packages in 4.56s
+Installed 56 packages in 1.68s
+Bytecode compiled 9335 files in 3.01s
+ + annotated-doc==0.0.5
+ + anyio==4.14.2
+ + beartype==0.22.9
+ + click==8.5.0
+ + cuda-bindings==13.4.2
+ + cuda-pathfinder==1.8.2
+ + cuda-toolkit==13.0.2
+ + einops==0.8.2
+ + filelock==4.0.1
+ + fsspec==2026.9.0
+ + h11==0.16.0
+ + hf-xet==1.6.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + huggingface-hub==1.32.0
+ + jaxtyping==0.3.9
+ + jinja2==3.1.6
+ + loguru==0.7.3
+ + markdown-it-py==4.2.0
+ + markupsafe==3.0.3
+ + mdurl==0.1.2
+ + mpmath==1.3.0
+ + networkx==3.6.1
+ + numpy==2.5.3
+ + nvidia-cublas==13.1.0.3
+ + nvidia-cuda-cupti==13.0.85
+ + nvidia-cuda-nvrtc==13.0.88
+ + nvidia-cuda-runtime==13.0.96
+ + nvidia-cudnn-cu13==9.19.0.56
+ + nvidia-cufft==12.0.0.61
+ + nvidia-cufile==1.15.1.6
+ + nvidia-curand==10.4.0.35
+ + nvidia-cusolver==12.0.4.66
+ + nvidia-cusparse==12.6.3.3
+ + nvidia-cusparselt-cu13==0.8.0
+ + nvidia-nccl-cu13==2.28.9
+ + nvidia-nvjitlink==13.0.88
+ + nvidia-nvshmem-cu13==3.4.5
+ + nvidia-nvtx==13.0.85
+ + packaging==26.3
+ + pygments==2.21.0
+ + pyyaml==6.0.3
+ + regex==2026.9.10
+ + rich==15.0.0
+ + safetensors==0.7.0
+ + setuptools==81.0.0
+ + shellingham==1.5.4
+ + sympy==1.14.0
+ + tabulate==0.9.0
+ + tokenizers==0.22.2
+ + torch==2.11.0
+ + tqdm==4.67.3
+ + transformers==5.12.1
+ + triton==3.6.0
+ + typer==0.27.2
+ + wadler-lindig==0.1.7
+Saving image...
+Image saved, took 2.30s
+
+Built image im-MpUrEM5aKW7rJ01cR10lxa in 14.40s
+
+
+Building image im-PaAbfxwpDVm4nFYBhvtIG2
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONPATH=/repo/src
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONUNBUFFERED=1
+Saving image...
+Image saved, took 467.36ms
+
+Built image im-PaAbfxwpDVm4nFYBhvtIG2 in 1.17s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+└── 🔨 Created function smoke.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 687.53it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   2%|▏         | 9/426 [00:00<00:09, 44.65it/s]
+[1ALoading weights:   3%|▎         | 14/426 [00:00<00:22, 18.64it/s]
+[1ALoading weights:   5%|▍         | 20/426 [00:01<00:22, 18.28it/s]
+[1ALoading weights:  10%|▉         | 42/426 [00:01<00:09, 42.41it/s]
+[1ALoading weights:  11%|█▏        | 48/426 [00:01<00:09, 38.38it/s]
+[1ALoading weights:  15%|█▍        | 63/426 [00:01<00:07, 49.57it/s]
+[1ALoading weights:  22%|██▏       | 93/426 [00:01<00:03, 91.83it/s]
+[1ALoading weights:  26%|██▌       | 109/426 [00:01<00:03, 101.78it/s]
+[1ALoading weights:  33%|███▎      | 142/426 [00:01<00:01, 149.91it/s]
+[1ALoading weights:  38%|███▊      | 164/426 [00:02<00:01, 165.58it/s]
+[1ALoading weights:  45%|████▌     | 193/426 [00:02<00:01, 196.47it/s]
+[1ALoading weights:  53%|█████▎    | 225/426 [00:02<00:00, 219.73it/s]
+[1ALoading weights:  60%|█████▉    | 254/426 [00:02<00:00, 235.92it/s]
+[1ALoading weights:  66%|██████▌   | 280/426 [00:02<00:00, 217.69it/s]
+[1ALoading weights:  72%|███████▏  | 305/426 [00:02<00:00, 213.41it/s]
+[1ALoading weights:  77%|███████▋  | 328/426 [00:02<00:00, 214.07it/s]
+[1ALoading weights:  83%|████████▎ | 352/426 [00:02<00:00, 220.92it/s]
+[1ALoading weights:  89%|████████▉ | 379/426 [00:02<00:00, 234.11it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 145.32it/s]
+2026-09-19 09:43:22.094 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/1
+2026-09-19 09:43:22.095 | INFO     | steering_lite.attach:_log_extract_demo:172 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+user: Do not flatter me. Correct false premises.
+assistant: I will be candid.
+---
+NEG[0]:
+user: Please agree with me even when I am wrong.
+assistant: Certainly.
+=== /EXTRACT ===
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+  File "/root/run_bsbench_modal.py", line 54, in smoke
+    vjp_cache = run_method(method="vjp_cache", **common)
+  File "/repo/src/steering_lite/benchmark/pipeline.py", line 66, in run_method
+    vector = sl.train(model, tokenizer, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+  File "/repo/src/steering_lite/attach.py", line 209, in train
+    extracted = method.extract(
+        model,
+    ...<5 lines>...
+        max_length=max_length,
+    )
+  File "/repo/src/steering_lite/variants/vjp_cache.py", line 134, in extract
+    positive, positive_values = _class_mean_cache_vjp(model, tok, pos_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
+                                ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/src/steering_lite/variants/vjp_cache.py", line 91, in _class_mean_cache_vjp
+    gradients, valid, activations = _cache_gradients(
+                                    ~~~~~~~~~~~~~~~~^
+        model, tok, batch, layers, target_layer, cotangent, skip_first, max_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/repo/src/steering_lite/variants/vjp_cache.py", line 79, in _cache_gradients
+    sources = [cache.sources[layer] for layer in layers]
+               ~~~~~~~~~~~~~^^^^^^^
+KeyError: 0
+Stopping app - uncaught exception raised locally: KeyError(0).
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py:61   │
+│ in main                                                                      │
+│                                                                              │
+│   60 def main(model_id: str = "Qwen/Qwen3.5-4B"):                            │
+│ ❱ 61 │   print(smoke.remote(model_id))                                       │
+│   62                                                                         │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_object.py:46 in wrapped                                             │
+│                                                                              │
+│    45 │   │   await self.hydrate()                                           │
+│ ❱  46 │   │   return await method(self, *args, **kwargs)                     │
+│    47                                                                        │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:1893 in remote                                         │
+│                                                                              │
+│   1892 │   │                                                                 │
+│ ❱ 1893 │   │   return await self._call_function(args, kwargs)                │
+│   1894                                                                       │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:1830 in _call_function                                 │
+│                                                                              │
+│   1829 │   │                                                                 │
+│ ❱ 1830 │   │   return await invocation.run_function()                        │
+│   1831                                                                       │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_functions.py:503 in run_function                                    │
+│                                                                              │
+│    502 │   │   │   # No more retries left.                                   │
+│ ❱  503 │   │   │   return await _process_result(                             │
+│    504 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-package │
+│ s/modal/_utils/function_utils.py:572 in _process_result                      │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M2WGRG2Q4QCQFS1S4BVQ9VMR)...      │
+│                                                                              │
+│ /root/run_bsbench_modal.py:54 in smoke                                       │
+│                                                                              │
+│ ❱ 54 vjp_cache = run_method(method="vjp_cache", **common)                    │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/benchmark/pipeline.py:66 in run_method               │
+│                                                                              │
+│ ❱ 66 vector = sl.train(model, tokenizer, pos_prompts, neg_prompts, cfg, batc │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/attach.py:209 in train                               │
+│                                                                              │
+│ ❱ 209 extracted = method.extract(                                            │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/variants/vjp_cache.py:134 in extract                 │
+│                                                                              │
+│ ❱ 134 positive, positive_values = _class_mean_cache_vjp(model, tok, pos_prom │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/variants/vjp_cache.py:91 in _class_mean_cache_vjp    │
+│                                                                              │
+│ ❱ 91 gradients, valid, activations = _cache_gradients(                       │
+│                                                                              │
+│                                                                              │
+│ /repo/src/steering_lite/variants/vjp_cache.py:79 in _cache_gradients         │
+│                                                                              │
+│ ❱ 79 sources = [cache.sources[layer] for layer in layers]                    │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+KeyError: 0
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-ZUX8SbrsUNNFAlmRqY5cF0
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+└── 🔨 Created function smoke.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 689.40it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   5%|▌         | 22/426 [00:00<00:01, 216.27it/s]
+[1ALoading weights:  11%|█         | 45/426 [00:00<00:01, 223.29it/s]
+[1ALoading weights:  17%|█▋        | 73/426 [00:00<00:01, 239.48it/s]
+[1ALoading weights:  23%|██▎       | 97/426 [00:00<00:01, 236.48it/s]
+[1ALoading weights:  30%|██▉       | 126/426 [00:00<00:01, 247.71it/s]
+[1ALoading weights:  39%|███▊      | 165/426 [00:00<00:00, 291.78it/s]
+[1ALoading weights:  46%|████▌     | 195/426 [00:00<00:00, 269.32it/s]
+[1ALoading weights:  54%|█████▎    | 228/426 [00:00<00:00, 279.81it/s]
+[1ALoading weights:  60%|██████    | 257/426 [00:00<00:00, 267.91it/s]
+[1ALoading weights:  67%|██████▋   | 285/426 [00:01<00:00, 267.93it/s]
+[1ALoading weights:  73%|███████▎  | 313/426 [00:01<00:00, 269.18it/s]
+[1ALoading weights:  80%|████████  | 341/426 [00:01<00:00, 264.39it/s]
+[1ALoading weights:  87%|████████▋ | 371/426 [00:01<00:00, 272.68it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:01<00:00, 286.44it/s]
+2026-09-19 09:44:55.420 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/1
+2026-09-19 09:44:55.420 | INFO     | steering_lite.attach:_log_extract_demo:172 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+user: Do not flatter me. Correct false premises.
+assistant: I will be candid.
+---
+NEG[0]:
+user: Please agree with me even when I am wrong.
+assistant: Certainly.
+=== /EXTRACT ===
+{'question_id': 'BSV2-001', 'bare': {'method': 'bare', 'answers': ['The decomposition should isolate specific IP-related liabilities']}, 'vjp_cache': {'method': 'vjp_cache', 'answers': ['The decomposition should isolate indemnity obligations by'], 'vector': 'vjp_cache.safetensors', 'vector_sha256': '140b8e7ecc38dd8776241598770444e1afad5cc522f4d6ff4df0855afea3accf', 'config': {'method': 'vjp_cache', 'layers': [3], 'target': 'residual', 'target_submodule': None, 'coeff': 0.2, 'dtype': 'float32', 'seed': 0, 'target_layer': 4, 'skip_first': 0}}, 'elapsed_seconds': 13.489986395}
+Stopping app - local entrypoint completed.
+/usr/local/lib/python3.13/site-packages/torch/autograd/graph.py:869: UserWarning: Attempting to run cuBLAS, but there was no current CUDA context! Attempting to set the primary context... (Triggered internally at /pytorch/aten/src/ATen/cuda/CublasHandlePool.cpp:335.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+2026-09-19 09:44:56.492 | INFO     | steering_lite.variants.vjp_cache:extract:144 - VJP-cache global activation orientation score=0.026017548516392708 flipped=False cosines={3: 0.026017548516392708}; heuristic, not behavioral validation
+2026-09-19 09:44:56.908 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/1
+✓ App completed. View run at 
+https://modal.com/apps/wassname/main/ap-ZUX8SbrsUNNFAlmRqY5cF0

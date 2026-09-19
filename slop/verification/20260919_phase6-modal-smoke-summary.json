@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "question_id": "BSV2-001",
+  "conditions": ["bare", "vjp_cache"],
+  "modal_app": "ap-ZUX8SbrsUNNFAlmRqY5cF0",
+  "result": "completed",
+  "generation_records": {
+    "bare": {"answers": ["The decomposition should isolate specific IP-related liabilities"]},
+    "vjp_cache": {"answers": ["The decomposition should isolate indemnity obligations by"], "vector": "vjp_cache.safetensors", "vector_sha256": "140b8e7ecc38dd8776241598770444e1afad5cc522f4d6ff4df0855afea3accf", "config": {"layers": [3], "target_layer": 4, "coeff": 0.2}}
+  },
+  "reservation": {
+    "id": "7a00af1fd54a5c84be5d22d8a68586fb72090cec3f2f9640c4aedddfa8e56835",
+    "upper_usd": 2.0,
+    "settled": false,
+    "reason": "The local smoke log contains elapsed model work but not Modal billing receipts; the full $2 reservation remains unresolved rather than claiming an actual cost."
+  },
+  "paid_judge_or_api_calls": 0
+}
