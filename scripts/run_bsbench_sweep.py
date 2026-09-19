@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
-from steering_lite.benchmark.cache import committed, save_json, settle_receipt
+from steering_lite.benchmark.cache import committed, content_key, save_json, settle_receipt, source_hash
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import record_completed_stage, run_condition, run_stages
@@ -15,10 +16,22 @@ from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, dry_manifest
 
 
 def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], backend, prompt_spec: dict, judge, methods: tuple[str, ...] = METHODS, measure=None, solver=None, vector_loader=None, transfer_records=None) -> dict:
-    """Run canonical conditions in order and atomically save progress after every condition."""
+    """Run named conditions in order and atomically save only a matching run summary."""
     summary_path = root / "run-summary.json"
-    prior = json.loads(summary_path.read_text()) if summary_path.exists() else {"schema": "bsbench-run-summary-v1", "conditions": {}}
-    conditions = dict(prior["conditions"])
+    identity = {
+        "schema": "bsbench-run-summary-identity-v1",
+        "model": model,
+        "cohort": cohort_identity(rows),
+        "prompt_spec": prompt_spec,
+        "judge": {"model": model["judge_model"], "endpoint": judge.endpoint},
+        "methods": list(methods),
+        "code_sha256": content_key({
+            "benchmark": source_hash(),
+            "entrypoint": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        }),
+    }
+    prior = json.loads(summary_path.read_text()) if summary_path.exists() else None
+    conditions = dict(prior["conditions"]) if prior and prior.get("identity") == identity else {}
     for method in methods:
         conditions[method] = run_condition(
             root,
@@ -35,8 +48,8 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
             vector_loader=vector_loader,
             transfer_records=transfer_records,
         )
-        save_json(summary_path, {"schema": "bsbench-run-summary-v1", "methods": list(methods), "conditions": conditions})
-    return {"schema": "bsbench-run-summary-v1", "methods": list(methods), "conditions": conditions, "summary_path": str(summary_path), "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False))}
+        save_json(summary_path, {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions})
+    return {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions, "summary_path": str(summary_path), "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False))}
 
 
 def import_recorded_smoke(out: Path, model_id: str) -> dict:
@@ -102,7 +115,13 @@ def main() -> None:
                 def gpu(self, *, stage, method, config, prompts):
                     self.calls.append(stage)
                     if stage == "generation":
-                        return {"actual_usd": 0.0, "answers": [f"Fake {method} answer." for _ in prompts], "health_records": [{"question_id": prompt_id, "reasons": []} for prompt_id in config["prompt_ids"]]}
+                        result = {"actual_usd": 0.0, "answers": [f"Fake {method} answer." for _ in prompts], "health_records": [{"question_id": prompt_id, "reasons": []} for prompt_id in config["prompt_ids"]]}
+                        if method == "prompting" and "persona_validation_prompt_ids" in config:
+                            result["persona_validation_pairs"] = [
+                                {"question_id": prompt_id, "sycophantic": "Fake agreement.", "abrasive": "Fake challenge."}
+                                for prompt_id in config["persona_validation_prompt_ids"]
+                            ]
+                        return result
                     if stage == "calibration-candidates":
                         coefficients = [0.2, 0.4]
                         return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "baseline_answers": ["Fake baseline." for _ in prompts], "candidate_coefficients": coefficients, "candidate_health": {str(coefficient): {"reasons": []} for coefficient in coefficients}, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
@@ -125,7 +144,9 @@ def main() -> None:
 
                 def complete(self, requests):
                     return [
-                        {"summary": "offline difference", "changes": []}
+                        {"intended_behavior_explains": True, "reason": "The paired responses differ on the stated premise."}
+                        if request["schema"] == "bsbench-persona-validation-request-v1"
+                        else {"summary": "offline difference", "changes": []}
                         if request["blind"]
                         else {"on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
                         for request in requests

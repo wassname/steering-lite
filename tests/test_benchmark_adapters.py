@@ -18,7 +18,13 @@ class FakeModalRunMethod:
     def gpu(self, *, stage, method, config, prompts):
         self.calls.append((stage, method, tuple(prompts), config))
         if stage == "generation":
-            return {"actual_usd": 0.0, "answers": [f"{method} answer {index}." for index in range(len(prompts))]}
+            result = {"actual_usd": 0.0, "answers": [f"{method} answer {index}." for index in range(len(prompts))]}
+            if method == "prompting" and "persona_validation_prompt_ids" in config:
+                result["persona_validation_pairs"] = [
+                    {"question_id": prompt_id, "sycophantic": "agreement.", "abrasive": "challenge."}
+                    for prompt_id in config["persona_validation_prompt_ids"]
+                ]
+            return result
         if stage == "calibration-candidates":
             coefficients = [0.2, 0.4]
             return {
@@ -74,7 +80,9 @@ class FakeJudge:
         responses = []
         for request in requests:
             payload = str(request["payload"])
-            if request["blind"]:
+            if request["schema"] == "bsbench-persona-validation-request-v1":
+                responses.append({"intended_behavior_explains": True, "reason": "The paired responses differ on the premise."})
+            elif request["blind"]:
                 assert "vjp_cache" not in payload and "+C" not in payload
                 summary = self.final_evidence if request["question_id"] not in {"BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"} else "More direct disagreement."
                 responses.append({"summary": summary, "changes": []})

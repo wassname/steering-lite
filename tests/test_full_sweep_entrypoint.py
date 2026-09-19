@@ -9,6 +9,7 @@ from steering_lite.benchmark.cache import content_key
 from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
+from steering_lite.benchmark.sweep import persona_extraction_identity
 from steering_lite.benchmark.transfer_data import load_transfer_records
 
 
@@ -30,11 +31,17 @@ class FakeRemoteStageCall:
     def __call__(self, *, stage, method, config, prompts):
         self.calls.append((stage, method))
         if stage == "generation":
-            return {
+            result = {
                 "actual_usd": 0.0,
                 "answers": [f"{method} answer." for _ in prompts],
                 "health_records": [{"question_id": prompt_id, "reasons": []} for prompt_id in config["prompt_ids"]],
             }
+            if method == "prompting" and "persona_validation_prompt_ids" in config:
+                result["persona_validation_pairs"] = [
+                    {"question_id": prompt_id, "sycophantic": "agreement.", "abrasive": "challenge."}
+                    for prompt_id in config["persona_validation_prompt_ids"]
+                ]
+            return result
         if stage == "calibration-candidates":
             coefficients = [0.2, 0.4]
             return {
@@ -117,7 +124,9 @@ class FakeJudgeCall:
     def __call__(self, payload):
         self.payloads.append(payload)
         name = payload["response_format"]["json_schema"]["name"]
-        if name == "blind_change_description":
+        if name == "persona_pair_validation":
+            response = {"intended_behavior_explains": True, "reason": "The paired responses differ on the premise."}
+        elif name == "blind_change_description":
             response = {"summary": "No material change.", "changes": []}
         else:
             response = {"evidence": "B agrees more.", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
@@ -162,7 +171,12 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
         *(stage for _ in METHODS[2:] for stage in ("calibration-candidates", "final-generation")),
     ]
     assert len(stage_call.calls) == 14
-    assert len(judge_call.payloads) == 848
+    assert len(judge_call.payloads) == 860
+    validation = first["conditions"]["prompting"]["persona_validation"]
+    assert len(validation["examples"]) == len(validation["requests"]) == len(validation["responses"]) == len(validation["disagreements"]) == 12
+    assert all(example["persona_source"] == persona_extraction_identity() for example in validation["examples"])
+    assert all(request["input_tokens_upper"] == 2_000 and request["output_tokens_upper"] == 100 for request in validation["requests"])
+    assert all(response["response"]["intended_behavior_explains"] for response in validation["responses"])
     assert all("method" not in payload and "coefficient" not in payload for payload in judge_call.payloads if payload["response_format"]["json_schema"]["name"] == "blind_change_description")
 
     first_stage_calls = len(stage_call.calls)
@@ -196,6 +210,39 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     before_prompt_change = len(stage_call.calls)
     _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec=prompt_spec, transfer_records=changed_records)
     assert stage_call.calls[before_prompt_change:] == [("final-generation", method) for method in METHODS[2:]]
+
+    recovery = _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec={**prompt_spec, "template": "Answer plainly."})
+    assert recovery["methods"] == list(METHODS)
+    assert set(recovery["conditions"]) == set(METHODS)
+    single_method = _entrypoint_module().run_full_sweep(
+        root,
+        ledger,
+        model={"id": "fake", "judge_model": "fake-judge"},
+        rows=read_dev_cohort(),
+        backend=real_adapters(
+            modal_stage_call=stage_call,
+            judge_request_call=judge_call,
+            judge_endpoint="https://judge-b.example/v1",
+            explicit_run=True,
+            budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+            root=root,
+            ledger=ledger,
+        )[0],
+        prompt_spec={**prompt_spec, "template": "Answer in one sentence."},
+        judge=real_adapters(
+            modal_stage_call=stage_call,
+            judge_request_call=judge_call,
+            judge_endpoint="https://judge-b.example/v1",
+            explicit_run=True,
+            budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+            root=root,
+            ledger=ledger,
+        )[1],
+        methods=("pca",),
+    )
+    assert single_method["methods"] == ["pca"]
+    assert set(single_method["conditions"]) == {"pca"}
+    assert json.loads((root / "run-summary.json").read_text())["identity"] == single_method["identity"]
 
     events = [json.loads(line) for line in ledger.read_text().splitlines()]
     judge_reservations = [row for row in events if row["event"] == "reserved" and row["kind"].startswith("judge-")]

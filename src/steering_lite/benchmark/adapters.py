@@ -76,8 +76,9 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
 
 
 def judge_request_upper_usd(request: dict) -> float:
-    input_tokens = 2_000 if request["blind"] else 4_000
-    return input_tokens / 1_000_000 * JUDGE_INPUT_USD_PER_MTOKEN + 1_200 / 1_000_000 * JUDGE_OUTPUT_USD_PER_MTOKEN
+    input_tokens = request["input_tokens_upper"] if "input_tokens_upper" in request else (2_000 if request["blind"] else 4_000)
+    output_tokens = request["output_tokens_upper"] if "output_tokens_upper" in request else 1_200
+    return input_tokens / 1_000_000 * JUDGE_INPUT_USD_PER_MTOKEN + output_tokens / 1_000_000 * JUDGE_OUTPUT_USD_PER_MTOKEN
 
 
 class LocalJudgeAdapter:

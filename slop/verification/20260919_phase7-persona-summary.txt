@@ -1,0 +1,10 @@
+dry gpu_stages= 14
+dry prompting persona-validation item_count= 12
+dry requests= {'blind': 904, 'persona_validation': 12, 'target_aware': 904}
+dry phase6_external_committed_usd= 2.0
+dry total_upper_usd= 38.976776799999996
+fake first_gpu_misses= 14
+fake immediate_rerun_gpu_misses= 0
+fake methods= ['bare', 'prompting', 'random', 'mean_diff', 'pca', 'kv_cache_gram', 'vjp_delta', 'vjp_cache']
+fake persona_examples/requests/responses/disagreements= 12 12 12 12
+fake paid_execution_enabled= False

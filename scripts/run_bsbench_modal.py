@@ -33,10 +33,10 @@ app = modal.App("steering-lite-bsbench")
 cache = modal.Volume.from_name("steering-lite-bsbench-cache", create_if_missing=True)
 
 
-def canonical_prompt_texts(tokenizer, prompts: list[str], prompt_spec: dict, *, persona: str | None = None) -> list[str]:
+def canonical_prompt_texts(tokenizer, prompts: list[str], prompt_spec: dict, *, persona: str | None = None, persona_template: str = "Answer as someone who is {persona}.") -> list[str]:
     instruction = prompt_spec["template"]
     thinking = prompt_spec.get("enable_thinking", False)
-    prefix = "" if persona is None else f"Answer as someone who is {persona}.\n\n"
+    prefix = "" if persona is None else persona_template.format(persona=persona) + "\n\n"
     return [
         tokenizer.apply_chat_template(
             [{"role": "user", "content": prefix + prompt + " " + instruction}],
@@ -107,7 +107,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
 
     import steering_lite as sl
     from steering_lite.benchmark.generation import generate, health
-    from steering_lite.benchmark.pipeline import method_config, run_method
+    from steering_lite.benchmark.pipeline import method_config
     from steering_lite.data import make_persona_pairs, persona_corpus_identity
 
     started = time.monotonic()
@@ -117,31 +117,48 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         condition = config["condition"]
         if method != condition or method not in {"bare", "prompting"}:
             raise ValueError("direct generation stage requires matching bare or prompting condition")
-        rows = [{"prompt": prompt} for prompt in prompts]
-        result = run_method(
+        persona_source = config.get("persona_source")
+        if persona_source is not None:
+            from steering_lite.benchmark.sweep import persona_extraction_identity
+
+            if persona_source != persona_extraction_identity():
+                raise ValueError("direct prompting persona source differs from the fixed extraction identity")
+        persona = "sycophantic" if method == "prompting" else None
+        persona_template = persona_source["template"] if persona_source is not None else "Answer as someone who is {persona}."
+        answers = generate(
             model,
             tokenizer,
-            method,
-            [],
-            [],
-            vector_dir=Path("/cache/bsbench-direct-vectors"),
-            rows=rows,
-            layers=_layers(model)[0],
-            target_layer=_layers(model)[1],
-            max_new_tokens=config["prompt_spec"]["max_new_tokens"],
+            canonical_prompt_texts(tokenizer, prompts, config["prompt_spec"], persona=persona, persona_template=persona_template),
+            1,
+            config["prompt_spec"]["max_new_tokens"],
         )
-        metrics, reasons = health(tokenizer, result["answers"])
+        metrics, reasons = health(tokenizer, answers)
         prompt_ids = config["prompt_ids"]
-        if not isinstance(prompt_ids, list) or len(prompt_ids) != len(result["answers"]):
+        if not isinstance(prompt_ids, list) or len(prompt_ids) != len(answers):
             raise ValueError("direct generation requires numbered prompt identities")
-        return {
+        result = {
             "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started}},
-            "answers": result["answers"],
+            "answers": answers,
             "health_records": [
                 {"question_id": prompt_id, "metrics": metrics, "reasons": reasons}
                 for prompt_id in prompt_ids
             ],
         }
+        if method == "prompting" and "persona_validation_prompt_ids" in config:
+            validation_ids = config["persona_validation_prompt_ids"]
+            indices = [prompt_ids.index(prompt_id) for prompt_id in validation_ids]
+            abrasive_answers = generate(
+                model,
+                tokenizer,
+                canonical_prompt_texts(tokenizer, [prompts[index] for index in indices], config["prompt_spec"], persona="abrasive", persona_template=persona_template),
+                1,
+                config["prompt_spec"]["max_new_tokens"],
+            )
+            result["persona_validation_pairs"] = [
+                {"question_id": prompt_id, "sycophantic": answers[index], "abrasive": abrasive}
+                for prompt_id, index, abrasive in zip(validation_ids, indices, abrasive_answers, strict=True)
+            ]
+        return result
     if stage == "calibration-candidates":
         identity = config["persona_source"]
         observed_corpus = persona_corpus_identity(thinking=identity["thinking"])

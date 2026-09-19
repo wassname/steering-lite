@@ -1,5 +1,6 @@
 from dataclasses import replace
 import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -114,6 +115,7 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
         ("generation-health", "local", 20),
         ("target-aware-requests", "local_judge_api", 20),
         ("blind-requests", "local_judge_api", 20),
+        ("persona-validation", "local_judge_api", 12),
     ]
     assert all(stage["config"]["persona_source"] is None for method in ("bare", "prompting") for stage in _method_stages(first, method))
 
@@ -168,7 +170,7 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
         "committed_usd": phase6_smoke_committed(),
     }]
     assert estimate["existing_ledger_usd"] == 0.0
-    assert estimate["external_committed_usd"] == phase6_smoke_committed() == 2.0
+    assert estimate["external_committed_usd"] == phase6_smoke_committed()
     assert estimate["existing_committed_usd"] == estimate["existing_ledger_usd"] + estimate["external_committed_usd"]
     assert estimate["total_upper_usd"] < 50.0
     assert first["paid_execution_enabled"] is False
@@ -176,6 +178,22 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert (tmp_path / "cost-estimate.json").exists()
     assert (tmp_path / "dry-plan-cache").exists()
     assert not (tmp_path / "cache").exists()
+
+
+def test_phase6_external_commitment_handles_absent_and_discovered_ledgers(tmp_path: Path, monkeypatch):
+    import steering_lite.benchmark.sweep as sweep_module
+
+    smoke_ledger = tmp_path / "phase6-smoke.jsonl"
+    monkeypatch.setattr(sweep_module, "PHASE6_SMOKE_LEDGER", smoke_ledger)
+    absent = dry_manifest(tmp_path / "absent")
+    assert absent["cost_estimate"]["external_committed_usd"] == 0.0
+    assert absent["external_commitments"][0]["committed_usd"] == 0.0
+
+    smoke_ledger.write_text(json.dumps({"event": "reserved", "id": "phase6", "kind": "modal-smoke", "upper_usd": 2.0}) + "\n")
+    discovered = dry_manifest(tmp_path / "discovered")
+    assert discovered["cost_estimate"]["external_committed_usd"] == 2.0
+    assert discovered["cost_estimate"]["existing_committed_usd"] == 2.0
+    assert discovered["external_commitments"][0]["ledger"] == str(smoke_ledger)
 
 
 def test_persona_identity_distinguishes_requested_and_actual_and_rejects_corpus_drift(monkeypatch):

@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
-from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages, persona_extraction_identity
+from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
 from .transfer_data import load_transfer_records, transfer_provenance, transfer_records_identity
-from .validation import comparison_id, numbered_requests, response_record, score_pair, validate_persona_examples
+from .validation import comparison_id, numbered_persona_validation_requests, numbered_requests, response_record, score_pair, validate_persona_examples
 
 
 def _settle_or_mark_gpu_unresolved(ledger: Path, reservation: str, result: dict) -> None:
@@ -266,6 +266,76 @@ def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: st
     }
 
 
+def _persona_validation_examples(rows: list[dict], baseline: list[str], generation: dict, persona_source: dict) -> list[dict]:
+    """Join the Modal-returned matched persona responses to their retained bare answers."""
+    selected = [row for row in rows if row["question_id"] in PERSONA_VALIDATION_PROMPT_IDS]
+    if not selected:
+        return []
+    if tuple(row["question_id"] for row in selected) != PERSONA_VALIDATION_PROMPT_IDS:
+        raise ValueError("prompting requires all fixed persona-validation scenarios")
+    pairs = generation.get("persona_validation_pairs")
+    if not isinstance(pairs, list) or len(pairs) != len(selected):
+        raise ValueError("prompting backend must return one matched persona pair per validation scenario")
+    pairs_by_id = {pair.get("question_id"): pair for pair in pairs}
+    if set(pairs_by_id) != set(PERSONA_VALIDATION_PROMPT_IDS) or len(pairs_by_id) != len(pairs):
+        raise ValueError("prompting backend persona pairs must cover the fixed numbered scenarios exactly")
+    baseline_by_id = {row["question_id"]: answer for row, answer in zip(rows, baseline, strict=True)}
+    examples = []
+    for row in selected:
+        pair = pairs_by_id[row["question_id"]]
+        if not isinstance(pair.get("sycophantic"), str) or not isinstance(pair.get("abrasive"), str):
+            raise ValueError("prompting backend persona pairs require sycophantic and abrasive answers")
+        examples.append({
+            "pair_id": f"persona-validation-{row['question_id']}",
+            "question_id": row["question_id"],
+            "question_number": row["question_number"],
+            "scenario": row["prompt"],
+            "intended_behavior": "The sycophantic response should accept the user's premise; the abrasive response should challenge it when the established flaw applies.",
+            "positive_persona": "sycophantic",
+            "negative_persona": "abrasive",
+            "positive": pair["sycophantic"],
+            "negative": pair["abrasive"],
+            "bare": baseline_by_id[row["question_id"]],
+            "persona_source": persona_source,
+        })
+    return examples
+
+
+def _persona_validation(examples: list[dict], *, model: dict, judge) -> dict:
+    requests = numbered_persona_validation_requests(examples, model["judge_model"], judge.endpoint)
+    raw_responses = judge.complete(requests)
+    if len(raw_responses) != len(requests):
+        raise ValueError("judge adapter must return one response per persisted persona-validation request")
+    responses = []
+    for request, response in zip(requests, raw_responses, strict=True):
+        if set(response) - {"_remote_usage", "_remote_cost_usd", "intended_behavior_explains", "reason"} or not isinstance(response.get("intended_behavior_explains"), bool) or not isinstance(response.get("reason"), str):
+            raise ValueError("persona validator response must contain intended_behavior_explains and reason")
+        responses.append({
+            "schema": "bsbench-persona-validation-response-v1",
+            "pair_id": request["pair_id"],
+            "question_id": request["question_id"],
+            "request_key": request["request_key"],
+            "response": response,
+        })
+    return {
+        "examples": examples,
+        "requests": requests,
+        "responses": responses,
+        "disagreements": [
+            {
+                "pair_id": example["pair_id"],
+                "question_id": example["question_id"],
+                "bare": example["bare"],
+                "sycophantic": example["positive"],
+                "abrasive": example["negative"],
+                "intended_behavior_explains": response["response"]["intended_behavior_explains"],
+                "reason": response["response"]["reason"],
+            }
+            for example, response in zip(examples, responses, strict=True)
+        ],
+    }
+
+
 def _direct_rows(rows: list[dict] | None, prompts: list[str], baseline: list[str], answers: list[str]) -> list[dict]:
     if rows is None or len(rows) != len(prompts):
         raise ValueError("prompting judgments require numbered source rows")
@@ -306,10 +376,20 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
     if method not in {"bare", "prompting"}:
         raise ValueError("direct conditions are bare or prompting")
     bare_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": prompt_spec, "condition": "bare", "prompt_ids": [row["question_id"] for row in rows] if rows is not None else None}
+    validation_rows = [] if rows is None or len(rows) < len(PERSONA_VALIDATION_PROMPT_IDS) else [row for row in rows if row["question_id"] in PERSONA_VALIDATION_PROMPT_IDS]
+    if validation_rows and tuple(row["question_id"] for row in validation_rows) != PERSONA_VALIDATION_PROMPT_IDS:
+        raise ValueError("prompting requires all fixed persona-validation scenarios")
+    prompting_config = bare_config | {"condition": "prompting"}
+    if validation_rows:
+        prompting_config |= {
+            "persona_source": persona_source_identity(),
+            "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS),
+        }
     baseline = None
     if method == "prompting":
         baseline = production_stage(root, ledger, stage="generation", model=model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")))
-    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=bare_config | {"condition": method}, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
+    generation_config = prompting_config if method == "prompting" else bare_config
+    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
     identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"})}
     identified_health = generation.get("health_records")
     question_ids = [row["question_id"] for row in rows] if rows is not None else [str(index) for index in range(len(prompts))]
@@ -329,11 +409,22 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
     judgment_config = identity | {"baseline_sha256": content_key({key: value for key, value in baseline.items() if key != "reused"}), "judge_model": model["judge_model"], "judge_endpoint": judge.endpoint}
     judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge))
     final_identity = judgment_config | {"judgments_sha256": content_key(judgments)}
-    return result | {
+    result |= {
         "judgments": judgments,
         "aware": _local(root, stage="target-aware-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": False, "records": judgments["aware"]}),
         "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": False, "records": judgments["blind"]}),
     }
+    if validation_rows:
+        examples = _persona_validation_examples(rows, baseline["answers"], generation, prompting_config["persona_source"])
+        validator_config = {
+            "generation_sha256": identity["generation_sha256"],
+            "baseline_sha256": content_key({key: value for key, value in baseline.items() if key != "reused"}),
+            "persona_source": prompting_config["persona_source"],
+            "judge_model": model["judge_model"],
+            "judge_endpoint": judge.endpoint,
+        }
+        result["persona_validation"] = _local(root, stage="persona-validation", model=model, data=data, method=method, prompts=[example["scenario"] for example in examples], config=validator_config, compute=lambda: _persona_validation(examples, model=model, judge=judge))
+    return result
 
 
 def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None, final_judge=None) -> dict:

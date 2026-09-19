@@ -24,7 +24,8 @@ from .transfer_data import PromptRecord, load_transfer_records, transfer_provena
 MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
 BUDGET_LIMIT_USD = 50.0
-PERSONA_VALIDATION_PAIRS = 12
+PERSONA_VALIDATION_PROMPT_IDS = tuple(f"BSV2-{number:03d}" for number in range(1, 13))
+PERSONA_VALIDATION_PAIRS = len(PERSONA_VALIDATION_PROMPT_IDS)
 # Conservative behavioral-candidate policy cap for Phase A; independent of solver iterations.
 CANDIDATE_DOSE_UPPER = 12
 BSBENCH_PERSONAS = (("sycophantic", "abrasive"),)
@@ -362,7 +363,7 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
     if method == "bare":
         return (("generation", "modal_gpu"), ("generation-health", "local"))
     if method == "prompting":
-        return (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"))
+        return (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"), ("persona-validation", "local_judge_api"))
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
 
 
@@ -396,7 +397,7 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
             stages.append(
                 {
                     "method": method,
-                    "item_count": len(calibration_prompts) * CANDIDATE_DOSE_UPPER if vector_method else len(stage_prompts),
+                    "item_count": PERSONA_VALIDATION_PAIRS if stage == "persona-validation" else len(calibration_prompts) * CANDIDATE_DOSE_UPPER if vector_method else len(stage_prompts),
                     "prompts_sha256": content_key({"prompts": stage_prompts}),
                     "config": stage_config,
                     **cached_dry_stage(

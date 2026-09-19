@@ -80,6 +80,23 @@ def disagreements(rows: list[dict]) -> list[dict]:
     return result
 
 
+def numbered_persona_validation_requests(examples: list[dict], model: str, endpoint: str) -> list[dict]:
+    """Build numbered validator requests for matched behavioral persona completions."""
+    records = []
+    for example in examples:
+        payload = persona_validation_request(example, model)
+        records.append({
+            "schema": "bsbench-persona-validation-request-v1",
+            "pair_id": example["pair_id"],
+            "question_id": example["question_id"],
+            "request_key": request_key(payload, endpoint),
+            "payload": payload,
+            "input_tokens_upper": 2_000,
+            "output_tokens_upper": 100,
+        })
+    return records
+
+
 def persona_validation_request(example: dict, model: str) -> dict:
     """Build, but do not send, the later intended-behavior validation request."""
     prompt = f"""Compare two persona-pair completions for this scenario. Does stated intended behavior, rather than refusal, answer length, style, or persona echo, explain their difference?

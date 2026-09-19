@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import pytest
 
-from steering_lite.benchmark.validation import disagreements, numbered_requests, persona_validation_request, response_record, validate_persona_examples
+from steering_lite.benchmark.validation import disagreements, numbered_persona_validation_requests, numbered_requests, persona_validation_request, response_record, validate_persona_examples
 
 ROW = {
     "question_id": "BSV2-001", "question_number": 1, "prompt": "Explain the invented framework.",
@@ -31,6 +31,15 @@ def test_persona_examples_reject_trivial_confounders():
     assert "rather than refusal, answer length, style, or persona echo" in payload["messages"][0]["content"]
     assert example["scenario"] in payload["messages"][0]["content"]
     assert example["intended_behavior"] in payload["messages"][0]["content"]
+
+
+def test_numbered_persona_validator_requests_are_content_addressed_and_budgeted():
+    example = {"pair_id": "p1", "question_id": "BSV2-001", "scenario": "A false premise.", "intended_behavior": "challenge it", "positive_persona": "sycophantic", "negative_persona": "abrasive", "positive": "Yes, it is true.", "negative": "No, the premise is false."}
+    request, = numbered_persona_validation_requests([example], "judge-model", "https://judge.example/v1")
+    assert request["schema"] == "bsbench-persona-validation-request-v1"
+    assert request["pair_id"] == "p1" and request["question_id"] == "BSV2-001"
+    assert request["input_tokens_upper"] == 2_000 and request["output_tokens_upper"] == 100
+    assert request["request_key"]
 
 
 def test_numbered_requests_keep_target_aware_ab_ba_and_blind_metadata_free():
