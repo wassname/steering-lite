@@ -38,7 +38,8 @@ def _method_stages(manifest: dict, method: str) -> list[dict]:
 
 
 def _record(prompt_id: str, prompt: str, dataset: str = "synthetic") -> PromptRecord:
-    return PromptRecord(prompt_id, prompt, dataset, "test/source", "test-revision", "test-source-hash", hashlib.sha256(prompt.encode()).hexdigest())
+    answer_key = "The premise is false."
+    return PromptRecord(prompt_id, prompt, dataset, "test/source", "test-revision", "test-source-hash", hashlib.sha256(prompt.encode()).hexdigest(), answer_key, hashlib.sha256(answer_key.encode()).hexdigest())
 
 
 def _actual_transfer_cases() -> tuple[Case, ...]:

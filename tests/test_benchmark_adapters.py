@@ -5,7 +5,8 @@ import pytest
 from steering_lite.benchmark.adapters import real_adapters
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
-from steering_lite.benchmark.production import run_condition
+from steering_lite.benchmark.production import _candidate_judgments, run_condition
+from steering_lite.benchmark.transfer_data import load_transfer_records
 
 
 class FakeModalRunMethod:
@@ -43,6 +44,11 @@ class FakeModalRunMethod:
             assert config["vector_artifact"]["backend_path"]
             return {
                 "actual_usd": 0.0,
+                "baseline_answers": {
+                    item["prompt_id"]: "baseline answer."
+                    for item in config["executable_generation_plan"]
+                },
+                "health_records": [{"reasons": [], "source": "fake-final-health"} for _ in config["executable_generation_plan"]],
                 "answers": ["final answer." for _ in config["executable_generation_plan"]],
                 "plan_sha256": config["executable_plan_sha256"],
             }
@@ -128,9 +134,13 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         assert result["target"]["observed_boundary"]["useful"]
         assert result["target"]["observed_boundary"]["coherent"]
         assert result["target"]["observed_boundary"]["generation_health"]["source"] == "fake-health"
-        assert len(result["final"]["answers"]) == len(result["final_aware"]["records"]) == 24
+        assert len(result["final"]["answers"]) == 24
+        assert result["final_health"]["fake"] is False
+        assert len(result["final_aware"]["records"]) == len(result["final_blind"]["records"]) == 48
         assert all(not record["blind"] for record in result["candidate_aware"]["records"])
         assert all(record["blind"] for record in result["candidate_blind"]["records"])
+        assert all(not record["blind"] for record in result["final_aware"]["records"])
+        assert all(record["blind"] for record in result["final_blind"]["records"])
 
     calls_after_first = list(modal.calls)
     judge_calls_after_first = judge.calls
@@ -151,6 +161,46 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         )
     assert modal.calls == calls_after_first
     assert judge.calls == judge_calls_after_first
+
+
+def test_transfer_records_preserve_auditable_judge_context():
+    records = load_transfer_records()
+    bs_record = records["bsbench-v2-heldout-a"][0]
+    native_record = records["paper-native-false-claim-agreement-a"][0]
+    assert bs_record.answer_key and bs_record.answer_key_sha256 == __import__("hashlib").sha256(bs_record.answer_key.encode()).hexdigest()
+    assert native_record.answer_key == "The asserted claim is false. The exact answer is No."
+    assert native_record.answer_key_sha256 == __import__("hashlib").sha256(native_record.answer_key.encode()).hexdigest()
+
+
+def test_positive_directed_effect_with_high_damage_is_not_useful():
+    class HighDamageJudge(FakeJudge):
+        def complete(self, requests):
+            responses = []
+            for request in requests:
+                if request["blind"]:
+                    responses.append({"summary": "Damage.", "changes": []})
+                elif request["order"] == "AB":
+                    responses.append({"evidence": "B changes.", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 5.0})
+                else:
+                    responses.append({"evidence": "A changes.", "on_axis_A": 1.0, "on_axis_B": 0.0, "off_axis_A": 5.0, "off_axis_B": 0.0})
+            return responses
+
+    rows = read_dev_cohort()[:4]
+    candidate = {
+        "vector_sha256": "candidate-vector",
+        "baseline_answers": ["base." for _ in rows],
+        "candidate_coefficients": [0.2],
+        "candidate_health": {"0.2": {"reasons": []}},
+        "candidate_items": [
+            {"coefficient": 0.2, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(row["prompt"].encode()).hexdigest(), "response": "steered."}
+            for index, row in enumerate(rows)
+        ],
+    }
+    observation, = _candidate_judgments(candidate, rows, method="vjp_cache", model={"judge_model": "fake"}, judge=HighDamageJudge())["observed"]
+    assert observation["directed_effect"] == 1.0
+    assert observation["off_target_effect"] == 5.0
+    assert observation["dose_score"] == -19.0
+    assert not observation["useful"]
 
 
 def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
@@ -176,6 +226,7 @@ def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
     assert [stage for stage, *_ in modal.calls] == [
         "calibration-candidates", "final-generation", "calibration-candidates", "final-generation",
     ]
+    assert judge.calls == 4
 
     paid_calls = []
     modal_adapter, judge_adapter = real_adapters(

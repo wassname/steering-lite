@@ -162,10 +162,16 @@ def _candidate_judgments(
         health = health_by_coefficient[str(float(coefficient))]
         if not isinstance(health, dict) or "reasons" not in health:
             raise ValueError("candidate health requires metrics and a reasons list")
+        directed_effect = sum(effect["effect"] for effect in effects) / len(effects)
+        off_target_effect = sum(abs(effect["off_axis_perturbation"]) for effect in effects) / len(effects)
+        dose_score = directed_effect - 4 * off_target_effect
         observed.append(
             {
                 "coefficient": float(coefficient),
-                "useful": sum(effect["effect"] for effect in effects) / len(effects) > 0,
+                "directed_effect": directed_effect,
+                "off_target_effect": off_target_effect,
+                "dose_score": dose_score,
+                "useful": dose_score > 0,
                 "coherent": not health["reasons"] and max(effect["steered_off_axis"] for effect in effects) <= 2.5,
                 "provenance": content_key({"candidate": candidate["vector_sha256"], "responses": coefficient_responses}),
                 "generation_health": health,
@@ -185,12 +191,49 @@ def _plan(records: dict, dose_plans: list[dict]) -> list[dict]:
     ]
 
 
-def _validate_final(plan: list[dict], result: dict) -> None:
+def _validate_final(plan: list[dict], result: dict, *, require_judge_outputs: bool) -> None:
     answers = result.get("answers")
     if not isinstance(answers, list) or len(answers) != len(plan):
         raise ValueError("final backend must return exactly one answer per planned item")
     if result.get("plan_sha256") != content_key({"plan": plan}):
         raise ValueError("final backend result does not attest to the executable generation plan")
+    if require_judge_outputs:
+        unique_prompt_ids = {item["prompt_id"] for item in plan}
+        if not isinstance(result.get("baseline_answers"), dict) or set(result["baseline_answers"]) != unique_prompt_ids:
+            raise ValueError("judge-backed final backend must return one baseline answer per transfer prompt")
+        if not isinstance(result.get("health_records"), list) or len(result["health_records"]) != len(plan):
+            raise ValueError("judge-backed final backend must return one health record per planned item")
+
+
+def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: str, model: dict, judge) -> dict:
+    """Persist existing paired judge outputs for every final dose response."""
+    source_records = {record.prompt_id: record for case in TRANSFER_CASES for record in records[case.case_id]}
+    number_by_prompt = {prompt_id: number for number, prompt_id in enumerate(source_records, 21)}
+    rows = []
+    for item, answer, health in zip(plan, final["answers"], final["health_records"], strict=True):
+        source = source_records[item["prompt_id"]]
+        rows.append({
+            "question_id": source.prompt_id,
+            "question_number": number_by_prompt[source.prompt_id],
+            "prompt": source.prompt,
+            "nonsensical_element": source.answer_key,
+            "bare": final["baseline_answers"][source.prompt_id],
+            "steered": answer,
+            "method": method,
+            "coefficient": item["coefficient"],
+            "side": "+C",
+            "generation_health": health,
+        })
+    requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
+    raw_responses = judge.complete(requests)
+    if len(raw_responses) != len(requests):
+        raise ValueError("judge adapter must return one response per persisted final request")
+    responses = [response_record(request, response) for request, response in zip(requests, raw_responses, strict=True)]
+    return {
+        "health": final["health_records"],
+        "aware": [record for record in responses if not record["blind"]],
+        "blind": [record for record in responses if record["blind"]],
+    }
 
 
 def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, prompts: list[str], backend, prompt_spec: dict) -> dict:
@@ -280,13 +323,16 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
     plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
     final_config = stages[0]["config"] | {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}
-    final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result), dispatch_config=lambda config: _dispatch_sidecar(root, config))
+    final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result, require_judge_outputs=judge is not None), dispatch_config=lambda config: _dispatch_sidecar(root, config))
     final_inputs = {"final_sha256": content_key({key: value for key, value in final.items() if key != "reused"}), "plan": executable_plan, "target": target}
+    final_judgments = None
+    if judge is not None:
+        final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=judge))
     fake_records = [{**item, "response": answer, "fake": True, "non_experimental": True} for item, answer in zip(executable_plan, final["answers"], strict=True)]
     return {"paid_execution_enabled": False, "candidate": candidate, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final,
-            "final_health": _local(root, stage="final-health", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-health-v1", "fake": True, "records": fake_records}),
-            "final_aware": _local(root, stage="final-aware", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-aware-v1", "fake": True, "records": fake_records}),
-            "final_blind": _local(root, stage="final-blind", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-blind-v1", "fake": True, "records": fake_records})}
+            "final_health": _local(root, stage="final-health", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-health-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["health"]}),
+            "final_aware": _local(root, stage="final-aware", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-aware-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["aware"]}),
+            "final_blind": _local(root, stage="final-blind", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-blind-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["blind"]})}
 
 
 def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, judge=None) -> dict:

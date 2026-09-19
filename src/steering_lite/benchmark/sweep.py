@@ -221,7 +221,9 @@ def final_stages(
             raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
         if any(
             not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+            or not record.answer_key
             or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+            or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
             for record in records
         ):
             raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
