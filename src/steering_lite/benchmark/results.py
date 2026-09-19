@@ -294,13 +294,22 @@ def report_tables(points: list[dict]) -> tuple[list[dict], list[dict]]:
     return maximum, optimal
 
 
+def _dose_label(point: dict) -> str:
+    coefficient = point["coefficient"]
+    if coefficient is not None:
+        return f"{coefficient:.3g}"
+    if point["method"] in {"bare", "prompting"}:
+        return point["method"]
+    raise ValueError(f"missing dose for {point['method']} {point['phase']} {point['case_id']}")
+
+
 def _table_rows(points: list[dict]) -> str:
     rows = []
     for point in points:
         if "point_id" not in point:
             rows.append("<tr><td>{method}</td><td>{phase}</td><td>{case_id}</td><td colspan='5'>{status}</td></tr>".format(**{key: html.escape(str(value)) for key, value in point.items()}))
             continue
-        dose = "bare" if point["coefficient"] is None else f"{point['coefficient']:.3g}"
+        dose = _dose_label(point)
         rows.append(
             "<tr><td>{}</td><td>{}</td><td>{}</td><td><a href='#point-{}'>{}</a></td><td>{:+.3f}</td><td>{:.3f}</td><td>{:+.3f}</td><td>{}</td></tr>".format(
                 html.escape(point["method"]), html.escape(point["phase"]), html.escape(point["case_id"]), point["point_id"], dose,
@@ -314,7 +323,7 @@ def _evidence(point: dict) -> str:
     return "<details id='point-{}'><summary>{} {} {} dose {}</summary><p>Examples: {}</p><h4>Complete target-aware evidence</h4><pre>{}</pre><h4>Blind descriptions</h4><pre>{}</pre><h4>Order disagreements</h4><pre>{}</pre><h4>Health</h4><pre>{}</pre></details>".format(
         point["point_id"],
         html.escape(point["method"]), html.escape(point["phase"]), html.escape(point["case_id"]),
-        html.escape("bare" if point["coefficient"] is None else str(point["coefficient"])),
+        html.escape(_dose_label(point)),
         html.escape(", ".join(f"{item['question_number']}:{item['question_id']}" for item in point["examples"])),
         html.escape(json.dumps(point["aware"], indent=2, sort_keys=True)),
         html.escape(json.dumps(point["blind"], indent=2, sort_keys=True)),

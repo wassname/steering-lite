@@ -192,7 +192,11 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     parity = json.loads((root / "results" / "source-parity.json").read_text())
     assert parity["points_sha256"] == report["artifact"]["points_sha256"]
     assert parity["artifact_point_ids"] == parity["plot_point_ids"] == parity["pareto_plot_point_ids"]
-    assert "Numbered evidence" in (root / "results" / "index.html").read_text()
+    page = (root / "results" / "index.html").read_text()
+    prompting_point = next(point for point in report["artifact"]["points"] if point["method"] == "prompting")
+    assert benchmark_results._dose_label(prompting_point) == "prompting"
+    assert "prompting direct dev dose prompting" in page
+    assert "Numbered evidence" in page
     assert (root / "results" / "plot.png").exists()
     assert (root / "results" / "plot_pareto.png").exists()
 
