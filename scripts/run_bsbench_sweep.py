@@ -143,14 +143,21 @@ def main() -> None:
                 endpoint = "offline-fake-judge"
 
                 def complete(self, requests):
-                    return [
-                        {"intended_behavior_explains": True, "reason": "The paired responses differ on the stated premise."}
-                        if request["schema"] == "bsbench-persona-validation-request-v1"
-                        else {"summary": "offline difference", "changes": []}
-                        if request["blind"]
-                        else {"on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
-                        for request in requests
-                    ]
+                    responses = []
+                    for request in requests:
+                        if request["schema"] == "bsbench-persona-validation-request-v1":
+                            responses.append({"intended_behavior_explains": True, "reason": "The paired responses differ on the stated premise."})
+                        elif request["blind"]:
+                            responses.append({"summary": "offline difference", "changes": []})
+                        else:
+                            seed = int(hashlib.sha256(request["comparison_id"].encode()).hexdigest()[:8], 16)
+                            effect = .15 + (seed % 70) / 100
+                            off_target = .02 + ((seed // 70) % 20) / 100
+                            if request["order"] == "AB":
+                                responses.append({"on_axis_A": 0.0, "on_axis_B": effect, "off_axis_A": 0.0, "off_axis_B": off_target})
+                            else:
+                                responses.append({"on_axis_A": effect, "on_axis_B": 0.0, "off_axis_A": off_target, "off_axis_B": 0.0})
+                    return responses
 
             backend = FakeBackend()
             ledger = args.ledger or args.out / "costs.jsonl"

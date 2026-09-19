@@ -14,3 +14,7 @@ smoke:
 # Non-paid preflight: writes the Qwen3.5-4B manifest without network, model, judge, or Modal calls.
 sweep mode="--dry-run" model="Qwen/Qwen3.5-4B" out="outputs/bsbench-v2":
 	.venv/bin/python scripts/run_bsbench_sweep.py {{mode}} --model {{model}} --out {{out}}
+
+# Render HTML, PNG, and auditable evidence from one complete cached full sweep. — PI/OpenAI
+results run="outputs/bsbench-v2" out="outputs/bsbench-v2/results":
+	.venv/bin/python scripts/run_bsbench_results.py --run-dir {{run}} --out {{out}}

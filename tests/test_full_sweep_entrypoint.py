@@ -1,14 +1,19 @@
 import base64
+import copy
 import hashlib
 import importlib.util
 import json
 from pathlib import Path
+
+import pytest
 
 from steering_lite.benchmark.adapters import real_adapters
 from steering_lite.benchmark.cache import content_key
 from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
+from steering_lite.benchmark import results as benchmark_results
+from steering_lite.benchmark.results import normalize_summary, render_report
 from steering_lite.benchmark.sweep import persona_extraction_identity
 from steering_lite.benchmark.transfer_data import load_transfer_records
 
@@ -155,7 +160,7 @@ def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: 
     )
 
 
-def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path):
+def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     stage_call = FakeRemoteStageCall()
     judge_call = FakeJudgeCall()
@@ -179,6 +184,37 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     assert all(request["input_tokens_upper"] == 2_000 and request["output_tokens_upper"] == 100 for request in validation["requests"])
     assert all(response["response"]["intended_behavior_explains"] for response in validation["results"])
     assert all("method" not in payload and "coefficient" not in payload for payload in judge_call.payloads if payload["response_format"]["json_schema"]["name"] == "blind_change_description")
+
+    report = render_report(root, root / "results")
+    assert report["artifact"]["non_experimental"] is False
+    assert len(report["artifact"]["points"]) > len(METHODS)
+    assert all("aware" in point and "blind" in point and "health" in point for point in report["artifact"]["points"])
+    parity = json.loads((root / "results" / "source-parity.json").read_text())
+    assert parity["points_sha256"] == report["artifact"]["points_sha256"]
+    assert parity["artifact_point_ids"] == parity["plot_point_ids"] == parity["pareto_plot_point_ids"]
+    assert "Numbered evidence" in (root / "results" / "index.html").read_text()
+    assert (root / "results" / "plot.png").exists()
+    assert (root / "results" / "plot_pareto.png").exists()
+
+    saved_summary = json.loads((root / "run-summary.json").read_text())
+    incomplete = copy.deepcopy(saved_summary)
+    incomplete["conditions"].pop("pca")
+    with pytest.raises(ValueError, match="every canonical method"):
+        normalize_summary(incomplete)
+    fake_summary = copy.deepcopy(saved_summary)
+    for condition in fake_summary["conditions"].values():
+        condition["paid_execution_enabled"] = False
+    fake_artifact = normalize_summary(fake_summary)
+    assert fake_artifact["non_experimental"] is True
+    assert "FAKE DATA — NON-EXPERIMENTAL" in benchmark_results.render_html(fake_artifact, *benchmark_results.report_tables(fake_artifact["points"]))
+    missing_judgment = copy.deepcopy(saved_summary)
+    missing_judgment["conditions"]["pca"]["final_blind"]["records"] = []
+    with pytest.raises(ValueError, match="disagree|complete"):
+        normalize_summary(missing_judgment)
+    monkeypatch.setattr(benchmark_results, "_plot", lambda *_args, **_kwargs: set())
+    with pytest.raises(ValueError, match="plot/table points"):
+        render_report(root, root / "mismatched-results")
+    monkeypatch.undo()
 
     first_stage_calls = len(stage_call.calls)
     first_judge_calls = len(judge_call.payloads)

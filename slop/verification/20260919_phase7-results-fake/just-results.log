@@ -1,0 +1,2 @@
+.venv/bin/python scripts/run_bsbench_results.py --run-dir /tmp/bsbench-fake-run --out /tmp/bsbench-just-results
+{"non_experimental": true, "output": "/tmp/bsbench-just-results", "point_count": 86, "points_sha256": "890cccf6d09cd304cdbf363b63133774ad36aaae8d32f742528f24dd39540b7a"}
