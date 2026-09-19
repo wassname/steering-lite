@@ -1,0 +1,8 @@
+dry gpu_stages= 14
+dry requests= {'blind': 904, 'persona_validation': 12, 'target_aware': 904}
+dry phase6_external_committed_usd= 2.0
+dry total_upper_usd= 38.976776799999996
+fake first_gpu_misses= 14
+fake immediate_rerun_gpu_misses= 0
+fake persona comparisons/requests/results/disagreements= 12 12 12 0
+fake comparison has baseline= True

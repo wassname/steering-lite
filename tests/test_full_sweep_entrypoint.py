@@ -173,10 +173,11 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     assert len(stage_call.calls) == 14
     assert len(judge_call.payloads) == 860
     validation = first["conditions"]["prompting"]["persona_validation"]
-    assert len(validation["examples"]) == len(validation["requests"]) == len(validation["responses"]) == len(validation["disagreements"]) == 12
-    assert all(example["persona_source"] == persona_extraction_identity() for example in validation["examples"])
+    assert len(validation["comparisons"]) == len(validation["requests"]) == len(validation["results"]) == 12
+    assert validation["disagreements"] == []
+    assert all(comparison["persona_source"] == persona_extraction_identity() for comparison in validation["comparisons"])
     assert all(request["input_tokens_upper"] == 2_000 and request["output_tokens_upper"] == 100 for request in validation["requests"])
-    assert all(response["response"]["intended_behavior_explains"] for response in validation["responses"])
+    assert all(response["response"]["intended_behavior_explains"] for response in validation["results"])
     assert all("method" not in payload and "coefficient" not in payload for payload in judge_call.payloads if payload["response_format"]["json_schema"]["name"] == "blind_change_description")
 
     first_stage_calls = len(stage_call.calls)

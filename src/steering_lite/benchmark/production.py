@@ -317,22 +317,30 @@ def _persona_validation(examples: list[dict], *, model: dict, judge) -> dict:
             "request_key": request["request_key"],
             "response": response,
         })
+    comparisons = [
+        {
+            "pair_id": example["pair_id"],
+            "question_id": example["question_id"],
+            "bare": example["bare"],
+            "sycophantic": example["positive"],
+            "abrasive": example["negative"],
+            "persona_source": example["persona_source"],
+        }
+        for example in examples
+    ]
+    disagreements = [
+        comparison | {
+            "reason": result["response"]["reason"],
+            "intended_behavior_explains": False,
+        }
+        for comparison, result in zip(comparisons, responses, strict=True)
+        if not result["response"]["intended_behavior_explains"]
+    ]
     return {
-        "examples": examples,
+        "comparisons": comparisons,
         "requests": requests,
-        "responses": responses,
-        "disagreements": [
-            {
-                "pair_id": example["pair_id"],
-                "question_id": example["question_id"],
-                "bare": example["bare"],
-                "sycophantic": example["positive"],
-                "abrasive": example["negative"],
-                "intended_behavior_explains": response["response"]["intended_behavior_explains"],
-                "reason": response["response"]["reason"],
-            }
-            for example, response in zip(examples, responses, strict=True)
-        ],
+        "results": responses,
+        "disagreements": disagreements,
     }
 
 
