@@ -1,8 +1,10 @@
+import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+from types import ModuleType
 
 import pytest
 
@@ -133,3 +135,96 @@ def test_recorded_run_reuses_temp_ledger_and_rejects_wrong_model(tmp_path: Path)
     wrong = command[:-2] + ["--model", "wrong/model"]
     with pytest.raises(subprocess.CalledProcessError):
         subprocess.run(wrong, cwd=root, check=True, capture_output=True, text=True)
+
+
+def _sweep_script():
+    path = Path(__file__).parents[1] / "scripts" / "run_bsbench_sweep.py"
+    spec = importlib.util.spec_from_file_location("bsbench_sweep_lifecycle", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_real_sweep_keeps_one_modal_lifecycle_across_gpu_stages(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+    events = []
+    remote_calls = []
+
+    class App:
+        active = False
+
+        def run(self):
+            events.append("run")
+            return self
+
+        def __enter__(self):
+            assert not self.active
+            self.active = True
+            events.append("enter")
+            return self
+
+        def __exit__(self, *_args):
+            assert self.active
+            self.active = False
+            events.append("exit")
+
+    app = App()
+    modal_module = ModuleType("run_bsbench_modal")
+    modal_module.app = app
+
+    def remote_stage_call(_model, *, explicit_run, budget_preflight):
+        assert app.active and explicit_run
+        assert budget_preflight == {"total_upper_usd": 1.0, "limit_usd": 50.0}
+
+        def call(**kwargs):
+            remote_calls.append((app.active, kwargs["method"]))
+            return {"actual_usd": 0.0}
+
+        return call
+
+    modal_module.remote_stage_call = remote_stage_call
+    monkeypatch.setitem(sys.modules, "run_bsbench_modal", modal_module)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sentinel")
+    monkeypatch.setattr(sweep, "dry_manifest", lambda *_args, **_kwargs: {"cost_estimate": {"total_upper_usd": 1.0, "limit_usd": 50.0}})
+    monkeypatch.setattr(sweep, "read_dev_cohort", lambda: [])
+
+    def run_two_stages(_root, _ledger, *, backend, **_kwargs):
+        backend.gpu(stage="generation", method="bare", config={}, prompts=["one"])
+        backend.gpu(stage="generation", method="prompting", config={}, prompts=["two"])
+        return {"ok": True}
+
+    monkeypatch.setattr(sweep, "run_full_sweep", run_two_stages)
+    monkeypatch.setattr(sys, "argv", ["run_bsbench_sweep.py", "--run", "--backend", "real", "--out", str(tmp_path / "out")])
+    sweep.main()
+
+    assert events == ["run", "enter", "exit"]
+    assert remote_calls == [(True, "bare"), (True, "prompting")]
+
+
+def test_real_sweep_lifecycle_failure_precedes_production_reservation(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+
+    class FailingApp:
+        def run(self):
+            return self
+
+        def __enter__(self):
+            raise RuntimeError("unusable Modal lifecycle")
+
+        def __exit__(self, *_args):
+            raise AssertionError("unreachable")
+
+    modal_module = ModuleType("run_bsbench_modal")
+    modal_module.app = FailingApp()
+    modal_module.remote_stage_call = lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unreachable"))
+    monkeypatch.setitem(sys.modules, "run_bsbench_modal", modal_module)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sentinel")
+    monkeypatch.setattr(sweep, "dry_manifest", lambda *_args, **_kwargs: {"cost_estimate": {"total_upper_usd": 1.0, "limit_usd": 50.0}})
+    monkeypatch.setattr(sweep, "run_full_sweep", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unreachable")))
+    ledger = tmp_path / "costs.jsonl"
+    monkeypatch.setattr(sys, "argv", ["run_bsbench_sweep.py", "--run", "--backend", "real", "--out", str(tmp_path / "out"), "--ledger", str(ledger)])
+
+    with pytest.raises(RuntimeError, match="unusable Modal lifecycle"):
+        sweep.main()
+    assert not ledger.exists()

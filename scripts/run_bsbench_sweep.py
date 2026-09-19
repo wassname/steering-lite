@@ -181,27 +181,28 @@ def main() -> None:
             ledger = args.ledger or args.out / "costs.jsonl"
             manifest = dry_manifest(args.out, args.model, ledger=ledger)
             budget = manifest["cost_estimate"]
-            from run_bsbench_modal import remote_stage_call
-            modal_adapter, judge_adapter = real_adapters(
-                modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
-                judge_request_call=openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key),
-                judge_endpoint=args.judge_endpoint,
-                explicit_run=args.run,
-                budget_preflight=budget,
-                root=args.out,
-                ledger=ledger,
-            )
-            rows = read_dev_cohort()
-            result = run_full_sweep(
-                args.out,
-                ledger,
-                model={"id": args.model, "judge_model": JUDGE_MODEL},
-                rows=rows,
-                backend=modal_adapter,
-                prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128},
-                judge=judge_adapter,
-                methods=(args.method,) if args.method else METHODS,
-            )
+            from run_bsbench_modal import app, remote_stage_call
+            with app.run():
+                modal_adapter, judge_adapter = real_adapters(
+                    modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
+                    judge_request_call=openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key),
+                    judge_endpoint=args.judge_endpoint,
+                    explicit_run=args.run,
+                    budget_preflight=budget,
+                    root=args.out,
+                    ledger=ledger,
+                )
+                rows = read_dev_cohort()
+                result = run_full_sweep(
+                    args.out,
+                    ledger,
+                    model={"id": args.model, "judge_model": JUDGE_MODEL},
+                    rows=rows,
+                    backend=modal_adapter,
+                    prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128},
+                    judge=judge_adapter,
+                    methods=(args.method,) if args.method else METHODS,
+                )
         else:
             summary = json.loads(Path("slop/verification/20260919_phase6-modal-smoke-summary.json").read_text())
             if summary["model"] != args.model:
