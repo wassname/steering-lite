@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
-from steering_lite.benchmark.cache import committed
+from steering_lite.benchmark.cache import committed, settle_receipt
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.production import record_completed_stage, run_direct_condition, run_live_two_step, run_stages
 from steering_lite.benchmark.sweep import CALIBRATION_CASE, JUDGE_MODEL, MODEL_ID, dry_manifest
@@ -44,6 +44,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--import-smoke", action="store_true")
+    mode.add_argument("--import-receipt", type=Path)
     mode.add_argument("--run", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
     parser.add_argument("--out", type=Path, default=Path("outputs/bsbench-v2"))
@@ -56,6 +57,13 @@ def main() -> None:
         result = dry_manifest(args.out, args.model)
     elif args.import_smoke:
         result = import_recorded_smoke(args.out, args.model)
+    elif args.import_receipt:
+        receipt = json.loads(args.import_receipt.read_text())
+        if set(receipt) != {"reservation", "actual_usd", "receipt"}:
+            raise ValueError("receipt JSON must contain reservation, actual_usd and receipt")
+        ledger = args.ledger or args.out / "costs.jsonl"
+        settle_receipt(ledger, receipt["reservation"], receipt["actual_usd"], receipt["receipt"])
+        result = {"mode": "receipt-import", "ledger": str(ledger), "reservation": receipt["reservation"], "actual_usd": receipt["actual_usd"]}
     else:
         if args.backend == "fake":
             rows = read_dev_cohort()
@@ -70,7 +78,7 @@ def main() -> None:
                         return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "candidate_coefficients": coefficients, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
                     if stage == "final-generation":
                         artifact = config["vector_artifact"]
-                        assert __import__("hashlib").sha256(Path(artifact["backend_path"]).read_bytes()).hexdigest() == artifact["sha256"]
+                        assert __import__("hashlib").sha256(__import__("base64").b64decode(artifact["vector_bytes_b64"])).hexdigest() == artifact["sha256"]
                         return {"actual_usd": 0.0, "answers": ["Fake local final answer." for _ in config["executable_generation_plan"]], "plan_sha256": config["executable_plan_sha256"], "fake": True}
                     return {"actual_usd": 0.0, "answers": ["Fake local answer." for _ in prompts], "fake": True}
             class FakeJudge:

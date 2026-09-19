@@ -25,7 +25,8 @@ class FakeBackend:
             return {"actual_usd": 0.0, "vector_bytes": b"durable-test-vector", "candidate_coefficients": coefficients, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"answer-{coefficient}-{index}"} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"method": method}}
         if stage == "final-generation":
             artifact = config["vector_artifact"]
-            assert Path(artifact["backend_path"]).read_bytes() == b"durable-test-vector"
+            assert "backend_path" not in artifact
+            assert __import__("base64").b64decode(artifact["vector_bytes_b64"]) == b"durable-test-vector"
             return {"actual_usd": 0.0, "answers": ["answer." for _ in config["executable_generation_plan"]], "plan_sha256": config["executable_plan_sha256"]}
         return {"actual_usd": 0.0, "answers": ["answer." for _ in prompts]}
 
@@ -63,7 +64,8 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     persisted_config = json.loads(final_cache.read_text())["identity"]["config"]
     assert "backend_path" not in json.dumps(persisted_config)
     final_dispatch_config = backend.configs[-1]
-    assert Path(final_dispatch_config["vector_artifact"]["backend_path"]).is_absolute()
+    assert "backend_path" not in final_dispatch_config["vector_artifact"]
+    assert __import__("base64").b64decode(final_dispatch_config["vector_artifact"]["vector_bytes_b64"]) == artifact.read_bytes()
 
 
 def test_candidate_item_coverage_and_observation_coefficients_fail_before_target(tmp_path: Path):

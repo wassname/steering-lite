@@ -33,7 +33,7 @@ def test_production_stages_reserve_before_dispatch_reuse_and_invalidate(tmp_path
     assert not run_stages(tmp_path, ledger, changed, backend)[0]["reused"]
 
 
-def test_modal_pending_receipt_is_cached_unsettled_and_blocks_new_dispatch(tmp_path: Path):
+def test_modal_pending_receipt_is_cached_estimated_and_reconciled_later(tmp_path: Path):
     ledger = tmp_path / "costs.jsonl"
     calls = []
 
@@ -49,12 +49,45 @@ def test_modal_pending_receipt_is_cached_unsettled_and_blocks_new_dispatch(tmp_p
     assert run_stages(tmp_path, ledger, [stage], PendingModal())[0]["reused"] is True
     assert calls == ["generation"]
     rows = [json.loads(line) for line in ledger.read_text().splitlines()]
-    assert [row["event"] for row in rows] == ["reserved", "unresolved"]
-    blocked = {**stage, "stage": "another", "config": {"upper_usd": 0.5}}
-    with pytest.raises(RuntimeError, match="unresolved remote work"):
-        run_stages(tmp_path, ledger, [blocked], PendingModal())
+    assert [row["event"] for row in rows] == ["reserved", "estimated_at_reservation_upper"]
+    assert rows[-1]["estimated_usd"] == 0.5 and "actual_usd" not in rows[-1]
+    next_stage = {**stage, "stage": "another", "config": {"upper_usd": 0.5}}
+    assert run_stages(tmp_path, ledger, [next_stage], PendingModal())[0]["reused"] is False
     settle_receipt(ledger, first["reservation"], 0.25, {"provider": "Modal", "receipt_id": "later"})
-    assert run_stages(tmp_path, ledger, [blocked], PendingModal())[0]["reused"] is False
+    reconciled = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert [row["event"] for row in reconciled][:4] == ["reserved", "estimated_at_reservation_upper", "reserved", "estimated_at_reservation_upper"]
+    assert [row["event"] for row in reconciled][-2:] == ["settled", "receipt_imported"]
+
+
+def test_cli_imports_modal_receipt_without_remote_dispatch(tmp_path: Path):
+    ledger = tmp_path / "costs.jsonl"
+
+    class PendingModal:
+        def gpu(self, **_kwargs):
+            return {"cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}}}
+
+    stage = {"model": {"id": "fake"}, "data": {"sha256": "dev"}, "method": "bare", "stage": "generation", "config": {"upper_usd": 0.5}, "prompts": ["one"]}
+    result, = run_stages(tmp_path, ledger, [stage], PendingModal())
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(json.dumps({"reservation": result["reservation"], "actual_usd": 0.25, "receipt": {"provider": "Modal", "receipt_id": "cli"}}))
+    command = [sys.executable, "scripts/run_bsbench_sweep.py", "--import-receipt", str(receipt_path), "--ledger", str(ledger)]
+    output = subprocess.run(command, cwd=Path(__file__).parents[1], check=True, capture_output=True, text=True)
+    assert json.loads(output.stdout)["mode"] == "receipt-import"
+    assert [json.loads(line)["event"] for line in ledger.read_text().splitlines()][-2:] == ["settled", "receipt_imported"]
+
+
+def test_modal_receipt_overage_is_detected_after_estimate(tmp_path: Path):
+    ledger = tmp_path / "costs.jsonl"
+
+    class PendingModal:
+        def gpu(self, **kwargs):
+            return {"cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}}}
+
+    stage = {"model": {"id": "fake"}, "data": {"sha256": "dev"}, "method": "bare", "stage": "generation", "config": {"upper_usd": 0.5}, "prompts": ["one"]}
+    result, = run_stages(tmp_path, ledger, [stage], PendingModal())
+    with pytest.raises(RuntimeError, match="exceeded reservation"):
+        settle_receipt(ledger, result["reservation"], 0.6, {"provider": "Modal", "receipt_id": "over"})
+    assert [json.loads(line)["event"] for line in ledger.read_text().splitlines()] == ["reserved", "estimated_at_reservation_upper", "settled", "overage"]
 
 
 def test_local_judge_work_persists_persona_checks_and_both_request_kinds(tmp_path: Path):

@@ -5,11 +5,11 @@ import base64
 import hashlib
 import json
 from pathlib import Path
-from .cache import cached_stage, content_key, mark_unresolved, reserve, settle
+from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
 from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
-from .transfer_data import load_transfer_records, transfer_provenance
+from .transfer_data import load_transfer_records, transfer_provenance, transfer_records_identity
 from .validation import comparison_id, numbered_requests, response_record, score_pair, validate_persona_examples
 
 
@@ -18,8 +18,8 @@ def _settle_or_mark_gpu_unresolved(ledger: Path, reservation: str, result: dict)
         settle(ledger, reservation, result["actual_usd"])
         return
     receipt = result.get("cost_receipt")
-    if isinstance(receipt, dict) and receipt.get("status") == "pending":
-        mark_unresolved(ledger, reservation, "awaiting_modal_receipt")
+    if isinstance(receipt, dict) and receipt.get("status") == "pending" and receipt.get("provider") == "Modal" and isinstance(receipt.get("usage"), dict):
+        estimate_at_reservation_upper(ledger, reservation, receipt)
         return
     mark_unresolved(ledger, reservation, "missing_modal_cost_receipt")
     raise ValueError("Modal stage must return actual cost or an unresolved receipt")
@@ -87,7 +87,8 @@ def _load_sidecar(root: Path, artifact: dict) -> dict:
 
 def _dispatch_sidecar(root: Path, config: dict) -> dict:
     artifact = _load_sidecar(root, config["vector_artifact"])
-    return config | {"vector_artifact": artifact | {"backend_path": str((root / artifact["path"]).resolve())}}
+    raw = (root / artifact["path"]).read_bytes()
+    return config | {"vector_artifact": artifact | {"vector_bytes_b64": base64.b64encode(raw).decode()}}
 
 
 def _local(root: Path, *, stage: str, model: dict, data: dict, method: str, prompts: list[str], config: dict, compute) -> dict:
@@ -395,18 +396,51 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]})
     aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]})
     blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]})
-    vector = vector_loader(artifact)
-    target_config = {"candidate_sha256": content_key(candidate_identity), "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "candidate_records": [health, aware, blind]}
-    target = _local(root, stage="fit-target", model=model, data=data, method=method, prompts=calibration_prompts, config=target_config, compute=lambda: fit_target(vector, model, None, calibration_prompts, CALIBRATION_CASE, observed, method=method, model_id=model["id"], measure_kwargs={}, measure=measure) | {"extraction_identity": source})
-    provenance = {case_id: transfer_provenance(case_records) for case_id, case_records in records.items()}
-    transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
-    prediction_config = {"target": target, "transfer_provenance": provenance, "prompt_spec": prompt_spec, "vector_sha256": candidate["vector_sha256"]}
-    prediction = _local(root, stage="transfer-prediction", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, bracket=(0.01, 2.0), solver_kwargs={}, solver=solver) for case in TRANSFER_CASES]})
-    stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
-    executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
-    plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
-    final_config = stages[0]["config"] | {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}
-    final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result, require_judge_outputs=judge is not None), dispatch_config=lambda config: _dispatch_sidecar(root, config))
+    if getattr(backend, "remote_vector_binding", False):
+        transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
+        final_config = {
+            "schema": "bsbench-remote-vector-final-v1",
+            "upper_usd": MODAL_GPU_STAGE_UPPER_USD,
+            "candidate_sha256": content_key(candidate_identity),
+            "observed": observed,
+            "observed_sha256": content_key({"observed": observed}),
+            "vector_sha256": candidate["vector_sha256"],
+            "vector_artifact": artifact,
+            "calibration_prompts": calibration_prompts,
+            "transfer_prompt_records": transfer_records_identity(records),
+            "prompt_spec": prompt_spec,
+            "extraction_identity": source,
+        }
+
+        def validate_remote_final(result: dict) -> None:
+            predictions = result.get("transfer_predictions")
+            if not isinstance(predictions, list) or not isinstance(result.get("target"), dict):
+                raise ValueError("remote vector final stage must return target and transfer predictions")
+            remote_stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=predictions, case_prompts=records, prompt_spec=prompt_spec)
+            remote_plan = _plan(records, remote_stages[0]["config"]["final_dose_plans"])
+            if result.get("final_dose_plans") != remote_stages[0]["config"]["final_dose_plans"]:
+                raise ValueError("remote vector final stage returned a non-canonical dose plan")
+            _validate_final(remote_plan, result, require_judge_outputs=judge is not None)
+
+        final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=transfer_prompts, backend=backend, validate_result=validate_remote_final, dispatch_config=lambda config: _dispatch_sidecar(root, config))
+        prediction = {"predictions": final["transfer_predictions"]}
+        target = final["target"]
+        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
+        executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
+        plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
+    else:
+        vector = vector_loader(artifact)
+        target_config = {"candidate_sha256": content_key(candidate_identity), "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "candidate_records": [health, aware, blind]}
+        target = _local(root, stage="fit-target", model=model, data=data, method=method, prompts=calibration_prompts, config=target_config, compute=lambda: fit_target(vector, model, None, calibration_prompts, CALIBRATION_CASE, observed, method=method, model_id=model["id"], measure_kwargs={}, measure=measure) | {"extraction_identity": source})
+        provenance = {case_id: transfer_provenance(case_records) for case_id, case_records in records.items()}
+        transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
+        prediction_config = {"target": target, "transfer_provenance": provenance, "prompt_spec": prompt_spec, "vector_sha256": candidate["vector_sha256"]}
+        prediction = _local(root, stage="transfer-prediction", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, bracket=(0.01, 2.0), solver_kwargs={}, solver=solver) for case in TRANSFER_CASES]})
+        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
+        executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
+        plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
+        final_config = stages[0]["config"] | {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}
+        final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=plan_prompts, backend=backend, validate_result=lambda result: _validate_final(executable_plan, result, require_judge_outputs=judge is not None), dispatch_config=lambda config: _dispatch_sidecar(root, config))
     final_inputs = {"final_sha256": content_key({key: value for key, value in final.items() if key != "reused"}), "plan": executable_plan, "target": target}
     final_judgments = None
     final_judge = judge if final_judge is None else final_judge

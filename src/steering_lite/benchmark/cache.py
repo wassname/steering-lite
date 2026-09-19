@@ -89,8 +89,9 @@ def reserve_many(
         handle.seek(0)
         records = [json.loads(line) for line in handle]
         settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
+        estimated = {row["reservation"] for row in records if row["event"] == "estimated_at_reservation_upper"}
         unresolved_overages = [row for row in records if row["event"] == "overage"]
-        unresolved = [row for row in records if row["event"] == "unresolved" and row["reservation"] not in settled]
+        unresolved = [row for row in records if row["event"] == "unresolved" and row["reservation"] not in settled and row["reservation"] not in estimated]
         total = sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
         requested = sum(upper_usd for _, upper_usd in reservations)
         if unresolved_overages:
@@ -115,6 +116,20 @@ def reserve_many(
 
 def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) -> str:
     return reserve_many(ledger, [(kind, upper_usd)], limit_usd)[0]
+
+
+def estimate_at_reservation_upper(ledger: Path, reservation: str, receipt: dict) -> None:
+    if not receipt:
+        raise ValueError("reservation estimate requires validated provider usage")
+    with ledger.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        rows = [json.loads(line) for line in handle]
+        reserved, = [row for row in rows if row["event"] == "reserved" and row["id"] == reservation]
+        if any(row["event"] == "settled" and row["reservation"] == reservation for row in rows):
+            raise ValueError("settled work cannot be estimated")
+        if not any(row["event"] == "estimated_at_reservation_upper" and row["reservation"] == reservation for row in rows):
+            handle.write(json.dumps({"event": "estimated_at_reservation_upper", "reservation": reservation, "estimated_usd": reserved["upper_usd"], "receipt": receipt}) + "\n")
 
 
 def mark_unresolved(ledger: Path, reservation: str, reason: str) -> None:

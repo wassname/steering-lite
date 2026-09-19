@@ -88,6 +88,9 @@ def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, limit: in
 @app.function(gpu="A10G", image=image, volumes={"/cache": cache}, timeout=45 * 60)
 def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], model_id: str = "Qwen/Qwen3.5-4B") -> dict:
     """Run exactly one production GPU stage and return only serializable data."""
+    import base64
+    import hashlib
+
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -179,8 +182,65 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             "method_config": vector.cfg.to_dict(),
         }
     if stage == "final-generation":
-        plan = config["executable_generation_plan"]
-        vector = sl.Vector.load(config["vector_artifact"]["backend_path"])
+        artifact = config["vector_artifact"]
+        vector_bytes = base64.b64decode(artifact["vector_bytes_b64"])
+        if hashlib.sha256(vector_bytes).hexdigest() != artifact["sha256"]:
+            raise ValueError("remote vector bytes do not match the persisted artifact SHA256")
+        vector_path = Path("/tmp") / f"{artifact['sha256']}.safetensors"
+        vector_path.write_bytes(vector_bytes)
+        vector = sl.Vector.load(str(vector_path))
+        target = None
+        transfer_predictions = None
+        final_dose_plans = None
+        if config.get("schema") == "bsbench-remote-vector-final-v1":
+            from steering_lite.benchmark.dose_search import CALIBRATION_CASE, TRANSFER_CASES, final_dose_plan, fit_target, predict_transfer
+            from steering_lite.benchmark.transfer_data import PromptRecord
+
+            records = {
+                case_id: tuple(PromptRecord(**record) for record in case_records)
+                for case_id, case_records in config["transfer_prompt_records"].items()
+            }
+            target = fit_target(
+                vector,
+                model,
+                tokenizer,
+                config["calibration_prompts"],
+                CALIBRATION_CASE,
+                config["observed"],
+                method=method,
+                model_id=model_id,
+                measure_kwargs={},
+            )
+            transfer_predictions = [
+                predict_transfer(
+                    vector,
+                    model,
+                    tokenizer,
+                    [record.prompt for record in records[case.case_id]],
+                    target,
+                    case,
+                    bracket=(0.01, 2.0),
+                    solver_kwargs={},
+                )
+                for case in TRANSFER_CASES
+            ]
+            final_dose_plans = [final_dose_plan(prediction) for prediction in transfer_predictions]
+            plans_by_case = {plan["case"]["case_id"]: plan for plan in final_dose_plans}
+            plan = [
+                {
+                    "case_id": case.case_id,
+                    "target_id": plans_by_case[case.case_id]["target_id"],
+                    "coefficient": coefficient,
+                    "prompt_id": record.prompt_id,
+                    "prompt": record.prompt,
+                    "prompt_sha256": record.content_sha256,
+                }
+                for case in TRANSFER_CASES
+                for record in records[case.case_id]
+                for coefficient in plans_by_case[case.case_id]["coefficients"]
+            ]
+        else:
+            plan = config["executable_generation_plan"]
         unique_prompts = {item["prompt_id"]: item["prompt"] for item in plan}
         baseline_answers = dict(zip(unique_prompts, generate(model, tokenizer, _chat_prompts(tokenizer, list(unique_prompts.values())), 1, config["prompt_spec"]["max_new_tokens"]), strict=True))
         answers = []
@@ -193,13 +253,21 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             health_records.append({"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "metrics": metrics, "reasons": reasons})
         cache.commit()
         from steering_lite.benchmark.cache import content_key
-        return {
+        result = {
             "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started}},
             "baseline_answers": baseline_answers,
             "answers": answers,
             "health_records": health_records,
             "plan_sha256": content_key({"plan": plan}),
         }
+        if target is not None:
+            result |= {
+                "target": target,
+                "transfer_predictions": transfer_predictions,
+                "final_dose_plans": final_dose_plans,
+                "executable_generation_plan": plan,
+            }
+        return result
     raise ValueError(f"unsupported Modal stage {stage!r}")
 
 

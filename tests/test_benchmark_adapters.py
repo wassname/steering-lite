@@ -43,7 +43,8 @@ class FakeModalRunMethod:
                 "method_config": {"method": method},
             }
         if stage == "final-generation":
-            assert config["vector_artifact"]["backend_path"]
+            assert "backend_path" not in config["vector_artifact"]
+            assert config["vector_artifact"]["vector_bytes_b64"]
             return {
                 "actual_usd": 0.0,
                 "baseline_answers": {
@@ -176,6 +177,79 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         )
     assert modal.calls == calls_after_first
     assert judge.calls == judge_calls_after_first
+
+
+def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measurement(tmp_path):
+    from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
+
+    class RemoteVectorBackend(FakeModalRunMethod):
+        remote_vector_binding = True
+
+        def gpu(self, **kwargs):
+            if kwargs["stage"] != "final-generation":
+                return super().gpu(**kwargs)
+            self.calls.append((kwargs["stage"], kwargs["method"], tuple(kwargs["prompts"]), kwargs["config"]))
+            config = kwargs["config"]
+            artifact = config["vector_artifact"]
+            assert "backend_path" not in artifact and artifact["vector_bytes_b64"]
+            target = {"target_id": "remote-target", "target_stat": "kl_rms", "target_rms": 1.0}
+            predictions = [
+                {
+                    "schema": "bsbench-rms-kl-transfer-v1",
+                    "target_id": target["target_id"],
+                    "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)},
+                    "method": kwargs["method"],
+                    "model": "fake",
+                    "target_stat": "kl_rms",
+                    "target_rms": 1.0,
+                    "bracket": (0.01, 2.0),
+                    "predicted_coefficient": 0.3,
+                    "search_history": [{"coeff": 0.3, "kl_rms": 1.0}],
+                }
+                for case in TRANSFER_CASES
+            ]
+            plans = [final_dose_plan(prediction) for prediction in predictions]
+            records = load_transfer_records()
+            by_case = {plan["case"]["case_id"]: plan for plan in plans}
+            plan = [
+                {"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
+                for case in TRANSFER_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]
+            ]
+            return {
+                "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}},
+                "target": target,
+                "transfer_predictions": predictions,
+                "final_dose_plans": plans,
+                "executable_generation_plan": plan,
+                "baseline_answers": {item["prompt_id"]: "baseline." for item in plan},
+                "answers": ["answer." for _ in plan],
+                "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []} for item in plan],
+                "plan_sha256": __import__("steering_lite.benchmark.cache", fromlist=["content_key"]).content_key({"plan": plan}),
+            }
+
+    rows = read_dev_cohort()
+    modal = RemoteVectorBackend()
+    measure, solver, _ = _adapters()
+    result = run_condition(
+        tmp_path,
+        tmp_path / "ledger.jsonl",
+        model={"id": "fake", "judge_model": "fake-judge"},
+        data=cohort_identity(rows),
+        method="vjp_cache",
+        rows=rows,
+        backend=modal,
+        prompt_spec={"max_new_tokens": 8},
+        measure=measure,
+        solver=solver,
+        vector_loader=lambda _artifact: pytest.fail("remote binding must not load a local model vector"),
+        judge=FakeJudge(),
+    )
+    assert [stage for stage, *_ in modal.calls] == ["calibration-candidates", "final-generation"]
+    assert result["target"]["target_id"] == "remote-target"
+    assert len(result["transfer_prediction"]["predictions"]) == 4
+    assert len(result["final"]["answers"]) == 24
+    events = [json.loads(line)["event"] for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    assert events == ["reserved", "settled", "reserved", "estimated_at_reservation_upper"]
 
 
 def test_final_judge_identity_invalidates_outputs_without_gpu_rerun(tmp_path):
