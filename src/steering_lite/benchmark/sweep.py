@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .cache import cached_stage, committed, reserve_many, save_json
-from .dose_search import CALIBRATION_CASE, TRANSFER_CASES
+from .cache import cached_stage, committed, content_key, reserve_many, save_json
+from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, Case, validate_cases
 from .generation import cohort_identity, read_dev_cohort
 from .pipeline import METHODS
 
@@ -13,6 +13,11 @@ MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
 BUDGET_LIMIT_USD = 50.0
 PERSONA_VALIDATION_PAIRS = 12
+BSBENCH_PERSONAS = (("sycophantic", "abrasive"),)
+BSBENCH_PERSONA_TEMPLATE = "Answer as someone who is {persona}."
+BSBENCH_PERSONA_SEED = 0
+BSBENCH_PERSONA_N_PAIRS = 256
+BSBENCH_PERSONA_THINKING = True
 
 MODAL_SOURCE = "https://modal.com/pricing (accessed 2026-09-19)"
 JUDGE_SOURCE = "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)"
@@ -47,20 +52,28 @@ def _sum(lines: list[BudgetLine]) -> float:
     return sum(line.subtotal_usd for line in lines)
 
 
-def _request_counts(stages: list[dict], questions: int) -> dict[str, int]:
-    target_aware_stages = sum(stage["stage"] == "target-aware-requests" for stage in stages)
-    blind_stages = sum(stage["stage"] == "blind-requests" for stage in stages)
+def _request_counts(stages: list[dict]) -> dict[str, int]:
+    target_aware = sum(
+        2 * stage["item_count"]
+        for stage in stages
+        if stage["stage"] in {"target-aware-requests", "candidate-aware", "final-aware"}
+    )
+    blind = sum(
+        2 * stage["item_count"]
+        for stage in stages
+        if stage["stage"] in {"blind-requests", "candidate-blind", "final-blind"}
+    )
     return {
-        "target_aware": questions * target_aware_stages * 2,
-        "blind": questions * blind_stages * 2,
+        "target_aware": target_aware,
+        "blind": blind,
         "persona_validation": PERSONA_VALIDATION_PAIRS,
     }
 
 
-def cost_estimate(stages: list[dict], questions: int) -> dict:
+def cost_estimate(stages: list[dict]) -> dict:
     gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
     gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
-    request_counts = _request_counts(stages, questions)
+    request_counts = _request_counts(stages)
     input_tokens = (
         request_counts["target_aware"] * 4_000
         + request_counts["blind"] * 2_000
@@ -139,32 +152,132 @@ def case_identity(case) -> dict:
     return {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}
 
 
+def final_stages(
+    *,
+    method: str,
+    vector_sha256: str,
+    observed: list[dict],
+    case_prompts: dict[str, list[str]],
+    prompt_spec: dict,
+    transfer_cases: tuple[Case, ...] = TRANSFER_CASES,
+) -> tuple[dict, ...]:
+    """Describe the post-judgment generation graph without dispatching it."""
+    if not vector_sha256 or not observed or not case_prompts or not prompt_spec:
+        raise ValueError("final stages require vector, observed records, prompts and prompt spec")
+    validate_cases(CALIBRATION_CASE, transfer_cases)
+    if any("placeholder" in case.dataset for case in transfer_cases):
+        raise ValueError("placeholder transfer cases cannot dispatch")
+
+    case_ids = [case.case_id for case in transfer_cases]
+    if set(case_prompts) != set(case_ids):
+        raise ValueError("final stages require complete prompts for every transfer case")
+    actual_case_prompts = {case_id: case_prompts[case_id] for case_id in case_ids}
+    if any(not prompts for prompts in actual_case_prompts.values()):
+        raise ValueError("final stages require loadable prompts for every transfer case")
+
+    ordered_observed = sorted(observed, key=content_key)
+    prompt_hashes = {
+        case_id: content_key({"prompts": prompts})
+        for case_id, prompts in actual_case_prompts.items()
+    }
+    item_count = sum(len(prompts) for prompts in actual_case_prompts.values())
+    config = {
+        "schema": "bsbench-final-stage-v1",
+        "method": method,
+        "vector_sha256": vector_sha256,
+        "observed_sha256": content_key({"observed": ordered_observed}),
+        "candidate_coefficients": sorted(row["coefficient"] for row in ordered_observed),
+        "case_prompt_hashes": prompt_hashes,
+        "prompt_spec": prompt_spec,
+        "prompt_spec_sha256": content_key(prompt_spec),
+    }
+    generation = {
+        "stage": "final-generation",
+        "runner": "modal_gpu",
+        "method": method,
+        "config": config,
+        "item_count": item_count,
+        "case_prompts": actual_case_prompts,
+    }
+    downstream = tuple(
+        {
+            "stage": stage,
+            "runner": runner,
+            "method": method,
+            "config": config,
+            "item_count": item_count,
+            "input_stage": "final-generation",
+        }
+        for stage, runner in (
+            ("final-health", "local"),
+            ("final-aware", "local_judge_api"),
+            ("final-blind", "local_judge_api"),
+        )
+    )
+    return (generation, *downstream)
+
+
 def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
-    common = (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"))
     if method in {"bare", "prompting"}:
-        return common
-    return (("extract", "modal_gpu"), ("rms-kl-fit", "modal_gpu"), ("rms-kl-transfer", "modal_gpu"), *common)
+        return (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"))
+    return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
 
 
 def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
+    prompts_by_id = {row["question_id"]: row["prompt"] for row in rows}
+    calibration_prompts = [prompts_by_id[prompt_id] for prompt_id in CALIBRATION_CASE.prompt_ids]
     data = cohort_identity(rows)
     model = {"id": model_id}
     cache_root = out / "dry-plan-cache"
     ledger = out / "costs.jsonl"
     stages = []
+    persona_source = {
+        "pairs": [list(pair) for pair in BSBENCH_PERSONAS],
+        "template": BSBENCH_PERSONA_TEMPLATE,
+        "seed": BSBENCH_PERSONA_SEED,
+        "n_pairs": BSBENCH_PERSONA_N_PAIRS,
+        "thinking": BSBENCH_PERSONA_THINKING,
+    }
     for method in METHODS:
-        config = {"condition": method, "target_stat": "kl_rms" if method not in {"bare", "prompting"} else None, "calibration_case": case_identity(CALIBRATION_CASE) if method not in {"bare", "prompting"} else None, "transfer_cases": [case_identity(case) for case in TRANSFER_CASES] if method not in {"bare", "prompting"} else []}
+        vector_method = method not in {"bare", "prompting"}
+        stage_prompts = calibration_prompts if vector_method else prompts
+        config = {
+            "condition": method,
+            "target_stat": "kl_rms" if vector_method else None,
+            "calibration_case": case_identity(CALIBRATION_CASE) if vector_method else None,
+            "calibration_prompts_sha256": content_key({"prompts": calibration_prompts}) if vector_method else None,
+            "persona_source": persona_source if vector_method else None,
+            "persona_source_sha256": content_key(persona_source) if vector_method else None,
+        }
         for stage, runner in condition_stages(method):
-            stages.append({"method": method, **cached_dry_stage(cache_root, stage=stage, runner=runner, model=model, data=data, method=method, config=config | {"stage": stage}, prompts=prompts)})
+            stage_config = config | {"stage": stage}
+            stages.append(
+                {
+                    "method": method,
+                    "item_count": len(stage_prompts),
+                    "prompts_sha256": content_key({"prompts": stage_prompts}),
+                    "config": stage_config,
+                    **cached_dry_stage(
+                        cache_root,
+                        stage=stage,
+                        runner=runner,
+                        model=model,
+                        data=data,
+                        method=method,
+                        config=stage_config,
+                        prompts=stage_prompts,
+                    ),
+                }
+            )
     manifest = {
         "schema": "bsbench-sweep-manifest-v1", "mode": "dry-run", "paid_execution_enabled": False,
         "model": model, "questions": [{"question_id": row["question_id"], "question_number": row["question_number"]} for row in rows],
         "data": data, "conditions": list(METHODS), "judge_model": JUDGE_MODEL, "target_aware_request_schema": "bsbench-judge-request-v1", "blind_request_schema": "bsbench-judge-request-v1",
         "ledger": str(ledger), "production_cache": str(out / "cache"), "dry_plan_cache": str(cache_root), "stages": stages,
     }
-    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages, len(rows)))
+    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages))
     save_json(out / "manifest.json", manifest)
     save_json(out / "cost-estimate.json", manifest["cost_estimate"])
     return manifest
