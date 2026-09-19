@@ -251,6 +251,31 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
     events = [json.loads(line)["event"] for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
     assert events == ["reserved", "settled", "reserved", "estimated_at_reservation_upper"]
 
+    class WrongPlan(RemoteVectorBackend):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            if kwargs["stage"] == "final-generation":
+                result["executable_generation_plan"] = list(reversed(result["executable_generation_plan"]))
+            return result
+
+    with pytest.raises(ValueError, match="executable plan differs"):
+        run_condition(
+            tmp_path / "mismatch",
+            tmp_path / "mismatch" / "ledger.jsonl",
+            model={"id": "fake", "judge_model": "fake-judge"},
+            data=cohort_identity(rows),
+            method="vjp_cache",
+            rows=rows,
+            backend=WrongPlan(),
+            prompt_spec={"max_new_tokens": 8},
+            measure=measure,
+            solver=solver,
+            vector_loader=lambda _artifact: pytest.fail("remote binding must not load a local model vector"),
+            judge=FakeJudge(),
+        )
+    mismatch_events = [json.loads(line)["event"] for line in (tmp_path / "mismatch" / "ledger.jsonl").read_text().splitlines()]
+    assert mismatch_events == ["reserved", "settled", "reserved", "unresolved"]
+
 
 def test_final_judge_identity_invalidates_outputs_without_gpu_rerun(tmp_path):
     rows = read_dev_cohort()

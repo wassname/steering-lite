@@ -420,6 +420,8 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             remote_plan = _plan(records, remote_stages[0]["config"]["final_dose_plans"])
             if result.get("final_dose_plans") != remote_stages[0]["config"]["final_dose_plans"]:
                 raise ValueError("remote vector final stage returned a non-canonical dose plan")
+            if result.get("executable_generation_plan") != remote_plan:
+                raise ValueError("remote vector final stage executable plan differs from the canonical plan")
             _validate_final(remote_plan, result, require_judge_outputs=judge is not None)
 
         final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=transfer_prompts, backend=backend, validate_result=validate_remote_final, dispatch_config=lambda config: _dispatch_sidecar(root, config))

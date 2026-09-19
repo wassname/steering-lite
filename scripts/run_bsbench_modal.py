@@ -11,6 +11,8 @@ from pathlib import Path
 
 import modal
 
+from steering_lite.benchmark.sweep import MODAL_GPU_STAGE_TIMEOUT_SECONDS
+
 image = (
     modal.Image.debian_slim(python_version="3.13")
     .uv_pip_install(
@@ -31,16 +33,25 @@ app = modal.App("steering-lite-bsbench")
 cache = modal.Volume.from_name("steering-lite-bsbench-cache", create_if_missing=True)
 
 
-def _chat_prompts(tokenizer, prompts: list[str], *, persona: str | None = None) -> list[str]:
+def canonical_prompt_texts(tokenizer, prompts: list[str], prompt_spec: dict, *, persona: str | None = None) -> list[str]:
+    instruction = prompt_spec["template"]
+    thinking = prompt_spec.get("enable_thinking", False)
     prefix = "" if persona is None else f"Answer as someone who is {persona}.\n\n"
     return [
         tokenizer.apply_chat_template(
-            [{"role": "user", "content": prefix + prompt + " Answer in 2 short sentences."}],
+            [{"role": "user", "content": prefix + prompt + " " + instruction}],
             tokenize=False,
             add_generation_prompt=True,
-            enable_thinking=False,
+            enable_thinking=thinking,
         )
         for prompt in prompts
+    ]
+
+
+def canonical_prompt_ids(tokenizer, prompts: list[str], prompt_spec: dict, *, persona: str | None = None):
+    return [
+        tokenizer(text, add_special_tokens=False, return_tensors="pt").input_ids[0]
+        for text in canonical_prompt_texts(tokenizer, prompts, prompt_spec, persona=persona)
     ]
 
 
@@ -85,7 +96,7 @@ def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, limit: in
     return coefficients, items, health_by_coefficient, {"schema": "bsbench-successive-health-bracket-v1", "limit": limit, "history": history, "termination": "search_limit"}
 
 
-@app.function(gpu="A10G", image=image, volumes={"/cache": cache}, timeout=45 * 60)
+@app.function(gpu="A10G", image=image, volumes={"/cache": cache}, timeout=MODAL_GPU_STAGE_TIMEOUT_SECONDS)
 def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], model_id: str = "Qwen/Qwen3.5-4B") -> dict:
     """Run exactly one production GPU stage and return only serializable data."""
     import base64
@@ -158,7 +169,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         )
         vector_path = Path("/tmp") / f"bsbench-{method}.safetensors"
         vector.save(str(vector_path))
-        calibration_prompts = _chat_prompts(tokenizer, prompts)
+        calibration_prompts = canonical_prompt_texts(tokenizer, prompts, config["prompt_spec"])
         baseline_answers = generate(model, tokenizer, calibration_prompts, 1, config["prompt_spec"]["max_new_tokens"])
         coefficients, candidate_items, candidate_health, search_history = _candidate_policy(
             vector,
@@ -204,7 +215,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                 vector,
                 model,
                 tokenizer,
-                config["calibration_prompts"],
+                canonical_prompt_ids(tokenizer, config["calibration_prompts"], config["prompt_spec"]),
                 CALIBRATION_CASE,
                 config["observed"],
                 method=method,
@@ -216,7 +227,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                     vector,
                     model,
                     tokenizer,
-                    [record.prompt for record in records[case.case_id]],
+                    canonical_prompt_ids(tokenizer, [record.prompt for record in records[case.case_id]], config["prompt_spec"]),
                     target,
                     case,
                     bracket=(0.01, 2.0),
@@ -242,12 +253,12 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         else:
             plan = config["executable_generation_plan"]
         unique_prompts = {item["prompt_id"]: item["prompt"] for item in plan}
-        baseline_answers = dict(zip(unique_prompts, generate(model, tokenizer, _chat_prompts(tokenizer, list(unique_prompts.values())), 1, config["prompt_spec"]["max_new_tokens"]), strict=True))
+        baseline_answers = dict(zip(unique_prompts, generate(model, tokenizer, canonical_prompt_texts(tokenizer, list(unique_prompts.values()), config["prompt_spec"]), 1, config["prompt_spec"]["max_new_tokens"]), strict=True))
         answers = []
         health_records = []
         for item in plan:
             with vector(model, C=item["coefficient"]):
-                answer = generate(model, tokenizer, _chat_prompts(tokenizer, [item["prompt"]]), 1, config["prompt_spec"]["max_new_tokens"])[0]
+                answer = generate(model, tokenizer, canonical_prompt_texts(tokenizer, [item["prompt"]], config["prompt_spec"]), 1, config["prompt_spec"]["max_new_tokens"])[0]
             metrics, reasons = health(tokenizer, [answer])
             answers.append(answer)
             health_records.append({"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "metrics": metrics, "reasons": reasons})
