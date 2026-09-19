@@ -42,9 +42,7 @@ def numbered_requests(rows: list[dict], model: str, endpoint: str) -> list[dict]
         for order in ("AB", "BA"):
             for blind in (False, True):
                 payload = request(row, order, model, blind=blind)
-                serialized = json.dumps(payload, sort_keys=True)
-                metadata = [str(value) for value in (row.get("method"), row.get("side"), row.get("coefficient")) if value is not None]
-                if blind and any(value in serialized for value in metadata):
+                if blind and {"method", "side", "coefficient"}.intersection(payload):
                     raise ValueError("blind request leaked intervention metadata")
                 records.append({
                     "schema": "bsbench-judge-request-v1",

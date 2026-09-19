@@ -1,0 +1,12 @@
+{
+  "first_process_backend_calls": [
+    "calibration-candidates",
+    "final-generation"
+  ],
+  "first_process_immediate_rerun_backend_calls": [],
+  "first_process_paid_execution_enabled": false,
+  "mode": "offline-fake-two-step",
+  "not_experimental_results": true,
+  "second_process_backend_calls": [],
+  "second_process_paid_execution_enabled": false
+}

@@ -5,7 +5,9 @@ The callbacks are injected so importing this module never imports Modal or an AP
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Callable
+from urllib.request import Request, urlopen
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,38 @@ class ModalRunMethodAdapter:
     def gpu(self, *, stage: str, method: str, config: dict, prompts: list[str]) -> dict:
         self._gate.require()
         return self._stage_call(stage=stage, method=method, config=config, prompts=prompts)
+
+
+def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dict], dict]:
+    """Return the one-shot OpenRouter callback for the already-persisted request payload."""
+    if not endpoint.startswith("https://"):
+        raise ValueError("judge endpoint must use HTTPS")
+    if not api_key:
+        raise ValueError("OpenRouter API key is required")
+
+    def call(payload: dict) -> dict:
+        body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
+        request = Request(endpoint, data=body, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
+        with urlopen(request, timeout=90) as response:
+            response_body = json.loads(response.read())
+        content = response_body["choices"][0]["message"]["content"]
+        judgment = json.loads(content)
+        schema = payload["response_format"]["json_schema"]["schema"]
+        required = set(schema["required"])
+        if set(judgment) != required:
+            raise ValueError("judge response does not match the strict requested JSON schema")
+        expected_types = {"string": str, "number": (int, float), "array": list, "boolean": bool}
+        for name, definition in schema["properties"].items():
+            if not isinstance(judgment[name], expected_types[definition["type"]]):
+                raise ValueError("judge response value does not match the strict requested JSON schema")
+        if not isinstance(response_body.get("usage"), dict):
+            raise ValueError("judge response omitted usage metadata")
+        return judgment | {
+            "_remote_usage": response_body["usage"],
+            "_remote_cost_usd": response_body.get("usage", {}).get("cost"),
+        }
+
+    return call
 
 
 class LocalJudgeAdapter:

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from .cache import cached_stage, content_key, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
-from .sweep import BSBENCH_PERSONAS, BSBENCH_PERSONA_N_PAIRS, BSBENCH_PERSONA_SEED, BSBENCH_PERSONA_TEMPLATE, BSBENCH_PERSONA_THINKING, CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages
+from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
 from .transfer_data import load_transfer_records, transfer_provenance
 from .validation import comparison_id, numbered_requests, response_record, score_pair, validate_persona_examples
@@ -46,7 +46,7 @@ def run_stages(root: Path, ledger: Path, stages: list[dict], backend) -> list[di
 
 
 def persona_source_identity() -> dict:
-    return {"pairs": [list(pair) for pair in BSBENCH_PERSONAS], "template": BSBENCH_PERSONA_TEMPLATE, "seed": BSBENCH_PERSONA_SEED, "n_pairs": BSBENCH_PERSONA_N_PAIRS, "thinking": BSBENCH_PERSONA_THINKING}
+    return persona_extraction_identity()
 
 
 def _sidecar(root: Path, payload: str | bytes) -> dict:
@@ -243,18 +243,74 @@ def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: st
     }
 
 
-def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, prompts: list[str], backend, prompt_spec: dict) -> dict:
-    """Cached direct bare/prompting path; it intentionally has no vector calibration."""
+def _direct_rows(rows: list[dict] | None, prompts: list[str], baseline: list[str], answers: list[str]) -> list[dict]:
+    if rows is None or len(rows) != len(prompts):
+        raise ValueError("prompting judgments require numbered source rows")
+    if [row["prompt"] for row in rows] != prompts:
+        raise ValueError("prompting judgment rows do not match generation prompts")
+    return [
+        {
+            "question_id": row["question_id"],
+            "question_number": row["question_number"],
+            "prompt": row["prompt"],
+            "nonsensical_element": row["nonsensical_element"],
+            "bare": bare,
+            "steered": answer,
+            "method": "prompting",
+            "coefficient": None,
+            "side": "+C",
+        }
+        for row, bare, answer in zip(rows, baseline, answers, strict=True)
+    ]
+
+
+def _direct_judgments(rows: list[dict], *, model: dict, judge) -> dict:
+    requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
+    raw_responses = judge.complete(requests)
+    if len(raw_responses) != len(requests):
+        raise ValueError("judge adapter must return one response per persisted prompting request")
+    responses = [response_record(request, response) for request, response in zip(requests, raw_responses, strict=True)]
+    return {
+        "requests": requests,
+        "responses": responses,
+        "aware": [record for record in responses if not record["blind"]],
+        "blind": [record for record in responses if record["blind"]],
+    }
+
+
+def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, prompts: list[str], backend, prompt_spec: dict, rows: list[dict] | None = None, judge=None) -> dict:
+    """Run bare once as the prompting reference; only prompting is paired with a judge."""
     if method not in {"bare", "prompting"}:
         raise ValueError("direct conditions are bare or prompting")
-    config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": prompt_spec, "condition": method}
-    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
-    identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"}), "fake": True}
-    items = [{"prompt": prompt, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "response": answer, "fake": True} for prompt, answer in zip(prompts, generation["answers"], strict=True)]
-    return {"paid_execution_enabled": False, "generation": generation,
-            "health": _local(root, stage="generation-health", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": True, "records": items}),
-            "aware": _local(root, stage="target-aware-requests", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": True, "records": items}),
-            "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": True, "records": items})}
+    bare_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": prompt_spec, "condition": "bare", "prompt_ids": [row["question_id"] for row in rows] if rows is not None else None}
+    baseline = None
+    if method == "prompting":
+        baseline = production_stage(root, ledger, stage="generation", model=model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")))
+    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=bare_config | {"condition": method}, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
+    identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"})}
+    identified_health = generation.get("health_records")
+    question_ids = [row["question_id"] for row in rows] if rows is not None else [str(index) for index in range(len(prompts))]
+    items = identified_health if isinstance(identified_health, list) else [
+        {"question_id": question_id, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "response": answer, "fake": True}
+        for question_id, prompt, answer in zip(question_ids, prompts, generation["answers"], strict=True)
+    ]
+    health = _local(root, stage="generation-health", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": identified_health is None, "records": items})
+    result = {"paid_execution_enabled": False, "generation": generation, "health": health}
+    if method == "bare":
+        return result | {"baseline_answers": generation["answers"]}
+    assert baseline is not None
+    result |= {"baseline": baseline, "baseline_answers": baseline["answers"]}
+    if judge is None:
+        raise ValueError("prompting requires a judge adapter for paired AB/BA and blind requests")
+    paired_rows = _direct_rows(rows, prompts, baseline["answers"], generation["answers"])
+    judgment_config = identity | {"baseline_sha256": content_key({key: value for key, value in baseline.items() if key != "reused"}), "judge_model": model["judge_model"], "judge_endpoint": judge.endpoint}
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge))
+    final_identity = judgment_config | {"judgments_sha256": content_key(judgments)}
+    return result | {
+        "judgments": judgments,
+        "aware": _local(root, stage="target-aware-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": False, "records": judgments["aware"]}),
+        "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": False, "records": judgments["blind"]}),
+    }
 
 
 def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None, final_judge=None) -> dict:
@@ -358,6 +414,8 @@ def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: 
             prompts=[row["prompt"] for row in rows],
             backend=backend,
             prompt_spec=prompt_spec,
+            rows=rows,
+            judge=judge,
         )
     if judge is None or measure is None or solver is None or vector_loader is None:
         raise ValueError("vector conditions require judge, measure, solver and vector loader adapters")

@@ -1,4 +1,9 @@
-"""One-question Qwen3.5 BS-bench GPU smoke; invoked only after a local reservation."""
+"""Serializable Modal callbacks for the audited BS-bench production stages.
+
+Importing this file defines callbacks but never dispatches them. The local CLI must
+supply ``--run``, the real backend selection, credentials, and a budget preflight
+before calling ``run_stage.remote``.
+"""
 from __future__ import annotations
 
 import time
@@ -26,38 +31,203 @@ app = modal.App("steering-lite-bsbench")
 cache = modal.Volume.from_name("steering-lite-bsbench-cache", create_if_missing=True)
 
 
+def _chat_prompts(tokenizer, prompts: list[str], *, persona: str | None = None) -> list[str]:
+    prefix = "" if persona is None else f"Answer as someone who is {persona}.\n\n"
+    return [
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": prefix + prompt + " Answer in 2 short sentences."}],
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        for prompt in prompts
+    ]
+
+
+def _layers(model) -> tuple[tuple[int, ...], int]:
+    full_attention = [index for index, kind in enumerate(model.config.layer_types) if kind == "full_attention"]
+    if not full_attention:
+        raise ValueError("Qwen3.5 model has no full-attention source layer")
+    source_layer = full_attention[0]
+    target_layer = source_layer + 1
+    if target_layer >= len(model.config.layer_types):
+        raise ValueError("Qwen3.5 source layer has no following target layer")
+    return (source_layer,), target_layer
+
+
+def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, limit: int, max_new_tokens: int, generate, health) -> tuple[list[float], list[dict], dict, dict]:
+    """Double one dose at a time; stop on the first health failure or the policy limit."""
+    coefficients: list[float] = []
+    items: list[dict] = []
+    health_by_coefficient: dict[str, dict] = {}
+    history: list[dict] = []
+    coefficient = 0.1
+    for iteration in range(limit):
+        with vector(model, C=coefficient):
+            answers = generate(model, tokenizer, prompts, 1, max_new_tokens)
+        metrics, reasons = health(tokenizer, answers)
+        record = {"iteration": iteration + 1, "coefficient": coefficient, "metrics": metrics, "reasons": reasons}
+        history.append(record)
+        health_by_coefficient[str(float(coefficient))] = record
+        coefficients.append(coefficient)
+        items.extend(
+            {
+                "coefficient": coefficient,
+                "prompt_index": index,
+                "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(),
+                "response": answer,
+            }
+            for index, (prompt, answer) in enumerate(zip(prompts, answers, strict=True))
+        )
+        if reasons:
+            return coefficients, items, health_by_coefficient, {"schema": "bsbench-successive-health-bracket-v1", "limit": limit, "history": history, "termination": "coherence_failure"}
+        coefficient *= 2
+    return coefficients, items, health_by_coefficient, {"schema": "bsbench-successive-health-bracket-v1", "limit": limit, "history": history, "termination": "search_limit"}
+
+
 @app.function(gpu="A10G", image=image, volumes={"/cache": cache}, timeout=45 * 60)
-def smoke(model_id: str = "Qwen/Qwen3.5-4B") -> dict:
+def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], model_id: str = "Qwen/Qwen3.5-4B") -> dict:
+    """Run exactly one production GPU stage and return only serializable data."""
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    from steering_lite.benchmark.generation import read_dev_cohort
-    from steering_lite.benchmark.pipeline import run_method
+    import steering_lite as sl
+    from steering_lite.benchmark.generation import generate, health
+    from steering_lite.benchmark.pipeline import method_config, run_method
+    from steering_lite.data import make_persona_pairs, persona_corpus_identity
 
     started = time.monotonic()
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16).eval().cuda()
-    rows = read_dev_cohort()[:1]
-    source_layer, = [index for index, kind in enumerate(model.config.layer_types) if kind == "full_attention"][:1]
-    target_layer = source_layer + 1
-    common = dict(
-        model=model,
-        tokenizer=tokenizer,
-        pos_prompts=["user: Do not flatter me. Correct false premises.\nassistant: I will be candid."],
-        neg_prompts=["user: Please agree with me even when I am wrong.\nassistant: Certainly."],
-        vector_dir=Path("/cache/bsbench-smoke-vectors"),
-        rows=rows,
-        layers=(source_layer,),
-        target_layer=target_layer,
-        max_length=64,
-        max_new_tokens=8,
-    )
-    bare = run_method(method="bare", **common)
-    vjp_cache = run_method(method="vjp_cache", **common)
-    cache.commit()
-    return {"question_id": rows[0]["question_id"], "bare": bare, "vjp_cache": vjp_cache, "elapsed_seconds": time.monotonic() - started}
+    if stage == "generation":
+        condition = config["condition"]
+        if method != condition or method not in {"bare", "prompting"}:
+            raise ValueError("direct generation stage requires matching bare or prompting condition")
+        rows = [{"prompt": prompt} for prompt in prompts]
+        result = run_method(
+            model,
+            tokenizer,
+            method,
+            [],
+            [],
+            vector_dir=Path("/cache/bsbench-direct-vectors"),
+            rows=rows,
+            layers=_layers(model)[0],
+            target_layer=_layers(model)[1],
+            max_new_tokens=config["prompt_spec"]["max_new_tokens"],
+        )
+        metrics, reasons = health(tokenizer, result["answers"])
+        prompt_ids = config["prompt_ids"]
+        if not isinstance(prompt_ids, list) or len(prompt_ids) != len(result["answers"]):
+            raise ValueError("direct generation requires numbered prompt identities")
+        return {
+            "actual_usd": config["upper_usd"],
+            "settled_at_reservation_upper": True,
+            "answers": result["answers"],
+            "health_records": [
+                {"question_id": prompt_id, "metrics": metrics, "reasons": reasons}
+                for prompt_id in prompt_ids
+            ],
+            "usage": {"elapsed_seconds": time.monotonic() - started},
+        }
+    if stage == "calibration-candidates":
+        identity = config["persona_source"]
+        observed_corpus = persona_corpus_identity(thinking=identity["thinking"])
+        if observed_corpus["actual_pairs"] != identity["actual_pairs"] or observed_corpus["corpus_sha256"] != identity["corpus_sha256"]:
+            raise ValueError("persona corpus differs from the cached extraction identity")
+        pos_prompts, neg_prompts = make_persona_pairs(
+            tokenizer,
+            n_pairs=identity["requested_pairs"],
+            thinking=identity["thinking"],
+            persona_pairs=[tuple(pair) for pair in identity["pairs"]],
+            template=identity["template"],
+            seed=identity["seed"],
+        )
+        if len(pos_prompts) != identity["actual_pairs"] or len(neg_prompts) != identity["actual_pairs"]:
+            raise ValueError("persona extraction actual pair count differs from cached identity")
+        layers, target_layer = _layers(model)
+        vector = sl.train(
+            model,
+            tokenizer,
+            pos_prompts,
+            neg_prompts,
+            method_config(method, layers=layers, target_layer=target_layer, seed=identity["seed"]),
+            batch_size=1,
+            max_length=64,
+        )
+        vector_path = Path("/tmp") / f"bsbench-{method}.safetensors"
+        vector.save(str(vector_path))
+        calibration_prompts = _chat_prompts(tokenizer, prompts)
+        baseline_answers = generate(model, tokenizer, calibration_prompts, 1, config["prompt_spec"]["max_new_tokens"])
+        coefficients, candidate_items, candidate_health, search_history = _candidate_policy(
+            vector,
+            model,
+            tokenizer,
+            calibration_prompts,
+            limit=config["candidate_dose_upper"],
+            max_new_tokens=config["prompt_spec"]["max_new_tokens"],
+            generate=generate,
+            health=health,
+        )
+        cache.commit()
+        return {
+            "actual_usd": config["upper_usd"],
+            "settled_at_reservation_upper": True,
+            "vector_bytes": vector_path.read_bytes(),
+            "baseline_answers": baseline_answers,
+            "candidate_coefficients": coefficients,
+            "candidate_items": candidate_items,
+            "candidate_health": candidate_health,
+            "candidate_search": search_history,
+            "method_config": vector.cfg.to_dict(),
+            "usage": {"elapsed_seconds": time.monotonic() - started, "persona_actual_pairs": len(pos_prompts)},
+        }
+    if stage == "final-generation":
+        plan = config["executable_generation_plan"]
+        vector = sl.Vector.load(config["vector_artifact"]["backend_path"])
+        unique_prompts = {item["prompt_id"]: item["prompt"] for item in plan}
+        baseline_answers = dict(zip(unique_prompts, generate(model, tokenizer, _chat_prompts(tokenizer, list(unique_prompts.values())), 1, config["prompt_spec"]["max_new_tokens"]), strict=True))
+        answers = []
+        health_records = []
+        for item in plan:
+            with vector(model, C=item["coefficient"]):
+                answer = generate(model, tokenizer, _chat_prompts(tokenizer, [item["prompt"]]), 1, config["prompt_spec"]["max_new_tokens"])[0]
+            metrics, reasons = health(tokenizer, [answer])
+            answers.append(answer)
+            health_records.append({"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "metrics": metrics, "reasons": reasons})
+        cache.commit()
+        from steering_lite.benchmark.cache import content_key
+        return {
+            "actual_usd": config["upper_usd"],
+            "settled_at_reservation_upper": True,
+            "baseline_answers": baseline_answers,
+            "answers": answers,
+            "health_records": health_records,
+            "plan_sha256": content_key({"plan": plan}),
+            "usage": {"elapsed_seconds": time.monotonic() - started},
+        }
+    raise ValueError(f"unsupported Modal stage {stage!r}")
+
+
+def remote_stage_call(model_id: str, *, explicit_run: bool, budget_preflight: dict):
+    """Return a stage callback that checks explicit selection and budget before dispatch."""
+    from steering_lite.benchmark.adapters import RunGate
+
+    gate = RunGate(explicit_run=explicit_run, budget_preflight=budget_preflight)
+
+    def call(*, stage, method, config, prompts):
+        gate.require()
+        return run_stage.remote(
+            stage=stage,
+            method=method,
+            config=config,
+            prompts=prompts,
+            model_id=model_id,
+        )
+
+    return call
 
 
 @app.local_entrypoint()
 def main(model_id: str = "Qwen/Qwen3.5-4B"):
-    print(smoke.remote(model_id))
+    raise RuntimeError("Use scripts/run_bsbench_sweep.py --run --backend real after budget preflight")

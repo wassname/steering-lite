@@ -3,7 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from steering_lite.benchmark.adapters import real_adapters
+from steering_lite.benchmark import adapters
+from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import _candidate_judgments, run_condition
@@ -115,8 +116,8 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
     results = {}
     for method in METHODS:
         results[method] = run_condition(
-            tmp_path / method,
-            tmp_path / method / "ledger.jsonl",
+            tmp_path,
+            tmp_path / "ledger.jsonl",
             model=model,
             data=cohort_identity(rows),
             method=method,
@@ -160,8 +161,8 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
     judge_calls_after_first = judge.calls
     for method in METHODS:
         run_condition(
-            tmp_path / method,
-            tmp_path / method / "ledger.jsonl",
+            tmp_path,
+            tmp_path / "ledger.jsonl",
             model=model,
             data=cohort_identity(rows),
             method=method,
@@ -247,6 +248,39 @@ def test_positive_directed_effect_with_high_damage_is_not_useful():
     assert observation["off_target_effect"] == 5.0
     assert observation["dose_score"] == -19.0
     assert not observation["useful"]
+
+
+def test_openrouter_callback_sends_exact_payload_once_and_keeps_usage(monkeypatch):
+    calls = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "choices": [{"message": {"content": json.dumps({"summary": "difference", "changes": []})}}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 2, "cost": 0.01},
+            }).encode()
+
+    monkeypatch.setattr(adapters, "urlopen", lambda request, timeout: calls.append((request, timeout)) or Response())
+    payload = {
+        "model": "deepseek/deepseek-chat",
+        "messages": [{"role": "user", "content": "persisted request"}],
+        "response_format": {"json_schema": {"schema": {
+            "type": "object",
+            "properties": {"summary": {"type": "string"}, "changes": {"type": "array"}},
+            "required": ["summary", "changes"],
+            "additionalProperties": False,
+        }}},
+    }
+    result = openrouter_request_callback(endpoint="https://example.invalid/v1/chat/completions", api_key="test-key")(payload)
+    assert result == {"summary": "difference", "changes": [], "_remote_usage": {"prompt_tokens": 3, "completion_tokens": 2, "cost": 0.01}, "_remote_cost_usd": 0.01}
+    assert len(calls) == 1 and calls[0][1] == 90
+    assert json.loads(calls[0][0].data) == payload
 
 
 def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):

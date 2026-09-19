@@ -208,11 +208,43 @@ def test_overage_is_auditable_not_cached_and_blocks_retry(tmp_path: Path):
     assert backend.calls == ["generation"]
 
 
-@pytest.mark.parametrize("method", ("bare", "prompting"))
-def test_direct_conditions_are_cached_without_vector_calibration(tmp_path: Path, method: str):
+class DirectJudge:
+    endpoint = "offline-direct-judge"
+
+    def __init__(self):
+        self.requests = []
+
+    def complete(self, requests):
+        self.requests.extend(requests)
+        return [
+            {"summary": "difference", "changes": []}
+            if request["blind"]
+            else {"on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
+            for request in requests
+        ]
+
+
+def test_bare_is_cached_origin_without_self_judgment(tmp_path: Path):
     backend = FakeBackend(); rows = read_dev_cohort()[:2]
-    result = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", model={"id": "fake"}, data=cohort_identity(rows), method=method, prompts=[row["prompt"] for row in rows], backend=backend, prompt_spec={"max_new_tokens": 8})
-    assert backend.calls == ["generation"] and len(result["aware"]["records"]) == 2
-    assert [row["response"] for row in result["aware"]["records"]] == ["answer.", "answer."]
-    run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", model={"id": "fake"}, data=cohort_identity(rows), method=method, prompts=[row["prompt"] for row in rows], backend=backend, prompt_spec={"max_new_tokens": 8})
+    result = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", model={"id": "fake"}, data=cohort_identity(rows), method="bare", prompts=[row["prompt"] for row in rows], rows=rows, backend=backend, prompt_spec={"max_new_tokens": 8})
     assert backend.calls == ["generation"]
+    assert set(result) == {"paid_execution_enabled", "generation", "health", "baseline_answers"}
+    assert [record["question_id"] for record in result["health"]["records"]] == [row["question_id"] for row in rows]
+    run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", model={"id": "fake"}, data=cohort_identity(rows), method="bare", prompts=[row["prompt"] for row in rows], rows=rows, backend=backend, prompt_spec={"max_new_tokens": 8})
+    assert backend.calls == ["generation"]
+
+
+def test_prompting_reuses_bare_and_persists_paired_judgments(tmp_path: Path):
+    backend = FakeBackend(); rows = read_dev_cohort()[:2]; judge = DirectJudge()
+    common = dict(model={"id": "fake", "judge_model": "fake-judge"}, data=cohort_identity(rows), method="prompting", prompts=[row["prompt"] for row in rows], rows=rows, backend=backend, prompt_spec={"max_new_tokens": 8}, judge=judge)
+    bare = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **(common | {"method": "bare", "judge": None}))
+    result = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **common)
+    assert backend.calls == ["generation", "generation"]
+    assert result["baseline_answers"] == bare["generation"]["answers"]
+    assert len(result["judgments"]["requests"]) == len(result["judgments"]["responses"]) == 8
+    assert len(result["aware"]["records"]) == len(result["blind"]["records"]) == 4
+    assert all(not record["blind"] for record in result["aware"]["records"])
+    assert all(record["blind"] for record in result["blind"]["records"])
+    assert all("prompting" not in str(request["payload"]) and "+C" not in str(request["payload"]) for request in result["judgments"]["requests"] if request["blind"])
+    run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **common)
+    assert backend.calls == ["generation", "generation"] and len(judge.requests) == 8

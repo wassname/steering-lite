@@ -20,7 +20,9 @@ from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.sweep import (
     BSBENCH_PERSONAS,
     CANDIDATE_DOSE_UPPER,
-    BSBENCH_PERSONA_N_PAIRS,
+    BSBENCH_PERSONA_ACTUAL_PAIRS,
+    BSBENCH_PERSONA_CORPUS_SHA256,
+    BSBENCH_PERSONA_REQUESTED_PAIRS,
     BSBENCH_PERSONA_SEED,
     BSBENCH_PERSONA_TEMPLATE,
     BSBENCH_PERSONA_THINKING,
@@ -29,6 +31,7 @@ from steering_lite.benchmark.sweep import (
     dry_manifest,
     final_stages,
     preflight_budget,
+    persona_extraction_identity,
     reserve_budget,
 )
 
@@ -101,15 +104,17 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert not any(stage["reused"] for stage in first["stages"])
     assert all(stage["reused"] for stage in second["stages"])
 
-    for method in ("bare", "prompting"):
-        stages = _method_stages(first, method)
-        assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in stages] == [
-            ("generation", "modal_gpu", 20),
-            ("generation-health", "local", 20),
-            ("target-aware-requests", "local_judge_api", 20),
-            ("blind-requests", "local_judge_api", 20),
-        ]
-        assert all(stage["config"]["persona_source"] is None for stage in stages)
+    assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in _method_stages(first, "bare")] == [
+        ("generation", "modal_gpu", 20),
+        ("generation-health", "local", 20),
+    ]
+    assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in _method_stages(first, "prompting")] == [
+        ("generation", "modal_gpu", 20),
+        ("generation-health", "local", 20),
+        ("target-aware-requests", "local_judge_api", 20),
+        ("blind-requests", "local_judge_api", 20),
+    ]
+    assert all(stage["config"]["persona_source"] is None for method in ("bare", "prompting") for stage in _method_stages(first, method))
 
     vector_methods = set(METHODS) - {"bare", "prompting"}
     assert len(vector_methods) == 6
@@ -117,7 +122,9 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
         "pairs": [list(pair) for pair in BSBENCH_PERSONAS],
         "template": BSBENCH_PERSONA_TEMPLATE,
         "seed": BSBENCH_PERSONA_SEED,
-        "n_pairs": BSBENCH_PERSONA_N_PAIRS,
+        "requested_pairs": BSBENCH_PERSONA_REQUESTED_PAIRS,
+        "actual_pairs": BSBENCH_PERSONA_ACTUAL_PAIRS,
+        "corpus_sha256": BSBENCH_PERSONA_CORPUS_SHA256,
         "thinking": BSBENCH_PERSONA_THINKING,
     }
     for method in vector_methods:
@@ -149,8 +156,8 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert all("transfer_provenance_sha256" in stage for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 944,
-        "blind": 944,
+        "target_aware": 904,
+        "blind": 904,
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
@@ -160,6 +167,16 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert (tmp_path / "cost-estimate.json").exists()
     assert (tmp_path / "dry-plan-cache").exists()
     assert not (tmp_path / "cache").exists()
+
+
+def test_persona_identity_distinguishes_requested_and_actual_and_rejects_corpus_drift(monkeypatch):
+    identity = persona_extraction_identity()
+    assert identity["requested_pairs"] == 256
+    assert identity["actual_pairs"] == 200
+    assert identity["corpus_sha256"] == BSBENCH_PERSONA_CORPUS_SHA256
+    monkeypatch.setattr("steering_lite.benchmark.sweep.persona_corpus_identity", lambda **_kwargs: {"actual_pairs": 199, "corpus_sha256": "changed", "thinking": True})
+    with pytest.raises(ValueError, match="canonical persona corpus changed"):
+        persona_extraction_identity()
 
 
 def test_stage_cache_invalidates_model_data_method_config_prompt_and_code(tmp_path: Path):
@@ -345,7 +362,7 @@ def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
 
     assert no_gpu["total_upper_usd"] < full["total_upper_usd"]
     assert no_blind["quantities"]["requests"] == {
-        "target_aware": 656,
+        "target_aware": 616,
         "blind": 0,
         "persona_validation": 12,
     }

@@ -6,6 +6,8 @@ import hashlib
 import math
 from pathlib import Path
 
+from steering_lite.data import persona_corpus_identity
+
 from .cache import cached_stage, committed, content_key, reserve_many, save_json
 from .dose_search import (
     CALIBRATION_CASE,
@@ -28,7 +30,9 @@ CANDIDATE_DOSE_UPPER = 12
 BSBENCH_PERSONAS = (("sycophantic", "abrasive"),)
 BSBENCH_PERSONA_TEMPLATE = "Answer as someone who is {persona}."
 BSBENCH_PERSONA_SEED = 0
-BSBENCH_PERSONA_N_PAIRS = 256
+BSBENCH_PERSONA_REQUESTED_PAIRS = 256
+BSBENCH_PERSONA_ACTUAL_PAIRS = 200
+BSBENCH_PERSONA_CORPUS_SHA256 = "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9faa045695a39319ba"
 BSBENCH_PERSONA_THINKING = True
 
 MODAL_SOURCE = "https://modal.com/pricing (accessed 2026-09-19)"
@@ -324,8 +328,25 @@ def final_stages(
     return (generation, *downstream)
 
 
+def persona_extraction_identity() -> dict:
+    corpus = persona_corpus_identity(thinking=BSBENCH_PERSONA_THINKING)
+    if corpus["actual_pairs"] != BSBENCH_PERSONA_ACTUAL_PAIRS or corpus["corpus_sha256"] != BSBENCH_PERSONA_CORPUS_SHA256:
+        raise ValueError("the canonical persona corpus changed; update its reviewed identity deliberately")
+    return {
+        "pairs": [list(pair) for pair in BSBENCH_PERSONAS],
+        "template": BSBENCH_PERSONA_TEMPLATE,
+        "seed": BSBENCH_PERSONA_SEED,
+        "requested_pairs": BSBENCH_PERSONA_REQUESTED_PAIRS,
+        "actual_pairs": corpus["actual_pairs"],
+        "corpus_sha256": corpus["corpus_sha256"],
+        "thinking": BSBENCH_PERSONA_THINKING,
+    }
+
+
 def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
-    if method in {"bare", "prompting"}:
+    if method == "bare":
+        return (("generation", "modal_gpu"), ("generation-health", "local"))
+    if method == "prompting":
         return (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"))
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
 
@@ -340,13 +361,7 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
     cache_root = out / "dry-plan-cache"
     ledger = out / "costs.jsonl"
     stages = []
-    persona_source = {
-        "pairs": [list(pair) for pair in BSBENCH_PERSONAS],
-        "template": BSBENCH_PERSONA_TEMPLATE,
-        "seed": BSBENCH_PERSONA_SEED,
-        "n_pairs": BSBENCH_PERSONA_N_PAIRS,
-        "thinking": BSBENCH_PERSONA_THINKING,
-    }
+    persona_source = persona_extraction_identity()
     for method in METHODS:
         vector_method = method not in {"bare", "prompting"}
         stage_prompts = calibration_prompts if vector_method else prompts
