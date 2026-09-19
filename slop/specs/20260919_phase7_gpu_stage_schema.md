@@ -12,4 +12,6 @@ Exactly one final GPU record carries the complete actual case→prompts mapping.
 
 The offline `scripts/run_bsbench_sweep.py --run --backend fake --stage vjp_cache` path exercises this graph twice with a deterministic local backend. Its records are marked non-experimental and the second pass must make zero backend calls.
 
+C. The real-call adapter boundary accepts injected Modal stage and judge request callbacks. It refuses both callback types unless the CLI has explicitly selected `--run` and a below-limit budget preflight is present. Candidate GPU results must contain baseline answers, per-coefficient health, vector bytes, and one answer per candidate prompt; the existing numbered AB/BA and blind schemas then produce useful/coherent observations. The remaining live binding is a serializable Modal callback that runs the existing `run_method` extraction/generation path and returns this contract; no callback is selected by offline tests or dry preflight.
+
 -- PI[gpt-5.6-terra]

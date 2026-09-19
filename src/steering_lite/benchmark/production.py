@@ -8,8 +8,9 @@ from pathlib import Path
 from .cache import cached_stage, content_key, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
 from .sweep import BSBENCH_PERSONAS, BSBENCH_PERSONA_N_PAIRS, BSBENCH_PERSONA_SEED, BSBENCH_PERSONA_TEMPLATE, BSBENCH_PERSONA_THINKING, CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages
+from .pipeline import METHODS
 from .transfer_data import load_transfer_records, transfer_provenance
-from .validation import numbered_requests, validate_persona_examples
+from .validation import comparison_id, numbered_requests, response_record, score_pair, validate_persona_examples
 
 
 def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None, dispatch_config=None) -> dict:
@@ -102,6 +103,77 @@ def _require_observed(rows: list[dict] | None, coefficients: list[float]) -> lis
     return rows
 
 
+def _candidate_judgments(
+    candidate: dict,
+    calibration_rows: list[dict],
+    *,
+    method: str,
+    model: dict,
+    judge,
+) -> dict:
+    """Turn candidate responses plus existing AB/BA/blind judge schemas into observations."""
+    baseline = candidate.get("baseline_answers")
+    health_by_coefficient = candidate.get("candidate_health")
+    if not isinstance(baseline, list) or len(baseline) != len(calibration_rows):
+        raise ValueError("candidate backend must return one baseline answer per calibration prompt")
+    if not isinstance(health_by_coefficient, dict):
+        raise ValueError("candidate backend must return health for every candidate coefficient")
+
+    rows = []
+    items_by_key = {
+        (float(item["coefficient"]), item["prompt_index"]): item
+        for item in candidate["candidate_items"]
+    }
+    for coefficient in candidate["candidate_coefficients"]:
+        coefficient_key = str(float(coefficient))
+        if coefficient_key not in health_by_coefficient:
+            raise ValueError("candidate backend health must cover every candidate coefficient")
+        for prompt_index, source in enumerate(calibration_rows):
+            item = items_by_key[(float(coefficient), prompt_index)]
+            rows.append(
+                source
+                | {
+                    "bare": baseline[prompt_index],
+                    "steered": item["response"],
+                    "method": method,
+                    "coefficient": float(coefficient),
+                    "side": "+C",
+                }
+            )
+
+    requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
+    raw_responses = judge.complete(requests)
+    if len(raw_responses) != len(requests):
+        raise ValueError("judge adapter must return one response per persisted request")
+    responses = [response_record(request, response) for request, response in zip(requests, raw_responses, strict=True)]
+
+    observed = []
+    for coefficient in candidate["candidate_coefficients"]:
+        coefficient_rows = [row for row in rows if row["coefficient"] == float(coefficient)]
+        comparison_ids = {comparison_id(row) for row in coefficient_rows}
+        coefficient_responses = [
+            record for record in responses if record["comparison_id"] in comparison_ids
+        ]
+        aware = [record for record in coefficient_responses if not record["blind"]]
+        blind = [record for record in coefficient_responses if record["blind"]]
+        if len(aware) != 2 * len(coefficient_rows) or len(blind) != 2 * len(coefficient_rows):
+            raise ValueError("judge adapter did not return complete AB/BA aware and blind candidate judgments")
+        effects = [score_pair(record["response"], record["order"], record["side"]) for record in aware]
+        health = health_by_coefficient[str(float(coefficient))]
+        if not isinstance(health, dict) or "reasons" not in health:
+            raise ValueError("candidate health requires metrics and a reasons list")
+        observed.append(
+            {
+                "coefficient": float(coefficient),
+                "useful": sum(effect["effect"] for effect in effects) / len(effects) > 0,
+                "coherent": not health["reasons"] and max(effect["steered_off_axis"] for effect in effects) <= 2.5,
+                "provenance": content_key({"candidate": candidate["vector_sha256"], "responses": coefficient_responses}),
+                "generation_health": health,
+            }
+        )
+    return {"observed": observed, "health": health_by_coefficient, "aware": [record for record in responses if not record["blind"]], "blind": [record for record in responses if record["blind"]]}
+
+
 def _plan(records: dict, dose_plans: list[dict]) -> list[dict]:
     """Expand the already-validated canonical final-dose plans into executable items."""
     by_case = {plan["case"]["case_id"]: plan for plan in dose_plans}
@@ -135,7 +207,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
             "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": True, "records": items})}
 
 
-def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None) -> dict:
+def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None) -> dict:
     """Execute the audited vector graph using real target/prediction functions and injected local measurement dependencies."""
     if method in {"bare", "prompting"} or len(calibration_prompts) != 4:
         raise ValueError("vector orchestration requires a vector method and exactly four calibration prompts")
@@ -165,11 +237,38 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     artifact = _load_sidecar(root, candidate["vector_artifact"])
     candidate = candidate | {"reused": not dispatched}
     candidate_identity = {key: value for key, value in candidate.items() if key != "reused"}
-    observed = _require_observed(candidate_judgments, candidate["candidate_coefficients"])
+    judgment_outputs = None
+    if judge is None:
+        observed = _require_observed(candidate_judgments, candidate["candidate_coefficients"])
+    else:
+        if candidate_judgments is not None or calibration_rows is None:
+            raise ValueError("judge-backed calibration requires rows and no caller-supplied observations")
+        judgment_config = {
+            "candidate_sha256": content_key(candidate_identity),
+            "judge_model": model["judge_model"],
+            "judge_endpoint": judge.endpoint,
+        }
+        judgment_outputs = _local(
+            root,
+            stage="candidate-judgments",
+            model=model,
+            data=data,
+            method=method,
+            prompts=calibration_prompts,
+            config=judgment_config,
+            compute=lambda: _candidate_judgments(
+                candidate,
+                calibration_rows,
+                method=method,
+                model=model,
+                judge=judge,
+            ),
+        )
+        observed = judgment_outputs["observed"]
     candidate_inputs = {"candidate_sha256": content_key(candidate_identity), "observed": observed, "vector_sha256": candidate["vector_sha256"]}
-    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": True, "candidate_items": candidate["candidate_items"], "records": observed})
-    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": True, "candidate_items": candidate["candidate_items"], "records": observed})
-    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": True, "candidate_items": candidate["candidate_items"], "records": observed})
+    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]})
+    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]})
+    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]})
     vector = vector_loader(artifact)
     target_config = {"candidate_sha256": content_key(candidate_identity), "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "candidate_records": [health, aware, blind]}
     target = _local(root, stage="fit-target", model=model, data=data, method=method, prompts=calibration_prompts, config=target_config, compute=lambda: fit_target(vector, model, None, calibration_prompts, CALIBRATION_CASE, observed, method=method, model_id=model["id"], measure_kwargs={}, measure=measure) | {"extraction_identity": source})
@@ -188,3 +287,41 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             "final_health": _local(root, stage="final-health", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-health-v1", "fake": True, "records": fake_records}),
             "final_aware": _local(root, stage="final-aware", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-aware-v1", "fake": True, "records": fake_records}),
             "final_blind": _local(root, stage="final-blind", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-blind-v1", "fake": True, "records": fake_records})}
+
+
+def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, judge=None) -> dict:
+    """Route one named condition through the existing direct or two-step production path."""
+    if method not in METHODS:
+        raise ValueError(f"unknown benchmark method {method!r}")
+    if method in {"bare", "prompting"}:
+        return run_direct_condition(
+            root,
+            ledger,
+            model=model,
+            data=data,
+            method=method,
+            prompts=[row["prompt"] for row in rows],
+            backend=backend,
+            prompt_spec=prompt_spec,
+        )
+    if judge is None or measure is None or solver is None or vector_loader is None:
+        raise ValueError("vector conditions require judge, measure, solver and vector loader adapters")
+    calibration_rows = [row for row in rows if row["question_id"] in CALIBRATION_CASE.prompt_ids]
+    if [row["question_id"] for row in calibration_rows] != list(CALIBRATION_CASE.prompt_ids):
+        raise ValueError("condition rows must contain the fixed numbered calibration prompts")
+    return run_live_two_step(
+        root,
+        ledger,
+        model=model,
+        data=data,
+        method=method,
+        calibration_prompts=[row["prompt"] for row in calibration_rows],
+        backend=backend,
+        prompt_spec=prompt_spec,
+        candidate_judgments=None,
+        measure=measure,
+        solver=solver,
+        vector_loader=vector_loader,
+        calibration_rows=calibration_rows,
+        judge=judge,
+    )
