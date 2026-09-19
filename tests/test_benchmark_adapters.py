@@ -229,7 +229,6 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
 
     rows = read_dev_cohort()
     modal = RemoteVectorBackend()
-    measure, solver, _ = _adapters()
     result = run_condition(
         tmp_path,
         tmp_path / "ledger.jsonl",
@@ -239,9 +238,9 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
         rows=rows,
         backend=modal,
         prompt_spec={"max_new_tokens": 8},
-        measure=measure,
-        solver=solver,
-        vector_loader=lambda _artifact: pytest.fail("remote binding must not load a local model vector"),
+        measure=None,
+        solver=None,
+        vector_loader=None,
         judge=FakeJudge(),
     )
     assert [stage for stage, *_ in modal.calls] == ["calibration-candidates", "final-generation"]
@@ -268,9 +267,9 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
             rows=rows,
             backend=WrongPlan(),
             prompt_spec={"max_new_tokens": 8},
-            measure=measure,
-            solver=solver,
-            vector_loader=lambda _artifact: pytest.fail("remote binding must not load a local model vector"),
+            measure=None,
+            solver=None,
+            vector_loader=None,
             judge=FakeJudge(),
         )
     mismatch_events = [json.loads(line)["event"] for line in (tmp_path / "mismatch" / "ledger.jsonl").read_text().splitlines()]

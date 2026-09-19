@@ -7,10 +7,36 @@ import os
 from pathlib import Path
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
-from steering_lite.benchmark.cache import committed, settle_receipt
+from steering_lite.benchmark.cache import committed, save_json, settle_receipt
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
-from steering_lite.benchmark.production import record_completed_stage, run_direct_condition, run_live_two_step, run_stages
-from steering_lite.benchmark.sweep import CALIBRATION_CASE, JUDGE_MODEL, MODEL_ID, dry_manifest
+from steering_lite.benchmark.pipeline import METHODS
+from steering_lite.benchmark.production import record_completed_stage, run_condition, run_stages
+from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, dry_manifest
+
+
+def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], backend, prompt_spec: dict, judge, methods: tuple[str, ...] = METHODS, measure=None, solver=None, vector_loader=None, transfer_records=None) -> dict:
+    """Run canonical conditions in order and atomically save progress after every condition."""
+    summary_path = root / "run-summary.json"
+    prior = json.loads(summary_path.read_text()) if summary_path.exists() else {"schema": "bsbench-run-summary-v1", "conditions": {}}
+    conditions = dict(prior["conditions"])
+    for method in methods:
+        conditions[method] = run_condition(
+            root,
+            ledger,
+            model=model,
+            data=cohort_identity(rows),
+            method=method,
+            rows=rows,
+            backend=backend,
+            prompt_spec=prompt_spec,
+            judge=judge,
+            measure=measure,
+            solver=solver,
+            vector_loader=vector_loader,
+            transfer_records=transfer_records,
+        )
+        save_json(summary_path, {"schema": "bsbench-run-summary-v1", "methods": list(methods), "conditions": conditions})
+    return {"schema": "bsbench-run-summary-v1", "methods": list(methods), "conditions": conditions, "summary_path": str(summary_path), "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False))}
 
 
 def import_recorded_smoke(out: Path, model_id: str) -> dict:
@@ -48,7 +74,7 @@ def main() -> None:
     mode.add_argument("--run", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
     parser.add_argument("--out", type=Path, default=Path("outputs/bsbench-v2"))
-    parser.add_argument("--stage", choices=("bare", "prompting", "random", "mean_diff", "pca", "kv_cache_gram", "vjp_delta", "vjp_cache"), default="vjp_cache")
+    parser.add_argument("--method", "--stage", dest="method", choices=METHODS, help="Run one condition for recovery or debugging; omit for the canonical full sweep.")
     parser.add_argument("--backend", choices=("recorded", "fake", "real"))
     parser.add_argument("--judge-endpoint", default="https://openrouter.ai/api/v1/chat/completions")
     parser.add_argument("--ledger", type=Path)
@@ -67,20 +93,33 @@ def main() -> None:
     else:
         if args.backend == "fake":
             rows = read_dev_cohort()
-            calibration = [next(row["prompt"] for row in rows if row["question_id"] == prompt_id) for prompt_id in CALIBRATION_CASE.prompt_ids]
             class FakeBackend:
-                """Deterministic offline backend; its records are explicitly not experiment results."""
+                """Deterministic offline remote-contract backend; its records are not experiment results."""
+                remote_vector_binding = True
+
                 def __init__(self): self.calls = []
+
                 def gpu(self, *, stage, method, config, prompts):
                     self.calls.append(stage)
+                    if stage == "generation":
+                        return {"actual_usd": 0.0, "answers": [f"Fake {method} answer." for _ in prompts], "health_records": [{"question_id": prompt_id, "reasons": []} for prompt_id in config["prompt_ids"]]}
                     if stage == "calibration-candidates":
                         coefficients = [0.2, 0.4]
-                        return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "candidate_coefficients": coefficients, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
+                        return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "baseline_answers": ["Fake baseline." for _ in prompts], "candidate_coefficients": coefficients, "candidate_health": {str(coefficient): {"reasons": []} for coefficient in coefficients}, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
                     if stage == "final-generation":
+                        from steering_lite.benchmark.cache import content_key
+                        from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
+                        from steering_lite.benchmark.transfer_data import load_transfer_records
+
                         artifact = config["vector_artifact"]
                         assert __import__("hashlib").sha256(__import__("base64").b64decode(artifact["vector_bytes_b64"])).hexdigest() == artifact["sha256"]
-                        return {"actual_usd": 0.0, "answers": ["Fake local final answer." for _ in config["executable_generation_plan"]], "plan_sha256": config["executable_plan_sha256"], "fake": True}
-                    return {"actual_usd": 0.0, "answers": ["Fake local answer." for _ in prompts], "fake": True}
+                        target = {"target_id": "offline-target", "target_stat": "kl_rms", "target_rms": 1.0}
+                        predictions = [{"schema": "bsbench-rms-kl-transfer-v1", "target_id": target["target_id"], "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}, "method": method, "model": config.get("model_id", "offline"), "target_stat": "kl_rms", "target_rms": 1.0, "bracket": (0.01, 2.0), "predicted_coefficient": 0.3, "search_history": []} for case in TRANSFER_CASES]
+                        plans = [final_dose_plan(prediction) for prediction in predictions]
+                        records = load_transfer_records(); by_case = {plan["case"]["case_id"]: plan for plan in plans}
+                        plan = [{"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256} for case in TRANSFER_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]]
+                        return {"actual_usd": 0.0, "target": target, "transfer_predictions": predictions, "final_dose_plans": plans, "executable_generation_plan": plan, "baseline_answers": {item["prompt_id"]: "Fake baseline." for item in plan}, "answers": ["Fake final answer." for _ in plan], "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []} for item in plan], "plan_sha256": content_key({"plan": plan})}
+                    raise AssertionError(stage)
             class FakeJudge:
                 endpoint = "offline-fake-judge"
 
@@ -94,31 +133,21 @@ def main() -> None:
 
             backend = FakeBackend()
             ledger = args.ledger or args.out / "costs.jsonl"
-            observed = [{"coefficient": coefficient, "useful": True, "coherent": True, "provenance": f"offline-fake-{coefficient}", "generation_health": {"rep": 0.0, "gen_len": 1, "steer_tail": "fake", "per_t_mean": [0.0], "per_t_p90": [0.0], "per_t_p95": [0.0], "per_t_max": [0.0], "per_t_n": [1]}} for coefficient in (0.2, 0.4)]
-            vector_loader = lambda _artifact: __import__("types").SimpleNamespace(cfg=__import__("types").SimpleNamespace(coeff=0.0))
-            def measure(vector, *_args, **_kwargs):
-                return {"kl_rms": abs(vector.cfg.coeff) + 0.5, **observed[-1]["generation_health"]}
-            def solver(_vector, _model, _tokenizer, prompts, **_kwargs):
-                return 0.3 + 0.01 * len(prompts[0]), [{"coeff": 0.3, "kl_rms": 0.9}]
-            common = dict(model={"id": args.model, "judge_model": "offline-fake-judge"}, data=cohort_identity(rows), method=args.stage, backend=backend, prompt_spec={"template": "Answer in 2 short sentences.", "max_new_tokens": 8})
-            vector_stage = args.stage not in {"bare", "prompting"}
-            inputs = common | (dict(calibration_prompts=calibration, candidate_judgments=observed, measure=measure, solver=solver, vector_loader=vector_loader) if vector_stage else dict(prompts=[row["prompt"] for row in rows], rows=rows, judge=FakeJudge()))
-            runner = run_live_two_step if vector_stage else run_direct_condition
-            first = runner(args.out, ledger, **inputs)
+            methods = (args.method,) if args.method else METHODS
+            common = dict(model={"id": args.model, "judge_model": "offline-fake-judge"}, rows=rows, backend=backend, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}, judge=FakeJudge(), methods=methods)
+            first = run_full_sweep(args.out, ledger, **common)
             calls_after_first = list(backend.calls)
-            second = runner(args.out, ledger, **inputs)
-            result = {"mode": "offline-fake-two-step", "not_experimental_results": True,
+            second = run_full_sweep(args.out, ledger, **common)
+            result = {"mode": "offline-fake-full-sweep", "not_experimental_results": True,
                       "first_backend_calls": calls_after_first, "immediate_rerun_backend_calls": backend.calls[len(calls_after_first):],
                       "first": first, "second": second}
         elif args.backend == "real":
-            if args.stage not in {"bare", "prompting"}:
-                raise RuntimeError("real vector execution still requires a bound target-fit/prediction adapter; no remote stage was dispatched")
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
                 raise RuntimeError("real backend requires OPENROUTER_API_KEY before remote callbacks are constructed")
-            manifest = dry_manifest(args.out, args.model)
-            budget = manifest["cost_estimate"]
             ledger = args.ledger or args.out / "costs.jsonl"
+            manifest = dry_manifest(args.out, args.model, ledger=ledger)
+            budget = manifest["cost_estimate"]
             from run_bsbench_modal import remote_stage_call
             modal_adapter, judge_adapter = real_adapters(
                 modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
@@ -130,17 +159,15 @@ def main() -> None:
                 ledger=ledger,
             )
             rows = read_dev_cohort()
-            result = run_direct_condition(
+            result = run_full_sweep(
                 args.out,
                 ledger,
                 model={"id": args.model, "judge_model": JUDGE_MODEL},
-                data=cohort_identity(rows),
-                method=args.stage,
-                prompts=[row["prompt"] for row in rows],
                 rows=rows,
                 backend=modal_adapter,
-                prompt_spec={"template": "Answer in 2 short sentences.", "max_new_tokens": 128},
+                prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128},
                 judge=judge_adapter,
+                methods=(args.method,) if args.method else METHODS,
             )
         else:
             summary = json.loads(Path("slop/verification/20260919_phase6-modal-smoke-summary.json").read_text())
@@ -149,13 +176,13 @@ def main() -> None:
             rows = read_dev_cohort()[:1]
             class RecordedBackend:
                 def gpu(self, **_kwargs):
-                    return summary["generation_records"][args.stage] | {"actual_usd": 0.0}
+                    return summary["generation_records"][args.method or "vjp_cache"] | {"actual_usd": 0.0}
             ledger = args.ledger or args.out / "costs.jsonl"
             smoke_ledger = Path("outputs/bsbench-smoke/costs.jsonl")
             external = committed(smoke_ledger) if ledger != smoke_ledger else 0.0
             if committed(ledger) + external + 0.001 >= 50.0:
                 raise RuntimeError("budget includes the unresolved smoke reservation")
-            result = run_stages(args.out, ledger, [{"stage": "generation", "model": {"id": args.model}, "data": cohort_identity(rows), "method": args.stage, "config": {"upper_usd": 0.001, "recorded_modal_app": summary["modal_app"]}, "prompts": [rows[0]["prompt"]]}], RecordedBackend())
+            result = run_stages(args.out, ledger, [{"stage": "generation", "model": {"id": args.model}, "data": cohort_identity(rows), "method": args.method or "vjp_cache", "config": {"upper_usd": 0.001, "recorded_modal_app": summary["modal_app"]}, "prompts": [rows[0]["prompt"]]}], RecordedBackend())
     print(json.dumps(result, sort_keys=True))
 
 

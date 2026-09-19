@@ -32,6 +32,7 @@ from steering_lite.benchmark.sweep import (
     final_stages,
     preflight_budget,
     persona_extraction_identity,
+    phase6_smoke_committed,
     reserve_budget,
 )
 
@@ -161,6 +162,14 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
+    assert first["external_commitments"] == [{
+        "name": "phase6_modal_smoke",
+        "ledger": first["external_commitments"][0]["ledger"],
+        "committed_usd": phase6_smoke_committed(),
+    }]
+    assert estimate["existing_ledger_usd"] == 0.0
+    assert estimate["external_committed_usd"] == phase6_smoke_committed() == 2.0
+    assert estimate["existing_committed_usd"] == estimate["existing_ledger_usd"] + estimate["external_committed_usd"]
     assert estimate["total_upper_usd"] < 50.0
     assert first["paid_execution_enabled"] is False
     assert (tmp_path / "manifest.json").exists()

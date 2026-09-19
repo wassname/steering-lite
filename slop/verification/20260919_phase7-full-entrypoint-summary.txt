@@ -1,0 +1,10 @@
+dry command: .venv/bin/python scripts/run_bsbench_sweep.py --dry-run --out /tmp/bsbench-dry-entrypoint
+dry gpu_stages= 14
+dry requests= {'blind': 904, 'persona_validation': 12, 'target_aware': 904}
+dry phase6_external_committed_usd= 2.0
+dry total_upper_usd= 38.976776799999996
+fake command: just sweep '--run --backend fake' 'Qwen/Qwen3.5-4B' /tmp/bsbench-fake-entrypoint
+fake first_gpu_misses= 14
+fake immediate_rerun_gpu_misses= 0
+fake methods= ['bare', 'prompting', 'random', 'mean_diff', 'pca', 'kv_cache_gram', 'vjp_delta', 'vjp_cache']
+fake paid_execution_enabled= False

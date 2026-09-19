@@ -190,7 +190,13 @@ def _candidate_judgments(
                 "dose_score": dose_score,
                 "useful": dose_score > 0,
                 "coherent": not health["reasons"] and max(effect["steered_off_axis"] for effect in effects) <= 2.5,
-                "provenance": content_key({"candidate": candidate["vector_sha256"], "responses": coefficient_responses}),
+                "provenance": content_key({
+                    "candidate": candidate["vector_sha256"],
+                    "responses": [
+                        {key: record[key] for key in ("comparison_id", "order", "blind", "side", "response")}
+                        for record in coefficient_responses
+                    ],
+                }),
                 "generation_health": health,
             }
         )
@@ -312,7 +318,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
         for question_id, prompt, answer in zip(question_ids, prompts, generation["answers"], strict=True)
     ]
     health = _local(root, stage="generation-health", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": identified_health is None, "records": items})
-    result = {"paid_execution_enabled": False, "generation": generation, "health": health}
+    result = {"paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)), "generation": generation, "health": health}
     if method == "bare":
         return result | {"baseline_answers": generation["answers"]}
     assert baseline is not None
@@ -450,13 +456,13 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=final_judge))
         final_inputs |= {"final_judgments_sha256": content_key(final_judgments), "judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}
     fake_records = [{**item, "response": answer, "fake": True, "non_experimental": True} for item, answer in zip(executable_plan, final["answers"], strict=True)]
-    return {"paid_execution_enabled": False, "candidate": candidate, "candidate_judgments": judgment_outputs, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final, "final_judgments": final_judgments,
+    return {"paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)), "candidate": candidate, "candidate_judgments": judgment_outputs, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final, "final_judgments": final_judgments,
             "final_health": _local(root, stage="final-health", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-health-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["health"]}),
             "final_aware": _local(root, stage="final-aware", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-aware-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["aware"]}),
             "final_blind": _local(root, stage="final-blind", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-blind-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["blind"]})}
 
 
-def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, judge=None, final_judge=None) -> dict:
+def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, transfer_records: dict | None = None, judge=None, final_judge=None) -> dict:
     """Route one named condition through the existing direct or two-step production path."""
     if method not in METHODS:
         raise ValueError(f"unknown benchmark method {method!r}")
@@ -473,8 +479,10 @@ def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: 
             rows=rows,
             judge=judge,
         )
-    if judge is None or measure is None or solver is None or vector_loader is None:
-        raise ValueError("vector conditions require judge, measure, solver and vector loader adapters")
+    if judge is None:
+        raise ValueError("vector conditions require a judge adapter")
+    if not getattr(backend, "remote_vector_binding", False) and (measure is None or solver is None or vector_loader is None):
+        raise ValueError("local vector conditions require measure, solver and vector loader adapters")
     calibration_rows = [row for row in rows if row["question_id"] in CALIBRATION_CASE.prompt_ids]
     if [row["question_id"] for row in calibration_rows] != list(CALIBRATION_CASE.prompt_ids):
         raise ValueError("condition rows must contain the fixed numbered calibration prompts")
@@ -491,6 +499,7 @@ def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: 
         measure=measure,
         solver=solver,
         vector_loader=vector_loader,
+        transfer_records=transfer_records,
         calibration_rows=calibration_rows,
         judge=judge,
         final_judge=final_judge,

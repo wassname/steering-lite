@@ -140,12 +140,26 @@ def cost_estimate(stages: list[dict]) -> dict:
     }
 
 
-def preflight_budget(ledger: Path, estimate: dict) -> dict:
-    existing = committed(ledger)
+PHASE6_SMOKE_LEDGER = Path(__file__).parents[3] / "outputs" / "bsbench-smoke" / "costs.jsonl"
+
+
+def phase6_smoke_committed() -> float:
+    return committed(PHASE6_SMOKE_LEDGER)
+
+
+def preflight_budget(ledger: Path, estimate: dict, *, external_committed_usd: float = 0.0) -> dict:
+    existing_ledger_usd = committed(ledger)
+    existing = existing_ledger_usd + external_committed_usd
     total = existing + estimate["total_upper_usd"]
     if total >= BUDGET_LIMIT_USD:
         raise RuntimeError(f"budget: ${total:.2f} is at or above ${BUDGET_LIMIT_USD:.2f}")
-    return estimate | {"limit_usd": BUDGET_LIMIT_USD, "existing_committed_usd": existing, "total_upper_usd": total}
+    return estimate | {
+        "limit_usd": BUDGET_LIMIT_USD,
+        "existing_committed_usd": existing,
+        "existing_ledger_usd": existing_ledger_usd,
+        "external_committed_usd": external_committed_usd,
+        "total_upper_usd": total,
+    }
 
 
 def reserve_budget(ledger: Path, estimate: dict) -> list[str]:
@@ -352,7 +366,7 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
 
 
-def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
+def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None) -> dict:
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
     prompts_by_id = {row["question_id"]: row["prompt"] for row in rows}
@@ -360,7 +374,7 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
     data = cohort_identity(rows)
     model = {"id": model_id}
     cache_root = out / "dry-plan-cache"
-    ledger = out / "costs.jsonl"
+    ledger = out / "costs.jsonl" if ledger is None else ledger
     stages = []
     persona_source = persona_extraction_identity()
     for method in METHODS:
@@ -405,7 +419,13 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID) -> dict:
         "ledger": str(ledger), "production_cache": str(out / "cache"), "dry_plan_cache": str(cache_root),
         "stages": stages, "phase_b_budget_stages": list(final_budget_stages),
     }
-    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages + list(final_budget_stages)))
+    phase6_committed_usd = phase6_smoke_committed()
+    manifest["external_commitments"] = [{
+        "name": "phase6_modal_smoke",
+        "ledger": str(PHASE6_SMOKE_LEDGER),
+        "committed_usd": phase6_committed_usd,
+    }]
+    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages + list(final_budget_stages)), external_committed_usd=phase6_committed_usd)
     save_json(out / "manifest.json", manifest)
     save_json(out / "cost-estimate.json", manifest["cost_estimate"])
     return manifest

@@ -32,6 +32,7 @@ class ModalRunMethodAdapter:
     """Adapter for a Modal stage callback that implements the existing run_method path."""
 
     remote_vector_binding = True
+    paid_execution_enabled = True
 
     def __init__(self, stage_call: Callable[..., dict], gate: RunGate):
         self._stage_call = stage_call
