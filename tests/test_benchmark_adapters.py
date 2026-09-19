@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -48,7 +49,10 @@ class FakeModalRunMethod:
                     item["prompt_id"]: "baseline answer."
                     for item in config["executable_generation_plan"]
                 },
-                "health_records": [{"reasons": [], "source": "fake-final-health"} for _ in config["executable_generation_plan"]],
+                "health_records": [
+                    {"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": [], "source": "fake-final-health"}
+                    for item in config["executable_generation_plan"]
+                ],
                 "answers": ["final answer." for _ in config["executable_generation_plan"]],
                 "plan_sha256": config["executable_plan_sha256"],
             }
@@ -56,9 +60,9 @@ class FakeModalRunMethod:
 
 
 class FakeJudge:
-    endpoint = "offline-fake-judge"
-
-    def __init__(self):
+    def __init__(self, endpoint="offline-fake-judge", final_evidence=None):
+        self.endpoint = endpoint
+        self.final_evidence = final_evidence or f"B correction from {endpoint}."
         self.calls = 0
         self.requests = []
 
@@ -70,11 +74,14 @@ class FakeJudge:
             payload = str(request["payload"])
             if request["blind"]:
                 assert "vjp_cache" not in payload and "+C" not in payload
-                responses.append({"summary": "More direct disagreement.", "changes": []})
+                summary = self.final_evidence if request["question_id"] not in {"BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"} else "More direct disagreement."
+                responses.append({"summary": summary, "changes": []})
             elif request["order"] == "AB":
-                responses.append({"evidence": "B corrects the premise.", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.1, "off_axis_B": 0.2})
+                evidence = self.final_evidence if request["question_id"] not in {"BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"} else "B corrects the premise."
+                responses.append({"evidence": evidence, "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.1, "off_axis_B": 0.2})
             else:
-                responses.append({"evidence": "A corrects the premise.", "on_axis_A": 1.0, "on_axis_B": 0.0, "off_axis_A": 0.2, "off_axis_B": 0.1})
+                evidence = self.final_evidence.replace("B", "A", 1) if request["question_id"] not in {"BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"} else "A corrects the premise."
+                responses.append({"evidence": evidence, "on_axis_A": 1.0, "on_axis_B": 0.0, "off_axis_A": 0.2, "off_axis_B": 0.1})
         return responses
 
 
@@ -141,6 +148,13 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         assert all(record["blind"] for record in result["candidate_blind"]["records"])
         assert all(not record["blind"] for record in result["final_aware"]["records"])
         assert all(record["blind"] for record in result["final_blind"]["records"])
+        for judgments in (result["candidate_judgments"], result["final_judgments"]):
+            assert len(judgments["requests"]) == len(judgments["responses"])
+            assert {request["request_key"] for request in judgments["requests"]} == {response["request_key"] for response in judgments["responses"]}
+            for request in judgments["requests"]:
+                if request["blind"]:
+                    payload = str(request["payload"])
+                    assert method not in payload and "+C" not in payload
 
     calls_after_first = list(modal.calls)
     judge_calls_after_first = judge.calls
@@ -161,6 +175,38 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         )
     assert modal.calls == calls_after_first
     assert judge.calls == judge_calls_after_first
+
+
+def test_final_judge_identity_invalidates_outputs_without_gpu_rerun(tmp_path):
+    rows = read_dev_cohort()
+    model = {"id": "fake", "judge_model": "fake-judge"}
+    modal = FakeModalRunMethod()
+    measure, solver, vector_loader = _adapters()
+    kwargs = dict(model=model, data=cohort_identity(rows), method="vjp_cache", rows=rows, backend=modal, prompt_spec={"max_new_tokens": 8}, measure=measure, solver=solver, vector_loader=vector_loader)
+    candidate_judge = FakeJudge()
+    first = run_condition(tmp_path, tmp_path / "ledger.jsonl", judge=candidate_judge, final_judge=candidate_judge, **kwargs)
+    second = run_condition(tmp_path, tmp_path / "ledger.jsonl", judge=candidate_judge, final_judge=FakeJudge("offline-fake-judge-v2"), **kwargs)
+    assert [stage for stage, *_ in modal.calls] == ["calibration-candidates", "final-generation"]
+    assert first["final_judgments"]["responses"] != second["final_judgments"]["responses"]
+    assert first["final_aware"]["records"] != second["final_aware"]["records"]
+    assert first["final_blind"]["records"] != second["final_blind"]["records"]
+
+
+def test_final_health_requires_exact_plan_coverage_before_settlement(tmp_path):
+    class MissingFinalHealth(FakeModalRunMethod):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            if kwargs["stage"] == "final-generation":
+                result["health_records"] = result["health_records"][:-1]
+            return result
+
+    rows = read_dev_cohort()
+    measure, solver, vector_loader = _adapters()
+    ledger = tmp_path / "ledger.jsonl"
+    with pytest.raises(ValueError, match="cover each executable plan item"):
+        run_condition(tmp_path, ledger, model={"id": "fake", "judge_model": "fake-judge"}, data=cohort_identity(rows), method="vjp_cache", rows=rows, backend=MissingFinalHealth(), prompt_spec={"max_new_tokens": 8}, measure=measure, solver=solver, vector_loader=vector_loader, judge=FakeJudge())
+    events = [json.loads(line)["event"] for line in ledger.read_text().splitlines()]
+    assert events == ["reserved", "settled", "reserved"]
 
 
 def test_transfer_records_preserve_auditable_judge_context():
