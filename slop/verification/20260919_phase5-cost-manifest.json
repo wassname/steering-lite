@@ -1,0 +1,138 @@
+{
+  "existing_committed_usd": 0.0,
+  "expected_work": [
+    {
+      "kind": "Modal A10G GPU",
+      "quantity": 13.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/GPU-hour",
+      "rate_usd": 1.1,
+      "subtotal_usd": 14.3,
+      "unit": "GPU-hour"
+    },
+    {
+      "kind": "Modal CPU",
+      "quantity": 46800.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/core-second",
+      "rate_usd": 1.31e-05,
+      "subtotal_usd": 0.61308,
+      "unit": "core-second"
+    },
+    {
+      "kind": "Modal memory",
+      "quantity": 187200.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/GiB-second",
+      "rate_usd": 2.22e-06,
+      "subtotal_usd": 0.415584,
+      "unit": "GiB-second"
+    },
+    {
+      "kind": "Judge input",
+      "quantity": 1.944,
+      "rate_source": "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)",
+      "rate_unit": "USD/M-token",
+      "rate_usd": 0.2574,
+      "subtotal_usd": 0.5003856,
+      "unit": "M-token"
+    },
+    {
+      "kind": "Judge output",
+      "quantity": 0.7692,
+      "rate_source": "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)",
+      "rate_unit": "USD/M-token",
+      "rate_usd": 1.029,
+      "subtotal_usd": 0.7915068,
+      "unit": "M-token"
+    }
+  ],
+  "judge_model": "deepseek/deepseek-chat",
+  "limit_usd": 50.0,
+  "planned_reservations": [
+    {
+      "kind": "expected_modal_and_judge_work",
+      "upper_usd": 16.6205564
+    },
+    {
+      "kind": "one_full_retry",
+      "upper_usd": 16.6205564
+    },
+    {
+      "kind": "unresolved_work",
+      "upper_usd": 4.942952
+    }
+  ],
+  "planning_assumptions": {
+    "blind_input_tokens_per_request": 2000,
+    "cpu_cores_per_gpu_stage": 1.0,
+    "gpu_hours_per_stage_upper": 0.5,
+    "memory_gib_per_gpu_stage": 4.0,
+    "output_tokens_per_request": 1200,
+    "target_aware_input_tokens_per_request": 4000
+  },
+  "quantities": {
+    "gpu_hours": 13.0,
+    "gpu_stages": 26,
+    "input_tokens": 1944000,
+    "output_tokens": 769200,
+    "requests": {
+      "blind": 320,
+      "persona_validation": 12,
+      "target_aware": 320
+    }
+  },
+  "retry_reserve": {
+    "copies_of_expected_work": 1,
+    "subtotal_usd": 16.6205564
+  },
+  "schema": "bsbench-budget-estimate-v2",
+  "total_upper_usd": 38.1840648,
+  "unresolved_reserve": [
+    {
+      "kind": "Unresolved Modal A10G",
+      "quantity": 4.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/GPU-hour",
+      "rate_usd": 1.1,
+      "subtotal_usd": 4.4,
+      "unit": "GPU-hour"
+    },
+    {
+      "kind": "Unresolved Modal CPU",
+      "quantity": 14400.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/core-second",
+      "rate_usd": 1.31e-05,
+      "subtotal_usd": 0.18864,
+      "unit": "core-second"
+    },
+    {
+      "kind": "Unresolved Modal memory",
+      "quantity": 57600.0,
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "rate_unit": "USD/GiB-second",
+      "rate_usd": 2.22e-06,
+      "subtotal_usd": 0.12787199999999999,
+      "unit": "GiB-second"
+    },
+    {
+      "kind": "Unresolved judge input",
+      "quantity": 0.4,
+      "rate_source": "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)",
+      "rate_unit": "USD/M-token",
+      "rate_usd": 0.2574,
+      "subtotal_usd": 0.10296000000000001,
+      "unit": "M-token"
+    },
+    {
+      "kind": "Unresolved judge output",
+      "quantity": 0.12,
+      "rate_source": "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)",
+      "rate_unit": "USD/M-token",
+      "rate_usd": 1.029,
+      "subtotal_usd": 0.12347999999999998,
+      "unit": "M-token"
+    }
+  ]
+}

@@ -68,7 +68,21 @@ def cached_stage(
     return cached(root, stage, identity, compute)
 
 
-def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) -> str:
+def committed(ledger: Path) -> float:
+    if not ledger.exists():
+        return 0.0
+    records = [json.loads(line) for line in ledger.read_text().splitlines()]
+    settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
+    return sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
+
+
+def reserve_many(
+    ledger: Path,
+    reservations: list[tuple[str, float]],
+    limit_usd: float = 49.0,
+    *,
+    strict_limit: bool = False,
+) -> list[str]:
     ledger.parent.mkdir(parents=True, exist_ok=True)
     with ledger.open("a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
@@ -76,12 +90,25 @@ def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) 
         records = [json.loads(line) for line in handle]
         settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
         total = sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
-        if upper_usd <= 0 or total + upper_usd > limit_usd:
-            raise RuntimeError(f"budget: ${total:.4f} committed + ${upper_usd:.4f} requested exceeds ${limit_usd:.2f}")
-        record = {"event": "reserved", "kind": kind, "upper_usd": upper_usd, "time": datetime.now(timezone.utc).isoformat()}
-        record["id"] = content_key(record)
-        handle.write(json.dumps(record) + "\n")
-        return record["id"]
+        requested = sum(upper_usd for _, upper_usd in reservations)
+        if (
+            not reservations
+            or any(upper_usd <= 0 for _, upper_usd in reservations)
+            or total + requested > limit_usd
+            or (strict_limit and total + requested >= limit_usd)
+        ):
+            raise RuntimeError(f"budget: ${total:.4f} committed + ${requested:.4f} requested exceeds ${limit_usd:.2f}")
+        records_to_write = []
+        for kind, upper_usd in reservations:
+            record = {"event": "reserved", "kind": kind, "upper_usd": upper_usd, "time": datetime.now(timezone.utc).isoformat()}
+            record["id"] = content_key(record)
+            records_to_write.append(record)
+        handle.write("".join(json.dumps(record) + "\n" for record in records_to_write))
+        return [record["id"] for record in records_to_write]
+
+
+def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) -> str:
+    return reserve_many(ledger, [(kind, upper_usd)], limit_usd)[0]
 
 
 def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
