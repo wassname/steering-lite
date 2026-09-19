@@ -207,7 +207,7 @@ def test_final_health_requires_exact_plan_coverage_before_settlement(tmp_path):
     with pytest.raises(ValueError, match="cover each executable plan item"):
         run_condition(tmp_path, ledger, model={"id": "fake", "judge_model": "fake-judge"}, data=cohort_identity(rows), method="vjp_cache", rows=rows, backend=MissingFinalHealth(), prompt_spec={"max_new_tokens": 8}, measure=measure, solver=solver, vector_loader=vector_loader, judge=FakeJudge())
     events = [json.loads(line)["event"] for line in ledger.read_text().splitlines()]
-    assert events == ["reserved", "settled", "reserved"]
+    assert events == ["reserved", "settled", "reserved", "unresolved"]
 
 
 def test_transfer_records_preserve_auditable_judge_context():
@@ -283,6 +283,73 @@ def test_openrouter_callback_sends_exact_payload_once_and_keeps_usage(monkeypatc
     assert json.loads(calls[0][0].data) == payload
 
 
+def _judge_request(request_key: str, *, blind: bool) -> dict:
+    return {
+        "request_key": request_key,
+        "blind": blind,
+        "payload": {"model": "fake-judge", "messages": [{"role": "user", "content": request_key}]},
+    }
+
+
+def test_judge_requests_reserve_cache_settle_and_reuse_individually(tmp_path):
+    calls = []
+    modal, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=lambda payload: calls.append(payload) or {"summary": payload["messages"][0]["content"], "changes": [], "_remote_usage": {"cost": 0.001}, "_remote_cost_usd": 0.001},
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    assert modal
+    requests = [_judge_request("aware", blind=False), _judge_request("blind", blind=True)]
+    first = judge.complete(requests)
+    assert [record["summary"] for record in first] == ["aware", "blind"]
+    assert len(calls) == 2
+    assert judge.complete(requests) == first
+    assert len(calls) == 2
+    ledger_rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    assert [row["event"] for row in ledger_rows] == ["reserved", "settled", "reserved", "settled"]
+    assert ledger_rows[0]["upper_usd"] > ledger_rows[2]["upper_usd"]
+    cached = list((tmp_path / "cache" / "judge-request").glob("*.json"))
+    assert len(cached) == 2
+    assert all({"request", "response", "usage", "reservation", "upper_usd"}.issubset(json.loads(path.read_text())["result"]) for path in cached)
+
+
+def test_judge_partial_failure_reuses_completed_request_after_explicit_receipt(tmp_path):
+    from steering_lite.benchmark.cache import settle_receipt
+
+    calls = []
+    def fail_second(payload):
+        calls.append(payload["messages"][0]["content"])
+        if len(calls) == 2:
+            raise ConnectionError("request status unknown")
+        return {"summary": calls[-1], "changes": [], "_remote_usage": {"cost": 0.001}, "_remote_cost_usd": 0.001}
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=fail_second,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    requests = [_judge_request("first", blind=False), _judge_request("second", blind=False)]
+    with pytest.raises(ConnectionError, match="unknown"):
+        judge.complete(requests)
+    assert calls == ["first", "second"]
+    rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    unresolved = next(row["reservation"] for row in rows if row["event"] == "unresolved")
+    with pytest.raises(RuntimeError, match="unresolved remote work"):
+        judge.complete(requests)
+    assert calls == ["first", "second"]
+    settle_receipt(tmp_path / "ledger.jsonl", unresolved, 0.0, {"outcome": "not_sent"})
+    assert [record["summary"] for record in judge.complete(requests)] == ["first", "second"]
+    assert calls == ["first", "second", "second"]
+
+
 def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
     rows = read_dev_cohort()
     model = {"id": "fake", "judge_model": "fake-judge"}
@@ -315,6 +382,8 @@ def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
         judge_endpoint="https://example.invalid",
         explicit_run=False,
         budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "gate-ledger.jsonl",
     )
     with pytest.raises(RuntimeError, match="explicit --run"):
         modal_adapter.gpu(stage="generation", method="bare", config={}, prompts=[])
@@ -326,6 +395,8 @@ def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
         judge_endpoint="https://example.invalid",
         explicit_run=True,
         budget_preflight={"total_upper_usd": 50.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "gate-ledger.jsonl",
     )
     with pytest.raises(RuntimeError, match="budget preflight"):
         blocked_modal.gpu(stage="generation", method="bare", config={}, prompts=[])
@@ -337,6 +408,8 @@ def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):
         judge_endpoint="https://example.invalid",
         explicit_run=True,
         budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "gate-ledger.jsonl",
     )
     assert allowed_modal.gpu(stage="generation", method="bare", config={}, prompts=[]) == {"stage": "generation"}
     assert allowed_judge.complete([]) == []

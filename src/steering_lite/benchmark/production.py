@@ -5,12 +5,24 @@ import base64
 import hashlib
 import json
 from pathlib import Path
-from .cache import cached_stage, content_key, reserve, settle
+from .cache import cached_stage, content_key, mark_unresolved, reserve, settle
 from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
 from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
 from .transfer_data import load_transfer_records, transfer_provenance
 from .validation import comparison_id, numbered_requests, response_record, score_pair, validate_persona_examples
+
+
+def _settle_or_mark_gpu_unresolved(ledger: Path, reservation: str, result: dict) -> None:
+    if "actual_usd" in result:
+        settle(ledger, reservation, result["actual_usd"])
+        return
+    receipt = result.get("cost_receipt")
+    if isinstance(receipt, dict) and receipt.get("status") == "pending":
+        mark_unresolved(ledger, reservation, "awaiting_modal_receipt")
+        return
+    mark_unresolved(ledger, reservation, "missing_modal_cost_receipt")
+    raise ValueError("Modal stage must return actual cost or an unresolved receipt")
 
 
 def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None, dispatch_config=None) -> dict:
@@ -22,10 +34,14 @@ def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data:
         reservation = reserve(ledger, f"modal-{stage}-{method}", config["upper_usd"], limit_usd=50.0)
         dispatched = True
         backend_config = config if dispatch_config is None else dispatch_config(config)
-        result = backend.gpu(stage=stage, method=method, config=backend_config, prompts=prompts)
-        if validate_result:
-            validate_result(result)
-        settle(ledger, reservation, result["actual_usd"])
+        try:
+            result = backend.gpu(stage=stage, method=method, config=backend_config, prompts=prompts)
+            if validate_result:
+                validate_result(result)
+            _settle_or_mark_gpu_unresolved(ledger, reservation, result)
+        except Exception:
+            mark_unresolved(ledger, reservation, "dispatch_or_validation_failure")
+            raise
         return result | {"reservation": reservation}
 
     result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute)
@@ -329,15 +345,19 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         nonlocal dispatched
         reservation = reserve(ledger, f"modal-calibration-candidates-{method}", calibration_config["upper_usd"], limit_usd=50.0)
         dispatched = True
-        result = backend.gpu(stage="calibration-candidates", method=method, config=calibration_config, prompts=calibration_prompts)
-        if "vector_bytes" not in result:
-            raise ValueError("calibration backend must return vector_bytes, not a container path")
-        artifact = _sidecar(root, result.pop("vector_bytes"))
-        coefficients = result.get("candidate_coefficients")
-        if not coefficients or len(coefficients) > CANDIDATE_DOSE_UPPER or len({float(coefficient) for coefficient in coefficients}) != len(coefficients):
-            raise ValueError(f"calibration backend must return 1..{CANDIDATE_DOSE_UPPER} unique candidate coefficients")
-        items = _candidate_items(coefficients, calibration_prompts, result.get("candidate_items", []))
-        settle(ledger, reservation, result["actual_usd"])
+        try:
+            result = backend.gpu(stage="calibration-candidates", method=method, config=calibration_config, prompts=calibration_prompts)
+            if "vector_bytes" not in result:
+                raise ValueError("calibration backend must return vector_bytes, not a container path")
+            artifact = _sidecar(root, result.pop("vector_bytes"))
+            coefficients = result.get("candidate_coefficients")
+            if not coefficients or len(coefficients) > CANDIDATE_DOSE_UPPER or len({float(coefficient) for coefficient in coefficients}) != len(coefficients):
+                raise ValueError(f"calibration backend must return 1..{CANDIDATE_DOSE_UPPER} unique candidate coefficients")
+            items = _candidate_items(coefficients, calibration_prompts, result.get("candidate_items", []))
+            _settle_or_mark_gpu_unresolved(ledger, reservation, result)
+        except Exception:
+            mark_unresolved(ledger, reservation, "dispatch_or_validation_failure")
+            raise
         return result | {"candidate_items": items, "reservation": reservation, "vector_artifact": artifact, "vector_sha256": artifact["sha256"], "method_config": result.get("method_config", {})}
     candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute)
     artifact = _load_sidecar(root, candidate["vector_artifact"])

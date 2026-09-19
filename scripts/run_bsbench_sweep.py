@@ -110,6 +110,7 @@ def main() -> None:
                 raise RuntimeError("real backend requires OPENROUTER_API_KEY before remote callbacks are constructed")
             manifest = dry_manifest(args.out, args.model)
             budget = manifest["cost_estimate"]
+            ledger = args.ledger or args.out / "costs.jsonl"
             from run_bsbench_modal import remote_stage_call
             modal_adapter, judge_adapter = real_adapters(
                 modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
@@ -117,9 +118,10 @@ def main() -> None:
                 judge_endpoint=args.judge_endpoint,
                 explicit_run=args.run,
                 budget_preflight=budget,
+                root=args.out,
+                ledger=ledger,
             )
             rows = read_dev_cohort()
-            ledger = args.ledger or args.out / "costs.jsonl"
             result = run_direct_condition(
                 args.out,
                 ledger,

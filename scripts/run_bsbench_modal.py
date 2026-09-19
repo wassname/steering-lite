@@ -121,14 +121,12 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         if not isinstance(prompt_ids, list) or len(prompt_ids) != len(result["answers"]):
             raise ValueError("direct generation requires numbered prompt identities")
         return {
-            "actual_usd": config["upper_usd"],
-            "settled_at_reservation_upper": True,
+            "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started}},
             "answers": result["answers"],
             "health_records": [
                 {"question_id": prompt_id, "metrics": metrics, "reasons": reasons}
                 for prompt_id in prompt_ids
             ],
-            "usage": {"elapsed_seconds": time.monotonic() - started},
         }
     if stage == "calibration-candidates":
         identity = config["persona_source"]
@@ -171,8 +169,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         )
         cache.commit()
         return {
-            "actual_usd": config["upper_usd"],
-            "settled_at_reservation_upper": True,
+            "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started, "persona_actual_pairs": len(pos_prompts)}},
             "vector_bytes": vector_path.read_bytes(),
             "baseline_answers": baseline_answers,
             "candidate_coefficients": coefficients,
@@ -180,7 +177,6 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             "candidate_health": candidate_health,
             "candidate_search": search_history,
             "method_config": vector.cfg.to_dict(),
-            "usage": {"elapsed_seconds": time.monotonic() - started, "persona_actual_pairs": len(pos_prompts)},
         }
     if stage == "final-generation":
         plan = config["executable_generation_plan"]
@@ -198,13 +194,11 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         cache.commit()
         from steering_lite.benchmark.cache import content_key
         return {
-            "actual_usd": config["upper_usd"],
-            "settled_at_reservation_upper": True,
+            "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started}},
             "baseline_answers": baseline_answers,
             "answers": answers,
             "health_records": health_records,
             "plan_sha256": content_key({"plan": plan}),
-            "usage": {"elapsed_seconds": time.monotonic() - started},
         }
     raise ValueError(f"unsupported Modal stage {stage!r}")
 

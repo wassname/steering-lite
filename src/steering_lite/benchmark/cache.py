@@ -90,10 +90,13 @@ def reserve_many(
         records = [json.loads(line) for line in handle]
         settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
         unresolved_overages = [row for row in records if row["event"] == "overage"]
+        unresolved = [row for row in records if row["event"] == "unresolved" and row["reservation"] not in settled]
         total = sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
         requested = sum(upper_usd for _, upper_usd in reservations)
         if unresolved_overages:
             raise RuntimeError("budget: unresolved overage requires audit before another reservation")
+        if unresolved:
+            raise RuntimeError("budget: unresolved remote work requires a receipt or audit before another reservation")
         if (
             not reservations
             or any(upper_usd <= 0 for _, upper_usd in reservations)
@@ -114,6 +117,19 @@ def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) 
     return reserve_many(ledger, [(kind, upper_usd)], limit_usd)[0]
 
 
+def mark_unresolved(ledger: Path, reservation: str, reason: str) -> None:
+    with ledger.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        rows = [json.loads(line) for line in handle]
+        if not any(row["event"] == "reserved" and row["id"] == reservation for row in rows):
+            raise ValueError("unresolved work has no matching reservation")
+        if any(row["event"] == "settled" and row["reservation"] == reservation for row in rows):
+            return
+        if not any(row["event"] == "unresolved" and row["reservation"] == reservation for row in rows):
+            handle.write(json.dumps({"event": "unresolved", "reservation": reservation, "reason": reason}) + "\n")
+
+
 def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
     if actual_usd < 0:
         raise ValueError("negative cost")
@@ -127,3 +143,12 @@ def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
         if actual_usd > original["upper_usd"]:
             handle.write(json.dumps({"event": "overage", "reservation": reservation, "actual_usd": actual_usd, "upper_usd": original["upper_usd"]}) + "\n")
             raise RuntimeError(f"actual cost ${actual_usd} exceeded reservation ${original['upper_usd']}; revise pricing before continuing")
+
+
+def settle_receipt(ledger: Path, reservation: str, actual_usd: float, receipt: dict) -> None:
+    if not receipt:
+        raise ValueError("receipt import requires receipt metadata")
+    settle(ledger, reservation, actual_usd)
+    with ledger.open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.write(json.dumps({"event": "receipt_imported", "reservation": reservation, "receipt": receipt}) + "\n")

@@ -6,8 +6,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from pathlib import Path
 from typing import Callable
 from urllib.request import Request, urlopen
+
+from .cache import cached, mark_unresolved, reserve, settle
+from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
 
 
 @dataclass(frozen=True)
@@ -68,17 +72,56 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
     return call
 
 
+def judge_request_upper_usd(request: dict) -> float:
+    input_tokens = 2_000 if request["blind"] else 4_000
+    return input_tokens / 1_000_000 * JUDGE_INPUT_USD_PER_MTOKEN + 1_200 / 1_000_000 * JUDGE_OUTPUT_USD_PER_MTOKEN
+
+
 class LocalJudgeAdapter:
     """Adapter for local/API judge calls over persisted existing request payloads."""
 
-    def __init__(self, request_call: Callable[[dict], dict], endpoint: str, gate: RunGate):
+    def __init__(self, request_call: Callable[[dict], dict], endpoint: str, gate: RunGate, *, root: Path, ledger: Path):
         self._request_call = request_call
         self.endpoint = endpoint
         self._gate = gate
+        self._root = root
+        self._ledger = ledger
+
+    def _complete_one(self, request: dict) -> dict:
+        upper_usd = judge_request_upper_usd(request)
+        identity = {
+            "schema": "bsbench-judge-request-cache-v1",
+            "request": request,
+            "judge_model": request["payload"]["model"],
+            "judge_endpoint": self.endpoint,
+            "upper_usd": upper_usd,
+        }
+
+        def compute() -> dict:
+            reservation = reserve(self._ledger, f"judge-{request['request_key']}", upper_usd, limit_usd=50.0)
+            try:
+                response = self._request_call(request["payload"])
+            except Exception:
+                mark_unresolved(self._ledger, reservation, "judge_request_failure")
+                raise
+            actual_usd = response.get("_remote_cost_usd")
+            if not isinstance(actual_usd, (int, float)) or actual_usd < 0:
+                mark_unresolved(self._ledger, reservation, "judge_response_missing_cost")
+            else:
+                settle(self._ledger, reservation, float(actual_usd))
+            return {
+                "request": request,
+                "response": response,
+                "usage": response.get("_remote_usage"),
+                "reservation": reservation,
+                "upper_usd": upper_usd,
+            }
+
+        return cached(self._root / "cache", "judge-request", identity, compute)["response"]
 
     def complete(self, requests: list[dict]) -> list[dict]:
         self._gate.require()
-        return [self._request_call(request["payload"]) for request in requests]
+        return [self._complete_one(request) for request in requests]
 
 
 def real_adapters(
@@ -88,10 +131,12 @@ def real_adapters(
     judge_endpoint: str,
     explicit_run: bool,
     budget_preflight: dict,
+    root: Path,
+    ledger: Path,
 ) -> tuple[ModalRunMethodAdapter, LocalJudgeAdapter]:
     """Build the only real-call path; callers must supply both an explicit run and preflight."""
     gate = RunGate(explicit_run=explicit_run, budget_preflight=budget_preflight)
     return (
         ModalRunMethodAdapter(modal_stage_call, gate),
-        LocalJudgeAdapter(judge_request_call, judge_endpoint, gate),
+        LocalJudgeAdapter(judge_request_call, judge_endpoint, gate, root=root, ledger=ledger),
     )

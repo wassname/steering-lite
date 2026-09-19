@@ -1,9 +1,11 @@
+import json
 from pathlib import Path
 import subprocess
 import sys
 
 import pytest
 
+from steering_lite.benchmark.cache import settle_receipt
 from steering_lite.benchmark.production import persist_local_judge_work, run_stages
 
 
@@ -29,6 +31,30 @@ def test_production_stages_reserve_before_dispatch_reuse_and_invalidate(tmp_path
     assert all(row["reused"] for row in run_stages(tmp_path, ledger, stages, backend))
     changed = [{**stages[0], "config": {"upper_usd": 0.5, "step": 3}}]
     assert not run_stages(tmp_path, ledger, changed, backend)[0]["reused"]
+
+
+def test_modal_pending_receipt_is_cached_unsettled_and_blocks_new_dispatch(tmp_path: Path):
+    ledger = tmp_path / "costs.jsonl"
+    calls = []
+
+    class PendingModal:
+        def gpu(self, **kwargs):
+            calls.append(kwargs["stage"])
+            return {"stage": kwargs["stage"], "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}}}
+
+    stage = {"model": {"id": "fake"}, "data": {"sha256": "dev"}, "method": "bare", "stage": "generation", "config": {"upper_usd": 0.5}, "prompts": ["one"]}
+    first, = run_stages(tmp_path, ledger, [stage], PendingModal())
+    assert first["reused"] is False and "actual_usd" not in first
+    assert calls == ["generation"]
+    assert run_stages(tmp_path, ledger, [stage], PendingModal())[0]["reused"] is True
+    assert calls == ["generation"]
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert [row["event"] for row in rows] == ["reserved", "unresolved"]
+    blocked = {**stage, "stage": "another", "config": {"upper_usd": 0.5}}
+    with pytest.raises(RuntimeError, match="unresolved remote work"):
+        run_stages(tmp_path, ledger, [blocked], PendingModal())
+    settle_receipt(ledger, first["reservation"], 0.25, {"provider": "Modal", "receipt_id": "later"})
+    assert run_stages(tmp_path, ledger, [blocked], PendingModal())[0]["reused"] is False
 
 
 def test_local_judge_work_persists_persona_checks_and_both_request_kinds(tmp_path: Path):
