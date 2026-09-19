@@ -1,4 +1,4 @@
-"""Explicitly gated adapters for the planned Modal GPU and local judge APIs.
+"""Adapters that require explicit run selection and below-limit budget preflight.
 
 The callbacks are injected so importing this module never imports Modal or an API SDK.
 """
