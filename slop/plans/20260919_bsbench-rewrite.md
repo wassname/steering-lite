@@ -3,6 +3,7 @@
 > User: "Just use this instead of what we have. a rewrite. on a branch."
 > User: "It's a first pass suitable for use and demo."
 > User: "spend <$50 on this initial set."
+> User: "use cheaper models for subagents not astra"
 
 - [/] goal: reuse vjp-steering as the benchmark base on `rewrite/bsbench-vjp`
   - Inspect source, judge payloads, costs and cache contracts before changing them.
