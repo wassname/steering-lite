@@ -1,0 +1,14 @@
+started_at=2026-09-20T02:13:01Z
+purpose=local production _candidate_items reproduction; no Modal dispatch
+question_ids=['BSV2-001', 'BSV2-002', 'BSV2-003', 'BSV2-004']
+BSV2-001 raw_sha256=3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2 canonical_sha256=fab269379bf74e775bdc1b57fd1d06646e3a8b57b1ffbec8b4f92fc264414c08 same=False
+BSV2-002 raw_sha256=d93b69a6edfa0fb006504aca88be14a2f606cd021bd25d4e161edfaf60210847 canonical_sha256=a4cbb11c11f595c54fa9ec2d188e58a9502da183421bb33b99ae73fa56a12eb5 same=False
+BSV2-003 raw_sha256=ae7e47f3841e56da05dbb8f87a207e44e713454d65e80c4f0ce6f7ec3c94cc6a canonical_sha256=c8072427e1d4644011232b64249df8a4069fbbb764e3cbb54f9ee2575129e742 same=False
+BSV2-004 raw_sha256=d98d1cb1f5916b598830b6cdf9750866e8a8690f0fb4bc83f54a9a38fd70dea4 canonical_sha256=a0d7c905bb4b62496dbbf720194cfebc47fbc722c3fafc53e9408aedefc0d72e same=False
+coefficients=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+expected_count=28 observed_count=28 item_count=28
+missing_expected=28 extra_observed=28 duplicate_items=0
+production_validation=ValueError: candidate items must cover exactly every coefficient and calibration prompt once
+fixed_validation=item_count:28
+finished_at=2026-09-20T02:13:03Z
+exit_code=0

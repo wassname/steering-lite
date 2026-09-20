@@ -6,6 +6,7 @@ before calling ``run_stage.remote``.
 """
 from __future__ import annotations
 
+import hashlib
 import time
 from pathlib import Path
 
@@ -66,8 +67,10 @@ def _layers(model) -> tuple[tuple[int, ...], int]:
     return (source_layer,), target_layer
 
 
-def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, limit: int, max_new_tokens: int, generate, health) -> tuple[list[float], list[dict], dict, dict]:
+def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, prompt_sha256s: list[str], limit: int, max_new_tokens: int, generate, health) -> tuple[list[float], list[dict], dict, dict]:
     """Double one dose at a time; stop on the first health failure or the policy limit."""
+    if len(prompts) != len(prompt_sha256s):
+        raise ValueError("candidate source hashes must match serialized calibration prompts")
     coefficients: list[float] = []
     items: list[dict] = []
     health_by_coefficient: dict[str, dict] = {}
@@ -85,7 +88,7 @@ def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, limit: in
             {
                 "coefficient": coefficient,
                 "prompt_index": index,
-                "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(),
+                "prompt_sha256": prompt_sha256s[index],
                 "response": answer,
             }
             for index, (prompt, answer) in enumerate(zip(prompts, answers, strict=True))
@@ -187,12 +190,14 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         vector_path = Path("/tmp") / f"bsbench-{method}.safetensors"
         vector.save(str(vector_path))
         calibration_prompts = canonical_prompt_texts(tokenizer, prompts, config["prompt_spec"])
+        calibration_prompt_sha256s = [hashlib.sha256(prompt.encode()).hexdigest() for prompt in prompts]
         baseline_answers = generate(model, tokenizer, calibration_prompts, 1, config["prompt_spec"]["max_new_tokens"])
         coefficients, candidate_items, candidate_health, search_history = _candidate_policy(
             vector,
             model,
             tokenizer,
             calibration_prompts,
+            prompt_sha256s=calibration_prompt_sha256s,
             limit=config["candidate_dose_upper"],
             max_new_tokens=config["prompt_spec"]["max_new_tokens"],
             generate=generate,

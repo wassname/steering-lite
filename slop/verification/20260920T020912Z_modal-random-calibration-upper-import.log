@@ -1,0 +1,5 @@
+started_at=2026-09-20T02:09:12Z
+command=.venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260920T020800Z_modal-random-calibration-upper-receipt.json --ledger outputs/bsbench-v2/costs.jsonl
+{"actual_usd": 0.8843460000000001, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "2f2ae5cdc97c66878e73a5e3189a87926118ad64cf358aee2cae32c211f3d9f7"}
+finished_at=2026-09-20T02:09:14Z
+exit_code=0

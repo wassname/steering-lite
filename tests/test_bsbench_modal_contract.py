@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import hashlib
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from steering_lite.benchmark.pipeline import METHODS
+from steering_lite.benchmark.production import _candidate_items
 from steering_lite.benchmark.sweep import GPU_HOURS_PER_STAGE, MODAL_GPU_STAGE_TIMEOUT_SECONDS
 
 
@@ -83,16 +85,25 @@ def test_candidate_policy_records_coherence_failure_or_search_limit(modal_script
     def generate(_model, _tokenizer, prompts, _batch_size, _max_new_tokens):
         return ["answer." for _ in prompts]
 
+    source_prompts = ["raw one", "raw two"]
+    source_hashes = [hashlib.sha256(prompt.encode()).hexdigest() for prompt in source_prompts]
     coefficients, items, health, search = modal_script._candidate_policy(
-        Vector(), object(), object(), ["one", "two"], limit=2, max_new_tokens=8,
+        Vector(), object(), object(), ["serialized one", "serialized two"], prompt_sha256s=source_hashes, limit=2, max_new_tokens=8,
         generate=generate, health=lambda _tokenizer, _answers: ({"answers": 2}, []),
     )
     assert coefficients == [0.1, 0.2]
-    assert len(items) == 4 and set(health) == {"0.1", "0.2"}
+    assert len(items) == 4 and {item["prompt_sha256"] for item in items} == set(source_hashes) and set(health) == {"0.1", "0.2"}
+    assert _candidate_items(coefficients, source_prompts, items) == items
     assert search["termination"] == "search_limit" and len(search["history"]) == 2
 
     _, _, _, failed = modal_script._candidate_policy(
-        Vector(), object(), object(), ["one"], limit=2, max_new_tokens=8,
+        Vector(), object(), object(), ["serialized one"], prompt_sha256s=["raw-one"], limit=2, max_new_tokens=8,
         generate=generate, health=lambda _tokenizer, _answers: ({"answers": 1}, ["repetition"]),
     )
     assert failed["termination"] == "coherence_failure" and len(failed["history"]) == 1
+
+    with pytest.raises(ValueError, match="source hashes"):
+        modal_script._candidate_policy(
+            Vector(), object(), object(), ["serialized one"], prompt_sha256s=[], limit=2, max_new_tokens=8,
+            generate=generate, health=lambda _tokenizer, _answers: ({"answers": 1}, []),
+        )

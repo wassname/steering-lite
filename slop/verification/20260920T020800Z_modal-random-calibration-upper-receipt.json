@@ -1,0 +1,24 @@
+{
+  "reservation": "2f2ae5cdc97c66878e73a5e3189a87926118ad64cf358aee2cae32c211f3d9f7",
+  "actual_usd": 0.8843460000000001,
+  "receipt": {
+    "schema": "bsbench-modal-completed-no-invoice-reconciliation-v1",
+    "provider": "Modal",
+    "outcome": "function_completed_local_validation_rejected_result",
+    "app_id": "ap-4ublFhNSLuYc5l5rDUA40J",
+    "function_id": "fu-ZiGBwS8F6TsPPU8ygX1fKt",
+    "function_call_id": "fc-01M2Y8Q0X2PQK31M4A4CVEPF78",
+    "container_id": "ta-01M2Y8Q14CX8HXKJPRWFQ0DMYR",
+    "provider_log": "slop/verification/20260920T020657Z_modal-random-calibration-app-identifiers.log",
+    "local_failure_log": "slop/verification/20260920T015849Z_real-full-sweep-429-recovery.log",
+    "audit": "slop/audits/20260920_random_calibration_prompt_identity_failure.md",
+    "timing": {
+      "first_provider_log_at": "2026-09-20T10:01:10+08:00",
+      "last_generation_log_at": "2026-09-20T10:04:23+08:00",
+      "local_validation_failure_at": "2026-09-20T10:04:24+08:00",
+      "observed_elapsed_seconds_approximately": 194
+    },
+    "cost_treatment": "No billed provider invoice is available. The function completed and returned before local validation failed, so actual_usd is conservatively set to the existing reservation upper rather than zero.",
+    "recorded_by": "PI/OpenAI"
+  }
+}
