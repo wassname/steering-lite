@@ -1,0 +1,24 @@
+{
+  "schema": "bsbench-mean-diff-terminal-audit-v1",
+  "run_log": "slop/verification/20260920T170730Z_mean-diff-one-hour-backoff-retry.log",
+  "exit_code": 0,
+  "candidate_cache_reused": true,
+  "final_generation_cache_reused": true,
+  "final_answers": 84,
+  "final_health_records": 84,
+  "final_aware_records": 168,
+  "final_blind_records": 168,
+  "final_judgments_aware": 168,
+  "final_judgments_blind": 168,
+  "prediction_case_ids": [
+    "bsbench-v2-evaluation",
+    "bsbench-v2-heldout-a",
+    "bsbench-v2-heldout-b",
+    "paper-native-false-claim-agreement-a",
+    "paper-native-false-claim-agreement-b"
+  ],
+  "open_unresolved_reservations": [],
+  "committed_usd_after": 12.9747659622,
+  "observation": "The one-hour retry completed the cached mean_diff final-judgment stage. It added one settled provider request rather than rerunning final generation or candidate work.",
+  "author": "PI[gpt-5.6-terra]"
+}

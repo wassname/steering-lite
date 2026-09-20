@@ -1,0 +1,7 @@
+checked_at=2026-09-20T17:06:28Z
+active_sweeps=[]
+open_unresolved=[]
+code_changed_since_tests=false
+full_tests=142 passed (slop/verification/20260920T150500Z_mean-diff-504-full-tests.log)
+smoke=passed (slop/verification/20260920T150800Z_mean-diff-504-smoke.log)
+dry_preflight_total_upper_usd=25.8843975314
