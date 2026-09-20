@@ -1,0 +1,79 @@
+{
+  "committed_usd": 11.071976048900002,
+  "open_reservation_records": {
+    "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01": {
+      "event": "reserved",
+      "id": "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01",
+      "kind": "judge-b91f8b872f293eb5b541ee5ea3a771b6b6ced126fd74afd7c146a755a53ea5a7",
+      "time": "2026-09-20T13:28:52.598349+00:00",
+      "upper_usd": 0.0022643999999999997
+    }
+  },
+  "open_unresolved_reservations": [
+    "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01"
+  ],
+  "recent_provider_evidence": [
+    "outputs/bsbench-v2/provider-evidence/334a6e70f9a5f1106f4042be8df87d829d619a73b095383b3a27e4e9018fca59-000457-failed.json",
+    "outputs/bsbench-v2/provider-evidence/3b96b7a59830f90189f78b1fb90786030786680935aed57494d2292cea7d79dc-000456-success.json",
+    "outputs/bsbench-v2/provider-evidence/ae87b4efeccea30b9e41449d9a2e635f8cc94a34703380a300c1322ad2aabf0d-000455-success.json",
+    "outputs/bsbench-v2/provider-evidence/038041237b83d8c89e0392452636c4fd0796c1a78ca3ee000a9c69d62e03a46f-000454-success.json",
+    "outputs/bsbench-v2/provider-evidence/3308550a36cf344613b4c45a2d0cfc24ff1bd4bfaf5f58ba551f41923dd898dc-000453-success.json",
+    "outputs/bsbench-v2/provider-evidence/1633384c2beaaffb76c8585e9cfaa558b3d063094f4b812fbf5ffa39b29c266c-000452-success.json",
+    "outputs/bsbench-v2/provider-evidence/166dade0f19d84e416fff6e469748487e91e0e95ecbc6d160027691d2247e5b2-000451-success.json",
+    "outputs/bsbench-v2/provider-evidence/61d110c0768ac1590ae2f9a1d78a90952182fb93c3a6bf9b17c6a509b686a71c-000450-success.json",
+    "outputs/bsbench-v2/provider-evidence/c6e59153004473bfa4dc84702e13b3f02e3f9ca053e484a82783664ababaf084-000449-success.json",
+    "outputs/bsbench-v2/provider-evidence/a7891d940f9ee6afe0032b49314e2d15b71f7fd53b5b1d94dec8f5c751841383-000448-success.json"
+  ],
+  "reservations_total": 1239,
+  "run_log": "slop/verification/20260920T113300Z_corrected-authorized-sweep.log",
+  "schema": "bsbench-corrected-random-429-reconciliation-v1",
+  "settled_total": 1228,
+  "unresolved_events": {
+    "2f2ae5cdc97c66878e73a5e3189a87926118ad64cf358aee2cae32c211f3d9f7": {
+      "event": "unresolved",
+      "reason": "dispatch_or_validation_failure",
+      "reservation": "2f2ae5cdc97c66878e73a5e3189a87926118ad64cf358aee2cae32c211f3d9f7"
+    },
+    "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01": {
+      "event": "unresolved",
+      "reason": "judge_request_failure",
+      "reservation": "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01"
+    },
+    "4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70": {
+      "event": "unresolved",
+      "reason": "local_process_interrupted_unknown_openrouter_outcome",
+      "reservation": "4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70"
+    },
+    "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760": {
+      "event": "unresolved",
+      "reason": "judge_request_failure",
+      "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"
+    },
+    "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b": {
+      "event": "unresolved",
+      "reason": "judge_request_failure",
+      "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b"
+    },
+    "b6125b261fed63b579cc7aa92651611043a49f4dc0a59a65d3388f7d50374d28": {
+      "event": "unresolved",
+      "reason": "judge_request_failure",
+      "reservation": "b6125b261fed63b579cc7aa92651611043a49f4dc0a59a65d3388f7d50374d28"
+    },
+    "d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95": {
+      "event": "unresolved",
+      "reason": "judge_request_failure",
+      "reservation": "d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95"
+    },
+    "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8": {
+      "event": "unresolved",
+      "reason": "dispatch_or_validation_failure",
+      "reservation": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8"
+    },
+    "ff2950ac84a00a8153e1b7c2a205b0960dbead16bf19be2a5964b734dbea96fc": {
+      "event": "unresolved",
+      "reason": "dispatch_or_validation_failure",
+      "reservation": "ff2950ac84a00a8153e1b7c2a205b0960dbead16bf19be2a5964b734dbea96fc"
+    }
+  },
+  "upper_settled_total": 10
+}

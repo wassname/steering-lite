@@ -1,0 +1,8 @@
+{
+  "reservation": "48d338d5127f107fa75340236de5ac0811e74992e8088ccb7ada2c48fbd87e01",
+  "upper_usd": 0.0022643999999999997,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/334a6e70f9a5f1106f4042be8df87d829d619a73b095383b3a27e4e9018fca59-000457-failed.json",
+  "outcome": "HTTP 429 from OpenRouter; no generation result or billable usage was returned",
+  "accounting": "Conservative: retain the reservation upper rather than infer $0 from the rejection.",
+  "author": "PI[gpt-5.6-terra]"
+}
