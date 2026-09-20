@@ -6,9 +6,11 @@ import hashlib
 import json
 import os
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.error import HTTPError
+from http.client import RemoteDisconnected
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
@@ -177,6 +179,33 @@ def _provider_headers(headers) -> dict:
     }
 
 
+def _request_identity(payload: dict) -> dict:
+    return {
+        "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "model": payload["model"],
+        "response_schema": payload["response_format"]["json_schema"]["name"],
+    }
+
+
+@contextmanager
+def _openrouter_read_timeout(seconds: float):
+    """Apply the fixed read timeout without changing production-cache source identity."""
+    if seconds <= 0:
+        raise ValueError("OpenRouter read timeout must be positive")
+    import steering_lite.benchmark.adapters as adapters
+
+    original_urlopen = adapters.urlopen
+
+    def timed_urlopen(request, *args, **kwargs):
+        return original_urlopen(request, *args, **(kwargs | {"timeout": seconds}))
+
+    adapters.urlopen = timed_urlopen
+    try:
+        yield
+    finally:
+        adapters.urlopen = original_urlopen
+
+
 def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence_root: Path, min_interval_seconds: float = 10.0):
     request_call = openrouter_request_callback(endpoint=endpoint, api_key=api_key)
     next_request_at = 0.0
@@ -187,6 +216,7 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
         if wait_seconds > 0:
             time.sleep(wait_seconds)
         next_request_at = time.monotonic() + min_interval_seconds
+        started_at = time.monotonic()
         try:
             return request_call(payload)
         except HTTPError as error:
@@ -199,15 +229,24 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
                 "schema": "bsbench-openrouter-http-error-v1",
                 "recorded_at": datetime.now(timezone.utc).isoformat(),
                 "endpoint": endpoint,
-                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
-                "model": payload["model"],
-                "response_schema": payload["response_format"]["json_schema"]["name"],
+                **_request_identity(payload),
                 "status": error.code,
                 "reason": error.reason,
                 "headers": _provider_headers(error.headers),
                 "body": body,
             }
             save_json(evidence_root / f"{evidence['payload_sha256']}-{error.code}.json", evidence)
+            raise
+        except (TimeoutError, URLError, RemoteDisconnected, ConnectionResetError) as error:
+            evidence = {
+                "schema": "bsbench-openrouter-no-response-v1",
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint,
+                **_request_identity(payload),
+                "exception_type": type(error).__name__,
+                "elapsed_seconds": time.monotonic() - started_at,
+            }
+            save_json(evidence_root / f"{evidence['payload_sha256']}-{evidence['exception_type']}.json", evidence)
             raise
 
     return call
@@ -374,7 +413,7 @@ def main() -> None:
             manifest = dry_manifest(args.out, args.model, ledger=ledger)
             budget = manifest["cost_estimate"]
             from run_bsbench_modal import app, remote_stage_call
-            with app.run():
+            with app.run(), _openrouter_read_timeout(180.0):
                 modal_adapter, judge_adapter = real_adapters(
                     modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
                     judge_request_call=audited_openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key, evidence_root=args.out / "provider-evidence"),

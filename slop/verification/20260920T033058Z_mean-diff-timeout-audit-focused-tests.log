@@ -1,0 +1,6 @@
+started_at=2026-09-20T03:30:58Z
+command=.venv/bin/pytest tests/test_benchmark_production.py tests/test_full_sweep_entrypoint.py -q
+................                                                         [100%]
+16 passed in 32.90s
+finished_at=2026-09-20T03:31:33Z
+exit_code=0

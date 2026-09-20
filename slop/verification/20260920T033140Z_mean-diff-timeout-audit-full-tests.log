@@ -1,0 +1,8 @@
+started_at=2026-09-20T03:31:40Z
+command=just test
+uv run --extra test --extra hf-test --extra benchmark pytest -q
+........................................................................ [ 52%]
+..................................................................       [100%]
+138 passed in 43.88s
+finished_at=2026-09-20T03:32:27Z
+exit_code=0

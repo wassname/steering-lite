@@ -183,9 +183,54 @@ def test_openrouter_http_error_evidence_preserves_retry_metadata_without_key(tmp
     assert "private prompt" not in evidence.read_text()
 
 
+def test_openrouter_no_response_evidence_has_request_identity_without_payload(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+    monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: lambda _payload: (_ for _ in ()).throw(TimeoutError("private prompt must not persist")))
+    clock = iter((1.0, 1.0, 1.0, 4.0))
+    monkeypatch.setattr(sweep.time, "monotonic", lambda: next(clock))
+    request_call = sweep.audited_openrouter_request_callback(
+        endpoint="https://openrouter.ai/api/v1/chat/completions",
+        api_key="must-not-persist",
+        evidence_root=tmp_path,
+    )
+    payload = {
+        "model": "deepseek/deepseek-chat",
+        "messages": [{"role": "user", "content": "private prompt"}],
+        "response_format": {"json_schema": {"name": "blind_change_description"}},
+    }
+    with pytest.raises(TimeoutError):
+        request_call(payload)
+
+    evidence, = tmp_path.glob("*.json")
+    record = json.loads(evidence.read_text())
+    assert record["schema"] == "bsbench-openrouter-no-response-v1"
+    assert record["exception_type"] == "TimeoutError"
+    assert record["elapsed_seconds"] == 3.0
+    assert record["response_schema"] == "blind_change_description"
+    assert "must-not-persist" not in evidence.read_text()
+    assert "private prompt" not in evidence.read_text()
+
+
+def test_openrouter_read_timeout_overrides_adapter_default(monkeypatch):
+    sweep = _sweep_script()
+    import steering_lite.benchmark.adapters as adapters
+
+    seen = []
+
+    def urlopen(*_args, **kwargs):
+        seen.append(kwargs["timeout"])
+
+    monkeypatch.setattr(adapters, "urlopen", urlopen)
+    with sweep._openrouter_read_timeout(180.0):
+        adapters.urlopen("request", timeout=90)
+    assert seen == [180.0]
+    assert adapters.urlopen("request", timeout=90) is None
+    assert seen == [180.0, 90]
+
+
 def test_openrouter_callback_paces_uncached_requests(tmp_path: Path, monkeypatch):
     sweep = _sweep_script()
-    clock = iter((0.0, 0.0, 3.0, 10.0))
+    clock = iter((0.0, 0.0, 0.0, 3.0, 10.0, 10.0))
     sleeps = []
     monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: lambda _payload: {"ok": True})
     monkeypatch.setattr(sweep.time, "monotonic", lambda: next(clock))

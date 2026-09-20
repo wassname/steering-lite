@@ -1,0 +1,7 @@
+started_at=2026-09-20T03:28:20Z
+command=just sweep --openrouter-metadata Qwen/Qwen3.5-4B outputs/bsbench-v2
+purpose=non-generation key and credits reconciliation after timeout
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --openrouter-metadata --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"evidence_path": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T032823Z.json", "mode": "openrouter-metadata", "statuses": {"credits": 200, "key": 200}}
+finished_at=2026-09-20T03:28:23Z
+exit_code=0
