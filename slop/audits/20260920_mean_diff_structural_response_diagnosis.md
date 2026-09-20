@@ -26,6 +26,6 @@ After the 15-minute backoff, 210 newly requested judge responses settled and cac
 
 ## Decision
 
-No further paid request or later method dispatch without review. This is a repeated provider capacity failure after the authorized backoff, not an adapter or payload diagnosis. The 210 completed response caches remain reusable.
+A one-hour backoff is scheduled before one more same-payload retry of mean-difference only. This is a repeated provider capacity failure, not an adapter or payload diagnosis. Before it runs, the worker must confirm no active sweep, no unresolved reservation, unchanged code since the passing full and smoke tests, and a dry bound below $50. The 210 completed response caches remain reusable; later methods remain stopped.
 
 -- PI[gpt-5.6-terra]
