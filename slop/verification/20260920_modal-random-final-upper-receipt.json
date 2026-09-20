@@ -1,0 +1,21 @@
+{
+  "reservation": "ff2950ac84a00a8153e1b7c2a205b0960dbead16bf19be2a5964b734dbea96fc",
+  "actual_usd": 0.8843460000000001,
+  "receipt": {
+    "schema": "bsbench-modal-failed-final-upper-receipt-v1",
+    "provider": "Modal",
+    "cost_treatment": "reservation_upper",
+    "reason": "The provider log proves the final-generation function executed and loaded Qwen before a local fit_target ValueError; Modal did not provide a settled billed amount.",
+    "app_id": "ap-7iwHXfHqK1M2EygPMq1Vb8",
+    "function_id": "fu-pPbO0StqT0P8fKdSh3BHUC",
+    "function_call_id": "fc-01M2YB8F1Z8XA87KA0TE0Q29QB",
+    "container_id": "ta-01M2YB8F945YSMSJC91X6FBV1R",
+    "provider_log": "slop/verification/20260920T025000Z_modal-random-final-failure-app-identifiers.log",
+    "provider_log_observations": [
+      "2026-09-20 10:45:31+08:00 identifies the function call and container.",
+      "2026-09-20 10:45:35+08:00 reports Loading weights: 100%|...| 426/426.",
+      "2026-09-20 10:45:38+08:00 reports ValueError: calibration needs a measured useful, coherent dose."
+    ],
+    "audit": "slop/audits/20260920_random_no_useful_coherent_dose.md"
+  }
+}

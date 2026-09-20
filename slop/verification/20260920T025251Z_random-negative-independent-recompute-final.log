@@ -1,0 +1,17 @@
+started_at=2026-09-20T02:52:51Z
+purpose=independent recomputation from saved random candidate request/response records; no remote calls
+candidate_coefficients=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+candidate_items=28 unique_item_keys=28
+candidate_source_hashes=['3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2', 'ae7e47f3841e56da05dbb8f87a207e44e713454d65e80c4f0ce6f7ec3c94cc6a', 'd93b69a6edfa0fb006504aca88be14a2f606cd021bd25d4e161edfaf60210847', 'd98d1cb1f5916b598830b6cdf9750866e8a8690f0fb4bc83f54a9a38fd70dea4']
+requests=112 responses=112 aware=56 blind=56 unique_request_keys=104
+coefficient=0.1 aware_pairs=8 directed=-0.112500 off_target=1.487500 score=-6.062500 saved_match=True useful=False coherent=False health_reasons=[]
+coefficient=0.2 aware_pairs=8 directed=-0.937500 off_target=1.925000 score=-8.637500 saved_match=True useful=False coherent=False health_reasons=[]
+coefficient=0.4 aware_pairs=8 directed=-1.150000 off_target=0.787500 score=-4.300000 saved_match=True useful=False coherent=True health_reasons=[]
+coefficient=0.8 aware_pairs=8 directed=+0.475000 off_target=0.937500 score=-3.275000 saved_match=True useful=False coherent=True health_reasons=[]
+coefficient=1.6 aware_pairs=8 directed=+0.487500 off_target=1.762500 score=-6.562500 saved_match=True useful=False coherent=False health_reasons=[]
+coefficient=3.2 aware_pairs=8 directed=-0.125000 off_target=2.462500 score=-9.975000 saved_match=True useful=False coherent=False health_reasons=[]
+coefficient=6.4 aware_pairs=8 directed=-0.700000 off_target=3.187500 score=-13.450000 saved_match=True useful=False coherent=False health_reasons=['unfinished', 'repetition']
+selection_predicate=useful is (directed_effect - 4 * off_target_effect > 0); coherent is (no health reasons and max steered off-axis <= 2.5)
+result=no measured useful, coherent random dose
+finished_at=2026-09-20T02:52:54Z
+exit_code=0

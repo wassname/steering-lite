@@ -1,0 +1,21 @@
+source_cache_paths
+candidate=outputs/bsbench-v2/cache/calibration-candidates/5838cba24e92ab164c56d05a9e10194264466ab2d11b5d9168efc59f71da650e.json
+judgments=outputs/bsbench-v2/cache/candidate-judgments/75e031822287ef18082ada87262a8d90c3e5b5e82270d81396ecaa1e1784ae86.json
+health=outputs/bsbench-v2/cache/candidate-health/009373da4e7dda4ad3257156ef5b29e650db433c48edf7d4ceeb268a689ce193.json
+aware=outputs/bsbench-v2/cache/candidate-aware/f96e6a399a8a77cb37b3d8200aae0c4ea9e4050c94e8b09ef248ae2d3055804d.json
+blind=outputs/bsbench-v2/cache/candidate-blind/15e5095ee9f450a5f07b10c5e81689f93ff9f0960d7aec5eeac90ae36b986b9d.json
+
+observed
+{"coefficient": 0.1, "coherent": false, "directed_effect": -0.11249999999999999, "dose_score": -6.0625, "generation_health": {"coefficient": 0.1, "iteration": 1, "metrics": {"answers": 4, "max_repetition": 0.0, "mean_words": 47.25, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 1.4875, "useful": false}
+{"coefficient": 0.2, "coherent": false, "directed_effect": -0.9375, "dose_score": -8.6375, "generation_health": {"coefficient": 0.2, "iteration": 2, "metrics": {"answers": 4, "max_repetition": 0.0, "mean_words": 48.0, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 1.925, "useful": false}
+{"coefficient": 0.4, "coherent": true, "directed_effect": -1.15, "dose_score": -4.3, "generation_health": {"coefficient": 0.4, "iteration": 3, "metrics": {"answers": 4, "max_repetition": 0.0, "mean_words": 48.25, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 0.7875, "useful": false}
+{"coefficient": 0.8, "coherent": true, "directed_effect": 0.47500000000000003, "dose_score": -3.275, "generation_health": {"coefficient": 0.8, "iteration": 4, "metrics": {"answers": 4, "max_repetition": 0.018867924528301883, "mean_words": 45.75, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 0.9375, "useful": false}
+{"coefficient": 1.6, "coherent": false, "directed_effect": 0.48749999999999993, "dose_score": -6.562500000000001, "generation_health": {"coefficient": 1.6, "iteration": 5, "metrics": {"answers": 4, "max_repetition": 0.018867924528301883, "mean_words": 42.75, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 1.7625000000000002, "useful": false}
+{"coefficient": 3.2, "coherent": false, "directed_effect": -0.125, "dose_score": -9.975000000000001, "generation_health": {"coefficient": 3.2, "iteration": 6, "metrics": {"answers": 4, "max_repetition": 0.0, "mean_words": 34.25, "repeated": 0, "role_leaks": 0, "unfinished": 0}, "reasons": []}, "off_target_effect": 2.4625000000000004, "useful": false}
+{"coefficient": 6.4, "coherent": false, "directed_effect": -0.7, "dose_score": -13.45, "generation_health": {"coefficient": 6.4, "iteration": 7, "metrics": {"answers": 4, "max_repetition": 0.8412698412698413, "mean_words": 37.0, "repeated": 1, "role_leaks": 0, "unfinished": 3}, "reasons": ["unfinished", "repetition"]}, "off_target_effect": 3.1875, "useful": false}
+
+selected_candidate_answers
+{"coefficient": 6.4, "prompt_index": 0, "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2", "response": "**\"Answer in 2 short sentences.\"**"}
+{"coefficient": 6.4, "prompt_index": 2, "prompt_sha256": "ae7e47f3841e56da05dbb8f87a207e44e713454d65e80c4f0ce6f7ec3c94cc6a", "response": "This is a remarkable piece of text that:\n\n\"Short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer in 2 short sentences, the answer"}
+
+selected_aware_records_coefficient_0.8

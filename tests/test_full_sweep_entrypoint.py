@@ -134,11 +134,39 @@ class FakeJudgeCall:
         elif name == "blind_change_description":
             response = {"summary": "No material change.", "changes": []}
         else:
-            response = {"evidence": "B agrees more.", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
+            content = payload["messages"][0]["content"]
+            steered_marker = next(marker for marker in ("candidate", "final.", "prompting answer.") if marker in content)
+            response_a = content.split("Response A:\n", 1)[1].split("\n\nResponse B:\n", 1)[0]
+            if steered_marker in response_a:
+                response = {"evidence": "A is the steered response.", "on_axis_A": 1.0, "on_axis_B": 0.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
+            else:
+                response = {"evidence": "B is the steered response.", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
         return response | {"_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
 
 
-def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: FakeJudgeCall, *, endpoint: str, prompt_spec: dict, transfer_records=None):
+class RandomNamedStageCall(FakeRemoteStageCall):
+    """Make the fake random candidate identifiable from its answer text."""
+
+    def __call__(self, *, stage, method, config, prompts):
+        result = super().__call__(stage=stage, method=method, config=config, prompts=prompts)
+        if stage == "calibration-candidates" and method == "random":
+            for item in result["candidate_items"]:
+                item["response"] = f"zzrandommarker {item['response']}"
+        return result
+
+
+class NonUsefulRandomJudgeCall(FakeJudgeCall):
+    """Score only the synthetic random candidate as valid but non-useful."""
+
+    def __call__(self, payload):
+        if payload["response_format"]["json_schema"]["name"] == "demo_rating" and "zzrandommarker" in json.dumps(payload):
+            self.payloads.append(payload)
+            response = {"evidence": "No measured directed change.", "on_axis_A": 0.0, "on_axis_B": 0.0, "off_axis_A": 0.0, "off_axis_B": 0.0}
+            return response | {"_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
+        return super().__call__(payload)
+
+
+def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: FakeJudgeCall, *, endpoint: str, prompt_spec: dict, transfer_records=None, methods=METHODS):
     modal, judge = real_adapters(
         modal_stage_call=stage_call,
         judge_request_call=judge_call,
@@ -157,7 +185,46 @@ def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: 
         prompt_spec=prompt_spec,
         judge=judge,
         transfer_records=transfer_records,
+        methods=methods,
     )
+
+
+def test_no_useful_candidate_records_terminal_condition_and_continues(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call = RandomNamedStageCall()
+    judge_call = NonUsefulRandomJudgeCall()
+    prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+
+    first = _run(
+        root, ledger, stage_call, judge_call,
+        endpoint="https://judge.example/v1", prompt_spec=prompt_spec,
+        methods=("random", "mean_diff"),
+    )
+
+    assert stage_call.calls == [
+        ("calibration-candidates", "random"),
+        ("calibration-candidates", "mean_diff"),
+        ("final-generation", "mean_diff"),
+    ]
+    terminal = first["conditions"]["random"]["terminal"]
+    assert terminal["status"] == "no measured useful, coherent dose"
+    assert terminal["final_dispatch_prevented"] is True
+    assert all(not row["useful"] for row in terminal["observed"])
+    assert "final" not in first["conditions"]["random"]
+    assert "terminal" not in first["conditions"]["mean_diff"]
+    assert first["conditions"]["mean_diff"]["final"]["reused"] is False
+
+    second = _run(
+        root, ledger, stage_call, judge_call,
+        endpoint="https://judge.example/v1", prompt_spec=prompt_spec,
+        methods=("random", "mean_diff"),
+    )
+    assert second["conditions"]["random"]["terminal"] == terminal
+    assert stage_call.calls == [
+        ("calibration-candidates", "random"),
+        ("calibration-candidates", "mean_diff"),
+        ("final-generation", "mean_diff"),
+    ]
 
 
 def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

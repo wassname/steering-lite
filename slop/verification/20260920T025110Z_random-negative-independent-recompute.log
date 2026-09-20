@@ -1,0 +1,9 @@
+started_at=2026-09-20T02:51:10Z
+purpose=independent recomputation from saved random candidate request/response records; no remote calls
+candidate_coefficients=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+candidate_items=28 unique_item_keys=28
+candidate_source_hashes=['3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2', 'ae7e47f3841e56da05dbb8f87a207e44e713454d65e80c4f0ce6f7ec3c94cc6a', 'd93b69a6edfa0fb006504aca88be14a2f606cd021bd25d4e161edfaf60210847', 'd98d1cb1f5916b598830b6cdf9750866e8a8690f0fb4bc83f54a9a38fd70dea4']
+requests=112 responses=112 aware=56 blind=56
+Traceback (most recent call last):
+  File "<stdin>", line 28, in <module>
+AssertionError
