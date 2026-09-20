@@ -1,0 +1,142 @@
+{
+  "cache": {
+    "candidate_items": 36,
+    "candidate_judgment_request_count": 144,
+    "candidate_judgment_response_count": 144,
+    "first_fresh_judge_cache_key": "30e2ad75b2b2",
+    "fresh_judge_cache_misses": 129,
+    "modal_candidate_reservation": "a900eeee5f5b26b71f63f858c8e3d6e304c3ba9a4a415f1fa1fc3e65f0d5dcc0",
+    "modal_candidate_reused": true,
+    "prior_judge_cache_hits": 15
+  },
+  "callback_timing": {
+    "first_evidence_file": "outputs/bsbench-v2/provider-evidence/94a91f91f87a3999c731952cd7d0114c54fb30894aba93d1f93cbd6cdc39bf38-000001-success.json",
+    "intervals_below_10_seconds": 0,
+    "last_evidence_file": "outputs/bsbench-v2/provider-evidence/235f6f5c3201f275cefc91364ea76a023f99c8448eec3fbe006b39a6dd2a6522-000129-success.json",
+    "maximum_elapsed_seconds": 25.6702751199482,
+    "maximum_enforced_wait_seconds": 8.22096943098586,
+    "maximum_start_to_start_seconds": 25.67502,
+    "minimum_elapsed_seconds": 1.7742465530172922,
+    "minimum_enforced_wait_seconds": 0.0,
+    "minimum_start_to_start_seconds": 10.000028,
+    "outcomes": {
+      "success": 129
+    },
+    "records": 129
+  },
+  "ledger": {
+    "new_reservation_upper_usd": 0.2586456,
+    "new_reservations": 129,
+    "new_settled_actual_usd": 0.0466293941,
+    "new_settlements": 129,
+    "open_unresolved_reservation_ids": [],
+    "timed_out_request_recovered": true,
+    "timed_out_request_recovery_reservation": "172f9d74884324f2512618fad16494f595a1e8614d039ff93222d5492d089cfb",
+    "unpaired_reservation_ids": []
+  },
+  "modal_app": {
+    "app_id": "ap-DtsbAEMYHVUDS63rq0kNsJ",
+    "created_at": "2026-09-20 13:48:00+08:00",
+    "description": "steering-lite-bsbench",
+    "state": "stopped",
+    "stopped_at": "2026-09-20 14:10:40+08:00",
+    "tasks": "0"
+  },
+  "post_run_dry_preflight": {
+    "existing_committed_usd": 9.278601469600002,
+    "limit_usd": 50.0,
+    "paid_execution_enabled": false,
+    "total_upper_usd": 46.2553782696
+  },
+  "run": {
+    "command": "just sweep \"--run --backend real --method kv_cache_gram --openrouter-read-timeout 300\"",
+    "exit_code": 0,
+    "finished_at": "2026-09-20T06:10:41+00:00",
+    "git_commit_at_launch": "13d084f",
+    "run_log": "slop/verification/20260920T054711Z_kv-cache-gram-300s-recovery.log",
+    "started_at": "2026-09-20T05:47:58+00:00"
+  },
+  "schema": "bsbench-kv-cache-gram-terminal-reconciliation-v1",
+  "terminal": {
+    "candidate_sha256": "16c20f199eab5895be2bc5eba4f9eca156918c2ca37f742ad9e543aa2a3e1dc6",
+    "final_dispatch_prevented": true,
+    "observed": [
+      {
+        "coefficient": 0.1,
+        "coherent": false,
+        "directed_effect": -0.875,
+        "dose_score": -7.875000000000001,
+        "off_target_effect": 1.7500000000000002,
+        "useful": false
+      },
+      {
+        "coefficient": 0.2,
+        "coherent": false,
+        "directed_effect": 0.24999999999999997,
+        "dose_score": -3.3500000000000005,
+        "off_target_effect": 0.9000000000000001,
+        "useful": false
+      },
+      {
+        "coefficient": 0.4,
+        "coherent": false,
+        "directed_effect": -1.0875,
+        "dose_score": -7.0375,
+        "off_target_effect": 1.4875,
+        "useful": false
+      },
+      {
+        "coefficient": 0.8,
+        "coherent": false,
+        "directed_effect": -2.025,
+        "dose_score": -9.125,
+        "off_target_effect": 1.7750000000000001,
+        "useful": false
+      },
+      {
+        "coefficient": 1.6,
+        "coherent": false,
+        "directed_effect": -1.3875,
+        "dose_score": -5.987500000000001,
+        "off_target_effect": 1.1500000000000001,
+        "useful": false
+      },
+      {
+        "coefficient": 3.2,
+        "coherent": false,
+        "directed_effect": 0.08750000000000002,
+        "dose_score": -7.612500000000001,
+        "off_target_effect": 1.9250000000000003,
+        "useful": false
+      },
+      {
+        "coefficient": 6.4,
+        "coherent": false,
+        "directed_effect": -0.625,
+        "dose_score": -9.225000000000001,
+        "off_target_effect": 2.1500000000000004,
+        "useful": false
+      },
+      {
+        "coefficient": 12.8,
+        "coherent": false,
+        "directed_effect": 0.35,
+        "dose_score": -10.650000000000002,
+        "off_target_effect": 2.7500000000000004,
+        "useful": false
+      },
+      {
+        "coefficient": 25.6,
+        "coherent": false,
+        "directed_effect": -2.625,
+        "dose_score": -20.575,
+        "off_target_effect": 4.4875,
+        "useful": false
+      }
+    ],
+    "observed_sha256": "bff3d0c55759a87a7635e460c92e1cbe2c5d50bb7c3c113d7e803dafe4cd1f4c",
+    "selection_predicate": "useful is directed_effect - 4 * off_target_effect > 0; coherent is no health reasons and max steered off-axis <= 2.5",
+    "status": "no measured useful, coherent dose",
+    "vector_sha256": "6ddba1f4ff3c394fe736fad02682ccf6cfebd69eb1de87cd1d7a9dce033cc222"
+  }
+}
