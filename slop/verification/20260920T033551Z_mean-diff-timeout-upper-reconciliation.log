@@ -1,0 +1,5 @@
+started_at=2026-09-20T03:35:51Z
+command=.venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260920_mean-diff-timeout-upper-receipt.json --ledger outputs/bsbench-v2/costs.jsonl
+{"actual_usd": 0.0017496, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95"}
+finished_at=2026-09-20T03:35:55Z
+exit_code=0

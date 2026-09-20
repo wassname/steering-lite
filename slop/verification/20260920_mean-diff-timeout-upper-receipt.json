@@ -1,0 +1,20 @@
+{
+  "reservation": "d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95",
+  "actual_usd": 0.0017496,
+  "receipt": {
+    "schema": "bsbench-openrouter-timeout-upper-receipt-v1",
+    "provider": "OpenRouter",
+    "cost_treatment": "reservation_upper",
+    "reason": "unknown provider outcome; charged at upper",
+    "request_key": "0313a31ea7d5fcdc92d089cab9eefe47475de29f4119b2a0ad76e73acb204301",
+    "request_schema": "bsbench-judge-request-v1",
+    "response_schema": "blind_change_description",
+    "payload_sha256": "250b555b067df97f5680d0eb92204e79a779a9b09e655b6eb144eb46b64a309c",
+    "timeout_evidence": "slop/verification/20260920T030842Z_canonical-full-after-random-terminal.log",
+    "reconstruction": "slop/verification/20260920T032644Z_mean-diff-timeout-request-reconstruction.log",
+    "ledger_comparison": "slop/verification/20260920T032741Z_mean-diff-timeout-cache-ledger-audit-repair.log",
+    "metadata_before": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T015551Z.json",
+    "metadata_after": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T032823Z.json",
+    "audit": "slop/audits/20260920_mean_diff_openrouter_timeout.md"
+  }
+}

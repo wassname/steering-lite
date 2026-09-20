@@ -42,7 +42,7 @@ This is the exact affected payload identity. It contains no prompt text in this 
 
 The lower unique-key count is expected: identical candidate answer pairs share a cached request. Every dispatched preceding unique request has both a ledger settlement and cache response. The 26 unreserved keys were never reached after the failure. The candidate-judgments stage has no partial cache record because it writes only after all reconstructed requests return.
 
-The one unresolved reservation is `d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95`, upper `$0.0017496`, with ledger reason `judge_request_failure`. Mean-difference calibration itself is preserved and conservatively estimated at its `$0.884346` stage upper: reservation `25156108d6fb47e51b8b80f2802e669246866600caf8b3dd98990c4384c6ccda`, provider pending usage `148.080115213` seconds and 200 persona pairs.
+The timed-out reservation is `d4cd25efb75817c4fd95ac0151282f26a13b0b9fc4677e58e9b3de8eb8512f95`, upper `$0.0017496`, with ledger reason `judge_request_failure`. It was subsequently settled at that full upper via `slop/verification/20260920_mean-diff-timeout-upper-receipt.json`: `unknown provider outcome; charged at upper`. This is append-only and does not claim a known provider bill. Mean-difference calibration itself is preserved and conservatively estimated at its `$0.884346` stage upper: reservation `25156108d6fb47e51b8b80f2802e669246866600caf8b3dd98990c4384c6ccda`, provider pending usage `148.080115213` seconds and 200 persona pairs.
 
 ### Non-generation key metadata — provider account observation
 
@@ -71,7 +71,7 @@ Regression evidence: focused tests `16 passed` and full offline tests `138 passe
 
 One retry is proposed, not run: the identical canonical `mean_diff` recovery command. Existing 57 judge responses and mean-difference calibration are cache hits; the same unresolved request key is first and retains the same endpoint, model, serialized payload, temperature, token uppers, and 10-second pacing. It uses only the 180-second read timeout. No later requests/methods may dispatch before that request settles. If it fails or has unknown outcome again, stop immediately and retain its new sanitized no-response evidence.
 
-The aggregate dry preflight remains below the budget: `$44.3855922359 < $50`; it includes `$7.4088154359` existing commitments plus expected work, one full retry reserve, and unresolved-work reserve. Evidence: `slop/verification/20260920T033237Z_mean-diff-timeout-dry-preflight.log`.
+After the append-only upper settlement, the unresolved set is empty and the aggregate dry preflight remains `$44.3855922359 < $50`; it includes `$7.4088154359` existing commitments plus expected work, one full retry reserve, and unresolved-work reserve. Evidence: `slop/verification/20260920T033618Z_mean-diff-timeout-post-reconciliation-dry-preflight.log`.
 
 ## Epistemic summary
 
