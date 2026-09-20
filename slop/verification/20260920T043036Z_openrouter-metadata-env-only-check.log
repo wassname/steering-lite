@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 455, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 328, in main
+    raise RuntimeError("OPENROUTER_API_KEY is not set")
+RuntimeError: OPENROUTER_API_KEY is not set

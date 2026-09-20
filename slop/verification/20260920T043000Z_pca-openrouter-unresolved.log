@@ -1,0 +1,16 @@
+started_at=2026-09-20T04:29:27Z
+action=append explicit unresolved event; no provider call
+[
+  {
+    "event": "reserved",
+    "id": "4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70",
+    "kind": "judge-7d5c703c718b4020c818b27f825fb0190b540bee6d58600a83f41155286da7f6",
+    "time": "2026-09-20T03:53:29.270000+00:00",
+    "upper_usd": 0.0017496
+  },
+  {
+    "event": "unresolved",
+    "reason": "local_process_interrupted_unknown_openrouter_outcome",
+    "reservation": "4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70"
+  }
+]

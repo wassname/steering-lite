@@ -1,0 +1,34 @@
+started_at=2026-09-20T04:19:26Z
+scope=recovery audit only; no paid dispatch or source-code edit
+
+## local process
+No `run_bsbench_sweep`, Modal-run, or BS-bench Python process was active during the audit.
+
+## Modal app
+`modal app list --json`:
+{"app_id":"ap-dL5tjZAX0qJOPjjZa7r3S4","description":"steering-lite-bsbench","state":"stopped","tasks":"0","created_at":"2026-09-20 11:46:07+08:00","stopped_at":"2026-09-20 11:56:31+08:00"}
+
+`modal app logs ap-dL5tjZAX0qJOPjjZa7r3S4 --tail 1000 --timestamps --show-function-id --show-function-call-id --show-container-id` identifies the PCA calibration function as:
+- function_id=fu-jKH3j0ZIj6yzpa9vZpCRoL
+- function_call_id=fc-01M2YEQRQ820JCYPTB1790M9CG
+- container_id=ta-01M2YEQRX3VX6CH3FWRECBGZFR
+
+Provider log tail:
+> 2026-09-20 11:49:42+08:00 ... generation 4/4
+> 2026-09-20 11:56:31+08:00 Stopping app - local client disconnected. Use `modal run --detach` to keep apps running even if your local client disconnects.
+
+## PCA ledger and cache
+- Modal PCA candidate reservation `ad345c3ed6aaa65d3c6b1d6191990edd8564b1ce7b8b323792bfcfba4e609870` has a persisted candidate cache and `estimated_at_reservation_upper=$0.884346`; the candidate receipt reports `elapsed_seconds=195.225266666` and `persona_actual_pairs=200`.
+- Candidate cache `outputs/bsbench-v2/cache/calibration-candidates/91e3f8bfbfaee0d156d830dedbbf7d25f41d3fd71919e2b05c1ac7fd6bc14e4f.json` holds 6 coefficients `[0.1, 0.2, 0.4, 0.8, 1.6, 3.2]` and 24 candidate items.
+- 23 PCA judge reservations are settled and have persisted response caches. The last settled reservation is `cacd62a6d3428ca46ca06bb037ae79bfb03af9d4b25f6aad907545bc9f32ecaf`, request `53856643d15f2852455fcb05cbee5d4950da418d72799390d96301b74fed4a9f`, BSV2-002 / BA / target-aware, actual_usd=$0.0003180897.
+- The only open ledger reservation is `4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70`, request `7d5c703c718b4020c818b27f825fb0190b540bee6d58600a83f41155286da7f6`, BSV2-002 / BA / blind, upper_usd=$0.0017496. It has no matching response-cache record and no provider evidence after the request begins.
+
+## dry preflight
+Command: `.venv/bin/python scripts/run_bsbench_sweep.py --dry-run --out outputs/bsbench-v2 --ledger outputs/bsbench-v2/costs.jsonl`
+- paid_execution_enabled=false
+- existing_ledger_usd=$6.312606547800001
+- external_committed_usd=$2.0
+- total_upper_usd=$45.2893833478 (< $50)
+- this treats all incomplete/unknown work through the unchanged `unresolved_work=$4.942952` reserve; it does not settle `4a9d...` at zero.
+
+-- PI[gpt-5.6-terra]

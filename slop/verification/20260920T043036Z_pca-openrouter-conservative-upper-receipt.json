@@ -1,0 +1,16 @@
+{
+  "reservation": "4a9d062d89b3b0f6082ab6d277ace4484406c29c91637a4bcf2aa7cb6e773d70",
+  "actual_usd": 0.0017496,
+  "receipt": {
+    "schema": "bsbench-interrupted-openrouter-conservative-upper-receipt-v1",
+    "status": "unknown_provider_outcome_charged_at_reservation_upper",
+    "reason": "local process stopped after reservation; no local response cache; post-interruption metadata could not run because OPENROUTER_API_KEY is absent from the process environment and loading .env is denied by the tool secret-access policy",
+    "reservation_upper_usd": 0.0017496,
+    "evidence": [
+      "slop/verification/20260920T043000Z_pca-openrouter-unresolved.log",
+      "slop/verification/20260920T043036Z_openrouter-post-interruption-metadata-retry.log",
+      "slop/verification/20260920T043036Z_openrouter-metadata-env-only-check.log",
+      "slop/verification/20260920T042218Z_pca-interruption-recovery-audit.log"
+    ]
+  }
+}

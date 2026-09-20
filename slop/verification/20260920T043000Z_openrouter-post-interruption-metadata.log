@@ -1,0 +1,2 @@
+started_at=2026-09-20T04:29:36Z
+command=just sweep mode="--openrouter-metadata" model="Qwen/Qwen3.5-4B" out="outputs/bsbench-v2" env_file=".env"
