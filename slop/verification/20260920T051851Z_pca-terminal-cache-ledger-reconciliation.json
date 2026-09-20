@@ -1,0 +1,74 @@
+{
+  "candidate_cache_log_key": "91e3f8bfbfae",
+  "first_new_reservation": {
+    "event": "reserved",
+    "id": "c815b6c41a1b1be33bdd7d170062174f9bc78c52ee091642e60369635e337c13",
+    "kind": "judge-7d5c703c718b4020c818b27f825fb0190b540bee6d58600a83f41155286da7f6",
+    "time": "2026-09-20T05:04:09.817343+00:00",
+    "upper_usd": 0.0017496
+  },
+  "judge_cache_hits_before_recovery": 23,
+  "new_actual_usd": 0.027992505,
+  "new_reservations": 73,
+  "new_settlements": 73,
+  "new_unresolved_reservations": [],
+  "open_unresolved_reservations": [],
+  "run_log": "slop/verification/20260920T050323Z_pca-authorized-recovery-run.log",
+  "run_summary": "outputs/bsbench-v2/run-summary.json",
+  "schema": "bsbench-pca-terminal-cache-ledger-reconciliation-v1",
+  "terminal": {
+    "final_dispatch_prevented": true,
+    "observed": [
+      {
+        "coefficient": 0.1,
+        "coherent": true,
+        "directed_effect": -0.5625,
+        "dose_score": -2.3125,
+        "off_target_effect": 0.4375,
+        "useful": false
+      },
+      {
+        "coefficient": 0.2,
+        "coherent": true,
+        "directed_effect": -0.30000000000000004,
+        "dose_score": -4.25,
+        "off_target_effect": 0.9875,
+        "useful": false
+      },
+      {
+        "coefficient": 0.4,
+        "coherent": false,
+        "directed_effect": -0.5250000000000001,
+        "dose_score": -7.625000000000001,
+        "off_target_effect": 1.7750000000000001,
+        "useful": false
+      },
+      {
+        "coefficient": 0.8,
+        "coherent": true,
+        "directed_effect": -0.7625,
+        "dose_score": -3.5625,
+        "off_target_effect": 0.7000000000000001,
+        "useful": false
+      },
+      {
+        "coefficient": 1.6,
+        "coherent": false,
+        "directed_effect": 1.9125,
+        "dose_score": -7.637500000000001,
+        "off_target_effect": 2.3875,
+        "useful": false
+      },
+      {
+        "coefficient": 3.2,
+        "coherent": false,
+        "directed_effect": -2.2,
+        "dose_score": -16.3,
+        "off_target_effect": 3.525,
+        "useful": false
+      }
+    ],
+    "selection_predicate": "useful is directed_effect - 4 * off_target_effect > 0; coherent is no health reasons and max steered off-axis <= 2.5",
+    "status": "no measured useful, coherent dose"
+  }
+}
