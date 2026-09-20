@@ -1,0 +1,12 @@
+{
+  "schema": "bsbench-corrected-mean-diff-structural-post-reconciliation-v1",
+  "failed_reservation": "8369c27cce7d16a8896a16a3f8f8950c7f3e39067bb22e5c7fdab2103edc6bd1",
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/410fc26bb21cc9a70574999105f93df3b424acb7afb12103cecaa0f18bed0e95-000044-failed.json",
+  "receipt": "slop/verification/20260920T141130Z_corrected-mean-diff-structural-upper-receipt.json",
+  "settlement": "estimated_at_reservation_upper",
+  "estimated_usd": 0.0017496,
+  "committed_usd_after": 11.9805479395,
+  "open_unresolved_reservations_after": [],
+  "observation": "The pre-instrumentation callback raised KeyError because the HTTP response JSON lacked choices. It did not preserve usage, so the ledger uses the reservation upper. The next same-payload retry will persist sanitized response structure if this occurs again.",
+  "author": "PI[gpt-5.6-terra]"
+}

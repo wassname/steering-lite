@@ -1,0 +1,17 @@
+{
+  "committed_usd": 11.980547939500001,
+  "open_reservations": {
+    "8369c27cce7d16a8896a16a3f8f8950c7f3e39067bb22e5c7fdab2103edc6bd1": {
+      "event": "reserved",
+      "id": "8369c27cce7d16a8896a16a3f8f8950c7f3e39067bb22e5c7fdab2103edc6bd1",
+      "kind": "judge-d7226839a8e6f9b8857f865300b3185e0eb2c41b16e13207dabe312bf7a2de16",
+      "time": "2026-09-20T14:22:02.969103+00:00",
+      "upper_usd": 0.0017496
+    }
+  },
+  "open_unresolved_reservations": [
+    "8369c27cce7d16a8896a16a3f8f8950c7f3e39067bb22e5c7fdab2103edc6bd1"
+  ],
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/410fc26bb21cc9a70574999105f93df3b424acb7afb12103cecaa0f18bed0e95-000044-failed.json",
+  "schema": "bsbench-corrected-mean-diff-structural-response-reconciliation-v1"
+}

@@ -420,6 +420,32 @@ def test_openrouter_callback_records_malformed_assistant_content(monkeypatch):
     assert error.value.evidence["assistant_content_bytes"] == len('{"summary":"unterminated"')
 
 
+def test_openrouter_callback_records_missing_assistant_content(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps({"error": {"message": "temporary upstream failure"}}).encode()
+
+    monkeypatch.setattr(adapters, "urlopen", lambda *_args, **_kwargs: Response())
+    payload = {
+        "model": "deepseek/deepseek-chat",
+        "messages": [{"role": "user", "content": "persisted request"}],
+        "response_format": {"json_schema": {"schema": {
+            "type": "object",
+            "properties": {"summary": {"type": "string"}, "changes": {"type": "array"}},
+            "required": ["summary", "changes"],
+        }}},
+    }
+    with pytest.raises(adapters.OpenRouterResponseParseError, match="lacks assistant content") as error:
+        openrouter_request_callback(endpoint="https://example.invalid/v1/chat/completions", api_key="test-key")(payload)
+    assert error.value.evidence["response"] == {"error": {"message": "temporary upstream failure"}}
+
+
 def _judge_request(request_key: str, *, blind: bool) -> dict:
     return {
         "request_key": request_key,

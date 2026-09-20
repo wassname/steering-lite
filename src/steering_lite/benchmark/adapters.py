@@ -74,7 +74,18 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
                     "json_error": str(error),
                 },
             ) from error
-        content = response_body["choices"][0]["message"]["content"]
+        try:
+            content = response_body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise OpenRouterResponseParseError(
+                "OpenRouter response lacks assistant content",
+                {
+                    "response_sha256": hashlib.sha256(raw_response).hexdigest(),
+                    "response_bytes": len(raw_response),
+                    "response": response_body,
+                    "structural_error": str(error),
+                },
+            ) from error
         try:
             judgment = json.loads(content)
         except json.JSONDecodeError as error:

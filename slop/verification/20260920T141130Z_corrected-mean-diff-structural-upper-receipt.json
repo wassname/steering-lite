@@ -1,0 +1,8 @@
+{
+  "reservation": "8369c27cce7d16a8896a16a3f8f8950c7f3e39067bb22e5c7fdab2103edc6bd1",
+  "upper_usd": 0.0017496,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/410fc26bb21cc9a70574999105f93df3b424acb7afb12103cecaa0f18bed0e95-000044-failed.json",
+  "outcome": "OpenRouter returned JSON without an assistant choices field; the previous callback raised KeyError and did not retain the response body or usage.",
+  "accounting": "Conservative: settle at the reservation upper rather than infer $0.",
+  "author": "PI[gpt-5.6-terra]"
+}
