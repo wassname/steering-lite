@@ -1,0 +1,8 @@
+{
+  "reservation": "37b4f4b2284e405ab1fe4e5bc9233997584a1530f3c8a6e341f004e6b809caa8",
+  "upper_usd": 0.0017496,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/de2365f3ffc49bcc6996055bd5017977572b2721ad3eced32d397fafb60326d6-000004-failed.json",
+  "outcome": "OpenRouter delivered an HTTP response whose assistant content failed strict JSON decoding; callback evidence has no parseable usage receipt.",
+  "accounting": "Conservative: retain the full reservation upper rather than infer $0 from the parser failure.",
+  "author": "PI[gpt-5.6-terra]"
+}

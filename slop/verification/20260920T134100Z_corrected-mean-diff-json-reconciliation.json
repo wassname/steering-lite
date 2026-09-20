@@ -1,0 +1,24 @@
+{
+  "committed_usd": 11.074862325100002,
+  "latest_provider_evidence": [
+    "outputs/bsbench-v2/provider-evidence/de2365f3ffc49bcc6996055bd5017977572b2721ad3eced32d397fafb60326d6-000004-failed.json",
+    "outputs/bsbench-v2/provider-evidence/c533a0f6e685e7d944f2000680fe34952c5b52a52543ab8e50cdd27d7427edc9-000003-success.json",
+    "outputs/bsbench-v2/provider-evidence/2c2dfd11ce6fa89d832d5883866799018a91b34d7ff07edd0ee2d5875eaff511-000002-success.json",
+    "outputs/bsbench-v2/provider-evidence/334a6e70f9a5f1106f4042be8df87d829d619a73b095383b3a27e4e9018fca59-000001-success.json",
+    "outputs/bsbench-v2/provider-evidence/334a6e70f9a5f1106f4042be8df87d829d619a73b095383b3a27e4e9018fca59-000457-failed.json"
+  ],
+  "open_reservations": {
+    "37b4f4b2284e405ab1fe4e5bc9233997584a1530f3c8a6e341f004e6b809caa8": {
+      "event": "reserved",
+      "id": "37b4f4b2284e405ab1fe4e5bc9233997584a1530f3c8a6e341f004e6b809caa8",
+      "kind": "judge-941eac8190725be7e39200b899bbf4d5082108cc99609dad0e9229ffcb5d42b0",
+      "time": "2026-09-20T13:40:20.255585+00:00",
+      "upper_usd": 0.0017496
+    }
+  },
+  "open_unresolved_reservations": [
+    "37b4f4b2284e405ab1fe4e5bc9233997584a1530f3c8a6e341f004e6b809caa8"
+  ],
+  "run_log": "slop/verification/20260920T133900Z_corrected-mean-diff-429-retry.log",
+  "schema": "bsbench-corrected-mean-diff-json-reconciliation-v1"
+}
