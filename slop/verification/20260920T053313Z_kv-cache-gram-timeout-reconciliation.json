@@ -1,0 +1,34 @@
+{
+  "attribution": "not exact: aggregate metadata spans the earlier conservatively upper-settled 4a9d\u2026 unknown request and cannot identify the timed-out request",
+  "known_settled_actual_since_before_metadata": 0.0527150396,
+  "metadata_usage_after": 0.152403026,
+  "metadata_usage_before": 0.099578293,
+  "metadata_usage_delta": 0.052824733,
+  "new_kv_judge_actual_usd_before_timeout": 0.0052774227,
+  "new_kv_judge_reservations_before_timeout": 16,
+  "new_kv_judge_settlements_before_timeout": 15,
+  "reservation": {
+    "event": "reserved",
+    "id": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760",
+    "kind": "judge-1cf2dec792e836b964ce65334bcd4e1e52787e009c0774403ca31b35ea0e1e75",
+    "time": "2026-09-20T05:30:04.690084+00:00",
+    "upper_usd": 0.0017496
+  },
+  "run_log": "slop/verification/20260920T052144Z_canonical-continuation-run.log",
+  "schema": "bsbench-kv-cache-gram-timeout-reconciliation-v1",
+  "timeout_evidence": {
+    "elapsed_seconds": 181.61043234699173,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "exception_type": "TimeoutError",
+    "model": "deepseek/deepseek-chat",
+    "payload_sha256": "94a91f91f87a3999c731952cd7d0114c54fb30894aba93d1f93cbd6cdc39bf38",
+    "recorded_at": "2026-09-20T05:33:13.384617+00:00",
+    "response_schema": "blind_change_description",
+    "schema": "bsbench-openrouter-no-response-v1"
+  },
+  "unresolved_event": {
+    "event": "unresolved",
+    "reason": "judge_request_failure",
+    "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"
+  }
+}

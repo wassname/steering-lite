@@ -1,0 +1,10 @@
+{
+  "elapsed_seconds": 181.61043234699173,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "exception_type": "TimeoutError",
+  "model": "deepseek/deepseek-chat",
+  "payload_sha256": "94a91f91f87a3999c731952cd7d0114c54fb30894aba93d1f93cbd6cdc39bf38",
+  "recorded_at": "2026-09-20T05:33:13.384617+00:00",
+  "response_schema": "blind_change_description",
+  "schema": "bsbench-openrouter-no-response-v1"
+}

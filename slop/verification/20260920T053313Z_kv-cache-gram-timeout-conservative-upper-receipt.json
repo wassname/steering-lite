@@ -1,0 +1,15 @@
+{
+  "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760",
+  "actual_usd": 0.0017496,
+  "receipt": {
+    "schema": "bsbench-openrouter-timeout-conservative-upper-receipt-v1",
+    "status": "unknown_provider_outcome_charged_at_reservation_upper",
+    "reason": "OpenRouter response read timed out after 181.61043234699173 seconds. Provider account metadata before/after is aggregate and cannot identify this request exactly.",
+    "reservation_upper_usd": 0.0017496,
+    "evidence": [
+      "slop/verification/20260920T052144Z_canonical-continuation-run.log",
+      "slop/verification/20260920T053313Z_kv-timeout-openrouter-metadata.log",
+      "slop/verification/20260920T053313Z_kv-cache-gram-timeout-reconciliation.json"
+    ]
+  }
+}

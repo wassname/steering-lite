@@ -1,0 +1,22 @@
+{
+  "active_sweep_processes": [],
+  "conditions": [
+    "bare",
+    "prompting",
+    "random",
+    "mean_diff",
+    "pca",
+    "kv_cache_gram",
+    "vjp_delta",
+    "vjp_cache"
+  ],
+  "current_identity_sha256": "8ec996eba103e978d614735e253ad4e34996e79bb55b558ab53d58ef7d19c304",
+  "identity_matches_pca_run": true,
+  "judge_model": "deepseek/deepseek-chat",
+  "model": "Qwen/Qwen3.5-4B",
+  "paid_execution_enabled_in_preflight": false,
+  "pca_run_identity_sha256": "8ec996eba103e978d614735e253ad4e34996e79bb55b558ab53d58ef7d19c304",
+  "schema": "bsbench-canonical-continuation-preflight-identity-v1",
+  "tracked_source_diff_is_empty": true,
+  "untracked_artifacts_present": true
+}

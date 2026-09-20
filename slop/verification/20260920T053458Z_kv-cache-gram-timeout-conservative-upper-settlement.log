@@ -1,0 +1,3 @@
+started_at=2026-09-20T05:35:42Z
+action=import conservative upper receipt for OpenRouter timeout reservation 6387c6e…
+{"actual_usd": 0.0017496, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"}

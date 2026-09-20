@@ -1,0 +1,4 @@
+started_at=2026-09-20T05:33:54Z
+command=just sweep "--openrouter-metadata"
+reason=reconcile unresolved timeout reservation 6387c6e…; no generation request
+{"evidence_path": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T053357Z.json", "mode": "openrouter-metadata", "statuses": {"credits": 200, "key": 200}}

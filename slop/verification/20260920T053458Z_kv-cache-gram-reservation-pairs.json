@@ -1,0 +1,328 @@
+{
+  "counts": {
+    "estimated_at_reservation_upper": 1,
+    "settled": 16,
+    "unresolved": 0
+  },
+  "records": [
+    {
+      "events_after_reservation": [
+        {
+          "estimated_usd": 0.8843460000000001,
+          "event": "estimated_at_reservation_upper",
+          "receipt": {
+            "provider": "Modal",
+            "status": "pending",
+            "usage": {
+              "elapsed_seconds": 183.45274421,
+              "persona_actual_pairs": 200
+            }
+          },
+          "reservation": "a900eeee5f5b26b71f63f858c8e3d6e304c3ba9a4a415f1fa1fc3e65f0d5dcc0"
+        }
+      ],
+      "paired_status": "estimated_at_reservation_upper",
+      "reservation": {
+        "event": "reserved",
+        "id": "a900eeee5f5b26b71f63f858c8e3d6e304c3ba9a4a415f1fa1fc3e65f0d5dcc0",
+        "kind": "modal-calibration-candidates-kv_cache_gram",
+        "time": "2026-09-20T05:24:27.088303+00:00",
+        "upper_usd": 0.8843460000000001
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.000335322,
+          "event": "settled",
+          "reservation": "ee7c9bac2424a3c10e31d4ce9c7977de4dcdfbe707950b4b841226e7094b28e9"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "ee7c9bac2424a3c10e31d4ce9c7977de4dcdfbe707950b4b841226e7094b28e9",
+        "kind": "judge-75818b180277f92a1f7a15bee53f9cf151313b87851e8102e93b11f18e363a8c",
+        "time": "2026-09-20T05:27:41.773048+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0004735305,
+          "event": "settled",
+          "reservation": "0fbfcf45d0b8f7ad170b1260ff81ad59fc5c4143827e1a3b8be3193d91297ed7"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "0fbfcf45d0b8f7ad170b1260ff81ad59fc5c4143827e1a3b8be3193d91297ed7",
+        "kind": "judge-7ebdcc6beebd6239faefdbbbe12e706998fb7ea0045c1f4921b41df5441ca3d2",
+        "time": "2026-09-20T05:27:44.785947+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0003229776,
+          "event": "settled",
+          "reservation": "5b766c66e6ccc06e82b670430feec9c75a2f3bc17c0349ecbbfc4b37e1e9d41c"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "5b766c66e6ccc06e82b670430feec9c75a2f3bc17c0349ecbbfc4b37e1e9d41c",
+        "kind": "judge-d960f591675feb31e87b4aed1f030c49d2435abb2ae011df600bd2975de8ff80",
+        "time": "2026-09-20T05:27:59.635060+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0003768327,
+          "event": "settled",
+          "reservation": "ac5a763e20dd0decc82585314833e80f81d4b6c1d72199486054aeb08893963d"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "ac5a763e20dd0decc82585314833e80f81d4b6c1d72199486054aeb08893963d",
+        "kind": "judge-709c30a87958f3fc8aee9bfb5939e8639f316ecc002b271b62f25ea8f1c9dd8f",
+        "time": "2026-09-20T05:28:08.507713+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0003193803,
+          "event": "settled",
+          "reservation": "618e6b5f776983d21decd889e133718b47ec09034d608c22ed98d5eba4ee194b"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "618e6b5f776983d21decd889e133718b47ec09034d608c22ed98d5eba4ee194b",
+        "kind": "judge-869bc9a5933b48cc97a19e28cc2d305d75d449edca8899b8541a8396c6fd3cbd",
+        "time": "2026-09-20T05:28:18.044031+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0004789332,
+          "event": "settled",
+          "reservation": "09404ed6c34c234f557533b2ca7d4671dcda79e860589d41e327dba149403cf9"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "09404ed6c34c234f557533b2ca7d4671dcda79e860589d41e327dba149403cf9",
+        "kind": "judge-e553082d8729ad52a4467c8d3e7cc6398c08e60ea37d2877cb799507b1eb5d7d",
+        "time": "2026-09-20T05:28:23.702834+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.000320409,
+          "event": "settled",
+          "reservation": "0cb2ac070bd30b98787eecf1929f99b9b9ca1df00cd527a34aa35010e8604ed6"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "0cb2ac070bd30b98787eecf1929f99b9b9ca1df00cd527a34aa35010e8604ed6",
+        "kind": "judge-0ec6d81cd61e635cd15cbd8c010e634a0f6306dc6dcc61af98133a0533a38e3d",
+        "time": "2026-09-20T05:28:39.149069+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.000503622,
+          "event": "settled",
+          "reservation": "7e18b7cf3f6baa11be2c85bd725276b2b19e0e16df84af7f4480441f3a504e68"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "7e18b7cf3f6baa11be2c85bd725276b2b19e0e16df84af7f4480441f3a504e68",
+        "kind": "judge-a9e64a81a8cbafab1e6cec0d263557f4ae5fa8e4326c774035e560826406567e",
+        "time": "2026-09-20T05:28:43.993478+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.000321174,
+          "event": "settled",
+          "reservation": "d5a35ada05365851cc2b9ea68ae84302ee1c1d014bfc0a75b1cbab5b3238372f"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "d5a35ada05365851cc2b9ea68ae84302ee1c1d014bfc0a75b1cbab5b3238372f",
+        "kind": "judge-4ab0ae5eafcb76117a4ddbfa32acffb6952fd448abfe694dfc1bdc3d2c997265",
+        "time": "2026-09-20T05:28:59.995739+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0004779009,
+          "event": "settled",
+          "reservation": "0799ae559034b689ef52c8999a1fa2f4f7ec848b93d8951e04bb6a2882caefeb"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "0799ae559034b689ef52c8999a1fa2f4f7ec848b93d8951e04bb6a2882caefeb",
+        "kind": "judge-7291ee31e820284002f6ea5d31f95132f80173c4395ed8828072f89a4f0b82fd",
+        "time": "2026-09-20T05:29:04.611089+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0003170592,
+          "event": "settled",
+          "reservation": "d1bf87b49e53f8f3f02f842b62b66c429fa5ad79036560f48a68fea65aac69bc"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "d1bf87b49e53f8f3f02f842b62b66c429fa5ad79036560f48a68fea65aac69bc",
+        "kind": "judge-5767ba23adb6ffcccce32ffe0a6188b40bbd54f532b1dbfe3324cd0963c658ee",
+        "time": "2026-09-20T05:29:18.771508+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0002875914,
+          "event": "settled",
+          "reservation": "820e69a357b062fe5454738c7a31de75618c2d0de7626892810107c8bc159ebb"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "820e69a357b062fe5454738c7a31de75618c2d0de7626892810107c8bc159ebb",
+        "kind": "judge-1b3ca014de2f877326bb3c1ff84d25afc28ba1c50b7ffd32d23b22ab7dcb0aa9",
+        "time": "2026-09-20T05:29:24.025930+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0003003327,
+          "event": "settled",
+          "reservation": "9536b6ef011126021bc1a3f5fdb05d362aa23304d853908edf2f5278a17167f2"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "9536b6ef011126021bc1a3f5fdb05d362aa23304d853908edf2f5278a17167f2",
+        "kind": "judge-66fdf016e457a06555208918bbad9300caebc11c767441c779fa75f95e3af1fc",
+        "time": "2026-09-20T05:29:36.582524+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0001440819,
+          "event": "settled",
+          "reservation": "12050939a521334a737d19fa3f8f240db93c86146d9c3283451a7f84cc691cb4"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "12050939a521334a737d19fa3f8f240db93c86146d9c3283451a7f84cc691cb4",
+        "kind": "judge-1cf2dec792e836b964ce65334bcd4e1e52787e009c0774403ca31b35ea0e1e75",
+        "time": "2026-09-20T05:29:44.120449+00:00",
+        "upper_usd": 0.0017496
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "actual_usd": 0.0002982753,
+          "event": "settled",
+          "reservation": "999149c82d36adbe17f09a87fc654ef09ad634e62c814e2e627c5c08849fd11b"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "999149c82d36adbe17f09a87fc654ef09ad634e62c814e2e627c5c08849fd11b",
+        "kind": "judge-66fdf016e457a06555208918bbad9300caebc11c767441c779fa75f95e3af1fc",
+        "time": "2026-09-20T05:29:54.605562+00:00",
+        "upper_usd": 0.0022643999999999997
+      }
+    },
+    {
+      "events_after_reservation": [
+        {
+          "event": "unresolved",
+          "reason": "judge_request_failure",
+          "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"
+        },
+        {
+          "actual_usd": 0.0017496,
+          "event": "settled",
+          "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"
+        },
+        {
+          "event": "receipt_imported",
+          "receipt": {
+            "evidence": [
+              "slop/verification/20260920T052144Z_canonical-continuation-run.log",
+              "slop/verification/20260920T053313Z_kv-timeout-openrouter-metadata.log",
+              "slop/verification/20260920T053313Z_kv-cache-gram-timeout-reconciliation.json"
+            ],
+            "reason": "OpenRouter response read timed out after 181.61043234699173 seconds. Provider account metadata before/after is aggregate and cannot identify this request exactly.",
+            "reservation_upper_usd": 0.0017496,
+            "schema": "bsbench-openrouter-timeout-conservative-upper-receipt-v1",
+            "status": "unknown_provider_outcome_charged_at_reservation_upper"
+          },
+          "reservation": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760"
+        }
+      ],
+      "paired_status": "settled",
+      "reservation": {
+        "event": "reserved",
+        "id": "6387c6e872dedf583007129c4703208c22006b263a7cd3ce8251dd81cc07f760",
+        "kind": "judge-1cf2dec792e836b964ce65334bcd4e1e52787e009c0774403ca31b35ea0e1e75",
+        "time": "2026-09-20T05:30:04.690084+00:00",
+        "upper_usd": 0.0017496
+      }
+    }
+  ],
+  "run_started_at": "2026-09-20T05:24:19+00:00",
+  "schema": "bsbench-reservation-pairs-v1"
+}
