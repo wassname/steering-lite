@@ -227,6 +227,27 @@ def test_no_useful_candidate_records_terminal_condition_and_continues(tmp_path: 
     ]
 
 
+def test_render_report_keeps_candidate_points_for_terminal_calibration(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    summary = _run(
+        root,
+        ledger,
+        RandomNamedStageCall(),
+        NonUsefulRandomJudgeCall(),
+        endpoint="https://judge.example/v1",
+        prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8},
+    )
+
+    report = render_report(root, root / "results")
+
+    random_points = [point for point in report["artifact"]["points"] if point["method"] == "random"]
+    assert {point["phase"] for point in random_points} == {"candidate"}
+    assert len(random_points) == 2
+    assert report["artifact"]["terminal_methods"] == [{"method": "random", "status": "no measured useful, coherent dose"}]
+    assert "no eligible final dose; RMS-KL transfer was not measured because transfer is downstream of eligibility" in (root / "results" / "index.html").read_text()
+    assert summary["conditions"]["random"]["terminal"]["final_dispatch_prevented"] is True
+
+
 def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     stage_call = FakeRemoteStageCall()

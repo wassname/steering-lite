@@ -1,0 +1,19 @@
+started_at=2026-09-20T07:27:26Z
+command=just results
+scope=render only from canonical cached run; no model, provider, or Modal dispatch
+.venv/bin/python scripts/run_bsbench_results.py --run-dir outputs/bsbench-v2 --out outputs/bsbench-v2/results
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_results.py", line 28, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_results.py", line 18, in main
+    report = render_report(args.run_dir, output)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/results.py", line 423, in render_report
+    artifact = normalize_summary(json.loads(summary_path.read_text()))
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/results.py", line 248, in normalize_summary
+    points.extend(_final_points(method, conditions[method]))
+                  ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/results.py", line 136, in _final_points
+    raise ValueError(f"{method} is missing final generation, judgments, or health")
+ValueError: random is missing final generation, judgments, or health
+error: recipe `results` failed on line 20 with exit code 1

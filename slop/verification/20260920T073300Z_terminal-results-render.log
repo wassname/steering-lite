@@ -1,0 +1,7 @@
+started_at=2026-09-20T07:30:34Z
+command=just results
+scope=terminal-aware render from canonical cached summary; no provider or Modal dispatch
+.venv/bin/python scripts/run_bsbench_results.py --run-dir outputs/bsbench-v2 --out outputs/bsbench-v2/results
+/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/results.py:397: UserWarning: You passed a edgecolor/edgecolors ('none') for an unfilled marker ('x').  Matplotlib is ignoring the edgecolor in favor of the facecolor.  This behavior may change in the future.
+  ax.scatter(x, y, color=colors[method], s=34, alpha=.85, edgecolors="#222222" if pareto else "none", linewidths=.55 if pareto else 0, marker="o" if all(point["coherent"] for point in draw) else "x", label=label)
+{"non_experimental": false, "output": "outputs/bsbench-v2/results", "point_count": 44, "points_sha256": "392a9ec2ecc4766b77075c70e9ab4328c3136cba1f87fe1b7f5ab36cb671f3cb"}

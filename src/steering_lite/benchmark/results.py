@@ -129,6 +129,19 @@ def _candidate_points(method: str, condition: dict) -> list[dict]:
 
 
 def _final_points(method: str, condition: dict) -> list[dict]:
+    terminal = condition.get("terminal")
+    if terminal is not None:
+        if (
+            not isinstance(terminal, dict)
+            or terminal.get("schema") != "bsbench-terminal-calibration-v1"
+            or terminal.get("method") != method
+            or terminal.get("status") != "no measured useful, coherent dose"
+            or terminal.get("final_dispatch_prevented") is not True
+        ):
+            raise ValueError(f"{method} has an invalid terminal calibration record")
+        if any(condition.get(stage) is not None for stage in ("final", "final_judgments", "final_health", "final_aware", "final_blind")):
+            raise ValueError(f"{method} terminal calibration must not include final-stage records")
+        return []
     final = condition.get("final")
     final_judgments = condition.get("final_judgments")
     final_health = condition.get("final_health")
@@ -243,9 +256,12 @@ def normalize_summary(summary: dict) -> dict:
     if len(paid) != 1 or not isinstance(next(iter(paid)), bool):
         raise ValueError("results refuse mixed or missing execution identities")
     points = [_direct_point("bare", conditions["bare"]), _direct_point("prompting", conditions["prompting"])]
+    terminal_methods = []
     for method in METHODS[2:]:
         points.extend(_candidate_points(method, conditions[method]))
         points.extend(_final_points(method, conditions[method]))
+        if terminal := conditions[method].get("terminal"):
+            terminal_methods.append({"method": method, "status": terminal["status"]})
     if not points:
         raise ValueError("results require measured points")
     artifact = {
@@ -254,6 +270,7 @@ def normalize_summary(summary: dict) -> dict:
         "run_identity_sha256": summary["identity_sha256"],
         "non_experimental": not next(iter(paid)),
         "points": points,
+        "terminal_methods": terminal_methods,
     }
     artifact["points_sha256"] = content_key({"points": points})
     return artifact
@@ -336,17 +353,19 @@ def render_html(artifact: dict, maximum: list[dict], optimal: list[dict]) -> str
     warning = "<p class='warning'>FAKE DATA — NON-EXPERIMENTAL. This report tests the artifact contract; it is not a benchmark result.</p>" if artifact["non_experimental"] else ""
     headers = "<tr><th>method</th><th>phase</th><th>case</th><th>dose</th><th>directed intended effect</th><th>|off-target effect|</th><th>1:4 score</th><th>coherent</th></tr>"
     details = "".join(_evidence(point) for point in artifact["points"])
+    terminal_rows = "".join("<tr><td>{}</td><td>{}</td><td>no eligible final dose; RMS-KL transfer was not measured because transfer is downstream of eligibility.</td></tr>".format(html.escape(item["method"]), html.escape(item["status"])) for item in artifact["terminal_methods"])
     return """<!doctype html><meta charset='utf-8'><title>BS-bench results</title>
 <style>body{{font:16px system-ui;max-width:1120px;margin:2rem auto;padding:0 1rem}}table{{border-collapse:collapse;width:100%;margin:1rem 0}}th,td{{padding:.35rem .55rem;border-bottom:1px solid #ccc;text-align:left}}.warning{{background:#fff0d8;padding:.7rem;border-left:4px solid #d55e00}}pre{{overflow:auto;background:#f6f6f6;padding:.7rem;font-size:.8rem}}details{{margin:.5rem 0}}</style>
 <h1>BS-bench measured results</h1>{warning}
 <p>All tables and both plots read <code>measured-points.json</code> (SHA-256: <code>{hash}</code>). Points retain every measured dose. Directed intended effect is the paired AB/BA mean. The 1:4 score is directed effect minus four times mean absolute off-target effect.</p>
 <h2>Maximum coherent dose</h2><table>{headers}{maximum}</table>
 <h2>1:4-optimal Pareto point</h2><table>{headers}{optimal}</table>
+<h2>Terminal calibration outcomes</h2><table><tr><th>method</th><th>status</th><th>final and transfer evidence</th></tr>{terminal_rows}</table>
 <h2>Measured dose paths</h2><img src='plot.png' alt='Measured dose paths'>
 <h2>Pareto view</h2><img src='plot_pareto.png' alt='Pareto dose paths'>
 <p>The highlighted frontier is non-dominated within each method, phase, and case; faded marks remain measured points.</p>
 <h2>Numbered evidence</h2>{details}
-""".format(warning=warning, hash=artifact["points_sha256"], headers=headers, maximum=_table_rows(maximum), optimal=_table_rows(optimal), details=details)
+""".format(warning=warning, hash=artifact["points_sha256"], headers=headers, maximum=_table_rows(maximum), optimal=_table_rows(optimal), terminal_rows=terminal_rows, details=details)
 
 
 def _plot(points: list[dict], output: Path, *, pareto: bool, non_experimental: bool) -> set[str]:
@@ -354,10 +373,12 @@ def _plot(points: list[dict], output: Path, *, pareto: bool, non_experimental: b
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
     from matplotlib.patches import Polygon
 
     colors = {method: color for method, color in zip(METHODS, ("#222222", "#d55e00", "#777777", "#0072b2", "#cc79a7", "#009e73", "#6f4aa8", "#56b4e9"), strict=True)}
-    fig, ax = plt.subplots(figsize=(10.64, 5.9), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(10.64, 6.2))
+    fig.subplots_adjust(left=.11, right=.98, top=.91, bottom=.27)
     random = [point for point in points if point["method"] == "random"]
     if len(random) >= 3:
         cloud = [(point["directed_effect"], point["absolute_off_target_effect"]) for point in random]
@@ -365,7 +386,6 @@ def _plot(points: list[dict], output: Path, *, pareto: bool, non_experimental: b
         ax.add_patch(Polygon(hull, closed=True, facecolor="#999999", edgecolor="none", alpha=.18, label="random measured region"))
     groups = _group_points(points)
     labeled_methods: set[str] = set()
-    frontier_labeled = False
     for (method, phase, case_id), group in sorted(groups.items()):
         ordered = sorted(group, key=lambda point: (-1 if point["coefficient"] is None else point["coefficient"]))
         draw = _pareto(ordered) if pareto else ordered
@@ -378,19 +398,39 @@ def _plot(points: list[dict], output: Path, *, pareto: bool, non_experimental: b
         x = [point["directed_effect"] for point in draw]
         y = [point["absolute_off_target_effect"] for point in draw]
         if method != "bare" and method != "random" and len(draw) > 1:
-            ax.plot(x, y, color=colors[method], alpha=.9 if pareto else .45, linewidth=2.2 if pareto else 1.3, label="Pareto frontier" if pareto and not frontier_labeled else None)
-            frontier_labeled |= pareto
+            ax.plot(x, y, color=colors[method], alpha=.9 if pareto else .45, linewidth=2.2 if pareto else 1.3)
         label = method if method not in labeled_methods else None
-        ax.scatter(x, y, color=colors[method], s=34, alpha=.85, edgecolors="#222222" if pareto else "none", linewidths=.55 if pareto else 0, marker="o" if all(point["coherent"] for point in draw) else "x", label=label)
+        coherent = [point for point in draw if point["coherent"]]
+        incoherent = [point for point in draw if not point["coherent"]]
+        if coherent:
+            ax.scatter(
+                [point["directed_effect"] for point in coherent],
+                [point["absolute_off_target_effect"] for point in coherent],
+                color=colors[method], s=38, alpha=.85, edgecolors="#222222", linewidths=.55,
+                marker="o", label=label,
+            )
+            label = None
+        if incoherent:
+            ax.scatter(
+                [point["directed_effect"] for point in incoherent],
+                [point["absolute_off_target_effect"] for point in incoherent],
+                color=colors[method], s=44, alpha=.95, linewidths=1.25,
+                marker="x", label=label,
+            )
         labeled_methods.add(method)
     title = "FAKE — non-experimental BS-bench Pareto frontiers" if pareto and non_experimental else "BS-bench Pareto frontiers" if pareto else "FAKE — non-experimental BS-bench measured points" if non_experimental else "BS-bench measured points"
     ax.set_title(title)
     ax.set_xlabel("directed intended effect")
     ax.set_ylabel("absolute off-target effect (lower is better)")
+    ax.margins(x=.06, y=.08)
     ax.invert_yaxis()
     ax.axvline(0, color="#999999", linewidth=.7)
     ax.grid(color="#e5e5e5", linewidth=.7)
-    ax.legend(ncol=4, fontsize=8, loc="upper center", bbox_to_anchor=(.5, -0.17), frameon=False)
+    handles, labels = ax.get_legend_handles_labels()
+    if pareto:
+        handles.append(Line2D([], [], color="#222222", linewidth=2.2))
+        labels.append("within-method Pareto frontier")
+    ax.legend(handles, labels, ncol=4, fontsize=8, loc="upper center", bbox_to_anchor=(.5, -0.19), frameon=False)
     fig.savefig(output, dpi=150)
     return {point["point_id"] for point in points}
 
