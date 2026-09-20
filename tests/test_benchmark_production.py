@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import os
+from contextlib import contextmanager
 from urllib.error import HTTPError
 from pathlib import Path
 import subprocess
@@ -186,7 +187,7 @@ def test_openrouter_http_error_evidence_preserves_retry_metadata_without_key(tmp
 def test_openrouter_no_response_evidence_has_request_identity_without_payload(tmp_path: Path, monkeypatch):
     sweep = _sweep_script()
     monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: lambda _payload: (_ for _ in ()).throw(TimeoutError("private prompt must not persist")))
-    clock = iter((1.0, 1.0, 1.0, 4.0))
+    clock = iter((1.0, 1.0, 4.0))
     monkeypatch.setattr(sweep.time, "monotonic", lambda: next(clock))
     request_call = sweep.audited_openrouter_request_callback(
         endpoint="https://openrouter.ai/api/v1/chat/completions",
@@ -228,13 +229,24 @@ def test_openrouter_read_timeout_overrides_adapter_default(monkeypatch):
     assert seen == [180.0, 90]
 
 
-def test_openrouter_callback_paces_uncached_requests(tmp_path: Path, monkeypatch):
+def test_openrouter_callback_records_dispatch_starts_at_least_ten_seconds_apart(tmp_path: Path, monkeypatch):
     sweep = _sweep_script()
-    clock = iter((0.0, 0.0, 0.0, 3.0, 10.0, 10.0))
+    clock = [0.0]
+    dispatch_starts = []
     sleeps = []
-    monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: lambda _payload: {"ok": True})
-    monkeypatch.setattr(sweep.time, "monotonic", lambda: next(clock))
-    monkeypatch.setattr(sweep.time, "sleep", sleeps.append)
+
+    def request(_payload):
+        dispatch_starts.append(clock[0])
+        clock[0] += 0.25
+        return {"ok": True}
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: request)
+    monkeypatch.setattr(sweep.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(sweep.time, "sleep", sleep)
     request_call = sweep.audited_openrouter_request_callback(
         endpoint="https://openrouter.ai/api/v1/chat/completions",
         api_key="must-not-persist",
@@ -243,7 +255,14 @@ def test_openrouter_callback_paces_uncached_requests(tmp_path: Path, monkeypatch
     )
     payload = {"model": "deepseek/deepseek-chat", "response_format": {"json_schema": {"name": "persona_pair_validation"}}}
     assert request_call(payload) == request_call(payload) == {"ok": True}
-    assert sleeps == [7.0]
+
+    assert dispatch_starts[1] - dispatch_starts[0] >= 10.0
+    assert sleeps == [9.75]
+    timing_records = [json.loads(path.read_text()) for path in sorted(tmp_path.glob("*.json"))]
+    assert [record["outcome"] for record in timing_records] == ["success", "success"]
+    assert [record["enforced_wait_seconds"] for record in timing_records] == [0.0, 9.75]
+    assert [record["elapsed_seconds"] for record in timing_records] == [0.25, 0.25]
+    assert all(record["dispatch_started_at"] and record["response_finished_at"] for record in timing_records)
 
 
 def test_openrouter_metadata_redacts_key_fields(tmp_path: Path, monkeypatch):
@@ -272,6 +291,14 @@ def test_real_sweep_keeps_one_modal_lifecycle_across_gpu_stages(tmp_path: Path, 
     sweep = _sweep_script()
     events = []
     remote_calls = []
+    read_timeouts = []
+
+    @contextmanager
+    def read_timeout(seconds):
+        read_timeouts.append(seconds)
+        yield
+
+    monkeypatch.setattr(sweep, "_openrouter_read_timeout", read_timeout)
 
     class App:
         active = False
@@ -317,10 +344,11 @@ def test_real_sweep_keeps_one_modal_lifecycle_across_gpu_stages(tmp_path: Path, 
         return {"ok": True}
 
     monkeypatch.setattr(sweep, "run_full_sweep", run_two_stages)
-    monkeypatch.setattr(sys, "argv", ["run_bsbench_sweep.py", "--run", "--backend", "real", "--out", str(tmp_path / "out")])
+    monkeypatch.setattr(sys, "argv", ["run_bsbench_sweep.py", "--run", "--backend", "real", "--openrouter-read-timeout", "300", "--out", str(tmp_path / "out")])
     sweep.main()
 
     assert events == ["run", "enter", "exit"]
+    assert read_timeouts == [300.0]
     assert remote_calls == [(True, "bare"), (True, "prompting")]
 
 

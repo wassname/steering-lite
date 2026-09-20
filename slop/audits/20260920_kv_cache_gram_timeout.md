@@ -35,7 +35,7 @@ The post-timeout OpenRouter metadata query succeeded with 200 responses from key
 
 `audited_openrouter_request_callback` in [`scripts/run_bsbench_sweep.py`](../../scripts/run_bsbench_sweep.py) stores `next_request_at`, waits before the POST, and delegates the request. The main real-backend path wraps it in `_openrouter_read_timeout(180.0)`. The underlying adapter calls `urlopen(..., timeout=90)`, and the wrapper overwrites that with 180 seconds.
 
-The timeout is observed at 181.61 seconds. Successful requests do not persist an elapsed-duration field, so the log cannot estimate a response latency distribution. Reservation timestamps have adjacent intervals from 3.013 to 16.002 seconds. These are not reliable response latencies, but the 3.013-second interval also means the claimed 10-second request pacing is not established from the append-only ledger. This needs a local timestamp measurement before another expensive continuation.
+The timeout is observed at 181.61 seconds. Successful requests do not persist an elapsed-duration field, so the log cannot estimate a response latency distribution. Reservation timestamps have adjacent intervals from 3.013 to 16.002 seconds. A reservation is written before the callback waits, so these intervals do not measure POST dispatch timing. This needs a local callback-boundary timestamp measurement before another expensive continuation.
 
 ## Interpretation and smallest recovery proposal
 
@@ -48,14 +48,14 @@ The timeout is observed at 181.61 seconds. Successful requests do not persist an
 - **Action:** Keep `6387…` settled at upper. Do not relaunch until review.
 - **Interpretability:** yes for the timeout, no for its exact provider charge.
 
-### H2 [harness | Likely | 70%]
+### H2 [measurement | Likely | 75%]
 
-- **Mechanism:** The intended 10-second request pace is not being enforced for all reservation starts.
-- **Evidence:** Ledger reservation start intervals include 3.013, 5.254, and 4.615 seconds despite the callback's `min_interval_seconds=10.0` default.
-- **Contrary evidence:** Reservation times are only an indirect measurement of POST starts; no per-request dispatch timestamp is recorded.
+- **Mechanism:** The ledger cannot establish the intended 10-second request pace because it reserves cost before the callback waits.
+- **Evidence:** Ledger reservation intervals include 3.013, 5.254, and 4.615 seconds, while the callback's `min_interval_seconds` applies after that reservation.
+- **Contrary evidence:** The callback keeps `next_request_at`, which may already enforce the intended pace; no per-request dispatch timestamp was recorded.
 - **Discriminating test:** Add a local `dispatch_started_at` field at the callback boundary and assert consecutive starts are at least 10 seconds apart before any external call.
-- **Action:** Fix and verify pacing locally before the next paid continuation.
-- **Interpretability:** partial. It affects rate and reliability, not the persisted responses already received.
+- **Action:** Measure pacing locally before the next paid continuation.
+- **Interpretability:** yes. It identifies the missing measurement without inferring a pace failure.
 
 ### H3 [measurement | Plausible | 40%]
 

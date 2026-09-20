@@ -209,45 +209,70 @@ def _openrouter_read_timeout(seconds: float):
 def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence_root: Path, min_interval_seconds: float = 10.0):
     request_call = openrouter_request_callback(endpoint=endpoint, api_key=api_key)
     next_request_at = 0.0
+    attempt = 0
 
     def call(payload: dict) -> dict:
-        nonlocal next_request_at
-        wait_seconds = next_request_at - time.monotonic()
-        if wait_seconds > 0:
+        nonlocal attempt, next_request_at
+        attempt += 1
+        wait_seconds = max(next_request_at - time.monotonic(), 0.0)
+        if wait_seconds:
             time.sleep(wait_seconds)
-        next_request_at = time.monotonic() + min_interval_seconds
-        started_at = time.monotonic()
+        dispatch_started_monotonic = time.monotonic()
+        dispatch_started_at = datetime.now(timezone.utc).isoformat()
+        next_request_at = dispatch_started_monotonic + min_interval_seconds
+        identity = _request_identity(payload)
+
+        def timing(*, schema: str, outcome: str) -> dict:
+            response_finished_monotonic = time.monotonic()
+            response_finished_at = datetime.now(timezone.utc).isoformat()
+            return {
+                "schema": schema,
+                "recorded_at": response_finished_at,
+                "endpoint": endpoint,
+                **identity,
+                "attempt": attempt,
+                "outcome": outcome,
+                "dispatch_started_at": dispatch_started_at,
+                "response_finished_at": response_finished_at,
+                "elapsed_seconds": response_finished_monotonic - dispatch_started_monotonic,
+                "enforced_wait_seconds": wait_seconds,
+                "min_interval_seconds": min_interval_seconds,
+            }
+
+        def persist(evidence: dict) -> None:
+            save_json(evidence_root / f"{identity['payload_sha256']}-{attempt:06d}-{evidence['outcome']}.json", evidence)
+
         try:
-            return request_call(payload)
+            response = request_call(payload)
         except HTTPError as error:
             raw_body = error.read().decode(errors="replace")
             try:
                 body = _redact(json.loads(raw_body))
             except json.JSONDecodeError:
                 body = {"raw_body": raw_body[:10_000]}
-            evidence = {
-                "schema": "bsbench-openrouter-http-error-v1",
-                "recorded_at": datetime.now(timezone.utc).isoformat(),
-                "endpoint": endpoint,
-                **_request_identity(payload),
+            evidence = timing(schema="bsbench-openrouter-http-error-v1", outcome="failed") | {
                 "status": error.code,
                 "reason": error.reason,
                 "headers": _provider_headers(error.headers),
                 "body": body,
             }
-            save_json(evidence_root / f"{evidence['payload_sha256']}-{error.code}.json", evidence)
+            persist(evidence)
             raise
         except (TimeoutError, URLError, RemoteDisconnected, ConnectionResetError) as error:
-            evidence = {
-                "schema": "bsbench-openrouter-no-response-v1",
-                "recorded_at": datetime.now(timezone.utc).isoformat(),
-                "endpoint": endpoint,
-                **_request_identity(payload),
+            evidence = timing(schema="bsbench-openrouter-no-response-v1", outcome="failed") | {
                 "exception_type": type(error).__name__,
-                "elapsed_seconds": time.monotonic() - started_at,
             }
-            save_json(evidence_root / f"{evidence['payload_sha256']}-{evidence['exception_type']}.json", evidence)
+            persist(evidence)
             raise
+        except Exception as error:
+            evidence = timing(schema="bsbench-openrouter-callback-error-v1", outcome="failed") | {
+                "exception_type": type(error).__name__,
+            }
+            persist(evidence)
+            raise
+        else:
+            persist(timing(schema="bsbench-openrouter-response-timing-v1", outcome="success"))
+            return response
 
     return call
 
@@ -313,6 +338,7 @@ def main() -> None:
     parser.add_argument("--method", "--stage", dest="method", choices=METHODS, help="Run one condition for recovery or debugging; omit for the canonical full sweep.")
     parser.add_argument("--backend", choices=("recorded", "fake", "real"))
     parser.add_argument("--judge-endpoint", default="https://openrouter.ai/api/v1/chat/completions")
+    parser.add_argument("--openrouter-read-timeout", type=float, default=180.0)
     parser.add_argument("--ledger", type=Path)
     parser.add_argument("--metadata-out", type=Path)
     args = parser.parse_args()
@@ -413,7 +439,7 @@ def main() -> None:
             manifest = dry_manifest(args.out, args.model, ledger=ledger)
             budget = manifest["cost_estimate"]
             from run_bsbench_modal import app, remote_stage_call
-            with app.run(), _openrouter_read_timeout(180.0):
+            with app.run(), _openrouter_read_timeout(args.openrouter_read_timeout):
                 modal_adapter, judge_adapter = real_adapters(
                     modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
                     judge_request_call=audited_openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key, evidence_root=args.out / "provider-evidence"),

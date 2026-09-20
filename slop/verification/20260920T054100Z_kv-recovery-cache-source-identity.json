@@ -1,0 +1,9 @@
+{
+  "entrypoint_changed_outside_source_hash": true,
+  "head_commit": "3d1f783cf8af1fb7288330f5787898c807f2c638",
+  "head_source_hash": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+  "production_cache_identity_unchanged": true,
+  "schema": "bsbench-cache-source-identity-check-v1",
+  "source_tree_changed": false,
+  "working_source_hash": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88"
+}
