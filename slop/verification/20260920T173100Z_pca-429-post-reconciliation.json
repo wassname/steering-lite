@@ -1,0 +1,11 @@
+{
+  "schema": "bsbench-pca-429-post-reconciliation-v1",
+  "failed_reservation": "b166b067c61729f58f1ff4ff1070bed815ee7567d71f32cdf527f4d8ac471186",
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/472e45813909c7f8f66a25c3cafea1647838274a59a0e8cb85418b784a7b4d1a-000026-failed.json",
+  "settlement": "estimated_at_reservation_upper",
+  "estimated_usd": 0.0017496,
+  "committed_usd_after": 13.8706646319,
+  "open_unresolved_reservations_after": [],
+  "diagnosis": "PCA reused candidate work and entered final judgments. A repeated OpenRouter shared-pool 429 stopped the affected stage; later methods did not start.",
+  "author": "PI[gpt-5.6-terra]"
+}
