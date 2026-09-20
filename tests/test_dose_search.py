@@ -20,10 +20,10 @@ from steering_lite.benchmark.dose_search import (
 def observed(coefficient: float, *, useful: bool, coherent: bool, provenance: str) -> dict:
     return {
         "coefficient": coefficient,
-        "useful": useful,
-        "coherent": coherent,
+        "historical_score_positive": useful,
+        "historical_off_axis_within_2_5": coherent,
         "provenance": provenance,
-        "generation_health": {"rep": 0.0, "gen_len": 40, "steer_tail": "later response"},
+        "generation_health": {"reasons": []},
     }
 
 
@@ -51,7 +51,7 @@ def test_explicit_case_manifests_are_disjoint_and_include_other_datasets():
         validate_cases(Case("cal", "a", ("one",)), (Case("x", "b", ("two",)), Case("y", "c", ("two",))))
 
 
-def test_fit_target_measures_observed_useful_coherent_boundary():
+def test_fit_target_uses_largest_generation_healthy_candidate_not_behavioral_cutoffs():
     vector = SimpleNamespace(cfg=SimpleNamespace(coeff=0.0))
     calls = []
 
@@ -75,11 +75,11 @@ def test_fit_target_measures_observed_useful_coherent_boundary():
         measure_kwargs={"device": "cpu"},
         measure=measure,
     )
-    assert vector.cfg.coeff == 0.4
+    assert vector.cfg.coeff == 0.8
     assert calls[0][1] == {"device": "cpu"}
     assert target["target_stat"] == "kl_rms"
     assert target["target_rms"] == 1.25
-    assert target["source"]["provenance"] == "judge-002"
+    assert target["source"]["provenance"] == "judge-003"
     assert target["calibration_health"]["per_t_p95"] == [0.2, 0.3]
 
 
@@ -119,7 +119,7 @@ def test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_obser
         for coefficient in (0.56, 0.7, 0.84)
     ]
     classified = classify_transfer_boundary(record, planned_observations)
-    assert classified["boundary"] == "measured_useful_coherent_boundary"
+    assert classified["boundary"] == "measured_generation_health_boundary"
     with pytest.raises(ValueError, match="nearby observed"):
         classify_transfer_boundary(record, [])
     for changed, message in (
@@ -157,11 +157,11 @@ def test_boundary_distinguishes_failure_from_solver_limit_including_final_point(
         [{"coeff": 0.5, "kl_rms": 1.0, "final": True}],
         [
             observed(0.5, useful=True, coherent=True, provenance="judge-good"),
-            observed(0.8, useful=False, coherent=False, provenance="judge-failure"),
+            observed(0.8, useful=False, coherent=False, provenance="judge-still-healthy"),
         ],
         1.0,
         (0.1, 4.0),
-    ) == "measured_coherence_failure"
+    ) == "measured_generation_health_boundary"
 
 
 def test_cached_search_reuses_identical_inputs_and_invalidates_changes(tmp_path: Path):

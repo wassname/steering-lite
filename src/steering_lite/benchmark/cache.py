@@ -51,6 +51,7 @@ def cached_stage(
     prompts: list[str],
     compute,
     code: str | None = None,
+    compatible_code_sha256s: tuple[str, ...] = (),
 ) -> dict:
     """Cache only when every result-relevant local input is named in the key."""
     if not all((stage, model, data, method, config, prompts)):
@@ -65,6 +66,24 @@ def cached_stage(
         "prompts_sha256": content_key({"prompts": prompts}),
         "code_sha256": source_hash() if code is None else code,
     }
+    if compatible_code_sha256s:
+        semantic_identity = {key: value for key, value in identity.items() if key != "code_sha256"}
+        matches = []
+        for path in (root / stage).glob("*.json"):
+            record = json.loads(path.read_text())
+            cached_identity = record.get("identity")
+            if not isinstance(cached_identity, dict) or content_key(cached_identity) != path.stem:
+                raise RuntimeError(f"cache identity mismatch at {path}")
+            if cached_identity.get("code_sha256") not in compatible_code_sha256s:
+                continue
+            if {key: value for key, value in cached_identity.items() if key != "code_sha256"} == semantic_identity:
+                matches.append((path, record))
+        if len(matches) > 1:
+            raise RuntimeError(f"ambiguous compatible cache records for {stage} {method}")
+        if matches:
+            path, record = matches[0]
+            logger.info("cache reuse compatible {} {}", stage, path.stem[:12])
+            return record["result"]
     return cached(root, stage, identity, compute)
 
 

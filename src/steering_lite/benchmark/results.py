@@ -129,19 +129,6 @@ def _candidate_points(method: str, condition: dict) -> list[dict]:
 
 
 def _final_points(method: str, condition: dict) -> list[dict]:
-    terminal = condition.get("terminal")
-    if terminal is not None:
-        if (
-            not isinstance(terminal, dict)
-            or terminal.get("schema") != "bsbench-terminal-calibration-v1"
-            or terminal.get("method") != method
-            or terminal.get("status") != "no measured useful, coherent dose"
-            or terminal.get("final_dispatch_prevented") is not True
-        ):
-            raise ValueError(f"{method} has an invalid terminal calibration record")
-        if any(condition.get(stage) is not None for stage in ("final", "final_judgments", "final_health", "final_aware", "final_blind")):
-            raise ValueError(f"{method} terminal calibration must not include final-stage records")
-        return []
     final = condition.get("final")
     final_judgments = condition.get("final_judgments")
     final_health = condition.get("final_health")
@@ -256,21 +243,32 @@ def normalize_summary(summary: dict) -> dict:
     if len(paid) != 1 or not isinstance(next(iter(paid)), bool):
         raise ValueError("results refuse mixed or missing execution identities")
     points = [_direct_point("bare", conditions["bare"]), _direct_point("prompting", conditions["prompting"])]
-    terminal_methods = []
+    calibration_points = []
+    transfer_points = []
+    transfer_predictions = []
     for method in METHODS[2:]:
-        points.extend(_candidate_points(method, conditions[method]))
-        points.extend(_final_points(method, conditions[method]))
-        if terminal := conditions[method].get("terminal"):
-            terminal_methods.append({"method": method, "status": terminal["status"]})
-    if not points:
-        raise ValueError("results require measured points")
+        calibration_points.extend(_candidate_points(method, conditions[method]))
+        predictions = conditions[method].get("transfer_prediction", {}).get("predictions")
+        if not isinstance(predictions, list) or len(predictions) != 5:
+            raise ValueError(f"{method} is missing evaluation and transfer RMS-KL predictions")
+        transfer_predictions.extend(prediction for prediction in predictions if prediction["case"]["case_id"] != "bsbench-v2-evaluation")
+        for point in _final_points(method, conditions[method]):
+            if point["case_id"] == "bsbench-v2-evaluation":
+                points.append(point)
+            else:
+                transfer_points.append(point)
+    expected_methods = set(METHODS[2:])
+    if {point["method"] for point in points if point["method"] not in {"bare", "prompting"}} != expected_methods:
+        raise ValueError("results require completed numbered evaluation points for every activation method")
     artifact = {
-        "schema": "bsbench-measured-points-v1",
+        "schema": "bsbench-measured-points-v2",
         "run_identity": identity,
         "run_identity_sha256": summary["identity_sha256"],
         "non_experimental": not next(iter(paid)),
         "points": points,
-        "terminal_methods": terminal_methods,
+        "calibration_points": calibration_points,
+        "transfer_points": transfer_points,
+        "transfer_predictions": transfer_predictions,
     }
     artifact["points_sha256"] = content_key({"points": points})
     return artifact
@@ -349,23 +347,45 @@ def _evidence(point: dict) -> str:
     )
 
 
+def _transfer_prediction_rows(predictions: list[dict]) -> str:
+    rows = []
+    for prediction in predictions:
+        history = prediction["search_history"]
+        last = history[-1] if history else {"status": "empty search history"}
+        endpoint_kl = last.get("kl_rms") if isinstance(last, dict) else None
+        error = "unreported" if not isinstance(endpoint_kl, (int, float)) else f"{endpoint_kl - prediction['target_rms']:+.6g}"
+        rows.append(
+            "<tr><td>{}</td><td>{}</td><td>{:.6g}</td><td>{:.6g}</td><td>{}</td><td><details><summary>last: <code>{}</code></summary><pre>{}</pre></details></td></tr>".format(
+                html.escape(prediction["method"]),
+                html.escape(prediction["case"]["case_id"]),
+                prediction["target_rms"],
+                prediction["predicted_coefficient"],
+                error,
+                html.escape(json.dumps(last, sort_keys=True)),
+                html.escape(json.dumps(history, indent=2, sort_keys=True)),
+            )
+        )
+    return "".join(rows)
+
+
 def render_html(artifact: dict, maximum: list[dict], optimal: list[dict]) -> str:
     warning = "<p class='warning'>FAKE DATA — NON-EXPERIMENTAL. This report tests the artifact contract; it is not a benchmark result.</p>" if artifact["non_experimental"] else ""
     headers = "<tr><th>method</th><th>phase</th><th>case</th><th>dose</th><th>directed intended effect</th><th>|off-target effect|</th><th>1:4 score</th><th>coherent</th></tr>"
     details = "".join(_evidence(point) for point in artifact["points"])
-    terminal_rows = "".join("<tr><td>{}</td><td>{}</td><td>no eligible final dose; RMS-KL transfer was not measured because transfer is downstream of eligibility.</td></tr>".format(html.escape(item["method"]), html.escape(item["status"])) for item in artifact["terminal_methods"])
+    transfer_rows = _table_rows(artifact["transfer_points"])
+    prediction_rows = _transfer_prediction_rows(artifact["transfer_predictions"])
     return """<!doctype html><meta charset='utf-8'><title>BS-bench results</title>
 <style>body{{font:16px system-ui;max-width:1120px;margin:2rem auto;padding:0 1rem}}table{{border-collapse:collapse;width:100%;margin:1rem 0}}th,td{{padding:.35rem .55rem;border-bottom:1px solid #ccc;text-align:left}}.warning{{background:#fff0d8;padding:.7rem;border-left:4px solid #d55e00}}pre{{overflow:auto;background:#f6f6f6;padding:.7rem;font-size:.8rem}}details{{margin:.5rem 0}}</style>
 <h1>BS-bench measured results</h1>{warning}
 <p>All tables and both plots read <code>measured-points.json</code> (SHA-256: <code>{hash}</code>). Points retain every measured dose. Directed intended effect is the paired AB/BA mean. The 1:4 score is directed effect minus four times mean absolute off-target effect.</p>
 <h2>Maximum coherent dose</h2><table>{headers}{maximum}</table>
 <h2>1:4-optimal Pareto point</h2><table>{headers}{optimal}</table>
-<h2>Terminal calibration outcomes</h2><table><tr><th>method</th><th>status</th><th>final and transfer evidence</th></tr>{terminal_rows}</table>
-<h2>Measured dose paths</h2><img src='plot.png' alt='Measured dose paths'>
+<h2>Four-case RMS-KL transfer</h2><p>These rows are separate from the 20-question method comparison. Each case reports the measured 0.8×, 1.0×, and 1.2× predicted doses.</p><table>{headers}{transfer_rows}</table><h3>RMS-KL target and search endpoint</h3><table><tr><th>method</th><th>case</th><th>target RMS-KL</th><th>predicted coefficient</th><th>last search KL minus target</th><th>last search record</th></tr>{prediction_rows}</table>
+<h2>20-question evaluation dose paths</h2><img src='plot.png' alt='Measured dose paths'>
 <h2>Pareto view</h2><img src='plot_pareto.png' alt='Pareto dose paths'>
 <p>The highlighted frontier is non-dominated within each method, phase, and case; faded marks remain measured points.</p>
 <h2>Numbered evidence</h2>{details}
-""".format(warning=warning, hash=artifact["points_sha256"], headers=headers, maximum=_table_rows(maximum), optimal=_table_rows(optimal), terminal_rows=terminal_rows, details=details)
+""".format(warning=warning, hash=artifact["points_sha256"], headers=headers, maximum=_table_rows(maximum), optimal=_table_rows(optimal), transfer_rows=transfer_rows, prediction_rows=prediction_rows, details=details)
 
 
 def _plot(points: list[dict], output: Path, *, pareto: bool, non_experimental: bool) -> set[str]:

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from steering_lite.benchmark.cache import content_key
+from steering_lite.benchmark.cache import cached_stage, content_key
 from steering_lite.benchmark.dose_search import (
     CALIBRATION_CASE,
     Case,
@@ -150,17 +150,17 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     phase_b = first["phase_b_budget_stages"]
     assert len(phase_b) == 24
     assert {(stage["stage"], stage["runner"], stage["item_count"]) for stage in phase_b} == {
-        ("final-generation", "modal_gpu", 24),
-        ("final-health", "local", 24),
-        ("final-aware", "local_judge_api", 24),
-        ("final-blind", "local_judge_api", 24),
+        ("final-generation", "modal_gpu", 84),
+        ("final-health", "local", 84),
+        ("final-aware", "local_judge_api", 84),
+        ("final-blind", "local_judge_api", 84),
     }
     assert all("dispatch_blocked_by_missing_transfer_data" not in stage for stage in phase_b)
-    assert all("transfer_provenance_sha256" in stage for stage in phase_b)
+    assert all("prediction_provenance_sha256" in stage for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 904,
-        "blind": 904,
+        "target_aware": 1624,
+        "blind": 1624,
         "persona_validation": 12,
     }
     assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
@@ -204,6 +204,20 @@ def test_persona_identity_distinguishes_requested_and_actual_and_rejects_corpus_
     monkeypatch.setattr("steering_lite.benchmark.sweep.persona_corpus_identity", lambda **_kwargs: {"actual_pairs": 199, "corpus_sha256": "changed", "thinking": True})
     with pytest.raises(ValueError, match="canonical persona corpus changed"):
         persona_extraction_identity()
+
+
+def test_compatible_stage_cache_requires_exact_legacy_identity(tmp_path: Path):
+    inputs = {"model": {"id": "a"}, "data": {"sha256": "a"}, "method": "vjp_cache", "config": {"coefficient": 0.2}, "prompts": ["a"]}
+    cached_stage(tmp_path, "candidate-judgments", code="accepted", compute=lambda: {"result": "legacy"}, **inputs)
+    assert cached_stage(
+        tmp_path,
+        "candidate-judgments",
+        code="current",
+        compatible_code_sha256s=("accepted",),
+        compute=lambda: (_ for _ in ()).throw(AssertionError("must reuse accepted cache")),
+        **inputs,
+    ) == {"result": "legacy"}
+    assert cached_stage(tmp_path, "candidate-judgments", code="current", compute=lambda: {"result": "current"}, **inputs) == {"result": "current"}
 
 
 def test_stage_cache_invalidates_model_data_method_config_prompt_and_code(tmp_path: Path):
@@ -305,9 +319,9 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
 
 def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_classification():
     observed = [
-        {"coefficient": 0.2, "useful": True, "coherent": True, "provenance": "candidate-1", "generation_health": {}},
-        {"coefficient": 0.4, "useful": True, "coherent": True, "provenance": "candidate-2", "generation_health": {}},
-        {"coefficient": 0.8, "useful": False, "coherent": False, "provenance": "candidate-3", "generation_health": {}},
+        {"coefficient": 0.2, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "candidate-1", "generation_health": {"reasons": []}},
+        {"coefficient": 0.4, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "candidate-2", "generation_health": {"reasons": []}},
+        {"coefficient": 0.8, "historical_score_positive": False, "historical_off_axis_within_2_5": False, "provenance": "candidate-3", "generation_health": {"reasons": []}},
     ]
     health = {
         "kl_rms": 1.25, "rep": 0.0, "gen_len": 20, "steer_tail": "calibration",
@@ -345,7 +359,7 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     post_generation = classify_transfer_boundary(
         prediction,
         [
-            {"case_id": transfer_case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "useful": True, "coherent": True, "provenance": "transfer-1", "generation_health": {}}
+            {"case_id": transfer_case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "transfer-1", "generation_health": {"reasons": []}}
             for coefficient in (0.56, 0.7, 0.84)
         ],
     )
@@ -364,7 +378,7 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
 
     assert measured_prompts == [calibration_prompts]
     assert solved_prompts == [transfer_prompts]
-    assert target["observed_boundary"]["coefficient"] == 0.4
+    assert target["observed_boundary"]["coefficient"] == 0.8
     assert prediction["predicted_coefficient"] == 0.7
     assert prediction["predicted_coefficient"] != target["source"]["coefficient"]
     assert prediction["case"]["prompt_ids"] != list(CALIBRATION_CASE.prompt_ids)
@@ -376,7 +390,7 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
         "coefficients": [0.56, 0.7, 0.84],
     }]
     assert all(stage["item_count"] == 6 for stage in stages)
-    assert post_generation["boundary"] == "measured_useful_coherent_boundary"
+    assert post_generation["boundary"] == "measured_generation_health_boundary"
     assert changed_stages[0]["config"] != stages[0]["config"]
     assert retargeted_stages[0]["config"] != stages[0]["config"]
 
@@ -398,7 +412,7 @@ def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
     with pytest.raises(KeyError, match="item_count"):
         cost_estimate([{"stage": "final-blind", "runner": "local_judge_api"}])
 
-    assert len(reserve_budget(tmp_path / "costs.jsonl", full)) == 3
+    assert len(reserve_budget(tmp_path / "costs.jsonl", full)) == 2
     at_limit = {"total_upper_usd": 50.0, "planned_reservations": [{"kind": "first", "upper_usd": 10.0}, {"kind": "second", "upper_usd": 40.0}]}
     with pytest.raises(RuntimeError, match="at or above"):
         reserve_budget(tmp_path / "at-limit.jsonl", at_limit)

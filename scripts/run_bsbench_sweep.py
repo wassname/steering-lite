@@ -21,107 +21,6 @@ from steering_lite.benchmark.production import record_completed_stage, run_condi
 from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, dry_manifest
 
 
-class NoMeasuredUsefulCoherentDose(RuntimeError):
-    """Stop a remote final dispatch whose measured candidates cannot define a target."""
-
-    def __init__(self, *, method: str, config: dict):
-        super().__init__("no measured useful, coherent dose")
-        self.method = method
-        self.config = config
-
-
-def _matching_cache_results(root: Path, stage: str, *, model: dict, data: dict, method: str, config: dict | None = None) -> list[dict]:
-    records = []
-    for path in sorted((root / "cache" / stage).glob("*.json")):
-        record = json.loads(path.read_text())
-        identity = record["identity"]
-        if identity["model"] != model or identity["data"] != data or identity["method"] != method:
-            continue
-        if config is not None and identity["config"] != config:
-            continue
-        records.append(record["result"])
-    return records
-
-
-def _one_matching_cache_result(root: Path, stage: str, *, model: dict, data: dict, method: str, config: dict | None = None, result_sha256: str | None = None) -> dict:
-    matches = _matching_cache_results(root, stage, model=model, data=data, method=method, config=config)
-    if result_sha256 is not None:
-        matches = [result for result in matches if content_key(result) == result_sha256]
-    if not matches:
-        raise ValueError(f"terminal {method} condition is missing cached {stage}")
-    if len({content_key(result) for result in matches}) != 1:
-        raise ValueError(f"terminal {method} condition has conflicting cached {stage} records")
-    return matches[0]
-
-
-def _terminal_calibration_condition(root: Path, *, model: dict, data: dict, method: str, config: dict, backend) -> dict:
-    """Build an auditable terminal condition from the exact cached failed dose search."""
-    observed = config["observed"]
-    eligible = [row for row in observed if row["useful"] and row["coherent"]]
-    if eligible:
-        raise ValueError("terminal calibration condition requires no useful, coherent candidate")
-    candidate_inputs = {
-        "candidate_sha256": config["candidate_sha256"],
-        "observed": observed,
-        "vector_sha256": config["vector_sha256"],
-    }
-    candidate = _one_matching_cache_result(
-        root, "calibration-candidates", model=model, data=data, method=method,
-        result_sha256=config["candidate_sha256"],
-    )
-    candidate_judgments = _one_matching_cache_result(
-        root, "candidate-judgments", model=model, data=data, method=method,
-        config={"candidate_sha256": config["candidate_sha256"], "judge_model": model["judge_model"], "judge_endpoint": config["judge_endpoint"]},
-    )
-    return {
-        "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)),
-        "candidate": candidate | {"reused": True},
-        "candidate_judgments": candidate_judgments,
-        "candidate_health": _one_matching_cache_result(root, "candidate-health", model=model, data=data, method=method, config=candidate_inputs),
-        "candidate_aware": _one_matching_cache_result(root, "candidate-aware", model=model, data=data, method=method, config=candidate_inputs),
-        "candidate_blind": _one_matching_cache_result(root, "candidate-blind", model=model, data=data, method=method, config=candidate_inputs),
-        "terminal": {
-            "schema": "bsbench-terminal-calibration-v1",
-            "status": "no measured useful, coherent dose",
-            "method": method,
-            "selection_predicate": "useful is directed_effect - 4 * off_target_effect > 0; coherent is no health reasons and max steered off-axis <= 2.5",
-            "candidate_sha256": config["candidate_sha256"],
-            "vector_sha256": config["vector_sha256"],
-            "observed_sha256": config["observed_sha256"],
-            "observed": observed,
-            "final_dispatch_prevented": True,
-        },
-    }
-
-
-def _run_condition_or_terminal(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, judge, measure, solver, vector_loader, transfer_records) -> dict:
-    """Reject only a known impossible final stage before it can reserve or dispatch."""
-    import steering_lite.benchmark.production as production
-
-    production_stage = production.production_stage
-
-    def checked_production_stage(*args, **kwargs):
-        if kwargs["stage"] == "final-generation" and kwargs["method"] == method:
-            observed = kwargs["config"].get("observed")
-            if isinstance(observed, list) and not any(row["useful"] and row["coherent"] for row in observed):
-                raise NoMeasuredUsefulCoherentDose(method=method, config=kwargs["config"] | {"judge_endpoint": judge.endpoint})
-        return production_stage(*args, **kwargs)
-
-    production.production_stage = checked_production_stage
-    try:
-        return run_condition(
-            root, ledger, model=model, data=data, method=method, rows=rows, backend=backend,
-            prompt_spec=prompt_spec, judge=judge, measure=measure, solver=solver,
-            vector_loader=vector_loader, transfer_records=transfer_records,
-        )
-    except NoMeasuredUsefulCoherentDose as error:
-        return _terminal_calibration_condition(
-            root, model=model, data=data, method=error.method, config=error.config, backend=backend,
-        )
-    finally:
-        production.production_stage = production_stage
-
-
 def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], backend, prompt_spec: dict, judge, methods: tuple[str, ...] = METHODS, measure=None, solver=None, vector_loader=None, transfer_records=None) -> dict:
     """Run named conditions in order and atomically save only a matching run summary."""
     summary_path = root / "run-summary.json"
@@ -140,7 +39,7 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
     prior = json.loads(summary_path.read_text()) if summary_path.exists() else None
     conditions = dict(prior["conditions"]) if prior and prior.get("identity") == identity else {}
     for method in methods:
-        conditions[method] = _run_condition_or_terminal(
+        conditions[method] = run_condition(
             root,
             ledger,
             model=model,
@@ -343,7 +242,7 @@ def main() -> None:
     parser.add_argument("--metadata-out", type=Path)
     args = parser.parse_args()
     if args.dry_run:
-        result = dry_manifest(args.out, args.model)
+        result = dry_manifest(args.out, args.model, cache_aware=True)
     elif args.check_openrouter_env:
         if not os.environ.get("OPENROUTER_API_KEY"):
             raise RuntimeError("OPENROUTER_API_KEY is not set")
@@ -389,16 +288,16 @@ def main() -> None:
                         return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "baseline_answers": ["Fake baseline." for _ in prompts], "candidate_coefficients": coefficients, "candidate_health": {str(coefficient): {"reasons": []} for coefficient in coefficients}, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
                     if stage == "final-generation":
                         from steering_lite.benchmark.cache import content_key
-                        from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
-                        from steering_lite.benchmark.transfer_data import load_transfer_records
+                        from steering_lite.benchmark.dose_search import PREDICTION_CASES, final_dose_plan
+                        from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
                         artifact = config["vector_artifact"]
                         assert __import__("hashlib").sha256(__import__("base64").b64decode(artifact["vector_bytes_b64"])).hexdigest() == artifact["sha256"]
                         target = {"target_id": "offline-target", "target_stat": "kl_rms", "target_rms": 1.0}
-                        predictions = [{"schema": "bsbench-rms-kl-transfer-v1", "target_id": target["target_id"], "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}, "method": method, "model": config.get("model_id", "offline"), "target_stat": "kl_rms", "target_rms": 1.0, "bracket": (0.01, 2.0), "predicted_coefficient": 0.3, "search_history": []} for case in TRANSFER_CASES]
+                        predictions = [{"schema": "bsbench-rms-kl-transfer-v1", "target_id": target["target_id"], "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}, "method": method, "model": config.get("model_id", "offline"), "target_stat": "kl_rms", "target_rms": 1.0, "bracket": (0.01, 2.0), "predicted_coefficient": 0.3, "search_history": []} for case in PREDICTION_CASES]
                         plans = [final_dose_plan(prediction) for prediction in predictions]
-                        records = load_transfer_records(); by_case = {plan["case"]["case_id"]: plan for plan in plans}
-                        plan = [{"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256} for case in TRANSFER_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]]
+                        records = {PREDICTION_CASES[0].case_id: load_evaluation_records()} | load_transfer_records(); by_case = {plan["case"]["case_id"]: plan for plan in plans}
+                        plan = [{"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256} for case in PREDICTION_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]]
                         return {"actual_usd": 0.0, "target": target, "transfer_predictions": predictions, "final_dose_plans": plans, "executable_generation_plan": plan, "baseline_answers": {item["prompt_id"]: "Fake baseline." for item in plan}, "answers": ["Fake final answer." for _ in plan], "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []} for item in plan], "plan_sha256": content_key({"plan": plan})}
                     raise AssertionError(stage)
             class FakeJudge:
@@ -436,7 +335,7 @@ def main() -> None:
             if not api_key:
                 raise RuntimeError("real backend requires OPENROUTER_API_KEY before remote callbacks are constructed")
             ledger = args.ledger or args.out / "costs.jsonl"
-            manifest = dry_manifest(args.out, args.model, ledger=ledger)
+            manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True)
             budget = manifest["cost_estimate"]
             from run_bsbench_modal import app, remote_stage_call
             with app.run(), _openrouter_read_timeout(args.openrouter_read_timeout):

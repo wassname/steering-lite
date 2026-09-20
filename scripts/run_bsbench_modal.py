@@ -226,7 +226,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         transfer_predictions = None
         final_dose_plans = None
         if config.get("schema") == "bsbench-remote-vector-final-v1":
-            from steering_lite.benchmark.dose_search import CALIBRATION_CASE, TRANSFER_CASES, final_dose_plan, fit_target, predict_transfer
+            from steering_lite.benchmark.dose_search import CALIBRATION_CASE, PREDICTION_CASES, final_dose_plan, fit_target, predict_transfer
             from steering_lite.benchmark.transfer_data import PromptRecord
 
             records = {
@@ -255,7 +255,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                     bracket=(0.01, 2.0),
                     solver_kwargs={},
                 )
-                for case in TRANSFER_CASES
+                for case in PREDICTION_CASES
             ]
             final_dose_plans = [final_dose_plan(prediction) for prediction in transfer_predictions]
             plans_by_case = {plan["case"]["case_id"]: plan for plan in final_dose_plans}
@@ -268,7 +268,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                     "prompt": record.prompt,
                     "prompt_sha256": record.content_sha256,
                 }
-                for case in TRANSFER_CASES
+                for case in PREDICTION_CASES
                 for record in records[case.case_id]
                 for coefficient in plans_by_case[case.case_id]["coefficients"]
             ]

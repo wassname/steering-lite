@@ -20,6 +20,11 @@ CALIBRATION_CASE = Case(
     "bsbench-v2-dev",
     ("BSV2-001", "BSV2-002", "BSV2-003", "BSV2-004"),
 )
+EVALUATION_CASE = Case(
+    "bsbench-v2-evaluation",
+    "bsbench-v2-dev",
+    tuple(f"BSV2-{number:03d}" for number in range(1, 21)),
+)
 TRANSFER_CASES = (
     Case("bsbench-v2-heldout-a", "bsbench-v2-heldout", ("BSV2-021", "BSV2-022")),
     Case("bsbench-v2-heldout-b", "bsbench-v2-heldout", ("BSV2-023", "BSV2-024")),
@@ -29,6 +34,7 @@ TRANSFER_CASES = (
 
 
 FINAL_DOSE_MULTIPLIERS = (0.8, 1.0, 1.2)
+PREDICTION_CASES = (EVALUATION_CASE, *TRANSFER_CASES)
 
 
 _HEALTH_FIELDS = (
@@ -59,14 +65,18 @@ def health_evidence(metrics: dict) -> dict:
     return {field: metrics[field] for field in _HEALTH_FIELDS}
 
 
-def useful_coherent_boundary(observed: list[dict]) -> dict:
-    candidates = [row for row in observed if row["useful"] and row["coherent"]]
+def highest_healthy_candidate(observed: list[dict]) -> dict:
+    """Choose the largest measured candidate whose generation health has no reasons."""
+    candidates = [
+        row for row in observed
+        if isinstance(row.get("generation_health"), dict)
+        and row["generation_health"].get("reasons") == []
+    ]
     if not candidates:
-        raise ValueError("calibration needs a measured useful, coherent dose")
-    boundary = max(candidates, key=lambda row: abs(float(row["coefficient"])))
-    boundary["provenance"]
-    boundary["generation_health"]
-    return boundary
+        raise ValueError("calibration needs one candidate without generation-health reasons")
+    selected = max(candidates, key=lambda row: float(row["coefficient"]))
+    selected["provenance"]
+    return selected
 
 
 def classify_boundary(
@@ -75,14 +85,14 @@ def classify_boundary(
     target_rms: float,
     bracket: tuple[float, float],
 ) -> str:
-    """Classify a measured behavioral failure separately from an RMS search limit."""
-    if any(not row["coherent"] for row in observed):
-        return "measured_coherence_failure"
+    """Classify an observed generation-health failure separately from an RMS search limit."""
+    if any(row.get("generation_health", {}).get("reasons") for row in observed):
+        return "measured_generation_health_failure"
     if history and max(abs(float(row["coeff"])) for row in history) >= bracket[1] and all(
         float(row["kl_rms"]) < target_rms for row in history
     ):
         return "search_limit"
-    return "measured_useful_coherent_boundary"
+    return "measured_generation_health_boundary"
 
 
 def fit_target(
@@ -98,8 +108,8 @@ def fit_target(
     measure_kwargs: dict,
     measure=measure_kl,
 ) -> dict:
-    """Measure RMS-KL at the observed useful/coherent calibration boundary."""
-    boundary = useful_coherent_boundary(observed)
+    """Measure RMS-KL at the largest candidate without generation-health reasons."""
+    boundary = highest_healthy_candidate(observed)
     vector.cfg.coeff = float(boundary["coefficient"])
     metrics = measure(vector, model, tokenizer, prompts, **measure_kwargs)
     target_rms = float(metrics["kl_rms"])

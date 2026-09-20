@@ -9,13 +9,13 @@ import pytest
 
 from steering_lite.benchmark.adapters import real_adapters
 from steering_lite.benchmark.cache import content_key
-from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
+from steering_lite.benchmark.dose_search import PREDICTION_CASES, final_dose_plan
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark import results as benchmark_results
 from steering_lite.benchmark.results import normalize_summary, render_report
 from steering_lite.benchmark.sweep import persona_extraction_identity
-from steering_lite.benchmark.transfer_data import load_transfer_records
+from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
 
 def _entrypoint_module():
@@ -84,11 +84,11 @@ class FakeRemoteStageCall:
                     "predicted_coefficient": 0.3,
                     "search_history": [],
                 }
-                for case in TRANSFER_CASES
+                for case in PREDICTION_CASES
             ]
             dose_plans = [final_dose_plan(prediction) for prediction in predictions]
             records = config["transfer_prompt_records"]
-            assert prompts == [record["prompt"] for case in TRANSFER_CASES for record in records[case.case_id]]
+            assert prompts == [record["prompt"] for case in PREDICTION_CASES for record in records[case.case_id]]
             by_case = {plan["case"]["case_id"]: plan for plan in dose_plans}
             plan = [
                 {
@@ -99,7 +99,7 @@ class FakeRemoteStageCall:
                     "prompt": record["prompt"],
                     "prompt_sha256": record["content_sha256"],
                 }
-                for case in TRANSFER_CASES
+                for case in PREDICTION_CASES
                 for record in records[case.case_id]
                 for coefficient in by_case[case.case_id]["coefficients"]
             ]
@@ -189,7 +189,7 @@ def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: 
     )
 
 
-def test_no_useful_candidate_records_terminal_condition_and_continues(tmp_path: Path):
+def test_negative_candidate_score_does_not_prevent_final_evaluation(tmp_path: Path):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     stage_call = RandomNamedStageCall()
     judge_call = NonUsefulRandomJudgeCall()
@@ -203,15 +203,12 @@ def test_no_useful_candidate_records_terminal_condition_and_continues(tmp_path: 
 
     assert stage_call.calls == [
         ("calibration-candidates", "random"),
+        ("final-generation", "random"),
         ("calibration-candidates", "mean_diff"),
         ("final-generation", "mean_diff"),
     ]
-    terminal = first["conditions"]["random"]["terminal"]
-    assert terminal["status"] == "no measured useful, coherent dose"
-    assert terminal["final_dispatch_prevented"] is True
-    assert all(not row["useful"] for row in terminal["observed"])
-    assert "final" not in first["conditions"]["random"]
-    assert "terminal" not in first["conditions"]["mean_diff"]
+    assert first["conditions"]["random"]["candidate_judgments"]["observed"]
+    assert first["conditions"]["random"]["final"]["reused"] is False
     assert first["conditions"]["mean_diff"]["final"]["reused"] is False
 
     second = _run(
@@ -219,15 +216,11 @@ def test_no_useful_candidate_records_terminal_condition_and_continues(tmp_path: 
         endpoint="https://judge.example/v1", prompt_spec=prompt_spec,
         methods=("random", "mean_diff"),
     )
-    assert second["conditions"]["random"]["terminal"] == terminal
-    assert stage_call.calls == [
-        ("calibration-candidates", "random"),
-        ("calibration-candidates", "mean_diff"),
-        ("final-generation", "mean_diff"),
-    ]
+    assert second["conditions"]["random"]["final"]["reused"] is True
+    assert len(stage_call.calls) == 4
 
 
-def test_render_report_keeps_candidate_points_for_terminal_calibration(tmp_path: Path):
+def test_render_report_uses_final_evaluation_points_after_negative_calibration(tmp_path: Path):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     summary = _run(
         root,
@@ -241,11 +234,12 @@ def test_render_report_keeps_candidate_points_for_terminal_calibration(tmp_path:
     report = render_report(root, root / "results")
 
     random_points = [point for point in report["artifact"]["points"] if point["method"] == "random"]
-    assert {point["phase"] for point in random_points} == {"candidate"}
-    assert len(random_points) == 2
-    assert report["artifact"]["terminal_methods"] == [{"method": "random", "status": "no measured useful, coherent dose"}]
-    assert "no eligible final dose; RMS-KL transfer was not measured because transfer is downstream of eligibility" in (root / "results" / "index.html").read_text()
-    assert summary["conditions"]["random"]["terminal"]["final_dispatch_prevented"] is True
+    assert {point["phase"] for point in random_points} == {"final"}
+    assert {point["case_id"] for point in random_points} == {"bsbench-v2-evaluation"}
+    assert len(random_points) == 3
+    assert len(report["artifact"]["transfer_points"]) == len(METHODS[2:]) * 4 * 3
+    assert "Four-case RMS-KL transfer" in (root / "results" / "index.html").read_text()
+    assert summary["conditions"]["random"]["final"]["reused"] is False
 
 
 def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -264,7 +258,7 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
         *(stage for _ in METHODS[2:] for stage in ("calibration-candidates", "final-generation")),
     ]
     assert len(stage_call.calls) == 14
-    assert len(judge_call.payloads) == 860
+    assert len(judge_call.payloads) == 2300
     validation = first["conditions"]["prompting"]["persona_validation"]
     assert len(validation["comparisons"]) == len(validation["requests"]) == len(validation["results"]) == 12
     assert validation["disagreements"] == []
@@ -323,7 +317,7 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
         case_id: tuple(records)
         for case_id, records in load_transfer_records().items()
     }
-    first_case = TRANSFER_CASES[0].case_id
+    first_case = next(iter(changed_records))
     changed = changed_records[first_case][0]
     changed_records[first_case] = (changed.__class__(
         changed.prompt_id,

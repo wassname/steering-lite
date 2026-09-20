@@ -6,10 +6,16 @@ import hashlib
 import json
 from pathlib import Path
 from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle
-from .dose_search import CALIBRATION_CASE, TRANSFER_CASES, fit_target, predict_transfer
+from .dose_search import CALIBRATION_CASE, EVALUATION_CASE, PREDICTION_CASES, fit_target, predict_transfer
 from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
-from .transfer_data import load_transfer_records, transfer_provenance, transfer_records_identity
+from .transfer_data import load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
+
+
+# Reuse the audited pre-report code hash only after every other cache identity matches. — PI[gpt-5.6-terra]
+UPSTREAM_COMPATIBLE_CODE_SHA256S = (
+    "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+)
 from .validation import comparison_id, numbered_persona_validation_requests, numbered_requests, response_record, score_pair, validate_persona_examples
 
 
@@ -25,7 +31,7 @@ def _settle_or_mark_gpu_unresolved(ledger: Path, reservation: str, result: dict)
     raise ValueError("Modal stage must return actual cost or an unresolved receipt")
 
 
-def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None, dispatch_config=None) -> dict:
+def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], backend, validate_result=None, dispatch_config=None, compatible_code_sha256s: tuple[str, ...] = ()) -> dict:
     """Dispatch only on a cache miss, after reserving its declared upper cost."""
     dispatched = False
 
@@ -44,7 +50,7 @@ def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data:
             raise
         return result | {"reservation": reservation}
 
-    result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute)
+    result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
     return result | {"reused": not dispatched}
 
 
@@ -91,8 +97,8 @@ def _dispatch_sidecar(root: Path, config: dict) -> dict:
     return config | {"vector_artifact": artifact | {"vector_bytes_b64": base64.b64encode(raw).decode()}}
 
 
-def _local(root: Path, *, stage: str, model: dict, data: dict, method: str, prompts: list[str], config: dict, compute) -> dict:
-    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute)
+def _local(root: Path, *, stage: str, model: dict, data: dict, method: str, prompts: list[str], config: dict, compute, compatible_code_sha256s: tuple[str, ...] = ()) -> dict:
+    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
 
 
 def _candidate_items(coefficients: list[float], prompts: list[str], items: list[dict]) -> list[dict]:
@@ -112,9 +118,9 @@ def _candidate_items(coefficients: list[float], prompts: list[str], items: list[
 def _require_observed(rows: list[dict] | None, coefficients: list[float]) -> list[dict]:
     if not rows:
         raise ValueError("explicit candidate observations are required before target fitting")
-    required = {"coefficient", "useful", "coherent", "provenance", "generation_health"}
+    required = {"coefficient", "provenance", "generation_health"}
     if any(not required.issubset(row) for row in rows):
-        raise ValueError("candidate observations require coefficient, useful, coherent, provenance and generation_health")
+        raise ValueError("candidate observations require coefficient, provenance and generation_health")
     if {float(row["coefficient"]) for row in rows} != {float(coefficient) for coefficient in coefficients}:
         raise ValueError("observed coefficient set must exactly match candidate coefficients")
     return rows
@@ -188,8 +194,8 @@ def _candidate_judgments(
                 "directed_effect": directed_effect,
                 "off_target_effect": off_target_effect,
                 "dose_score": dose_score,
-                "useful": dose_score > 0,
-                "coherent": not health["reasons"] and max(effect["steered_off_axis"] for effect in effects) <= 2.5,
+                "historical_score_positive": dose_score > 0,
+                "historical_off_axis_within_2_5": max(effect["steered_off_axis"] for effect in effects) <= 2.5,
                 "provenance": content_key({
                     "candidate": candidate["vector_sha256"],
                     "responses": [
@@ -203,13 +209,13 @@ def _candidate_judgments(
     return {"observed": observed, "health": health_by_coefficient, "requests": requests, "responses": responses, "aware": [record for record in responses if not record["blind"]], "blind": [record for record in responses if record["blind"]]}
 
 
-def _plan(records: dict, dose_plans: list[dict]) -> list[dict]:
-    """Expand the already-validated canonical final-dose plans into executable items."""
+def _plan(records: dict, dose_plans: list[dict], cases=PREDICTION_CASES) -> list[dict]:
+    """Expand the numbered evaluation and disjoint transfer dose plans."""
     by_case = {plan["case"]["case_id"]: plan for plan in dose_plans}
     return [
         {"case_id": case.case_id, "target_id": by_case[case.case_id]["target_id"], "coefficient": coefficient,
          "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
-        for case in TRANSFER_CASES for record in records[case.case_id]
+        for case in cases for record in records[case.case_id]
         for coefficient in by_case[case.case_id]["coefficients"]
     ]
 
@@ -235,8 +241,12 @@ def _validate_final(plan: list[dict], result: dict, *, require_judge_outputs: bo
 
 def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: str, model: dict, judge) -> dict:
     """Persist existing paired judge outputs for every final dose response."""
-    source_records = {record.prompt_id: record for case in TRANSFER_CASES for record in records[case.case_id]}
-    number_by_prompt = {prompt_id: number for number, prompt_id in enumerate(source_records, 21)}
+    source_records = {record.prompt_id: record for case in PREDICTION_CASES for record in records[case.case_id]}
+    number_by_prompt = {f"BSV2-{number:03d}": number for number in range(1, 21)}
+    number_by_prompt |= {
+        prompt_id: number
+        for number, prompt_id in enumerate(sorted(set(source_records) - set(number_by_prompt)), 21)
+    }
     rows = []
     for item, answer, health in zip(plan, final["answers"], final["health_records"], strict=True):
         source = source_records[item["prompt_id"]]
@@ -395,9 +405,9 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
         }
     baseline = None
     if method == "prompting":
-        baseline = production_stage(root, ledger, stage="generation", model=model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")))
+        baseline = production_stage(root, ledger, stage="generation", model=model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     generation_config = prompting_config if method == "prompting" else bare_config
-    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
+    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"})}
     identified_health = generation.get("health_records")
     question_ids = [row["question_id"] for row in rows] if rows is not None else [str(index) for index in range(len(prompts))]
@@ -405,7 +415,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
         {"question_id": question_id, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "response": answer, "fake": True}
         for question_id, prompt, answer in zip(question_ids, prompts, generation["answers"], strict=True)
     ]
-    health = _local(root, stage="generation-health", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": identified_health is None, "records": items})
+    health = _local(root, stage="generation-health", model=model, data=data, method=method, prompts=prompts, config=identity, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": identified_health is None, "records": items}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     result = {"paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)), "generation": generation, "health": health}
     if method == "bare":
         return result | {"baseline_answers": generation["answers"]}
@@ -415,12 +425,12 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
         raise ValueError("prompting requires a judge adapter for paired AB/BA and blind requests")
     paired_rows = _direct_rows(rows, prompts, baseline["answers"], generation["answers"])
     judgment_config = identity | {"baseline_sha256": content_key({key: value for key, value in baseline.items() if key != "reused"}), "judge_model": model["judge_model"], "judge_endpoint": judge.endpoint}
-    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge))
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     final_identity = judgment_config | {"judgments_sha256": content_key(judgments)}
     result |= {
         "judgments": judgments,
-        "aware": _local(root, stage="target-aware-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": False, "records": judgments["aware"]}),
-        "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": False, "records": judgments["blind"]}),
+        "aware": _local(root, stage="target-aware-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": False, "records": judgments["aware"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S),
+        "blind": _local(root, stage="blind-requests", model=model, data=data, method=method, prompts=prompts, config=final_identity, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": False, "records": judgments["blind"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S),
     }
     if validation_rows:
         examples = _persona_validation_examples(rows, baseline["answers"], generation, prompting_config["persona_source"])
@@ -431,7 +441,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
             "judge_model": model["judge_model"],
             "judge_endpoint": judge.endpoint,
         }
-        result["persona_validation"] = _local(root, stage="persona-validation", model=model, data=data, method=method, prompts=[example["scenario"] for example in examples], config=validator_config, compute=lambda: _persona_validation(examples, model=model, judge=judge))
+        result["persona_validation"] = _local(root, stage="persona-validation", model=model, data=data, method=method, prompts=[example["scenario"] for example in examples], config=validator_config, compute=lambda: _persona_validation(examples, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     return result
 
 
@@ -444,7 +454,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     # Tests may version an otherwise exact identity; production rejects any semantic persona change.
     if {key: source[key] for key in expected_identity} != expected_identity:
         raise ValueError("vector calibration requires the fixed sycophantic/abrasive persona identity")
-    records = transfer_records if transfer_records is not None else load_transfer_records()
+    records = {EVALUATION_CASE.case_id: load_evaluation_records()} | (transfer_records if transfer_records is not None else load_transfer_records())
     calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec}
     dispatched = False
     def candidate_compute() -> dict:
@@ -465,7 +475,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             mark_unresolved(ledger, reservation, "dispatch_or_validation_failure")
             raise
         return result | {"candidate_items": items, "reservation": reservation, "vector_artifact": artifact, "vector_sha256": artifact["sha256"], "method_config": result.get("method_config", {})}
-    candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute)
+    candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     artifact = _load_sidecar(root, candidate["vector_artifact"])
     candidate = candidate | {"reused": not dispatched}
     candidate_identity = {key: value for key, value in candidate.items() if key != "reused"}
@@ -495,12 +505,13 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
                 model=model,
                 judge=judge,
             ),
+            compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S,
         )
         observed = judgment_outputs["observed"]
     candidate_inputs = {"candidate_sha256": content_key(candidate_identity), "observed": observed, "vector_sha256": candidate["vector_sha256"]}
-    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]})
-    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]})
-    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]})
+    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     if getattr(backend, "remote_vector_binding", False):
         transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
         final_config = {
@@ -521,7 +532,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             predictions = result.get("transfer_predictions")
             if not isinstance(predictions, list) or not isinstance(result.get("target"), dict):
                 raise ValueError("remote vector final stage must return target and transfer predictions")
-            remote_stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=predictions, case_prompts=records, prompt_spec=prompt_spec)
+            remote_stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=predictions, case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
             remote_plan = _plan(records, remote_stages[0]["config"]["final_dose_plans"])
             if result.get("final_dose_plans") != remote_stages[0]["config"]["final_dose_plans"]:
                 raise ValueError("remote vector final stage returned a non-canonical dose plan")
@@ -532,7 +543,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         final = production_stage(root, ledger, stage="final-generation", model=model, data=data, method=method, config=final_config, prompts=transfer_prompts, backend=backend, validate_result=validate_remote_final, dispatch_config=lambda config: _dispatch_sidecar(root, config))
         prediction = {"predictions": final["transfer_predictions"]}
         target = final["target"]
-        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
+        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
         executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
         plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
     else:
@@ -542,8 +553,8 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         provenance = {case_id: transfer_provenance(case_records) for case_id, case_records in records.items()}
         transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
         prediction_config = {"target": target, "transfer_provenance": provenance, "prompt_spec": prompt_spec, "vector_sha256": candidate["vector_sha256"]}
-        prediction = _local(root, stage="transfer-prediction", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, bracket=(0.01, 2.0), solver_kwargs={}, solver=solver) for case in TRANSFER_CASES]})
-        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec)
+        prediction = _local(root, stage="transfer-prediction", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, bracket=(0.01, 2.0), solver_kwargs={}, solver=solver) for case in PREDICTION_CASES]})
+        stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
         executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
         plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
         final_config = stages[0]["config"] | {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "extraction_identity": source, "vector_artifact": artifact, "executable_generation_plan": executable_plan, "executable_plan_sha256": content_key({"plan": executable_plan})}

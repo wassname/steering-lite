@@ -35,7 +35,7 @@ def inputs(backend):
     rows = read_dev_cohort()
     prompts = [next(row["prompt"] for row in rows if row["question_id"] == prompt_id) for prompt_id in CALIBRATION_CASE.prompt_ids]
     health = {"rep": 0.0, "gen_len": 1, "steer_tail": "fake", "per_t_mean": [0.0], "per_t_p90": [0.0], "per_t_p95": [0.0], "per_t_max": [0.0], "per_t_n": [1]}
-    observed = [{"coefficient": coefficient, "useful": True, "coherent": True, "provenance": f"fake-{coefficient}", "generation_health": health} for coefficient in (0.2, 0.4)]
+    observed = [{"coefficient": coefficient, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": f"fake-{coefficient}", "generation_health": {"reasons": []}} for coefficient in (0.2, 0.4)]
     measured, solved = [], []
     def measure(vector, *_args, **_kwargs):
         measured.append(vector.cfg.coeff)
@@ -50,9 +50,9 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     backend = FakeBackend(); kwargs, measured, solved = inputs(backend)
     first = run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     assert backend.calls == ["calibration-candidates", "final-generation"]
-    assert measured == [0.4] and len(solved) == 4
-    assert [item["predicted_coefficient"] for item in first["transfer_prediction"]["predictions"]] == [0.31, 0.32, 0.33, 0.34]
-    assert len(first["final"]["answers"]) == len(first["final_aware"]["records"]) == 24
+    assert measured == [0.4] and len(solved) == 5
+    assert [item["predicted_coefficient"] for item in first["transfer_prediction"]["predictions"]] == [0.31, 0.32, 0.33, 0.34, 0.35]
+    assert len(first["final"]["answers"]) == len(first["final_aware"]["records"]) == 84
     assert all(row["fake"] and row["non_experimental"] and row["response"] for row in first["final_blind"]["records"])
     canonical = {plan["case"]["case_id"]: plan["coefficients"] for plan in first["final_stages"][0]["config"]["final_dose_plans"]}
     assert {case_id: [row["coefficient"] for row in first["final_aware"]["records"] if row["case_id"] == case_id][:3] for case_id in canonical} == canonical

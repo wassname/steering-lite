@@ -11,7 +11,9 @@ from steering_lite.data import persona_corpus_identity
 from .cache import cached_stage, committed, content_key, reserve_many, save_json
 from .dose_search import (
     CALIBRATION_CASE,
+    EVALUATION_CASE,
     FINAL_DOSE_MULTIPLIERS,
+    PREDICTION_CASES,
     TRANSFER_CASES,
     Case,
     final_dose_plan,
@@ -19,7 +21,7 @@ from .dose_search import (
 )
 from .generation import cohort_identity, read_dev_cohort
 from .pipeline import METHODS
-from .transfer_data import PromptRecord, load_transfer_records, transfer_provenance, transfer_records_identity
+from .transfer_data import PromptRecord, load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
 
 MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-chat"
@@ -89,11 +91,11 @@ def _request_counts(stages: list[dict]) -> dict[str, int]:
     return {
         "target_aware": target_aware,
         "blind": blind,
-        "persona_validation": PERSONA_VALIDATION_PAIRS,
+        "persona_validation": sum(stage["item_count"] for stage in stages if stage["stage"] == "persona-validation"),
     }
 
 
-def cost_estimate(stages: list[dict]) -> dict:
+def _cost_lines(stages: list[dict]) -> tuple[list[BudgetLine], dict[str, int], int, int]:
     gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
     gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
     request_counts = _request_counts(stages)
@@ -106,38 +108,42 @@ def cost_estimate(stages: list[dict]) -> dict:
         (request_counts["target_aware"] + request_counts["blind"]) * 1_200
         + request_counts["persona_validation"] * 100
     )
-    expected = [
+    lines = [
         BudgetLine("Modal A10G GPU", gpu_hours, "GPU-hour", MODAL_A10G_USD_PER_GPU_HOUR, "USD/GPU-hour", MODAL_SOURCE),
         BudgetLine("Modal CPU", gpu_hours * 3600 * CPU_CORES_PER_GPU_STAGE, "core-second", MODAL_CPU_USD_PER_CORE_SECOND, "USD/core-second", MODAL_SOURCE),
         BudgetLine("Modal memory", gpu_hours * 3600 * MEMORY_GIB_PER_GPU_STAGE, "GiB-second", MODAL_MEMORY_USD_PER_GIB_SECOND, "USD/GiB-second", MODAL_SOURCE),
         BudgetLine("Judge input", input_tokens / 1_000_000, "M-token", JUDGE_INPUT_USD_PER_MTOKEN, "USD/M-token", JUDGE_SOURCE),
         BudgetLine("Judge output", output_tokens / 1_000_000, "M-token", JUDGE_OUTPUT_USD_PER_MTOKEN, "USD/M-token", JUDGE_SOURCE),
     ]
-    unresolved = [
-        BudgetLine("Unresolved Modal A10G", 4.0, "GPU-hour", MODAL_A10G_USD_PER_GPU_HOUR, "USD/GPU-hour", MODAL_SOURCE),
-        BudgetLine("Unresolved Modal CPU", 4.0 * 3600, "core-second", MODAL_CPU_USD_PER_CORE_SECOND, "USD/core-second", MODAL_SOURCE),
-        BudgetLine("Unresolved Modal memory", 4.0 * 3600 * MEMORY_GIB_PER_GPU_STAGE, "GiB-second", MODAL_MEMORY_USD_PER_GIB_SECOND, "USD/GiB-second", MODAL_SOURCE),
-        BudgetLine("Unresolved judge input", 100 * 4_000 / 1_000_000, "M-token", JUDGE_INPUT_USD_PER_MTOKEN, "USD/M-token", JUDGE_SOURCE),
-        BudgetLine("Unresolved judge output", 100 * 1_200 / 1_000_000, "M-token", JUDGE_OUTPUT_USD_PER_MTOKEN, "USD/M-token", JUDGE_SOURCE),
-    ]
+    return lines, request_counts, input_tokens, output_tokens
+
+
+def cost_estimate(stages: list[dict], *, retry_stages: list[dict] | None = None) -> dict:
+    expected, request_counts, input_tokens, output_tokens = _cost_lines(stages)
+    retry, retry_counts, retry_input_tokens, retry_output_tokens = _cost_lines(stages if retry_stages is None else retry_stages)
+    gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
+    gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
     expected_usd = _sum(expected)
-    retry_usd = expected_usd
-    unresolved_usd = _sum(unresolved)
+    retry_usd = _sum(retry)
     reservations = [
         {"kind": "expected_modal_and_judge_work", "upper_usd": expected_usd},
-        {"kind": "one_full_retry", "upper_usd": retry_usd},
-        {"kind": "unresolved_work", "upper_usd": unresolved_usd},
+        {"kind": "one_affected_stage_retry", "upper_usd": retry_usd},
     ]
     return {
-        "schema": "bsbench-budget-estimate-v2",
+        "schema": "bsbench-budget-estimate-v3",
         "judge_model": JUDGE_MODEL,
         "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_200},
         "quantities": {"gpu_stages": gpu_stages, "gpu_hours": gpu_hours, "requests": request_counts, "input_tokens": input_tokens, "output_tokens": output_tokens},
         "expected_work": [line.record() for line in expected],
-        "retry_reserve": {"copies_of_expected_work": 1, "subtotal_usd": retry_usd},
-        "unresolved_reserve": [line.record() for line in unresolved],
+        "retry_reserve": {
+            "scope": "one affected method's final generation and judgments",
+            "quantities": {"requests": retry_counts, "input_tokens": retry_input_tokens, "output_tokens": retry_output_tokens},
+            "work": [line.record() for line in retry],
+            "subtotal_usd": retry_usd,
+        },
+        "unresolved_reserve": [],
         "planned_reservations": reservations,
-        "total_upper_usd": expected_usd + retry_usd + unresolved_usd,
+        "total_upper_usd": expected_usd + retry_usd,
     }
 
 
@@ -190,9 +196,9 @@ def case_identity(case) -> dict:
 
 
 def phase_b_budget_stages() -> tuple[dict, ...]:
-    """Reserve the offline-described vector-method final sweep; this never dispatches."""
-    records = load_transfer_records()
-    item_count = sum(len(records[case.case_id]) for case in TRANSFER_CASES) * len(FINAL_DOSE_MULTIPLIERS)
+    """Describe only the remaining 20-question evaluation and disjoint transfer work."""
+    records = {PREDICTION_CASES[0].case_id: load_evaluation_records()} | load_transfer_records()
+    item_count = sum(len(records[case.case_id]) for case in PREDICTION_CASES) * len(FINAL_DOSE_MULTIPLIERS)
     provenance = transfer_records_identity(records)
     return tuple(
         {
@@ -200,7 +206,7 @@ def phase_b_budget_stages() -> tuple[dict, ...]:
             "runner": runner,
             "method": method,
             "item_count": item_count,
-            "transfer_provenance_sha256": content_key(provenance),
+            "prediction_provenance_sha256": content_key(provenance),
         }
         for method in METHODS
         if method not in {"bare", "prompting"}
@@ -221,12 +227,15 @@ def final_stages(
     transfer_predictions: list[dict],
     case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
     prompt_spec: dict,
-    transfer_cases: tuple[Case, ...] = TRANSFER_CASES,
+    transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
 ) -> tuple[dict, ...]:
     """Describe the post-judgment generation graph without dispatching it."""
     if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
         raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
-    validate_cases(CALIBRATION_CASE, transfer_cases)
+    disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+    validate_cases(CALIBRATION_CASE, disjoint_cases)
+    if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+        raise ValueError("evaluation case identity changed")
     case_ids = [case.case_id for case in transfer_cases]
     if set(case_prompts) != set(case_ids):
         raise ValueError("final stages require complete prompt records for every transfer case")
@@ -367,7 +376,7 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
 
 
-def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None) -> dict:
+def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False) -> dict:
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
     prompts_by_id = {row["question_id"]: row["prompt"] for row in rows}
@@ -426,7 +435,14 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
         "ledger": str(PHASE6_SMOKE_LEDGER),
         "committed_usd": phase6_committed_usd,
     }]
-    manifest["cost_estimate"] = preflight_budget(ledger, cost_estimate(stages + list(final_budget_stages)), external_committed_usd=phase6_committed_usd)
+    remaining_stages = list(final_budget_stages) if cache_aware else stages + list(final_budget_stages)
+    retry_stages = [stage for stage in final_budget_stages if stage["method"] == "mean_diff"] if cache_aware else None
+    manifest["cache_aware"] = cache_aware
+    manifest["cost_estimate"] = preflight_budget(
+        ledger,
+        cost_estimate(remaining_stages, retry_stages=retry_stages),
+        external_committed_usd=phase6_committed_usd,
+    )
     save_json(out / "manifest.json", manifest)
     save_json(out / "cost-estimate.json", manifest["cost_estimate"])
     return manifest

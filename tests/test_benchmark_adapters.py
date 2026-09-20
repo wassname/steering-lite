@@ -8,7 +8,7 @@ from steering_lite.benchmark.adapters import openrouter_request_callback, real_a
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import _candidate_judgments, run_condition
-from steering_lite.benchmark.transfer_data import load_transfer_records
+from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
 
 class FakeModalRunMethod:
@@ -148,12 +148,11 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         assert result["candidate_health"]["fake"] is False
         assert result["candidate_aware"]["fake"] is False
         assert result["candidate_blind"]["fake"] is False
-        assert result["target"]["observed_boundary"]["useful"]
-        assert result["target"]["observed_boundary"]["coherent"]
+        assert result["target"]["observed_boundary"]["generation_health"]["reasons"] == []
         assert result["target"]["observed_boundary"]["generation_health"]["source"] == "fake-health"
-        assert len(result["final"]["answers"]) == 24
+        assert len(result["final"]["answers"]) == 84
         assert result["final_health"]["fake"] is False
-        assert len(result["final_aware"]["records"]) == len(result["final_blind"]["records"]) == 48
+        assert len(result["final_aware"]["records"]) == len(result["final_blind"]["records"]) == 168
         assert all(not record["blind"] for record in result["candidate_aware"]["records"])
         assert all(record["blind"] for record in result["candidate_blind"]["records"])
         assert all(not record["blind"] for record in result["final_aware"]["records"])
@@ -188,7 +187,7 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
 
 
 def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measurement(tmp_path):
-    from steering_lite.benchmark.dose_search import TRANSFER_CASES, final_dose_plan
+    from steering_lite.benchmark.dose_search import PREDICTION_CASES, final_dose_plan
 
     class RemoteVectorBackend(FakeModalRunMethod):
         remote_vector_binding = True
@@ -214,14 +213,14 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
                     "predicted_coefficient": 0.3,
                     "search_history": [{"coeff": 0.3, "kl_rms": 1.0}],
                 }
-                for case in TRANSFER_CASES
+                for case in PREDICTION_CASES
             ]
             plans = [final_dose_plan(prediction) for prediction in predictions]
-            records = load_transfer_records()
+            records = {"bsbench-v2-evaluation": load_evaluation_records()} | load_transfer_records()
             by_case = {plan["case"]["case_id"]: plan for plan in plans}
             plan = [
                 {"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
-                for case in TRANSFER_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]
+                for case in PREDICTION_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]
             ]
             return {
                 "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}},
@@ -253,8 +252,8 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
     )
     assert [stage for stage, *_ in modal.calls] == ["calibration-candidates", "final-generation"]
     assert result["target"]["target_id"] == "remote-target"
-    assert len(result["transfer_prediction"]["predictions"]) == 4
-    assert len(result["final"]["answers"]) == 24
+    assert len(result["transfer_prediction"]["predictions"]) == 5
+    assert len(result["final"]["answers"]) == 84
     events = [json.loads(line)["event"] for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
     assert events == ["reserved", "settled", "reserved", "estimated_at_reservation_upper"]
 
@@ -353,7 +352,9 @@ def test_positive_directed_effect_with_high_damage_is_not_useful():
     assert observation["directed_effect"] == 1.0
     assert observation["off_target_effect"] == 5.0
     assert observation["dose_score"] == -19.0
-    assert not observation["useful"]
+    assert not observation["historical_score_positive"]
+    assert not observation["historical_off_axis_within_2_5"]
+    assert observation["generation_health"]["reasons"] == []
 
 
 def test_openrouter_callback_sends_exact_payload_once_and_keeps_usage(monkeypatch):

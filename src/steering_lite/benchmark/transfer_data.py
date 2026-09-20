@@ -6,7 +6,7 @@ invalidation, never a silent prompt substitution.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 from pathlib import Path
@@ -69,8 +69,8 @@ def _record(prompt_id: str, prompt: str, dataset: str, source_path: str, source_
     )
 
 
-def load_transfer_records() -> dict[str, tuple[PromptRecord, ...]]:
-    """Load exact source prompts for all declared transfer cases, or fail before dispatch."""
+def _source_records() -> tuple[dict[str, PromptRecord], dict[str, PromptRecord]]:
+    """Load checked BS-bench and paper-native prompt records."""
     bsbench_rows = [json.loads(line) for line in _verified_bytes("bullshit_bench_v2.jsonl", BSBENCH_SOURCE_SHA256).splitlines()]
     if len(bsbench_rows) != 100:
         raise ValueError("BS-bench v2 transfer source must contain exactly 100 rows")
@@ -92,6 +92,12 @@ def load_transfer_records() -> dict[str, tuple[PromptRecord, ...]]:
         )
         for number, prompt in enumerate(native_prompts, 1)
     }
+    return bsbench, native
+
+
+def load_transfer_records() -> dict[str, tuple[PromptRecord, ...]]:
+    """Load exact source prompts for all declared disjoint transfer cases."""
+    bsbench, native = _source_records()
     all_records = bsbench | native
     try:
         return {
@@ -100,6 +106,12 @@ def load_transfer_records() -> dict[str, tuple[PromptRecord, ...]]:
         }
     except KeyError as error:
         raise ValueError(f"declared transfer prompt is absent from its audited source: {error.args[0]}") from error
+
+
+def load_evaluation_records() -> tuple[PromptRecord, ...]:
+    """Load the fixed numbered 20-question BS-bench evaluation cohort."""
+    bsbench, _ = _source_records()
+    return tuple(replace(bsbench[f"BSV2-{number:03d}"], dataset="bsbench-v2-dev") for number in range(1, 21))
 
 
 def transfer_provenance(records: tuple[PromptRecord, ...] | list[PromptRecord]) -> list[dict[str, str]]:
