@@ -167,6 +167,8 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
             evidence = timing(schema="bsbench-openrouter-callback-error-v1", outcome="failed") | {
                 "exception_type": type(error).__name__,
             }
+            if hasattr(error, "evidence"):
+                evidence["parse_evidence"] = _redact(error.evidence)
             persist(evidence)
             raise
         else:

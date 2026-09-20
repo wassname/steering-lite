@@ -5,6 +5,7 @@ The callbacks are injected so importing this module never imports Modal or an AP
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 from typing import Callable
@@ -12,6 +13,12 @@ from urllib.request import Request, urlopen
 
 from .cache import cached, mark_unresolved, reserve, settle
 from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
+
+
+class OpenRouterResponseParseError(ValueError):
+    def __init__(self, message: str, evidence: dict):
+        super().__init__(message)
+        self.evidence = evidence
 
 
 @dataclass(frozen=True)
@@ -54,9 +61,33 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
         request = Request(endpoint, data=body, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
         with urlopen(request, timeout=90) as response:
-            response_body = json.loads(response.read())
+            raw_response = response.read()
+        try:
+            response_body = json.loads(raw_response)
+        except json.JSONDecodeError as error:
+            raise OpenRouterResponseParseError(
+                "OpenRouter response body is not JSON",
+                {
+                    "response_sha256": hashlib.sha256(raw_response).hexdigest(),
+                    "response_bytes": len(raw_response),
+                    "response_excerpt": raw_response.decode(errors="replace")[:10_000],
+                    "json_error": str(error),
+                },
+            ) from error
         content = response_body["choices"][0]["message"]["content"]
-        judgment = json.loads(content)
+        try:
+            judgment = json.loads(content)
+        except json.JSONDecodeError as error:
+            raise OpenRouterResponseParseError(
+                "OpenRouter assistant content is not strict JSON",
+                {
+                    "response_sha256": hashlib.sha256(raw_response).hexdigest(),
+                    "assistant_content_sha256": hashlib.sha256(content.encode()).hexdigest(),
+                    "assistant_content_bytes": len(content.encode()),
+                    "assistant_content": content[:10_000],
+                    "json_error": str(error),
+                },
+            ) from error
         schema = payload["response_format"]["json_schema"]["schema"]
         required = set(schema["required"])
         if set(judgment) != required:

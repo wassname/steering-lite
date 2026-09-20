@@ -12,9 +12,10 @@ from .pipeline import METHODS
 from .transfer_data import load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
 
 
-# Reuse the audited pre-report code hash only after every other cache identity matches. — PI[gpt-5.6-terra]
+# Reuse audited compatible code hashes only after every other cache identity matches. — PI[gpt-5.6-terra]
 UPSTREAM_COMPATIBLE_CODE_SHA256S = (
     "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+    "6270403485aaef4d5fdd50ac9af031d5b1488d70dead2789f5fe6660580cdf0d",
 )
 from .validation import comparison_id, numbered_persona_validation_requests, numbered_requests, response_record, score_pair, validate_persona_examples
 

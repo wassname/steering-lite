@@ -1,0 +1,8 @@
+{
+  "reservation": "0e0dd3049af5bd256d648588383466e19f3aeece7c79a2013e33ae26a0f28017",
+  "upper_usd": 0.0017496,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/32a04206fa1d5b7e2d8ed17c51a91f6b8cfd81f6995239871cb70e7702b8178c-000005-failed.json",
+  "outcome": "A second strict JSON decode failure occurred for a new mean_diff judge payload; the old callback evidence omits malformed assistant content and usage.",
+  "accounting": "Conservative: retain the reservation upper rather than infer $0.",
+  "author": "PI[gpt-5.6-terra]"
+}
