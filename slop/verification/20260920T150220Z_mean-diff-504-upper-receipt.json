@@ -1,0 +1,8 @@
+{
+  "reservation": "5ab00456a0796b92ef530af485540c0897543047317070f3568afd1c588000ec",
+  "upper_usd": 0.0022644,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/6e7acd662f755cd6bab346e9b2e5ac0fe9d30aaa1348f6dd397b98e9227e8aea-000078-failed.json",
+  "outcome": "The instrumented retry captured OpenRouter HTTP 504. The sanitized error reports an earlier DeepInfra 429 for deepseek/deepseek-chat, followed by StreamLake's aborted operation.",
+  "accounting": "Conservative: settle at the reservation upper because the failed HTTP response includes no per-request usage receipt.",
+  "author": "PI[gpt-5.6-terra]"
+}

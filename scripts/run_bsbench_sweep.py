@@ -61,7 +61,7 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
 def _redact(value):
     if isinstance(value, dict):
         return {
-            key: "<redacted>" if any(word in key.lower() for word in ("key", "token", "secret", "authorization", "hash")) else _redact(item)
+            key: "<redacted>" if any(word in key.lower() for word in ("key", "token", "secret", "authorization", "hash", "user_id")) else _redact(item)
             for key, item in value.items()
         }
     if isinstance(value, list):

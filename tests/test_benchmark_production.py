@@ -279,12 +279,13 @@ def test_openrouter_metadata_redacts_key_fields(tmp_path: Path, monkeypatch):
             return False
 
         def read(self):
-            return b'{"data":{"limit_remaining":4.5,"key_hash":"must-not-persist"}}'
+            return b'{"data":{"limit_remaining":4.5,"key_hash":"must-not-persist","user_id":"must-not-persist"}}'
 
     monkeypatch.setattr(sweep, "urlopen", lambda *_args, **_kwargs: Response())
     metadata = sweep.openrouter_metadata(api_key="must-not-persist")
     assert {name: value["status"] for name, value in metadata["endpoints"].items()} == {"key": 200, "credits": 200}
     assert all(value["body"]["data"]["key_hash"] == "<redacted>" for value in metadata["endpoints"].values())
+    assert all(value["body"]["data"]["user_id"] == "<redacted>" for value in metadata["endpoints"].values())
 
 
 def test_real_sweep_keeps_one_modal_lifecycle_across_gpu_stages(tmp_path: Path, monkeypatch):

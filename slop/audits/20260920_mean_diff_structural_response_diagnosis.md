@@ -16,8 +16,12 @@ The evidence cannot distinguish a provider response with no `choices` field from
 
 The adapter now raises `OpenRouterResponseParseError` for absent assistant content and saves a sanitized structural response through the audited callback. It preserves strict schema validation; it does not accept the response or change model, endpoint, or payload.
 
+## Instrumented retry
+
+The next instrumented request did not reach this parser. Its HTTP-error evidence records OpenRouter's prior `DeepInfra` 429 for `deepseek/deepseek-chat`, then a `StreamLake` 504 with “The operation was aborted.” This distinguishes upstream capacity failure from an adapter field-extraction error. The failed reservation is conservatively recorded at its `$0.0022644` upper in [receipt](../verification/20260920T150220Z_mean-diff-504-upper-receipt.json).
+
 ## Decision
 
-Do not issue another paid mean-difference request on this evidence alone. The remaining work is offline verification and a review decision on how to obtain discriminating provider evidence.
+Use the authorized 15-minute backoff, then retry only the cached mean-difference stage once if reconciliation remains empty and the current dry preflight stays below $50. No later method may start first.
 
 -- PI[gpt-5.6-terra]

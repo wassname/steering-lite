@@ -1,0 +1,12 @@
+{
+  "schema": "bsbench-mean-diff-504-post-reconciliation-v1",
+  "failed_reservation": "5ab00456a0796b92ef530af485540c0897543047317070f3568afd1c588000ec",
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/6e7acd662f755cd6bab346e9b2e5ac0fe9d30aaa1348f6dd397b98e9227e8aea-000078-failed.json",
+  "settlement": "estimated_at_reservation_upper",
+  "estimated_usd": 0.0022644,
+  "committed_usd_after": 12.8966813097,
+  "open_unresolved_reservations_after": [],
+  "diagnosis": "OpenRouter recorded a DeepInfra rate-limit response before a StreamLake HTTP 504. This distinguishes an upstream provider failure from an adapter field-extraction error.",
+  "next_authorized_action": "After a 15-minute backoff and clean recheck, retry only mean_diff's cached affected stage once.",
+  "author": "PI[gpt-5.6-terra]"
+}
