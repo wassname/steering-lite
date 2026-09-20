@@ -1,0 +1,8 @@
+{
+  "reservation": "cfc7d613faacbc92a4a299b2c9bc996387588dba9a104b2593f32e3308b61734",
+  "upper_usd": 0.0022644,
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/8c566493f3f98f9223d422dd78dddd379c454961573dae43f9897aa2b08766e5-000211-failed.json",
+  "outcome": "After the authorized 15-minute backoff, OpenRouter returned HTTP 429. Its sanitized body identifies `upstream_provider_shared_pool`, DeepInfra and StreamLake rate limiting for deepseek/deepseek-chat.",
+  "accounting": "Conservative: settle at the reservation upper because the failed HTTP response has no per-request usage receipt.",
+  "author": "PI[gpt-5.6-terra]"
+}

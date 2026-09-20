@@ -20,8 +20,12 @@ The adapter now raises `OpenRouterResponseParseError` for absent assistant conte
 
 The next instrumented request did not reach this parser. Its HTTP-error evidence records OpenRouter's prior `DeepInfra` 429 for `deepseek/deepseek-chat`, then a `StreamLake` 504 with “The operation was aborted.” This distinguishes upstream capacity failure from an adapter field-extraction error. The failed reservation is conservatively recorded at its `$0.0022644` upper in [receipt](../verification/20260920T150220Z_mean-diff-504-upper-receipt.json).
 
+## Backoff retry
+
+After the 15-minute backoff, 210 newly requested judge responses settled and cached. The next request received another HTTP 429. Its sanitized body identifies `upstream_provider_shared_pool`, `DeepInfra`, and `StreamLake`, and repeats that `deepseek/deepseek-chat` is temporarily rate-limited upstream. The final reservation is conservatively recorded at its `$0.0022644` upper in [receipt](../verification/20260920T160130Z_mean-diff-429-upper-receipt.json).
+
 ## Decision
 
-Use the authorized 15-minute backoff, then retry only the cached mean-difference stage once if reconciliation remains empty and the current dry preflight stays below $50. No later method may start first.
+No further paid request or later method dispatch without review. This is a repeated provider capacity failure after the authorized backoff, not an adapter or payload diagnosis. The 210 completed response caches remain reusable.
 
 -- PI[gpt-5.6-terra]

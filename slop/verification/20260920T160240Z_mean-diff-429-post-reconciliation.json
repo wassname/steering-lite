@@ -1,0 +1,15 @@
+{
+  "schema": "bsbench-mean-diff-429-post-reconciliation-v1",
+  "failed_reservation": "cfc7d613faacbc92a4a299b2c9bc996387588dba9a104b2593f32e3308b61734",
+  "provider_evidence": "outputs/bsbench-v2/provider-evidence/8c566493f3f98f9223d422dd78dddd379c454961573dae43f9897aa2b08766e5-000211-failed.json",
+  "settlement": "estimated_at_reservation_upper",
+  "estimated_usd": 0.0022644,
+  "retry_reservations": 211,
+  "retry_settled_responses": 210,
+  "retry_upper_settlements": 1,
+  "committed_usd_after": 12.9735115314,
+  "open_unresolved_reservations_after": [],
+  "diagnosis": "After a 15-minute backoff, the provider again reported upstream shared-pool rate limiting for DeepInfra and StreamLake. This is not an adapter or payload failure.",
+  "decision": "No further paid request or later method dispatch without review. Cached mean_diff request results from the 210 successful responses remain preserved.",
+  "author": "PI[gpt-5.6-terra]"
+}
