@@ -1,0 +1,12 @@
+{
+  "records": 29,
+  "outcomes": {
+    "success": 29
+  },
+  "min_start_to_start_seconds": 10.000063,
+  "starts_below_10_seconds": 0,
+  "elapsed_min": 2.175888239988126,
+  "elapsed_max": 13.949543170980178,
+  "first": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490-000001-success.json",
+  "last": "fcd259ed0e3c5ebbfb0b648bffc5e69b3d9c6e4b67b4e2779b26b70ab4169170-000029-success.json"
+}

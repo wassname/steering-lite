@@ -1,0 +1,15 @@
+{
+  "attempt": 1,
+  "dispatch_started_at": "2026-09-20T07:09:17.220673+00:00",
+  "elapsed_seconds": 7.990918094990775,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "enforced_wait_seconds": 0.0,
+  "min_interval_seconds": 10.0,
+  "model": "deepseek/deepseek-chat",
+  "outcome": "success",
+  "payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+  "recorded_at": "2026-09-20T07:09:25.211594+00:00",
+  "response_finished_at": "2026-09-20T07:09:25.211594+00:00",
+  "response_schema": "blind_change_description",
+  "schema": "bsbench-openrouter-response-timing-v1"
+}

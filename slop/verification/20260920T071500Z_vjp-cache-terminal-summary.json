@@ -1,0 +1,196 @@
+{
+  "summary_identity": {
+    "code_sha256": "0a32bb1567eff393eff882b578c8e3a470688472c486915c13eabc05d3bb288f",
+    "cohort": {
+      "rows": 20,
+      "sha256": "c220039523b581f6698e55c67842511c63f5f4e8ef93c3638e16d32000560ae9"
+    },
+    "judge": {
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "model": "deepseek/deepseek-chat"
+    },
+    "methods": [
+      "vjp_cache"
+    ],
+    "model": {
+      "id": "Qwen/Qwen3.5-4B",
+      "judge_model": "deepseek/deepseek-chat"
+    },
+    "prompt_spec": {
+      "enable_thinking": false,
+      "max_new_tokens": 128,
+      "template": "Answer in 2 short sentences."
+    },
+    "schema": "bsbench-run-summary-identity-v1"
+  },
+  "terminal": {
+    "candidate_sha256": "28f7fa225cdc1f63e6e46ebb2653beaffe08c606b3a1ea0f2ec9155ad228b99e",
+    "final_dispatch_prevented": true,
+    "method": "vjp_cache",
+    "observed": [
+      {
+        "coefficient": 0.1,
+        "coherent": false,
+        "directed_effect": 0.575,
+        "dose_score": -6.4750000000000005,
+        "generation_health": {
+          "coefficient": 0.1,
+          "iteration": 1,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.0,
+            "mean_words": 48.25,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 1.7625000000000002,
+        "provenance": "88ba2b328cdc5e00df6f2e9c5de27d886d9978feb76b638398a3750886578af5",
+        "useful": false
+      },
+      {
+        "coefficient": 0.2,
+        "coherent": false,
+        "directed_effect": -0.6625,
+        "dose_score": -9.6125,
+        "generation_health": {
+          "coefficient": 0.2,
+          "iteration": 2,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.0,
+            "mean_words": 49.75,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 2.2375000000000003,
+        "provenance": "3c6a62761b88ed5972917cb1279bfcaf422a32411acc439631750bdbe70f20a0",
+        "useful": false
+      },
+      {
+        "coefficient": 0.4,
+        "coherent": false,
+        "directed_effect": 0.5499999999999999,
+        "dose_score": -5.65,
+        "generation_health": {
+          "coefficient": 0.4,
+          "iteration": 3,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.0,
+            "mean_words": 44.0,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 1.55,
+        "provenance": "5814fab7671933b089e0402c0a02f93af60b4e7e98a4afa8e3dcd252ded32b97",
+        "useful": false
+      },
+      {
+        "coefficient": 0.8,
+        "coherent": false,
+        "directed_effect": -0.5875,
+        "dose_score": -6.0375000000000005,
+        "generation_health": {
+          "coefficient": 0.8,
+          "iteration": 4,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.0,
+            "mean_words": 44.5,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 1.3625,
+        "provenance": "2691f3d8edf8a19580f6fa663999028ff66f08a59f274be7bb6eb449f69bc438",
+        "useful": false
+      },
+      {
+        "coefficient": 1.6,
+        "coherent": false,
+        "directed_effect": 0.45000000000000007,
+        "dose_score": -4.95,
+        "generation_health": {
+          "coefficient": 1.6,
+          "iteration": 5,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.0,
+            "mean_words": 53.5,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 1.35,
+        "provenance": "c584c03daf44a7f62cb3a858796276d51be1d0a32799b340abea0cae599e4b18",
+        "useful": false
+      },
+      {
+        "coefficient": 3.2,
+        "coherent": false,
+        "directed_effect": 0.85,
+        "dose_score": -4.300000000000001,
+        "generation_health": {
+          "coefficient": 3.2,
+          "iteration": 6,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.023809523809523836,
+            "mean_words": 65.0,
+            "repeated": 0,
+            "role_leaks": 0,
+            "unfinished": 0
+          },
+          "reasons": []
+        },
+        "off_target_effect": 1.2875,
+        "provenance": "74b21ca5ff9065848625443f080050a28e032916dd1352cb95ee94040a0d02bb",
+        "useful": false
+      },
+      {
+        "coefficient": 6.4,
+        "coherent": false,
+        "directed_effect": -1.0875,
+        "dose_score": -17.8375,
+        "generation_health": {
+          "coefficient": 6.4,
+          "iteration": 7,
+          "metrics": {
+            "answers": 4,
+            "max_repetition": 0.7063492063492063,
+            "mean_words": 102.25,
+            "repeated": 4,
+            "role_leaks": 1,
+            "unfinished": 3
+          },
+          "reasons": [
+            "unfinished",
+            "role_leak",
+            "repetition"
+          ]
+        },
+        "off_target_effect": 4.1875,
+        "provenance": "b7afccc95c210a776ac7935563a8f88122d2b97363272d1fce8a73ddb22d382a",
+        "useful": false
+      }
+    ],
+    "observed_sha256": "751d99bb269aa67ac7a406ee452a2577654a59e83570fe6bbbc433bd4e53b841",
+    "schema": "bsbench-terminal-calibration-v1",
+    "selection_predicate": "useful is directed_effect - 4 * off_target_effect > 0; coherent is no health reasons and max steered off-axis <= 2.5",
+    "status": "no measured useful, coherent dose",
+    "vector_sha256": "3dc2eec83a3afbe405b682f62d5220fbe8e4f127ff6de40dc787ad82452f5f05"
+  }
+}

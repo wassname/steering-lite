@@ -1,0 +1,78 @@
+{
+  "schema": "bsbench-vjp-cache-terminal-reconciliation-v1",
+  "recorded_by": "PI[gpt-5.6-terra]",
+  "retry": {
+    "command": "just sweep \"--run --backend real --method vjp_cache --openrouter-read-timeout 300\"",
+    "log": "slop/verification/20260920T070900Z_vjp-cache-429-retry.log",
+    "exit_code": 0,
+    "started_at": "2026-09-20T07:09:08Z",
+    "model": "Qwen/Qwen3.5-4B",
+    "judge_model": "deepseek/deepseek-chat",
+    "judge_endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "read_timeout_seconds": 300,
+    "min_dispatch_interval_seconds": 10
+  },
+  "cache_reuse": {
+    "candidate_cache": "outputs/bsbench-v2/cache/calibration-candidates/8e8bff0f303d34e283182415037d2964f9bd70557385fa3141ddad0ecbba596d.json",
+    "candidate_log_line": 39,
+    "prior_judge_request_cache_hits": 83,
+    "prior_judge_request_log_lines": [41, 123],
+    "first_new_judge_cache_identity": "55b2a3715cb686abc96d7498f9c7226046d0405e5cacabbdef91add9605677ae",
+    "first_new_provider_payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+    "first_new_provider_evidence": "outputs/bsbench-v2/provider-evidence/69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490-000001-success.json",
+    "new_judge_requests": 29,
+    "new_judge_request_log_lines": [124, 152],
+    "candidate_judgment_cache": "outputs/bsbench-v2/cache/candidate-judgments/8cb3638235ea271066a05928ba1781b80915d4bac0923be0a81bd2d3646f968b.json"
+  },
+  "openrouter_timing": {
+    "summary": "slop/verification/20260920T071500Z_vjp-cache-retry-timing-summary.json",
+    "records": 29,
+    "outcomes": {"success": 29},
+    "min_start_to_start_seconds": 10.000063,
+    "starts_below_10_seconds": 0,
+    "elapsed_seconds": {"min": 2.175888239988126, "max": 13.949543170980178}
+  },
+  "ledger": {
+    "path": "outputs/bsbench-v2/costs.jsonl",
+    "prior_429_reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b",
+    "prior_429_treatment": "settled at reservation upper 0.0017496 after aggregate provider metadata could not attribute the HTTP 429 request",
+    "retry_reservations": 29,
+    "retry_settlements": 29,
+    "retry_upper_usd": 0.0579456,
+    "retry_actual_usd": 0.0117848457,
+    "unresolved_events_without_settlement": [],
+    "estimated_modal_reservations": 8,
+    "estimated_modal_treatment": "Each has an estimated_at_reservation_upper record. cache.reserve_many excludes these records from the unresolved-provider-work check; their upper values remain in committed()."
+  },
+  "terminal_calibration": {
+    "candidate_items": 28,
+    "candidate_judgments": {"aware": 56, "blind": 56, "total": 112},
+    "status": "no measured useful, coherent dose",
+    "selection_predicate": "useful is directed_effect - 4 * off_target_effect > 0; coherent is no health reasons and max steered off-axis <= 2.5",
+    "scores": [
+      {"coefficient": 0.1, "directed_effect": 0.575, "off_target_effect": 1.7625, "dose_score": -6.475, "useful": false, "coherent": false},
+      {"coefficient": 0.2, "directed_effect": -0.6625, "off_target_effect": 2.2375, "dose_score": -9.6125, "useful": false, "coherent": false},
+      {"coefficient": 0.4, "directed_effect": 0.55, "off_target_effect": 1.55, "dose_score": -5.65, "useful": false, "coherent": false},
+      {"coefficient": 0.8, "directed_effect": -0.5875, "off_target_effect": 1.3625, "dose_score": -6.0375, "useful": false, "coherent": false},
+      {"coefficient": 1.6, "directed_effect": 0.45, "off_target_effect": 1.35, "dose_score": -4.95, "useful": false, "coherent": false},
+      {"coefficient": 3.2, "directed_effect": 0.85, "off_target_effect": 1.2875, "dose_score": -4.3, "useful": false, "coherent": false},
+      {"coefficient": 6.4, "directed_effect": -1.0875, "off_target_effect": 4.1875, "dose_score": -17.8375, "useful": false, "coherent": false}
+    ],
+    "final_dispatch_prevented": true,
+    "summary": "slop/verification/20260920T071500Z_vjp-cache-terminal-summary.json"
+  },
+  "modal": {
+    "app_id": "ap-sRHlZ7TxbgHmVAmqoeF6xS",
+    "state": "stopped",
+    "tasks": 0,
+    "evidence": "slop/verification/20260920T071500Z_vjp-cache-terminal-modal-app-list-venv.json"
+  },
+  "dry_preflight": {
+    "command": "just sweep \"--dry-run\"",
+    "paid_execution_enabled": false,
+    "existing_committed_usd": 11.1300113737,
+    "total_upper_usd": 48.1067881737,
+    "limit_usd": 50.0,
+    "evidence": "slop/verification/20260920T072000Z_vjp-terminal-dry-preflight.log"
+  }
+}
