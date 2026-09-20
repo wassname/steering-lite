@@ -5,7 +5,11 @@ import argparse
 import hashlib
 import json
 import os
+import time
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
 from steering_lite.benchmark.cache import committed, content_key, save_json, settle_receipt, source_hash
@@ -52,6 +56,83 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
     return {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions, "summary_path": str(summary_path), "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False))}
 
 
+def _redact(value):
+    if isinstance(value, dict):
+        return {
+            key: "<redacted>" if any(word in key.lower() for word in ("key", "token", "secret", "authorization", "hash")) else _redact(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
+
+
+def _provider_headers(headers) -> dict:
+    return {
+        key.lower(): value
+        for key, value in headers.items()
+        if key.lower() in {"date", "content-type", "content-length", "retry-after", "x-request-id", "cf-ray"}
+        or key.lower().startswith("x-ratelimit-")
+    }
+
+
+def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence_root: Path, min_interval_seconds: float = 10.0):
+    request_call = openrouter_request_callback(endpoint=endpoint, api_key=api_key)
+    next_request_at = 0.0
+
+    def call(payload: dict) -> dict:
+        nonlocal next_request_at
+        wait_seconds = next_request_at - time.monotonic()
+        if wait_seconds > 0:
+            time.sleep(wait_seconds)
+        next_request_at = time.monotonic() + min_interval_seconds
+        try:
+            return request_call(payload)
+        except HTTPError as error:
+            raw_body = error.read().decode(errors="replace")
+            try:
+                body = _redact(json.loads(raw_body))
+            except json.JSONDecodeError:
+                body = {"raw_body": raw_body[:10_000]}
+            evidence = {
+                "schema": "bsbench-openrouter-http-error-v1",
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint,
+                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                "model": payload["model"],
+                "response_schema": payload["response_format"]["json_schema"]["name"],
+                "status": error.code,
+                "reason": error.reason,
+                "headers": _provider_headers(error.headers),
+                "body": body,
+            }
+            save_json(evidence_root / f"{evidence['payload_sha256']}-{error.code}.json", evidence)
+            raise
+
+    return call
+
+
+def openrouter_metadata(*, api_key: str) -> dict:
+    def get(resource: str) -> dict:
+        request = Request(f"https://openrouter.ai/api/v1/{resource}", headers={"Authorization": f"Bearer {api_key}"}, method="GET")
+        try:
+            with urlopen(request, timeout=30) as response:
+                return {"status": response.status, "headers": _provider_headers(response.headers), "body": _redact(json.loads(response.read()))}
+        except HTTPError as error:
+            raw_body = error.read().decode(errors="replace")
+            try:
+                body = _redact(json.loads(raw_body))
+            except json.JSONDecodeError:
+                body = {"raw_body": raw_body[:10_000]}
+            return {"status": error.code, "reason": error.reason, "headers": _provider_headers(error.headers), "body": body}
+
+    return {
+        "schema": "bsbench-openrouter-nongeneration-metadata-v1",
+        "queried_at": datetime.now(timezone.utc).isoformat(),
+        "endpoints": {"key": get("key"), "credits": get("credits")},
+    }
+
+
 def import_recorded_smoke(out: Path, model_id: str) -> dict:
     """Import the already-completed Modal smoke; do not dispatch another GPU job."""
     summary = json.loads(Path("slop/verification/20260919_phase6-modal-smoke-summary.json").read_text())
@@ -86,12 +167,14 @@ def main() -> None:
     mode.add_argument("--import-receipt", type=Path)
     mode.add_argument("--run", action="store_true")
     mode.add_argument("--check-openrouter-env", action="store_true")
+    mode.add_argument("--openrouter-metadata", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
     parser.add_argument("--out", type=Path, default=Path("outputs/bsbench-v2"))
     parser.add_argument("--method", "--stage", dest="method", choices=METHODS, help="Run one condition for recovery or debugging; omit for the canonical full sweep.")
     parser.add_argument("--backend", choices=("recorded", "fake", "real"))
     parser.add_argument("--judge-endpoint", default="https://openrouter.ai/api/v1/chat/completions")
     parser.add_argument("--ledger", type=Path)
+    parser.add_argument("--metadata-out", type=Path)
     args = parser.parse_args()
     if args.dry_run:
         result = dry_manifest(args.out, args.model)
@@ -99,6 +182,14 @@ def main() -> None:
         if not os.environ.get("OPENROUTER_API_KEY"):
             raise RuntimeError("OPENROUTER_API_KEY is not set")
         result = {"mode": "check-openrouter-env", "openrouter_api_key_present": True}
+    elif args.openrouter_metadata:
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is not set")
+        evidence = openrouter_metadata(api_key=api_key)
+        path = args.metadata_out or args.out / "provider-evidence" / f"openrouter-metadata-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json"
+        save_json(path, evidence)
+        result = {"mode": "openrouter-metadata", "evidence_path": str(path), "statuses": {name: endpoint["status"] for name, endpoint in evidence["endpoints"].items()}}
     elif args.import_smoke:
         result = import_recorded_smoke(args.out, args.model)
     elif args.import_receipt:
@@ -185,7 +276,7 @@ def main() -> None:
             with app.run():
                 modal_adapter, judge_adapter = real_adapters(
                     modal_stage_call=remote_stage_call(args.model, explicit_run=args.run, budget_preflight=budget),
-                    judge_request_call=openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key),
+                    judge_request_call=audited_openrouter_request_callback(endpoint=args.judge_endpoint, api_key=api_key, evidence_root=args.out / "provider-evidence"),
                     judge_endpoint=args.judge_endpoint,
                     explicit_run=args.run,
                     budget_preflight=budget,

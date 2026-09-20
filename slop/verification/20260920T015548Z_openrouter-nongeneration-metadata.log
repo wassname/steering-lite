@@ -1,0 +1,6 @@
+started_at=2026-09-20T01:55:48Z
+command=just sweep --openrouter-metadata Qwen/Qwen3.5-4B outputs/bsbench-v2
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --openrouter-metadata --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"evidence_path": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T015551Z.json", "mode": "openrouter-metadata", "statuses": {"credits": 200, "key": 200}}
+finished_at=2026-09-20T01:55:52Z
+exit_code=0

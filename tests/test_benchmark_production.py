@@ -1,6 +1,8 @@
 import importlib.util
+import io
 import json
 import os
+from urllib.error import HTTPError
 from pathlib import Path
 import subprocess
 import sys
@@ -144,6 +146,81 @@ def _sweep_script():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def test_openrouter_http_error_evidence_preserves_retry_metadata_without_key(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+
+    def fail(_payload):
+        raise HTTPError(
+            "https://openrouter.ai/api/v1/chat/completions",
+            429,
+            "Too Many Requests",
+            {"Retry-After": "60", "X-RateLimit-Remaining": "0"},
+            io.BytesIO(b'{"error":{"message":"rate limited","key":"must-not-persist"}}'),
+        )
+
+    monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: fail)
+    request_call = sweep.audited_openrouter_request_callback(
+        endpoint="https://openrouter.ai/api/v1/chat/completions",
+        api_key="must-not-persist",
+        evidence_root=tmp_path,
+    )
+    payload = {
+        "model": "deepseek/deepseek-chat",
+        "messages": [{"role": "user", "content": "private prompt"}],
+        "response_format": {"json_schema": {"name": "persona_pair_validation"}},
+    }
+    with pytest.raises(HTTPError, match="Too Many Requests"):
+        request_call(payload)
+
+    evidence, = tmp_path.glob("*.json")
+    record = json.loads(evidence.read_text())
+    assert record["status"] == 429
+    assert record["headers"] == {"retry-after": "60", "x-ratelimit-remaining": "0"}
+    assert record["body"] == {"error": {"message": "rate limited", "key": "<redacted>"}}
+    assert "must-not-persist" not in evidence.read_text()
+    assert "private prompt" not in evidence.read_text()
+
+
+def test_openrouter_callback_paces_uncached_requests(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+    clock = iter((0.0, 0.0, 3.0, 10.0))
+    sleeps = []
+    monkeypatch.setattr(sweep, "openrouter_request_callback", lambda **_kwargs: lambda _payload: {"ok": True})
+    monkeypatch.setattr(sweep.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(sweep.time, "sleep", sleeps.append)
+    request_call = sweep.audited_openrouter_request_callback(
+        endpoint="https://openrouter.ai/api/v1/chat/completions",
+        api_key="must-not-persist",
+        evidence_root=tmp_path,
+        min_interval_seconds=10.0,
+    )
+    payload = {"model": "deepseek/deepseek-chat", "response_format": {"json_schema": {"name": "persona_pair_validation"}}}
+    assert request_call(payload) == request_call(payload) == {"ok": True}
+    assert sleeps == [7.0]
+
+
+def test_openrouter_metadata_redacts_key_fields(tmp_path: Path, monkeypatch):
+    sweep = _sweep_script()
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "application/json", "X-RateLimit-Limit": "100"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"data":{"limit_remaining":4.5,"key_hash":"must-not-persist"}}'
+
+    monkeypatch.setattr(sweep, "urlopen", lambda *_args, **_kwargs: Response())
+    metadata = sweep.openrouter_metadata(api_key="must-not-persist")
+    assert {name: value["status"] for name, value in metadata["endpoints"].items()} == {"key": 200, "credits": 200}
+    assert all(value["body"]["data"]["key_hash"] == "<redacted>" for value in metadata["endpoints"].values())
 
 
 def test_real_sweep_keeps_one_modal_lifecycle_across_gpu_stages(tmp_path: Path, monkeypatch):

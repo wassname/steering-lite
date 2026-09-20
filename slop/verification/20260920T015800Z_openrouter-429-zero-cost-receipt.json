@@ -1,0 +1,24 @@
+{
+  "reservation": "b6125b261fed63b579cc7aa92651611043a49f4dc0a59a65d3388f7d50374d28",
+  "actual_usd": 0.0,
+  "receipt": {
+    "schema": "bsbench-openrouter-429-reconciliation-v1",
+    "provider": "OpenRouter",
+    "outcome": "http_429_no_detectable_generation_cost",
+    "failure": {
+      "status": 429,
+      "reason": "Too Many Requests",
+      "sweep_log": "slop/verification/20260920T013752Z_real-full-sweep.log"
+    },
+    "reconciliation_evidence": {
+      "provider_metadata": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T015551Z.json",
+      "completed_cached_judge_requests_before_failed_request": 80,
+      "settled_judge_cost_before_failed_request_usd": 0.0330859126,
+      "provider_key_usage_after_failed_request_usd": 0.033085887,
+      "absolute_difference_usd": 2.5599999999970093e-08,
+      "rounding_tolerance_usd": 0.000001,
+      "interpretation": "The provider key usage after the failed request matches the completed-request ledger total within the declared rounding tolerance; no additional billed generation is detectable for the 429 request."
+    },
+    "recorded_by": "PI/OpenAI"
+  }
+}

@@ -1,0 +1,5 @@
+started_at=2026-09-20T01:58:01Z
+command=.venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260920T015800Z_openrouter-429-zero-cost-receipt.json --ledger outputs/bsbench-v2/costs.jsonl
+{"actual_usd": 0.0, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "b6125b261fed63b579cc7aa92651611043a49f4dc0a59a65d3388f7d50374d28"}
+finished_at=2026-09-20T01:58:03Z
+exit_code=0
