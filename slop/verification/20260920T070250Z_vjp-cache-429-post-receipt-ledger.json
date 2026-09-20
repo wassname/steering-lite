@@ -1,0 +1,64 @@
+{
+  "open": [],
+  "last_events": [
+    {
+      "event": "settled",
+      "reservation": "7a6cac7a78068b9b5589def0ba8e4a7d7f16a2c32c5cb2e756fdc1a2292d5622",
+      "actual_usd": 0.0005890041
+    },
+    {
+      "event": "reserved",
+      "kind": "judge-dd6d698d46fb2fbe78a0c49ae8651299e88b489647db585ae27f074e3bbdf668",
+      "upper_usd": 0.0022643999999999997,
+      "time": "2026-09-20T07:00:40.450453+00:00",
+      "id": "b60b86b9408210251de7385cf37fe0a5fde2bdddfc9824e5de102d4a03961f3a"
+    },
+    {
+      "event": "settled",
+      "reservation": "b60b86b9408210251de7385cf37fe0a5fde2bdddfc9824e5de102d4a03961f3a",
+      "actual_usd": 0.00037753
+    },
+    {
+      "event": "reserved",
+      "kind": "judge-7b1505e50b691a0181646fb4858228ef0a14ab023750fd786b7027050ac61c53",
+      "upper_usd": 0.0017496,
+      "time": "2026-09-20T07:00:52.129131+00:00",
+      "id": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b"
+    },
+    {
+      "event": "unresolved",
+      "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b",
+      "reason": "judge_request_failure"
+    },
+    {
+      "event": "settled",
+      "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b",
+      "actual_usd": 0.0017496
+    },
+    {
+      "event": "receipt_imported",
+      "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b",
+      "receipt": {
+        "schema": "bsbench-openrouter-429-reconciliation-v1",
+        "provider": "OpenRouter",
+        "outcome": "http_429_aggregate_usage_cannot_attribute",
+        "failure": {
+          "status": 429,
+          "reason": "Too Many Requests",
+          "payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+          "sweep_log": "slop/verification/20260920T061625Z_vjp-canonical-continuation.log",
+          "provider_evidence": "outputs/bsbench-v2/provider-evidence/69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490-000196-failed.json"
+        },
+        "reconciliation_evidence": {
+          "provider_metadata": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T070100Z-vjp-429.json",
+          "provider_key_usage_usd_after_failed_request": 0.268215735,
+          "all_settled_judge_ledger_cost_usd": 0.273016928,
+          "difference_usd": -0.004801193,
+          "interpretation": "Aggregate key metadata is lower than the settled judge ledger total and cannot attribute the failed request. The response was an upstream-provider 429, but that response alone does not prove zero generation cost. This receipt charges the request at its reservation upper."
+        },
+        "cost_treatment": "Conservative upper settlement, not an invoice or a claim that OpenRouter charged this amount.",
+        "recorded_by": "PI[gpt-5.6-terra]"
+      }
+    }
+  ]
+}

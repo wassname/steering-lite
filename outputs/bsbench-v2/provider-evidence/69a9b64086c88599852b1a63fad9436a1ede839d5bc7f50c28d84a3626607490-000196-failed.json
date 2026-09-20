@@ -1,0 +1,44 @@
+{
+  "attempt": 196,
+  "body": {
+    "error": {
+      "code": 429,
+      "message": "Provider returned error",
+      "metadata": {
+        "is_byok": false,
+        "limit_source": "upstream_provider_shared_pool",
+        "previous_errors": [
+          {
+            "code": 429,
+            "message": "Provider returned error",
+            "provider_name": "DeepInfra",
+            "raw": "deepseek/deepseek-chat is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations"
+          }
+        ],
+        "provider_name": "StreamLake",
+        "raw": "deepseek/deepseek-chat is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations",
+        "remedy_hint": "Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing"
+      }
+    },
+    "user_id": "user_2ffkoR4mYsVn0rZWphIZivDqvFW"
+  },
+  "dispatch_started_at": "2026-09-20T07:00:52.129278+00:00",
+  "elapsed_seconds": 0.7979014100274071,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "enforced_wait_seconds": 0.0,
+  "headers": {
+    "cf-ray": "a3def4a1ef8c7b5b-PER",
+    "content-type": "application/json",
+    "date": "Sun, 20 Sep 2026 07:00:52 GMT"
+  },
+  "min_interval_seconds": 10.0,
+  "model": "deepseek/deepseek-chat",
+  "outcome": "failed",
+  "payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+  "reason": "Too Many Requests",
+  "recorded_at": "2026-09-20T07:00:52.927181+00:00",
+  "response_finished_at": "2026-09-20T07:00:52.927181+00:00",
+  "response_schema": "blind_change_description",
+  "schema": "bsbench-openrouter-http-error-v1",
+  "status": 429
+}

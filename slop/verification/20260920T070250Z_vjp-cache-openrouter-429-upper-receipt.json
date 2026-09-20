@@ -1,0 +1,25 @@
+{
+  "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b",
+  "actual_usd": 0.0017496,
+  "receipt": {
+    "schema": "bsbench-openrouter-429-reconciliation-v1",
+    "provider": "OpenRouter",
+    "outcome": "http_429_aggregate_usage_cannot_attribute",
+    "failure": {
+      "status": 429,
+      "reason": "Too Many Requests",
+      "payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+      "sweep_log": "slop/verification/20260920T061625Z_vjp-canonical-continuation.log",
+      "provider_evidence": "outputs/bsbench-v2/provider-evidence/69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490-000196-failed.json"
+    },
+    "reconciliation_evidence": {
+      "provider_metadata": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T070100Z-vjp-429.json",
+      "provider_key_usage_usd_after_failed_request": 0.268215735,
+      "all_settled_judge_ledger_cost_usd": 0.273016928,
+      "difference_usd": -0.004801193,
+      "interpretation": "Aggregate key metadata is lower than the settled judge ledger total and cannot attribute the failed request. The response was an upstream-provider 429, but that response alone does not prove zero generation cost. This receipt charges the request at its reservation upper."
+    },
+    "cost_treatment": "Conservative upper settlement, not an invoice or a claim that OpenRouter charged this amount.",
+    "recorded_by": "PI[gpt-5.6-terra]"
+  }
+}

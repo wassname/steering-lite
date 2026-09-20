@@ -1,0 +1,2 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --openrouter-metadata --metadata-out outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T070100Z-vjp-429.json --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"evidence_path": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T070100Z-vjp-429.json", "mode": "openrouter-metadata", "statuses": {"credits": 200, "key": 200}}

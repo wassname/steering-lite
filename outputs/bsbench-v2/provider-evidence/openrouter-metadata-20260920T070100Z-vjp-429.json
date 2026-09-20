@@ -1,0 +1,65 @@
+{
+  "endpoints": {
+    "credits": {
+      "body": {
+        "data": {
+          "total_credits": 4722.01,
+          "total_usage": 4668.21721369
+        }
+      },
+      "headers": {
+        "cf-ray": "a3def7866d7f8644-PER",
+        "content-type": "application/json",
+        "date": "Sun, 20 Sep 2026 07:02:50 GMT"
+      },
+      "status": 200
+    },
+    "key": {
+      "body": {
+        "data": {
+          "allowed_data_regions": [
+            "global"
+          ],
+          "byok_usage": 0,
+          "byok_usage_daily": 0,
+          "byok_usage_monthly": 0,
+          "byok_usage_weekly": 0,
+          "creator_user_id": "user_2ffkoR4mYsVn0rZWphIZivDqvFW",
+          "expires_at": "2027-03-18T22:41:00.002Z",
+          "free_model_daily_requests": {
+            "limit": 1000,
+            "remaining": 1000,
+            "used": 0
+          },
+          "include_byok_in_limit": false,
+          "is_free_tier": false,
+          "is_management_key": "<redacted>",
+          "is_provisioning_key": "<redacted>",
+          "label": "sk-or-v1-7bd...384",
+          "limit": 50,
+          "limit_remaining": 49.731784265,
+          "limit_reset": "monthly",
+          "organization_id": null,
+          "rate_limit": {
+            "interval": "10s",
+            "note": "This field is deprecated and safe to ignore.",
+            "requests": -1
+          },
+          "usage": 0.268215735,
+          "usage_daily": 0.268215735,
+          "usage_monthly": 0.268215735,
+          "usage_weekly": 0.268215735,
+          "workspace_id": "9fb722f7-322b-57be-afdf-ccc0179fef41"
+        }
+      },
+      "headers": {
+        "cf-ray": "a3def78448f53ea8-PER",
+        "content-type": "application/json",
+        "date": "Sun, 20 Sep 2026 07:02:50 GMT"
+      },
+      "status": 200
+    }
+  },
+  "queried_at": "2026-09-20T07:02:50.258777+00:00",
+  "schema": "bsbench-openrouter-nongeneration-metadata-v1"
+}

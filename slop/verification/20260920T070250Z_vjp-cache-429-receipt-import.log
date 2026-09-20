@@ -1,0 +1,2 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260920T070250Z_vjp-cache-openrouter-429-upper-receipt.json --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"actual_usd": 0.0017496, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b"}

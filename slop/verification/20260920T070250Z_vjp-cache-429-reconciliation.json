@@ -1,0 +1,91 @@
+{
+  "schema": "bsbench-vjp-cache-429-reconciliation-v1",
+  "run": {
+    "command": "just sweep \"--run --backend real --openrouter-read-timeout 300\"",
+    "run_log": "slop/verification/20260920T061625Z_vjp-canonical-continuation.log",
+    "started_at": "2026-09-20T06:17:06Z",
+    "exit_code": 1,
+    "source_commit": "0fd6e64",
+    "source_hash": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+    "model": "Qwen/Qwen3.5-4B",
+    "judge_model": "deepseek/deepseek-chat",
+    "judge_endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "read_timeout_seconds": 300,
+    "minimum_dispatch_interval_seconds": 10
+  },
+  "stage_state": {
+    "earlier_conditions": "all cache hits before VJP work",
+    "vjp_delta": {
+      "calibration_candidate_cache": "738046a82eb311e31f981fb3d1b34cad1b1c75eeb48ec92ecf70d242bab4b2aa",
+      "candidate_judgment_cache": "18691e91dffa45f20a1b09569f8051fab6b1d5628b60263e339b81da100239cd",
+      "candidate_judge_responses": 112,
+      "observed_dose_scores": {
+        "0.1": -7.675000000000001,
+        "0.2": -3.5875000000000004,
+        "0.4": -2.9125,
+        "0.8": -3.0125,
+        "1.6": -9.1,
+        "3.2": -10.35,
+        "6.4": -19.35
+      },
+      "useful_and_coherent_doses": [],
+      "terminal_result": "no measured useful and coherent dose; no final generation was dispatched"
+    },
+    "vjp_cache": {
+      "calibration_candidate_cache": "8e8bff0f303d34e283182415037d2964f9bd70557385fa3141ddad0ecbba596d",
+      "candidate_generation": "completed and cached before the judge failure",
+      "candidate_judgment_stage": "not cached because 83 successful individual request caches plus the 429 failure did not produce the complete aggregate stage",
+      "failure_request_payload_sha256": "69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490",
+      "failure_reservation": "6fa662b4275ec85293c9b8f27799c383fe66b1cb0a3c359d3c5c9ab01562687b"
+    }
+  },
+  "reservations_created_after_run_start": {
+    "count": 198,
+    "modal_candidate_reservations": 2,
+    "modal_candidate_settlement": "each is estimated at its $0.884346 reservation upper pending Modal invoice",
+    "judge_reservations": 196,
+    "judge_settled_before_429": 195,
+    "429_reservation_upper_usd": 0.0017496,
+    "429_settlement": "settled at reservation upper through the receipt file; this is a conservative accounting treatment, not a provider invoice",
+    "open_unresolved_reservations_after_receipt": []
+  },
+  "provider_evidence": {
+    "failure": "outputs/bsbench-v2/provider-evidence/69a9b64086c88599852b1a63fad9436a1ede839d5bc7f50c28d84a3626607490-000196-failed.json",
+    "failure_status": 429,
+    "failure_limit_source": "upstream_provider_shared_pool",
+    "metadata": "outputs/bsbench-v2/provider-evidence/openrouter-metadata-20260920T070100Z-vjp-429.json",
+    "metadata_key_usage_usd": 0.268215735,
+    "all_settled_judge_ledger_usd_before_receipt": 0.273016928,
+    "attribution": "not exact: aggregate metadata is $0.004801193 below the settled judge ledger total and cannot determine whether the rejected request was billed"
+  },
+  "dispatch_timing": {
+    "records": 196,
+    "successful": 195,
+    "failed": 1,
+    "minimum_start_to_start_seconds": 10.000033,
+    "starts_below_10_seconds": 0,
+    "elapsed_seconds_min": 0.7979014100274071,
+    "elapsed_seconds_max": 27.71386918297503
+  },
+  "modal": {
+    "evidence": "slop/verification/20260920T070000Z_vjp-429-modal-app-list-venv.json",
+    "app_id": "ap-2ImYkqIjksdYBymvFwWcea",
+    "state": "stopped",
+    "tasks": 0
+  },
+  "post_reconciliation_preflight": {
+    "evidence": "slop/verification/20260920T070250Z_vjp-cache-429-dry-preflight.log",
+    "paid_execution_enabled": false,
+    "total_upper_usd": 48.095003328,
+    "limit_usd": 50.0
+  },
+  "recovery_proposal": {
+    "requires_review": true,
+    "command": "just sweep \"--run --backend real --method vjp_cache --openrouter-read-timeout 300\"",
+    "scope": "retry only VJP-cache after the upstream shared provider pool has recovered",
+    "unchanged": ["model", "endpoint", "persisted request payload", "10-second dispatch pacing", "300-second read timeout"],
+    "expected_cache_reuse": "VJP-cache candidate generation and 83 successful judge-request records; retry starts at the rejected request payload and then completes only remaining VJP-cache candidate judgments",
+    "not_authorized_here": ["retry", "route to a different provider", "change model", "start final generation", "run rendering"]
+  },
+  "recorded_by": "PI[gpt-5.6-terra]"
+}
