@@ -1,0 +1,464 @@
+started_at=2026-09-20T21:39:10Z
+command=just sweep "--run --backend real --method pca --openrouter-read-timeout 300"
+scope=one unchanged PCA-only retry after malformed strict JSON; cache prior successes
+invariants=model=Qwen/Qwen3.5-4B endpoint=default min_dispatch_interval=10s read_timeout=300s strict_schema=unchanged
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --run --backend real --method pca --openrouter-read-timeout 300 --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+2026-09-21 05:39:23.877 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-21 05:39:24.131 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 481496e427e4
+2026-09-21 05:39:24.133 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health 7d3ea465bca3
+2026-09-21 05:39:24.136 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 45f370c2cd96
+2026-09-21 05:39:24.138 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health f7892eb2e840
+2026-09-21 05:39:24.141 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit target-aware-requests 9e7494cbde05
+2026-09-21 05:39:24.143 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit blind-requests 53c202703920
+2026-09-21 05:39:24.154 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit persona-validation 535f48e03ff5
+2026-09-21 05:39:24.157 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 2d37274ea538
+2026-09-21 05:39:24.161 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health c07c7ba11e4b
+2026-09-21 05:39:24.163 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 5559bafbfa60
+2026-09-21 05:39:24.166 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind c1379936fbeb
+2026-09-21 05:39:24.168 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates cf051ecad4e8
+2026-09-21 05:39:24.170 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 8b960754caaa
+2026-09-21 05:39:24.172 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware f724016305d3
+2026-09-21 05:39:24.174 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 7922f334b2f4
+2026-09-21 05:39:24.176 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 7d44bb5d411c
+2026-09-21 05:39:24.178 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health bbe8cb740172
+2026-09-21 05:39:24.181 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware a6c2841833db
+2026-09-21 05:39:24.184 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 4ee6fc923a32
+2026-09-21 05:39:24.187 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates ba988d056405
+2026-09-21 05:39:24.189 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health bc8ee31aa275
+2026-09-21 05:39:24.191 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware fb94398b2cad
+2026-09-21 05:39:24.193 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 64e2d798da78
+2026-09-21 05:39:24.195 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 9b0a21f5ab37
+2026-09-21 05:39:24.197 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 9a3929c29951
+2026-09-21 05:39:24.199 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 51f686f79612
+2026-09-21 05:39:24.201 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 1d36d6178987
+2026-09-21 05:39:24.204 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates e2cdf12745d4
+2026-09-21 05:39:24.206 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 60e52efa2f01
+2026-09-21 05:39:24.208 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 958995598e22
+2026-09-21 05:39:24.210 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 9587063cb2f5
+2026-09-21 05:39:28.079 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-21 05:39:28.158 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible calibration-candidates 91e3f8bfbfae
+2026-09-21 05:39:28.295 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-judgments dc1575e78cd9
+2026-09-21 05:39:28.389 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-health cb28fd55fb89
+2026-09-21 05:39:28.437 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-aware d252ea20f12e
+2026-09-21 05:39:28.482 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-blind 906c2febda1a
+2026-09-21 05:39:28.497 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit final-generation ecde5731d604
+2026-09-21 05:39:28.505 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-judgments db7963803ca1
+2026-09-21 05:39:28.518 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 62a54a79b8d2
+2026-09-21 05:39:28.521 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 0238ff2ec93b
+2026-09-21 05:39:28.538 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request fef1eb9653f3
+2026-09-21 05:39:28.538 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 01fcc81fcc05
+2026-09-21 05:39:28.555 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request eb44bea297d3
+2026-09-21 05:39:28.558 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f6071f1d460f
+2026-09-21 05:39:28.569 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b375a5606aa8
+2026-09-21 05:39:28.569 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8a57b7b2bccd
+2026-09-21 05:39:28.570 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 0f3c1efff1ec
+2026-09-21 05:39:28.570 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2bc802972e2e
+2026-09-21 05:39:28.570 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 806028ff2e79
+2026-09-21 05:39:28.571 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 04c2ea02eec1
+2026-09-21 05:39:28.571 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request db19d1862537
+2026-09-21 05:39:28.573 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 71f5169d2151
+2026-09-21 05:39:28.574 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 23cb5196a601
+2026-09-21 05:39:28.574 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7b946b9a6747
+2026-09-21 05:39:28.574 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ee7daa06d61b
+2026-09-21 05:39:28.575 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8e53b1aae4f6
+2026-09-21 05:39:28.575 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request bee8c8be10a1
+2026-09-21 05:39:28.575 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request cf73a4bb54c8
+2026-09-21 05:39:28.576 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d81c4b3ec7c4
+2026-09-21 05:39:28.585 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 62a8243abb04
+2026-09-21 05:39:28.594 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7ae44eec6bfb
+2026-09-21 05:39:28.595 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request cf8abe687132
+2026-09-21 05:39:28.595 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b916528ad941
+2026-09-21 05:39:28.602 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2c08da9ccb94
+2026-09-21 05:39:28.612 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request edd541825b7b
+2026-09-21 05:39:28.619 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a8aceb493d28
+2026-09-21 05:39:28.620 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7457a0c9ea82
+2026-09-21 05:39:28.620 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request dc7ad2d3487d
+2026-09-21 05:39:28.626 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request faf935a4f0eb
+2026-09-21 05:39:28.642 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 51a8a5c0e8a9
+2026-09-21 05:39:28.654 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 447a28fcea51
+2026-09-21 05:39:28.655 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f4437d61e3ea
+2026-09-21 05:39:28.662 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 349e7cd1398d
+2026-09-21 05:39:28.671 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 884c80b90714
+2026-09-21 05:39:28.672 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 760d7826d69f
+2026-09-21 05:39:28.677 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7d43470b105c
+2026-09-21 05:39:28.677 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 166b248e6ec8
+2026-09-21 05:39:28.678 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request fe6778f58f39
+2026-09-21 05:39:28.679 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b8bf0a8ec499
+2026-09-21 05:39:28.679 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 98c1621f269b
+2026-09-21 05:39:28.679 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request af51988d59ca
+2026-09-21 05:39:28.680 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e5a0a2c88f9f
+2026-09-21 05:39:28.686 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 877c506ca6f2
+2026-09-21 05:39:28.686 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 4bd9a386b109
+2026-09-21 05:39:28.687 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 01134cb23b16
+2026-09-21 05:39:28.687 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 07cc834ab2d4
+2026-09-21 05:39:28.688 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request bc25227a5c91
+2026-09-21 05:39:28.693 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 15d2e81d4ef1
+2026-09-21 05:39:28.693 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 675dafa2c7b2
+2026-09-21 05:39:28.695 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f8d9d8c43d44
+2026-09-21 05:39:28.700 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b5269876ab61
+2026-09-21 05:39:28.718 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 391b51f3fa80
+2026-09-21 05:39:28.739 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 1ddd1b1411cb
+2026-09-21 05:39:28.739 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 24f984d0ac78
+2026-09-21 05:39:28.745 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request cf868fba1725
+2026-09-21 05:39:28.745 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 980fe3e56b2d
+2026-09-21 05:39:28.746 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7695a4dbac64
+2026-09-21 05:39:28.746 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 111a666e023e
+2026-09-21 05:39:28.746 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 9d059538b5f3
+2026-09-21 05:39:28.747 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 9e9daa938d60
+2026-09-21 05:39:28.754 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 1c472c8948b5
+2026-09-21 05:39:28.754 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 115377e4e6af
+2026-09-21 05:39:28.755 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f5f618f0452e
+2026-09-21 05:39:28.766 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request c85231b33425
+2026-09-21 05:39:28.767 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 37244b339ef6
+2026-09-21 05:39:28.767 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f793e9a2c50d
+2026-09-21 05:39:28.767 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d114653d7fe0
+2026-09-21 05:39:28.768 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2a94d62af35c
+2026-09-21 05:39:28.768 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request fbedeb9442ec
+2026-09-21 05:39:28.778 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f3304d312b58
+2026-09-21 05:39:28.782 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 476b3c96969c
+2026-09-21 05:39:28.793 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 95622a5962f5
+2026-09-21 05:39:28.797 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request fd472f40de25
+2026-09-21 05:39:28.821 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request be05b2ba7488
+2026-09-21 05:39:28.843 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 53d84241b96f
+2026-09-21 05:39:28.844 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 5c27618094a8
+2026-09-21 05:39:28.858 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 218194f7d782
+2026-09-21 05:39:28.868 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a5e960c39a61
+2026-09-21 05:39:28.873 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7607b0f03fb8
+2026-09-21 05:39:28.885 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2663aa2be4ee
+2026-09-21 05:39:28.899 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a33681da0dd3
+2026-09-21 05:39:28.915 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 3ef2a944a1b1
+2026-09-21 05:39:28.916 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8e6538cce057
+2026-09-21 05:39:28.925 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 0e5aad456924
+2026-09-21 05:39:28.932 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d4ca770318c6
+2026-09-21 05:39:28.933 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 0d1876aa4121
+2026-09-21 05:39:28.949 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 3b97502070c9
+2026-09-21 05:39:28.949 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 42dca9be9cdc
+2026-09-21 05:39:28.952 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 258bbab83a0e
+2026-09-21 05:39:28.953 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a4b7443c02b9
+2026-09-21 05:39:28.953 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a7c33e8f4e3c
+2026-09-21 05:39:28.954 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request c7aa5801bea8
+2026-09-21 05:39:28.962 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 21b8aa586fa6
+2026-09-21 05:39:28.962 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 06be05b66c94
+2026-09-21 05:39:28.963 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2333f3d1c763
+2026-09-21 05:39:28.963 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 59e550e67bc5
+2026-09-21 05:39:28.963 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6e2e7f3049bf
+2026-09-21 05:39:28.964 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d4c1a8d07802
+2026-09-21 05:39:28.964 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ae61cc41f4cc
+2026-09-21 05:39:28.974 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 44f8db7bb094
+2026-09-21 05:39:28.974 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 1553738a0ba8
+2026-09-21 05:39:28.975 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7dc432a4f1a3
+2026-09-21 05:39:28.975 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 42423faabb8c
+2026-09-21 05:39:28.976 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 98a887dd864d
+2026-09-21 05:39:28.976 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 12bfef6a412c
+2026-09-21 05:39:28.977 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request c1d64ea34b58
+2026-09-21 05:39:28.977 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7643a4ddc7b0
+2026-09-21 05:39:28.977 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 33122e41b2e3
+2026-09-21 05:39:28.978 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b030d60a4472
+2026-09-21 05:39:28.978 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b83fe288658f
+2026-09-21 05:39:28.978 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 934b13663bd2
+2026-09-21 05:39:28.984 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 437d4f4ab4b3
+2026-09-21 05:39:28.984 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7e58d58d0a56
+2026-09-21 05:39:28.985 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 9c5d447f3414
+2026-09-21 05:39:28.985 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b5cab6920111
+2026-09-21 05:39:28.985 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e2a6da8ff24f
+2026-09-21 05:39:28.990 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 396de78c1deb
+2026-09-21 05:39:28.990 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 410b44661b7b
+2026-09-21 05:39:28.990 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 4aa02ad07e7f
+2026-09-21 05:39:28.991 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 1450af6a4b44
+2026-09-21 05:39:28.991 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 16a81f40d501
+2026-09-21 05:39:29.001 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 5d3168d5fc73
+2026-09-21 05:39:29.002 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 092acf27fbbb
+2026-09-21 05:39:29.002 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request de86e4490eaa
+2026-09-21 05:39:29.003 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ca9b608acdd3
+2026-09-21 05:39:29.003 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8282be9633f9
+2026-09-21 05:39:29.009 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8d629d32b284
+2026-09-21 05:39:29.009 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 354cb03bfd49
+2026-09-21 05:39:29.010 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6794f3371dbc
+2026-09-21 05:39:29.010 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ecc1b5955141
+2026-09-21 05:39:29.011 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 1f389bca3bc6
+2026-09-21 05:39:29.011 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 9bed446f51a0
+2026-09-21 05:39:29.019 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request de55e83ff857
+2026-09-21 05:39:29.019 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f75a9da120c8
+2026-09-21 05:39:29.031 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2ff030e7c973
+2026-09-21 05:39:29.031 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request afc873dd5403
+2026-09-21 05:39:29.032 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6fd70b904b0c
+2026-09-21 05:39:29.032 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6b0662dd40cb
+2026-09-21 05:39:29.032 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 46d5577314da
+2026-09-21 05:39:29.033 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 22cafbe6ea4a
+2026-09-21 05:39:29.033 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6dfe014a6fd4
+2026-09-21 05:39:29.044 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 3162d96b0387
+2026-09-21 05:39:29.045 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 87a012661aa6
+2026-09-21 05:39:29.045 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a3497706c98a
+2026-09-21 05:39:29.046 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request aa98831067b6
+2026-09-21 05:39:29.046 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 16f728b17270
+2026-09-21 05:39:29.046 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6414ea2129a2
+2026-09-21 05:39:29.047 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b117b86e8300
+2026-09-21 05:39:29.047 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request edfda236068c
+2026-09-21 05:39:29.047 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e3940ded19ec
+2026-09-21 05:39:29.048 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e919dbb21abc
+2026-09-21 05:39:29.048 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d502cb066ac7
+2026-09-21 05:39:29.048 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d569ecde7546
+2026-09-21 05:39:29.067 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7bd7e64feaa9
+2026-09-21 05:39:29.068 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 15550cd34b24
+2026-09-21 05:39:29.068 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8a083c988abd
+2026-09-21 05:39:29.083 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 89563cff5ede
+2026-09-21 05:39:29.084 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request da739791838e
+2026-09-21 05:39:29.085 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b139b6b0d840
+2026-09-21 05:39:29.098 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a539dd689aa5
+2026-09-21 05:39:29.099 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request bb300198a025
+2026-09-21 05:39:29.099 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ea42112a4053
+2026-09-21 05:39:29.100 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 5ec902225fda
+2026-09-21 05:39:29.100 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 675254f8b9c4
+2026-09-21 05:39:29.100 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request dc496cb215dd
+2026-09-21 05:39:29.101 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8028a1b3968d
+2026-09-21 05:39:29.101 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 45d889c5723a
+2026-09-21 05:39:29.102 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 69f1a996902e
+2026-09-21 05:39:29.102 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6bd64d10168f
+2026-09-21 05:39:29.103 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 9305126289c5
+2026-09-21 05:39:29.103 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 840beaac4403
+2026-09-21 05:39:29.103 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 225e14b4f452
+2026-09-21 05:39:29.114 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f620a8af8ff9
+2026-09-21 05:39:29.115 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request bc5458ccbcbb
+2026-09-21 05:39:29.115 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 00e39ece87cc
+2026-09-21 05:39:29.116 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2ef3907f81a8
+2026-09-21 05:39:29.125 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 08b4f63e66e0
+2026-09-21 05:39:29.125 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f2e9bc48ed12
+2026-09-21 05:39:29.126 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f05381b1ddcb
+2026-09-21 05:39:29.126 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 127c1c01029a
+2026-09-21 05:39:29.127 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 55ced15f2874
+2026-09-21 05:39:29.127 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 84552bd1435b
+2026-09-21 05:39:29.127 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6e4580a795d3
+2026-09-21 05:39:29.128 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 206b242fc5c8
+2026-09-21 05:39:29.128 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 760496547373
+2026-09-21 05:39:29.128 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 60666e7eedcb
+2026-09-21 05:39:29.129 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a3f3a6e3dd49
+2026-09-21 05:39:29.129 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 05b897d3f200
+2026-09-21 05:39:29.130 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 09dc7af77362
+2026-09-21 05:39:29.130 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request ffa8cf2eff53
+2026-09-21 05:39:29.131 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 3b2f539e1d07
+2026-09-21 05:39:29.131 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 45141a83b88b
+2026-09-21 05:39:29.131 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 68868b39d6ce
+2026-09-21 05:39:29.132 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request acba7770e7ba
+2026-09-21 05:39:29.132 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 14859065b21a
+2026-09-21 05:39:29.132 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request dbd50ad2c9d4
+2026-09-21 05:39:29.133 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e667758ab79f
+2026-09-21 05:39:29.139 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 12f7c7264172
+2026-09-21 05:39:29.140 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 6da37bcc98ea
+2026-09-21 05:39:29.140 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8b7d0bd38a0d
+2026-09-21 05:39:29.141 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 5c544d5ef227
+2026-09-21 05:39:29.141 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f2d22695eae7
+2026-09-21 05:39:29.141 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8bb36d904336
+2026-09-21 05:39:29.142 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 8442b67777ca
+2026-09-21 05:39:29.142 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request cbbe4620141f
+2026-09-21 05:39:29.143 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request fbcc5ae1f83b
+2026-09-21 05:39:29.143 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request a0c8769876b1
+2026-09-21 05:39:29.146 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request f81e75392b34
+2026-09-21 05:39:29.147 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 48ba5262f126
+2026-09-21 05:39:29.147 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b0cb52698730
+2026-09-21 05:39:29.147 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 32cd0b3e2311
+2026-09-21 05:39:29.148 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 0b24fc17f826
+2026-09-21 05:39:29.148 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 34a92ca8e452
+2026-09-21 05:39:29.149 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request b602c4cf4863
+2026-09-21 05:39:29.149 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request e2c5c428c9ea
+2026-09-21 05:39:29.154 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 7b03db47b656
+2026-09-21 05:39:29.154 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request d41c6afbbd02
+2026-09-21 05:39:29.155 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 2d3b482ce54c
+2026-09-21 05:39:29.155 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request df47cdd2b765
+2026-09-21 05:39:29.164 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request 4c6d37f71d30
+2026-09-21 05:39:29.164 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit judge-request c97af77e044a
+2026-09-21 05:39:29.164 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 1ab3336156b5
+2026-09-21 05:39:34.241 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request de3d3f5adfc7
+2026-09-21 05:39:41.159 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request c4b444a71f62
+2026-09-21 05:39:54.438 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 2d8b57ac1837
+2026-09-21 05:40:00.626 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 6c3a58b33a33
+2026-09-21 05:40:15.288 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7802a4810098
+2026-09-21 05:40:20.950 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 752dcb38ad9f
+2026-09-21 05:40:34.432 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 2ec504976061
+2026-09-21 05:40:41.038 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 4e8e1ede9c8e
+2026-09-21 05:40:54.366 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 81d32bd89c66
+2026-09-21 05:41:01.102 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7ae7539e7322
+2026-09-21 05:41:14.900 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request e227269148f3
+2026-09-21 05:41:20.884 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 130031d0c4d7
+2026-09-21 05:41:33.598 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request b440719a03ea
+2026-09-21 05:41:40.931 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8ee87dedf549
+2026-09-21 05:42:16.296 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 26a08198c960
+2026-09-21 05:42:18.245 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request e636775d22ca
+2026-09-21 05:42:31.284 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 405d808fe6c5
+2026-09-21 05:42:37.818 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request feb242c2e7df
+2026-09-21 05:42:51.216 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 08d6db3bbf3f
+2026-09-21 05:42:57.993 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request b6fd98449616
+2026-09-21 05:43:09.862 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 196df7fe8bbf
+2026-09-21 05:43:18.228 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 964f9434c64f
+2026-09-21 05:43:30.717 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 3f3d9bab8261
+2026-09-21 05:43:55.791 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request e48a060011f2
+2026-09-21 05:43:58.699 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 2d696cb903dd
+2026-09-21 05:44:07.934 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 68f42dff82e8
+2026-09-21 05:44:44.050 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 4b56cd214367
+2026-09-21 05:44:45.721 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0d216b6a193d
+2026-09-21 05:44:58.525 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8cbd18f71cdb
+2026-09-21 05:45:05.619 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0a275c0d2de8
+2026-09-21 05:45:17.696 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request a5722c813534
+2026-09-21 05:45:25.636 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 64d20f6a097e
+2026-09-21 05:45:38.196 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 670d7c317623
+2026-09-21 05:45:45.612 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 46be8d11243d
+2026-09-21 05:45:58.127 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 6f188b1f4ef5
+2026-09-21 05:46:23.331 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request b023b636d2fa
+2026-09-21 05:46:28.835 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 254a77a659e8
+2026-09-21 05:46:34.968 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request d4710ac926ab
+2026-09-21 05:46:46.230 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 275a48a1388f
+2026-09-21 05:46:55.528 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 3853ca512996
+2026-09-21 05:47:07.047 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 58f50af3b6ed
+2026-09-21 05:47:35.626 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request a062f159f108
+2026-09-21 05:47:39.353 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request e683ff2340b7
+2026-09-21 05:47:47.225 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 253915f41fa6
+2026-09-21 05:48:01.324 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 2207650d45b0
+2026-09-21 05:48:07.963 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 07ba01ab826b
+2026-09-21 05:48:19.922 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request f1694cc32891
+2026-09-21 05:48:27.383 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request af01eec8cd60
+2026-09-21 05:48:42.505 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 72f1166041c1
+2026-09-21 05:48:48.530 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request ab49ed9d50e5
+2026-09-21 05:49:00.379 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8303932c9aeb
+2026-09-21 05:49:07.081 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 1b1fae2d7fb4
+2026-09-21 05:49:19.409 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 3d8ff5de8630
+2026-09-21 05:49:27.504 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8bab510f028f
+2026-09-21 05:49:39.472 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 3c491c73b6ab
+2026-09-21 05:49:48.753 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 74d720759761
+2026-09-21 05:49:59.120 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request eb8db4fbaa89
+2026-09-21 05:50:07.749 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 091084147158
+2026-09-21 05:50:19.230 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 01b74175a6fe
+2026-09-21 05:50:27.471 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0234d36eaf53
+2026-09-21 05:50:39.473 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request b6ed2a6c2466
+2026-09-21 05:50:47.429 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request bfc421693c0c
+2026-09-21 05:51:00.942 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 00763f796f86
+2026-09-21 05:51:30.242 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 6caf35aba653
+2026-09-21 05:51:34.516 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 574373c589c5
+2026-09-21 05:51:42.419 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 08120dd3d3f5
+2026-09-21 05:51:52.323 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 62abc26ffa51
+2026-09-21 05:52:01.993 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 9b0e558d93f1
+2026-09-21 05:52:11.843 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 68b67161569c
+2026-09-21 05:52:22.325 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 5b57ea08a508
+2026-09-21 05:52:31.848 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 68761d957421
+2026-09-21 05:52:41.982 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request fbe020ada73d
+2026-09-21 05:52:59.784 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7a2a7e9ce48c
+2026-09-21 05:53:02.192 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7e713cec6679
+2026-09-21 05:53:12.409 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 05c14625aaf0
+2026-09-21 05:53:21.641 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 704c41cc3c63
+2026-09-21 05:53:33.604 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 9745ecb2ab7f
+2026-09-21 05:53:41.700 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request c03653f1f514
+2026-09-21 05:53:51.927 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request a04d3ad58fc9
+2026-09-21 05:54:01.892 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 265017f90870
+2026-09-21 05:54:11.764 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 41ee374f08a0
+2026-09-21 05:54:22.008 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8b6147df8874
+2026-09-21 05:54:31.601 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request cfeafa866729
+2026-09-21 05:54:42.393 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request cc339bf0e0d4
+2026-09-21 05:54:51.685 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0326147e0c81
+2026-09-21 05:55:01.929 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 048a102f5e83
+2026-09-21 05:55:11.885 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0f60dfcbc431
+2026-09-21 05:55:22.266 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 044e073d529b
+2026-09-21 05:55:32.031 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 38c1c8f30dde
+2026-09-21 05:55:42.268 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0833ffc41e94
+2026-09-21 05:55:54.171 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request af156c0a00c5
+2026-09-21 05:56:17.936 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 04f07cf687f4
+2026-09-21 05:56:22.026 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 8bf328dfdff4
+2026-09-21 05:56:29.997 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request ca7dbdb00c98
+2026-09-21 05:56:43.318 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 86217d2dfa78
+2026-09-21 05:56:49.884 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 36f1059e5a2a
+2026-09-21 05:57:02.030 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 89eacfbd2e19
+2026-09-21 05:57:09.998 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7763a9fcb544
+2026-09-21 05:57:21.597 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request ba97ee869c02
+2026-09-21 05:57:49.528 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 3e7bb26e79ff
+2026-09-21 05:58:12.609 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request e757bd7d660a
+2026-09-21 05:58:14.545 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request cfa43a2d821e
+2026-09-21 05:58:24.187 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 57f100df177d
+2026-09-21 05:58:34.105 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 803560350d21
+2026-09-21 05:58:44.113 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 84767cae8e21
+2026-09-21 05:58:54.299 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request d7946cc8a2e8
+2026-09-21 05:59:04.335 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 61d44f78a35e
+2026-09-21 05:59:14.558 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 25c95711011d
+2026-09-21 05:59:25.566 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 7decde4253ae
+2026-09-21 05:59:34.813 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 43144cecfa0e
+2026-09-21 05:59:54.789 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss judge-request 0e3f1fbf6fb7
+[modal-client] 2026-09-21T06:00:11+0800 Loop attempt for _run_app.<locals>.heartbeat failed
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_utils/async_utils.py", line 588, in loop_coro
+    await asyncio.wait_for(async_f(), timeout=timeout)
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/runner.py", line 66, in _heartbeat
+    await client.stub.AppHeartbeat(request, retry=Retry(attempt_timeout=HEARTBEAT_TIMEOUT))
+modal.exception.ConflictError: App state is APP_STATE_STOPPED
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 382, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 354, in main
+    result = run_full_sweep(
+        args.out,
+    ...<6 lines>...
+        methods=(args.method,) if args.method else METHODS,
+    )
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 42, in run_full_sweep
+    conditions[method] = run_condition(
+                         ~~~~~~~~~~~~~^
+        root,
+        ^^^^^
+    ...<11 lines>...
+        transfer_records=transfer_records,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 600, in run_condition
+    return run_live_two_step(
+        root,
+    ...<14 lines>...
+        final_judge=final_judge,
+    )
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 567, in run_live_two_step
+    final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=final_judge))
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 102, in _local
+    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 87, in cached_stage
+    return cached(root, stage, identity, compute)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 38, in cached
+    result = compute()
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 567, in <lambda>
+    final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=final_judge))
+                                                                                                                                                                                                                                              ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 267, in _final_judgments
+    raw_responses = judge.complete(requests)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 170, in complete
+    return [self._complete_one(request) for request in requests]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 166, in _complete_one
+    return cached(self._root / "cache", "judge-request", identity, compute)["response"]
+           ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 38, in cached
+    result = compute()
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 149, in compute
+    response = self._request_call(request["payload"])
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 145, in call
+    response = request_call(payload)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 64, in call
+    raw_response = response.read()
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/http/client.py", line 478, in read
+    return self._read_chunked(amt)
+           ~~~~~~~~~~~~~~~~~~^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/http/client.py", line 602, in _read_chunked
+    while (chunk_left := self._get_chunk_left()) is not None:
+                         ~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/http/client.py", line 584, in _get_chunk_left
+    chunk_left = self._read_next_chunk_size()
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/http/client.py", line 544, in _read_next_chunk_size
+    line = self.fp.readline(_MAXLINE + 1)
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/socket.py", line 719, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/ssl.py", line 1316, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/ssl.py", line 1150, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+ConnectionResetError: [Errno 104] Connection reset by peer
+error: recipe `sweep` failed on line 16 with exit code 1
