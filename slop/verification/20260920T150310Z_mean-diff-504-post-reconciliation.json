@@ -7,6 +7,6 @@
   "committed_usd_after": 12.8966813097,
   "open_unresolved_reservations_after": [],
   "diagnosis": "OpenRouter recorded a DeepInfra rate-limit response before a StreamLake HTTP 504. This distinguishes an upstream provider failure from an adapter field-extraction error.",
-  "next_authorized_action": "After a 15-minute backoff and clean recheck, retry only mean_diff's cached affected stage once.",
+  "next_authorized_action": "After a 15-minute backoff, retry only mean_diff's cached affected stage once if no sweep is active, open_unresolved is empty, and the dry preflight is below $50.",
   "author": "PI[gpt-5.6-terra]"
 }
