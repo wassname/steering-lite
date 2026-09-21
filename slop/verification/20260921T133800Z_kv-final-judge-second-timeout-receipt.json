@@ -1,0 +1,17 @@
+{
+  "reservation": "2e9f38014eb275fc7908a1a6c93a5288111fea20f70a0162b0286e46a8122c77",
+  "actual_usd": 0.0022643999999999997,
+  "receipt": {
+    "schema": "bsbench-openrouter-timeout-upper-receipt-v1",
+    "provider": "OpenRouter",
+    "cost_treatment": "reservation_upper",
+    "reason": "unknown provider outcome after read timeout; charged at reservation upper",
+    "request_key": "bbc6320b4e3cd89c5e303a12ded9c6b91d4eefd7c76a324c1e99ffefd1110ec9",
+    "request_schema": "bsbench-judge-request-v1",
+    "response_schema": "demo_rating",
+    "payload_sha256": "4e8bc1b07f6ff5e616f7f8c46da07a33ffa9e6ae223bf2f4b038fb2fef3cf4b6",
+    "failure_evidence": "outputs/bsbench-v2/provider-evidence/4e8bc1b07f6ff5e616f7f8c46da07a33ffa9e6ae223bf2f4b038fb2fef3cf4b6-000115-failed.json",
+    "sweep_log": "slop/verification/20260921T130100Z_kv-final-judge-second-retry.log",
+    "audit": "slop/audits/20260921_kv_final_judge_second_timeout_and_cache_identity.md"
+  }
+}

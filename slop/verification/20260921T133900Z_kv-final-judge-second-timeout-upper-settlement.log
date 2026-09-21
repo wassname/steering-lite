@@ -1,0 +1,15 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260921T133800Z_kv-final-judge-second-timeout-receipt.json --ledger outputs/bsbench-v2/costs.jsonl --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 382, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 267, in main
+    settle_receipt(ledger, receipt["reservation"], receipt["actual_usd"], receipt["receipt"])
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 185, in settle_receipt
+    settle(ledger, reservation, actual_usd)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 179, in settle
+    raise RuntimeError(f"actual cost ${actual_usd} exceeded reservation ${original['upper_usd']}; revise pricing before continuing")
+RuntimeError: actual cost $0.0022644 exceeded reservation $0.0022643999999999997; revise pricing before continuing
+error: recipe `sweep` failed on line 16 with exit code 1
