@@ -13,7 +13,7 @@ The benchmark did not preserve the supplied reference pipeline.
 5. Local VJP-delta adds an activation-cosine sign heuristic not present in the pinned implementation ([local `vjp_delta.py`](../../src/steering_lite/variants/vjp_delta.py#L32-L40), [reference `vjp.py`](../../docs/vendor/vjp-steering/src/vjp_steering/vjp.py#L157-L212)). With both signed directions measured, this heuristic is unnecessary and changes the method being called the reference VJP-delta.
 6. The reference random region uses ten random seeds ([reference `results.py`](../../docs/vendor/vjp-steering/src/vjp_steering/results.py#L16-L18)). Local code has one random condition at seed 0, so its plot cannot support the requested “random zone”.
 7. Local `score_pair` mixes two meanings. The judge's `-C` target is candidness, so steered-minus-bare is the directed intended effect. The function negates that value for `-C`, which instead produces a signed sycophancy-axis coordinate ([local `judge.py`](../../src/steering_lite/benchmark/judge.py#L205-L214)). A bidirectional report needs both quantities under different names.
-8. The reference request contract uses temperature 0.7, `min_p=0.1`, disabled reasoning, parameter-compatible precision routing, excludes AtlasCloud and DeepInfra, retries three transient failures, and runs six calls concurrently ([reference `judge.py`](../../docs/vendor/vjp-steering/scripts/judge.py#L257-L309)). Local code uses temperature 0, no provider routing, no in-request retry, and a serial 10-second interval ([local `judge.py`](../../src/steering_lite/benchmark/judge.py#L187-L195), [local entry point](../../scripts/run_bsbench_sweep.py#L105-L174)). The active plan authorized complete cached evidence and stop/reconcile after a failed paid stage. It did not authorize replacing the reference request contract.
+8. The reference request settings use temperature 0.7, `min_p=0.1`, disabled reasoning, parameter-compatible precision routing, exclude AtlasCloud and DeepInfra, retry three transient failures, and run six calls concurrently ([reference `judge.py`](../../docs/vendor/vjp-steering/scripts/judge.py#L257-L309)). Local code uses temperature 0, no provider routing, no in-request retry, and a serial 10-second interval ([local `judge.py`](../../src/steering_lite/benchmark/judge.py#L187-L195), [local entry point](../../scripts/run_bsbench_sweep.py#L105-L174)). The active plan authorized complete cached evidence and stop/reconcile after a failed paid stage. It did not authorize replacing the reference request settings.
 
 The repeated `deepseek/deepseek-chat` failures were therefore not evidence that the requested benchmark was externally blocked. They were failures of an unapproved judge configuration.
 
@@ -35,7 +35,7 @@ These local changes are retained:
 
 Use the pinned reference model exactly: `deepseek/deepseek-v4-flash-0731`.
 
-Aware requests copy the pinned reference contract:
+Aware requests copy the pinned reference settings:
 
 - AB and BA;
 - two passes per order;
@@ -47,7 +47,7 @@ Aware requests copy the pinned reference contract:
 - up to three attempts for 408, 429, 500, 502, 503, 504, 524, 529, connection failures, timeouts, empty choices, or invalid JSON;
 - maximum concurrency six.
 
-Blind requests use the same model, routing, retry and concurrency contract. They remain one pass for AB and BA at temperature 0 because they are a separate descriptive check, not a replacement for the reference score estimate.
+Blind requests use the same model, routing, retry and concurrency settings. They remain one pass for AB and BA at temperature 0 because they are a separate descriptive check, not a replacement for the reference score estimate.
 
 The local ledger records every provider attempt. After three failed attempts, the stage stops, the exact reservations are reconciled, and later methods remain stopped. Unlike the large reference run, this small benchmark does not silently omit a missing cell.
 
@@ -82,7 +82,7 @@ VJP-delta copies the pinned estimator and removes the activation-cosine sign fli
 
 ### Random control
 
-Use ten seeded random vectors as the reference random region. They use the same layers, signed target calibration, evaluation questions, transfer cases and judge contract. If the corrected cache-aware dry estimate exceeds $50, reduce no scientific condition silently. Report the estimate and request a budget/scope decision.
+Use ten seeded random vectors as the reference random region. They use the same layers, signed target calibration, evaluation questions, transfer cases and judge settings. If the corrected cache-aware dry estimate exceeds $50, reduce no scientific condition silently. Report the estimate and request a budget/scope decision.
 
 ## Cache and result validity
 
@@ -110,7 +110,7 @@ The old artifacts remain for provenance. They are not copied into the corrected 
 2. The fake full sweep contains the exact eight conditions, ten random seeds, complete signed dose plans, and the expected request count.
 3. `just test` and `just smoke` pass.
 4. A paid-disabled dry preflight includes sunk spending, corrected V4 Flash prices, all missing signed GPU work, all aware/blind calls, and one affected-stage retry reserve; total must be below $50.
-5. A one-question provider probe must return strict JSON under the exact reference request contract before the full corrected judge run.
+5. A one-question provider probe must return strict JSON with the exact reference request settings before the full corrected judge run.
 6. No old DeepSeek Chat judgment may satisfy a corrected V4 cache identity.
 
 -- PI/OpenAI
