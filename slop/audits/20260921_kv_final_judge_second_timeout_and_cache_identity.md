@@ -116,7 +116,7 @@ For `4e8bc1…`, cache inspection found 16 records with the same raw payload and
 - **Contrary evidence:** Separate calls could be intentional independent samples. The model is requested with `temperature: 0`, and no plan states that per-row duplicate sampling is intended.
 - **Discriminating test:** Offline: construct two request records with same payload but different comparison IDs, run the cache callback twice, and verify only one callback executes while each metadata row can reference the response.
 - **Fix/action:** Cache the remote response by canonical `{endpoint, request_key, judge_model, upper_usd}`; then attach each caller's own metadata outside the remote cache record. Do not mutate existing response records as though they had been deduplicated.
-- **Interpretability:** yes for existing completed records; no claim about a cache-only rerun until the revised contract is validated.
+- **Interpretability:** yes for existing completed records; no claim about a cache-only rerun until payload-level cache behavior is validated.
 
 ### H3 [provider | Likely | 65%]
 
