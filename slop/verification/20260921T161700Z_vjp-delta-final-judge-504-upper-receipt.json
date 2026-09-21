@@ -1,0 +1,13 @@
+{
+  "reservation": "8dc4a4e424f11917c98d21490b3cacfb44b8301bba8d57db67c6281faa3d89f5",
+  "actual_usd": 0.0022643999999999997,
+  "receipt": {
+    "schema": "bsbench-timeout-upper-receipt-v1",
+    "worker": "PI[gpt-5.6-terra]",
+    "provider_evidence": "outputs/bsbench-v2/provider-evidence/35441d3e67c2c43b8e29a9735bc319632a8c19db6cff34dfa8d403cb57ef06a2-000175-failed.json",
+    "status": 504,
+    "reason": "Gateway Timeout",
+    "provider_response": "The operation was aborted",
+    "decision": "No provider usage receipt can distinguish a zero charge from a completed charged request. Settle at the exact original reservation upper."
+  }
+}
