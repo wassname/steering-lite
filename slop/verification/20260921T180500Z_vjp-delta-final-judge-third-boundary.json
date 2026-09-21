@@ -1,0 +1,24 @@
+{
+  "schema": "bsbench-final-judge-cache-boundary-v2",
+  "method": "vjp_delta",
+  "generation_cache": "outputs/bsbench-v2/cache/final-generation/5558935323669a9ac44ea9f033e9bd9e7b2bb3b3cf94fb4e164382d728a86cd1.json",
+  "request_construction": "Rebuilt the 336 numbered final requests from the cached final-generation plan, then used the production judge-request cache identity including schema, endpoint, model and upper_usd.",
+  "planned_records": 336,
+  "cached_successes": 262,
+  "cache_misses": 74,
+  "known_unresolved_request_attempts": [
+    {
+      "status": 504,
+      "settlement": "upper",
+      "payload_sha256": "35441d3e67c2c43b8e29a9735bc319632a8c19db6cff34dfa8d403cb57ef06a2"
+    },
+    {
+      "status": 429,
+      "settlement": "zero",
+      "payload_sha256": "d56fd0a76b4a566e69315b231ad91b6ec1ed5bea8e8e6b8e48d58572777be55e"
+    }
+  ],
+  "untouched_records": 72,
+  "partition_total": 336,
+  "note": "The earlier zero-cost 429 payload 86e2c371... now has a cached success, so it is included in cached_successes rather than a pending item."
+}
