@@ -105,7 +105,7 @@ For `4e8bc1…`, cache inspection found 16 records with the same raw payload and
 - **Mechanism:** The retry correctly reused 178 completed per-row cache records, successfully recovered `cde040…`, then continued through still-unpersisted final-judgment records until `4e8bc1…` failed.
 - **Evidence:** The log transitions from `cache hit ... cf9993983ba3` to `cache miss ... e60f2e7f2bf9`; provider evidence gives cde attempt 1 success and 4e8bc1 attempt 115 timeout.
 - **Contrary evidence:** The prior audit described cde as the only missing cache key. That description did not count the complete 336-record plan.
-- **Discriminating test:** Build the complete requests list from cached f054 and count rows with exact cache files before dispatch. It should report 293 completed / 43 remaining after this run.
+- **Discriminating test:** Build the complete requests list from cached f054 and count rows with exact cache files before dispatch. It reports 292 persisted successful cache records, one terminal-but-uncached timeout, and 43 untouched records (44 cache misses remain).
 - **Fix/action:** Add that count to the cache-aware preflight before any resume.
 - **Interpretability:** partial; completed response records are usable, but KV final judgment is incomplete.
 
@@ -138,7 +138,7 @@ For `4e8bc1…`, cache inspection found 16 records with the same raw payload and
 
 ## Decision
 
-**Resolve-condition verdict:** not met. The requested KV final judgments require all 336 planned records; 293 have observed terminal outcomes, and one was an unknown timeout conservatively charged at upper. The final-stage cache has not been persisted.
+**Resolve-condition verdict:** not met. The requested KV final judgments require all 336 planned records; 292 successful responses are persisted, one later record has only an unknown timeout outcome, and 43 records are untouched. The final-stage cache has not been persisted.
 
 **Prediction check:**
 

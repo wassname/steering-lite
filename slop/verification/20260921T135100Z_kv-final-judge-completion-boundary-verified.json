@@ -1,0 +1,16 @@
+{
+  "missing_unique_raw_payloads": 26,
+  "persisted_success_records": 292,
+  "plan_rows": 84,
+  "planned_requests": 336,
+  "remaining_cache_miss_by_response_schema": {
+    "blind_change_description": 22,
+    "demo_rating": 22
+  },
+  "remaining_cache_miss_records": 44,
+  "schema": "bsbench-kv-final-judge-completion-boundary-v2",
+  "semantics": "one judge response remains required per comparison record; identical raw payloads are not deduplicated mid-experiment",
+  "terminal_unknown_timeout_records": 1,
+  "unique_raw_payloads": 290,
+  "untouched_records": 43
+}
