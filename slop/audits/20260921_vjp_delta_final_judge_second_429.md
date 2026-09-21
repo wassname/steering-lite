@@ -8,6 +8,12 @@
 
 The unchanged VJP-delta retry reused its prior 175 cached final judgments. It then persisted 84 more successful requests before the next request returned HTTP 429. The current boundary is 259 cached successes, one earlier upper-settled HTTP 504, one zero-cost HTTP 429, and 76 untouched records, against 336 planned final judgment records.
 
+### Correction
+
+An earlier progress message mistakenly described the final tail's seven displayed cache misses as the run total. The complete retry log has 85 cache-miss lines; provider evidence in the retry window has 84 successes and one 429. Thus the machine-checked increment is 84, not seven.
+
+Source: `slop/verification/20260921T170200Z_vjp-delta-second-retry-boundary-correction.json`.
+
 The provider evidence says the 429 is an upstream shared-pool limit:
 
 > `"limit_source": "upstream_provider_shared_pool",`

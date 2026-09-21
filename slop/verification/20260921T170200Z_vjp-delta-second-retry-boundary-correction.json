@@ -1,0 +1,28 @@
+{
+  "schema": "bsbench-vjp-delta-final-judgment-boundary-v1",
+  "first_attempt": {
+    "cached_successes_before_retry": 175,
+    "failed_http_504": 1
+  },
+  "second_attempt": {
+    "log": "slop/verification/20260921T163700Z_vjp-delta-final-judge-retry.log",
+    "provider_evidence_window_utc": {
+      "start_inclusive": "2026-09-21T16:36:00+00:00",
+      "end_exclusive": "2026-09-21T17:00:00+00:00"
+    },
+    "cache_misses_logged": 85,
+    "provider_records": 85,
+    "provider_successes": 84,
+    "provider_http_429": 1,
+    "failed_payload_sha256": "86e2c371bd4e3beffbfb92f881e13498bb87063c036bd2710310bc59613d22fb",
+    "inference": "The tail showed only the final seven cache-miss lines, not the run total. This attempt added 84 cached successes."
+  },
+  "final_plan": {
+    "planned_records": 336,
+    "cached_successes": 259,
+    "settled_http_504_failures": 1,
+    "settled_http_429_failures": 1,
+    "untouched_records": 76,
+    "partition_total": 336
+  }
+}
