@@ -1,0 +1,13 @@
+{
+  "reservation": "e1306e3212bc19412c7a3003a9517acf2c8b93aa331c430373b7e3b5cb3dc9d3",
+  "actual_usd": 0.0,
+  "receipt": {
+    "schema": "bsbench-http429-zero-receipt-v1",
+    "worker": "PI[gpt-5.6-terra]",
+    "provider_evidence": "outputs/bsbench-v2/provider-evidence/86e2c371bd4e3beffbfb92f881e13498bb87063c036bd2710310bc59613d22fb-000085-failed.json",
+    "status": 429,
+    "limit_source": "upstream_provider_shared_pool",
+    "provider_response": "deepseek/deepseek-chat is temporarily rate-limited upstream",
+    "decision": "The HTTP 429 response contains no generated content or usage. Settle at $0.00."
+  }
+}
