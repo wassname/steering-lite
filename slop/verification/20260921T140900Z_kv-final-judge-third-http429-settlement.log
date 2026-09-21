@@ -1,0 +1,2 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --import-receipt slop/verification/20260921T140800Z_kv-final-judge-third-http429-receipt.json --ledger outputs/bsbench-v2/costs.jsonl --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"actual_usd": 0.0, "ledger": "outputs/bsbench-v2/costs.jsonl", "mode": "receipt-import", "reservation": "6e5820c3f4745c53cf1dd4df0bd8a5be0ad5ea9e8688a423fd343462284fd517"}

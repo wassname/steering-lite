@@ -1,0 +1,21 @@
+{
+  "first_remaining": {
+    "blind": true,
+    "comparison_id": "bb38df3e2b787423",
+    "order": "AB",
+    "question_id": "PNFCA-001",
+    "question_number": 25,
+    "request_key": "1b387651d7b788ea9852cfb150c7425f0e586f041a4225288b58be6b8dfb90ce"
+  },
+  "persisted_success_records": 293,
+  "plan_rows": 84,
+  "planned_requests": 336,
+  "remaining_cache_miss_by_response_schema": {
+    "blind_change_description": 22,
+    "demo_rating": 21
+  },
+  "remaining_cache_miss_records": 43,
+  "schema": "bsbench-kv-final-judge-post429-boundary-v1",
+  "terminal_http429_records": 1,
+  "untouched_records": 42
+}

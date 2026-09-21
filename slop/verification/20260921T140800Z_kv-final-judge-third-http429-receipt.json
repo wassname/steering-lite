@@ -1,0 +1,22 @@
+{
+  "reservation": "6e5820c3f4745c53cf1dd4df0bd8a5be0ad5ea9e8688a423fd343462284fd517",
+  "actual_usd": 0.0,
+  "receipt": {
+    "schema": "bsbench-openrouter-429-reconciliation-v1",
+    "provider": "OpenRouter",
+    "cost_treatment": "zero",
+    "outcome": "http_429_no_detectable_generation_cost",
+    "request_key": "1b387651d7b788ea9852cfb150c7425f0e586f041a4225288b58be6b8dfb90ce",
+    "request_schema": "bsbench-judge-request-v1",
+    "response_schema": "blind_change_description",
+    "payload_sha256": "65dde782b7178ee7f422a7430f3326192679679b1a8b99f14f2a4ee64d1fb8ff",
+    "failure_evidence": "outputs/bsbench-v2/provider-evidence/65dde782b7178ee7f422a7430f3326192679679b1a8b99f14f2a4ee64d1fb8ff-000002-failed.json",
+    "sweep_log": "slop/verification/20260921T140500Z_kv-final-judge-third-retry.log",
+    "evidence": {
+      "status": 429,
+      "provider_name": "StreamLake",
+      "limit_source": "upstream_provider_shared_pool",
+      "provider_message": "deepseek/deepseek-chat is temporarily rate-limited upstream"
+    }
+  }
+}
