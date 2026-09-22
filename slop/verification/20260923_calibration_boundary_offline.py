@@ -92,7 +92,7 @@ assert len(boundary) == 100
 
 for name,rows in [('best-final',best),('calibration-candidates-4q',candidate_rows),('boundary-20q-and-transfer',boundary)]:
     with (out / f'{name}.csv').open('w',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+        w=csv.DictWriter(f,fieldnames=list(rows[0]),lineterminator="\n");w.writeheader();w.writerows(rows)
 
 count_case={case:Counter(r['status'] for r in boundary if (r['case']=='bsbench-v2-evaluation')==case) for case in (True,False)}
 count_kl={case:Counter(r['kl_within_005'] for r in boundary if (r['case']=='bsbench-v2-evaluation')==case) for case in (True,False)}
@@ -115,7 +115,7 @@ for p in data['points']:
             'point_id':p['point_id'],'raw_evidence':ref(p).replace('.html','.json')})
 assert len(eligibility_disagreements) == 8
 with (out / 'eligibility-disagreements.csv').open('w',newline='') as f:
-    w=csv.DictWriter(f,fieldnames=list(eligibility_disagreements[0]));w.writeheader();w.writerows(eligibility_disagreements)
+    w=csv.DictWriter(f,fieldnames=list(eligibility_disagreements[0]),lineterminator="\n");w.writeheader();w.writerows(eligibility_disagreements)
 
 fmt = lambda x: '—' if x is None else f'{x:+.2f}'
 md = ['# Signed dose boundary from saved BS-bench outputs', '',
