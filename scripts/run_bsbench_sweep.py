@@ -70,7 +70,7 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
 def _redact(value):
     if isinstance(value, dict):
         return {
-            key: "<redacted>" if any(word in key.lower() for word in ("key", "token", "secret", "authorization", "hash", "user_id")) else _redact(item)
+            key: "<redacted>" if key.lower() in {"api_key", "key", "token", "access_token", "refresh_token", "secret", "authorization", "user_id"} else _redact(item)
             for key, item in value.items()
         }
     if isinstance(value, list):
@@ -233,7 +233,7 @@ def import_recorded_smoke(out: Path, model_id: str) -> dict:
     return {"mode": "run-recorded-smoke", "records": records, "production_cache": str(out / "cache")}
 
 
-def run_provider_probe(root: Path, ledger: Path, *, model_id: str, endpoint: str, api_key: str, budget: dict) -> dict:
+def run_provider_probe(root: Path, ledger: Path, *, model_id: str, endpoint: str, api_key: str, budget: dict, aware_once: bool = False) -> dict:
     rows = read_dev_cohort()
     from steering_lite.benchmark.production import migrate_direct_generation
     from steering_lite.benchmark.cache import peek_stage
@@ -253,6 +253,29 @@ def run_provider_probe(root: Path, ledger: Path, *, model_id: str, endpoint: str
     from steering_lite.benchmark.validation import numbered_requests, response_record
     row = rows[0] | {"bare": generations["bare"]["answers"][0], "steered": generations["prompting"]["answers"][0], "method": "prompting", "magnitude": None, "random_seed": 0, "side": "+C"}
     requests = numbered_requests([row], JUDGE_MODEL, endpoint)
+    if aware_once:
+        from steering_lite.benchmark.adapters import judge_request_upper_usd, RunGate
+        from steering_lite.benchmark.cache import reserve, settle, estimate_at_reservation_upper, valid_cost
+        RunGate(True, budget).require()
+        request = next(request for request in requests if not request["blind"])
+        reservation = reserve(ledger, "aware-diagnostic-once", judge_request_upper_usd(request), limit_usd=budget["limit_usd"] - budget["external_committed_usd"])
+        callback = audited_openrouter_request_callback(endpoint=endpoint, api_key=api_key, evidence_root=root / "provider-evidence")
+        evidence = {"schema": "bsbench-aware-diagnostic-once-v1", "request": request, "reservation": reservation}
+        try:
+            response = callback(request["payload"])
+        except Exception as error:
+            evidence |= {"success": False, "exception_type": type(error).__name__, "provider_evidence": getattr(error, "evidence_path", None)}
+            estimate_at_reservation_upper(ledger, reservation, evidence)
+            save_json(root / "aware-diagnostic-once.json", evidence)
+            raise
+        actual = response.get("_remote_cost_usd")
+        if valid_cost(actual):
+            settle(ledger, reservation, actual)
+        else:
+            estimate_at_reservation_upper(ledger, reservation, {"schema": "bsbench-aware-diagnostic-missing-cost-v1", "cost_repr": repr(actual)})
+        evidence |= {"success": True, "response": response}
+        save_json(root / "aware-diagnostic-once.json", evidence)
+        return evidence
     _, judge = real_adapters(modal_stage_call=lambda **_: (_ for _ in ()).throw(RuntimeError("probe must not dispatch Modal")), judge_request_call=audited_openrouter_request_callback(endpoint=endpoint, api_key=api_key, evidence_root=root / "provider-evidence"), judge_endpoint=endpoint, explicit_run=True, budget_preflight=budget, root=root, ledger=ledger)
     before = committed(ledger)
     responses = judge.complete(requests)
@@ -270,6 +293,7 @@ def main() -> None:
     mode.add_argument("--import-receipt", type=Path)
     mode.add_argument("--run", action="store_true")
     mode.add_argument("--probe", action="store_true")
+    mode.add_argument("--probe-aware-once", action="store_true")
     mode.add_argument("--check-openrouter-env", action="store_true")
     mode.add_argument("--openrouter-metadata", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
@@ -286,14 +310,14 @@ def main() -> None:
         load_judge_pricing(args.judge_pricing)
     if args.dry_run:
         result = dry_manifest(args.out, args.model, cache_aware=True, judge_endpoint=args.judge_endpoint)
-    elif args.probe:
+    elif args.probe or args.probe_aware_once:
         api_key = os.environ["OPENROUTER_API_KEY"]
         ledger = args.ledger or args.out / "costs.jsonl"
         budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint)["cost_estimate"]
         if not budget["paid_preflight_passed"]:
             raise RuntimeError("provider probe requires a passing corrected preflight")
         with _openrouter_read_timeout(args.openrouter_read_timeout):
-            result = run_provider_probe(args.out, ledger, model_id=args.model, endpoint=args.judge_endpoint, api_key=api_key, budget=budget)
+            result = run_provider_probe(args.out, ledger, model_id=args.model, endpoint=args.judge_endpoint, api_key=api_key, budget=budget, aware_once=args.probe_aware_once)
     elif args.check_openrouter_env:
         if not os.environ.get("OPENROUTER_API_KEY"):
             raise RuntimeError("OPENROUTER_API_KEY is not set")

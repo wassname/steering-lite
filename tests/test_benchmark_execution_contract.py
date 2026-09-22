@@ -139,6 +139,30 @@ def test_six_overlapping_audited_calls_have_unique_evidence(tmp_path, monkeypatc
     assert all(row["enforced_wait_seconds"] == 0 for row in evidence)
 
 
+def test_parse_failure_preserves_provider_termination_metadata(monkeypatch):
+    body = {"id": "diagnostic-response", "provider": "test-provider", "model": sweep.JUDGE_MODEL, "usage": {"prompt_tokens": 123, "completion_tokens": 1024, "cost": 0.0001}, "error": {"code": "diagnostic"}, "choices": [{"finish_reason": "length", "native_finish_reason": "max_tokens", "message": {"content": '{"evidence":"unfinished', "reasoning": None}}]}
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *_): return False
+        def read(self): return json.dumps(body).encode()
+    captured = []
+    def urlopen(sent, **_):
+        captured.append(json.loads(sent.data))
+        return Response()
+    monkeypatch.setattr(adapters, "urlopen", urlopen)
+    payload = request()["payload"]
+    with pytest.raises(adapters.OpenRouterResponseParseError) as error:
+        adapters.openrouter_request_callback(endpoint="https://example.invalid", api_key="test")(payload)
+    assert captured == [payload]
+    metadata = error.value.evidence["response_metadata"]
+    assert metadata["provider"] == body["provider"]
+    assert metadata["usage"] == body["usage"]
+    assert metadata["error"] == body["error"]
+    assert metadata["choices"][0]["finish_reason"] == "length"
+    assert metadata["choices"][0]["native_finish_reason"] == "max_tokens"
+    assert entrypoint()._redact(metadata)["usage"] == body["usage"]
+
+
 def test_signed_budget_counts_match_five_seed_scope():
     final = sweep.phase_b_budget_stages()
     assert len([stage for stage in final if stage["runner"] == "modal_gpu"]) == 10

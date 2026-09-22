@@ -81,6 +81,8 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
                     "json_error": str(error),
                 },
             ) from error
+        metadata = {key: value for key, value in response_body.items() if key != "choices"}
+        metadata["choices"] = [{key: value for key, value in choice.items() if key != "message"} | {"message_metadata": {key: value for key, value in choice.get("message", {}).items() if key != "content"}} for choice in response_body.get("choices", [])]
         try:
             content = response_body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
@@ -104,13 +106,14 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
                     "assistant_content_bytes": len(content.encode()),
                     "assistant_content": content[:10_000],
                     "json_error": str(error),
+                    "response_metadata": metadata,
                 },
             ) from error
         schema = payload["response_format"]["json_schema"]["schema"]
         try:
             validate_judgment(judgment, schema)
         except ValueError as error:
-            raise OpenRouterResponseParseError(str(error), {"judgment_repr": repr(judgment)}) from error
+            raise OpenRouterResponseParseError(str(error), {"judgment_repr": repr(judgment), "response_metadata": metadata}) from error
         if not isinstance(response_body.get("usage"), dict):
             raise OpenRouterResponseParseError("judge response omitted usage metadata", {"response": response_body})
         return judgment | {
