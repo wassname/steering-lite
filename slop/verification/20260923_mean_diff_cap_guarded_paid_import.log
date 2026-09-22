@@ -1,0 +1,14 @@
+2026-09-23 07:54:35.844 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_mean_diff_cap_diagnostic.py", line 220, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_mean_diff_cap_diagnostic.py", line 216, in main
+    run(spec, old_bytes, historical, budget, args.approved_id)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_mean_diff_cap_diagnostic.py", line 168, in run
+    recovered = b''.join(callback.diagnostics.read_file(f"{spec['diagnostic_id']}.json"))
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_mean_diff_cap_import_guard/sitecustomize.py", line 24, in deny_provider_read
+    raise RuntimeError('BSBENCH_IMPORT_PROOF_DENIED_PROVIDER_READ')
+RuntimeError: BSBENCH_IMPORT_PROOF_DENIED_PROVIDER_READ

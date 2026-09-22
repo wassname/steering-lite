@@ -1,0 +1,17 @@
+{
+  "author": "PI/gpt-6-sol",
+  "argv": [
+    "slop/verification/20260923_run_mean_diff_cap_diagnostic.py",
+    "--run",
+    "--approved-id",
+    "aaf9aef0d6b6452cf19f7a4d9216ca897315c1a27ca3a4a5e4bc035e965b9b24"
+  ],
+  "repo_root_on_sys_path": true,
+  "callback_import_reached_provider_read": true,
+  "provider_read_attempts_denied": 1,
+  "socket_attempts_denied": 0,
+  "reservation_attempts_denied": 0,
+  "ledger_sha256_before": "af53fa34f85b4d17a9016d24d4f7232dde26c3195f964d20e18dbd24e601c426",
+  "ledger_sha256_after": "af53fa34f85b4d17a9016d24d4f7232dde26c3195f964d20e18dbd24e601c426",
+  "ledger_unchanged": true
+}
