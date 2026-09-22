@@ -1,0 +1,32 @@
+Running one guarded actual just sweep; full output: /workspace/2026/lite/steering-lite-bsbench/slop/verification/20260922_actual-just-sweep.command.log
+{
+  "author": "PI/OpenAI",
+  "command": [
+    "just",
+    "sweep",
+    "--run --backend real --judge-pricing slop/verification/20260922_v4-provider-endpoint-metadata.json",
+    "Qwen/Qwen3.5-4B",
+    "outputs/bsbench-v2",
+    ".local/bsbench-cli-proof/no-shell-env"
+  ],
+  "exit_code": 0,
+  "passed": true,
+  "guard_armed": true,
+  "same_guard_process": true,
+  "callback_attempts": {
+    "gpu": 0,
+    "judge": 0,
+    "reservation": 0
+  },
+  "unchanged": {
+    "source_files": true,
+    "entrypoint_sha256": true,
+    "summary_sha256": true,
+    "ledger_sha256": true,
+    "ledger_bytes": true,
+    "provider_files": true,
+    "cache_files": true,
+    "vector_files": true
+  },
+  "scientific_identity_sha256": "fab8661d7cc0dbf9ccec3f0644684558852bc0c0875a64de397458ffb6752b63"
+}

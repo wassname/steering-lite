@@ -1,0 +1,71 @@
+{
+  "author": "PI/OpenAI",
+  "original": "/workspace/2026/lite/steering-lite/.git/worktrees/steering-lite-bsbench/index.lock",
+  "preserved": ".local/bsbench-cli-proof/stale-index.lock",
+  "bytes": 0,
+  "mtime_ns": 1790099464282076634,
+  "git_processes": [
+    {
+      "pid": "3360947",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360968",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360969",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360970",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360971",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360972",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360973",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360974",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360975",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360976",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360977",
+      "cmd": "",
+      "cwd": "<zombie>"
+    },
+    {
+      "pid": "3360978",
+      "cmd": "",
+      "cwd": "<zombie>"
+    }
+  ],
+  "lsof_holders": "",
+  "note": "Earlier global no-git checks caught short-lived read-only harness commands and defunct processes."
+}

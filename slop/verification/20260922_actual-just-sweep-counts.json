@@ -1,0 +1,10 @@
+{
+  "author": "PI/OpenAI",
+  "pid": 3352837,
+  "armed": true,
+  "callback_attempts": {
+    "gpu": 0,
+    "judge": 0,
+    "reservation": 0
+  }
+}

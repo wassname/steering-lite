@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260922_check_signed_report.py", line 68, in <module>
+    assert parsers[(root/'index.html').resolve()].point_ids[:len(md_tables)]==md_tables
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

@@ -1,0 +1,15 @@
+{
+  "author": "PI/OpenAI",
+  "status": "passed",
+  "points": 62,
+  "audited_activation_metric_matches": 60,
+  "all_numbered_evidence_pages": 62,
+  "verified_local_links": 1894,
+  "markdown_html_disk_rank_parity": true,
+  "raw_failure_cannot_win_selection": true,
+  "transfer_groups": 240,
+  "solves": 100,
+  "kl_misses": 11,
+  "scientific_hashes_and_ledger_unchanged": true,
+  "fresh_eyes_oracle": "blocked: parent run35bb08f6 Codex usage limit; no verdict/retry"
+}

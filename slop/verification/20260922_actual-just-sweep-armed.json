@@ -1,0 +1,7 @@
+{
+  "author": "PI/OpenAI",
+  "pid": 3352837,
+  "guard_module": "/workspace/2026/lite/steering-lite-bsbench/.local/bsbench-cli-proof/sitecustomize.py",
+  "armed": true,
+  "dotenv_loaded_without_printing": true
+}

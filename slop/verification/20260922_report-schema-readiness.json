@@ -1,0 +1,823 @@
+{
+  "author": "PI/OpenAI",
+  "status": "read-only snapshot before final vjp_cache completes",
+  "source": "outputs/bsbench-v2/run-summary.json",
+  "sha256": "018d0d89dcd40ce76d64ee534451c88884587ac7bf8b99d2140c81939ced9dc2",
+  "schema": "bsbench-run-summary-v1",
+  "identity_sha256": "fab8661d7cc0dbf9ccec3f0644684558852bc0c0875a64de397458ffb6752b63",
+  "methods": [
+    "bare",
+    "prompting",
+    "random",
+    "mean_diff",
+    "pca",
+    "kv_cache_gram",
+    "vjp_delta",
+    "vjp_cache"
+  ],
+  "conditions": {
+    "bare": [
+      {
+        "keys": [
+          "baseline_answers",
+          "generation",
+          "health",
+          "paid_execution_enabled"
+        ]
+      }
+    ],
+    "kv_cache_gram": [
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 0,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 0.701596340467,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "d82ef81c4ca7f7360da7b29e3ecfbfed45f1ec50addd42c712a1b26ed44664c9"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      }
+    ],
+    "mean_diff": [
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 0,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 1.392109824997,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "b0d32d4cf68d216819817a7d553e30b0888763ad8b91e66e9ec9122f641a8863"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      }
+    ],
+    "pca": [
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 0,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 1.246932478647,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "3e106d9a51c66277c47fed26e8ae8ca3783e8f51aa0b4f7f69060b6f70338759"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      }
+    ],
+    "prompting": [
+      {
+        "keys": [
+          "aware",
+          "baseline",
+          "baseline_answers",
+          "blind",
+          "generation",
+          "health",
+          "judgments",
+          "paid_execution_enabled",
+          "persona_validation"
+        ]
+      }
+    ],
+    "random": [
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 0,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 2.483371227829,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "7a57cf04bfec02685af4c6b76c734cb3e9d253d873c3d903dd91cba5ec6815fb"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      },
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 1,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 2.6650052859,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "282bad017da3bfc80ecaeb15c5553c3865f99bea8a87ef2b2772951aa3c78726"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      },
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 2,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 2.547553089639,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "bc9397e96840337a1cc01dcb0c3d1e30020484fb2a8f3c8ceac509c2452e2b1e"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      },
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 3,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 2.827045669919,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "75ea2013e003ba91ab71d9949fce70d909e6a590cda2acc099ac67d5de0fb85b"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      },
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 4,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 2.296016965865,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "7b6ab23703b3d626ec8899771493ad64aed9b169d51a2d496c20ead3b6208253"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      }
+    ],
+    "vjp_delta": [
+      {
+        "keys": [
+          "candidate",
+          "candidate_aware",
+          "candidate_blind",
+          "candidate_health",
+          "candidate_judgments",
+          "final",
+          "final_aware",
+          "final_blind",
+          "final_health",
+          "final_judgments",
+          "final_stages",
+          "paid_execution_enabled",
+          "random_seed",
+          "target",
+          "transfer_prediction"
+        ],
+        "random_seed": 0,
+        "candidate_keys": [
+          "baseline_answers",
+          "candidate_health",
+          "candidate_items",
+          "candidate_magnitudes",
+          "candidate_search",
+          "cost_receipt",
+          "method_config",
+          "reservation",
+          "reused",
+          "vector_artifact",
+          "vector_sha256"
+        ],
+        "target_keys": [
+          "kl_spec",
+          "observed_boundary",
+          "schema",
+          "signed_components",
+          "source",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "prediction_keys": [
+          "bracket",
+          "case",
+          "kl_spec",
+          "method",
+          "model",
+          "schema",
+          "signed_predictions",
+          "target_id",
+          "target_rms",
+          "target_stat"
+        ],
+        "signed_prediction_keys": [
+          "magnitude",
+          "search_history",
+          "side"
+        ],
+        "plan_item": {
+          "case_id": "bsbench-v2-evaluation",
+          "magnitude": 0.6879260466,
+          "multiplier": 0.8,
+          "prompt": "Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration?",
+          "prompt_id": "BSV2-001",
+          "prompt_sha256": "3e640783ad8282f703b65acd29d79a849010ef4210986afabf0ee361edaf5fd2",
+          "side": "+C",
+          "target_id": "8266ee9bd04ce37067a1c7bc19b66faf8801a077f9ebda315db1605824b547ca"
+        },
+        "health_keys": [
+          "case_id",
+          "magnitude",
+          "metrics",
+          "prompt_id",
+          "reasons",
+          "side"
+        ],
+        "evaluation_points": 6,
+        "transfer_dose_groups": 24,
+        "answers": 168,
+        "aware": 480,
+        "blind": 240,
+        "candidate_blind": 0
+      }
+    ]
+  },
+  "expected_at_completion": {
+    "conditions": 8,
+    "random_replicates": 5,
+    "vector_replicates": 10,
+    "random_evaluation_points": 30,
+    "nonrandom_activation_evaluation_points": 30,
+    "direct_points": 2,
+    "total_comparison_points": 62,
+    "transfer_dose_groups": 240,
+    "transfer_signed_solves": 80,
+    "all_signed_solves_including_eval": 100
+  }
+}

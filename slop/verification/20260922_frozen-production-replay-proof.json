@@ -1,0 +1,12 @@
+{
+  "author": "PI/OpenAI",
+  "passed": true,
+  "callback_attempts": {
+    "gpu": 0,
+    "judge": 0,
+    "reservation": 0
+  },
+  "identity_sha256": "fab8661d7cc0dbf9ccec3f0644684558852bc0c0875a64de397458ffb6752b63",
+  "ledger_unchanged": true,
+  "summary_comparison_ignores_only_runtime_reused_flags": true
+}
