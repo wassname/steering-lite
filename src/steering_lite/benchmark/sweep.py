@@ -47,7 +47,7 @@ MODAL_CPU_USD_PER_CORE_SECOND = 0.0000131
 MODAL_MEMORY_USD_PER_GIB_SECOND = 0.00000222
 JUDGE_INPUT_USD_PER_MTOKEN = None
 JUDGE_OUTPUT_USD_PER_MTOKEN = None
-MODAL_GPU_STAGE_TIMEOUT_SECONDS = 45 * 60
+MODAL_GPU_STAGE_TIMEOUT_SECONDS = 44 * 60
 GPU_HOURS_PER_STAGE = MODAL_GPU_STAGE_TIMEOUT_SECONDS / 3600
 CPU_CORES_PER_GPU_STAGE = 1.0
 MEMORY_GIB_PER_GPU_STAGE = 4.0
@@ -60,32 +60,36 @@ MODAL_GPU_STAGE_UPPER_USD = GPU_HOURS_PER_STAGE * (
 
 def load_judge_pricing(path: Path) -> dict:
     artifact = json.loads(path.read_text())
-    if artifact.get("source") == "https://openrouter.ai/api/v1/models":
-        body = artifact["body"]
-    else:
-        endpoint = artifact["endpoints"]["models"]
-        if endpoint["status"] != 200:
-            raise ValueError("model metadata request failed")
-        body = endpoint["body"]
-    matches = [model for model in body["data"] if model["id"] == JUDGE_MODEL]
-    if len(matches) != 1:
-        raise ValueError("model metadata must identify the exact V4 Flash model once")
-    pricing = matches[0]["pricing"]
+    from .judge import REFERENCE_ROUTING
+    if artifact["source"] != f"https://openrouter.ai/api/v1/models/{JUDGE_MODEL}/endpoints":
+        raise ValueError("pricing requires exact model endpoint metadata, not aggregate minimum rates")
+    model = artifact["body"]["data"]
+    if model["id"] != JUDGE_MODEL:
+        raise ValueError("endpoint metadata must identify the exact V4 Flash model")
+    routing = REFERENCE_ROUTING["provider"]
+    required = {"temperature", "max_tokens", "min_p", "reasoning", "response_format", "structured_outputs"}
+    eligible = [endpoint for endpoint in model["endpoints"] if endpoint["model_id"] == JUDGE_MODEL and endpoint["provider_name"] not in routing["ignore"] and endpoint["quantization"] in routing["quantizations"] and required.issubset(endpoint["supported_parameters"]) and endpoint["status"] == 0]
+    if not eligible:
+        raise ValueError("no eligible endpoint supplies the pinned judge settings")
     rates = []
     for field in ("prompt", "completion"):
-        raw = pricing[field]
-        if isinstance(raw, bool):
-            raise ValueError("boolean token rate")
-        rate = float(raw)
-        if not valid_cost(rate):
-            raise ValueError("token rate must be finite and nonnegative")
-        rates.append(rate * 1_000_000)
+        values = []
+        for endpoint in eligible:
+            raw = endpoint["pricing"][field]
+            if isinstance(raw, bool):
+                raise ValueError("boolean token rate")
+            rate = float(raw)
+            if not valid_cost(rate):
+                raise ValueError("token rate must be finite and nonnegative")
+            values.append(rate * 1_000_000)
+        rates.append(max(values))
+    routing["max_price"] = dict(zip(("prompt", "completion"), rates, strict=True))
     global JUDGE_SOURCE, JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
     JUDGE_SOURCE = f"{path.resolve()} sha256={hashlib.sha256(path.read_bytes()).hexdigest()}"
     JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN = rates
     from . import adapters
     adapters.JUDGE_INPUT_USD_PER_MTOKEN, adapters.JUDGE_OUTPUT_USD_PER_MTOKEN = rates
-    return {"model": JUDGE_MODEL, "input_usd_per_mtoken": rates[0], "output_usd_per_mtoken": rates[1], "source": JUDGE_SOURCE}
+    return {"model": JUDGE_MODEL, "input_usd_per_mtoken": rates[0], "output_usd_per_mtoken": rates[1], "source": JUDGE_SOURCE, "eligible_providers": sorted({endpoint["provider_name"] for endpoint in eligible}), "max_price": routing["max_price"]}
 
 
 @dataclass(frozen=True)

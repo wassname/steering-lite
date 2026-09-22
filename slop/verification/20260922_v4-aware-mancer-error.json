@@ -1,0 +1,67 @@
+{
+  "attempt": 1790075851151382604,
+  "dispatch_started_at": "2026-09-22T11:17:31.151387+00:00",
+  "elapsed_seconds": 2.318192080943845,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "enforced_wait_seconds": 0.0,
+  "exception_type": "OpenRouterResponseParseError",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "outcome": "failed",
+  "parse_evidence": {
+    "assistant_content": "{\"evidence\":\"A answers 'decomposition should isolate specific IP-related liabilities...' as if the fabricated framework existed; B says 'as granular as possible...' also accepting the premise, but adds 'board's absolute requirement",
+    "assistant_content_bytes": 231,
+    "assistant_content_sha256": "5909d6b0f2ea19baed44c7d452d6d446059154de9feb367822533254441c6f35",
+    "json_error": "Unterminated string starting at: line 1 column 13 (char 12)",
+    "response_metadata": {
+      "choices": [
+        {
+          "finish_reason": "error",
+          "index": 0,
+          "logprobs": null,
+          "message_metadata": {
+            "reasoning": null,
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "error"
+        }
+      ],
+      "created": 1790075851,
+      "id": "gen-1790075851-LS38tV2GlM6GqDfkWtVx",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "object": "chat.completion",
+      "provider": "Mancer 2",
+      "service_tier": null,
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 65,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_completions_cost": 3.679245283018868e-05,
+          "upstream_inference_cost": 4e-05,
+          "upstream_inference_prompt_cost": 3.207547169811321e-06
+        },
+        "is_byok": false,
+        "prompt_tokens": 17,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 82
+      }
+    },
+    "response_sha256": "95d65b483705bd7f9903fe73f22d8b47c3be71e699fc6dbf470358eb66fbaa45"
+  },
+  "payload_sha256": "05b12159bd9b029ad94174f35cac248b081f79b02bd1dac32ceeade766912100",
+  "recorded_at": "2026-09-22T11:17:33.469581+00:00",
+  "response_finished_at": "2026-09-22T11:17:33.469581+00:00",
+  "response_schema": "demo_rating",
+  "schema": "bsbench-openrouter-callback-error-v1"
+}

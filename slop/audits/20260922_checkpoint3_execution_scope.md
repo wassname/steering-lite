@@ -23,4 +23,4 @@ Implementation interpretation:
 - The completed external smoke is conservatively recorded at its original $2 reservation upper, linked to its saved completion summary; this is not an invoice or newly inferred actual cost.
 - Directed intended effect is steered minus baseline in the disposition actually requested. The plot's signed-axis value negates this delta only for -C.
 
-Evidence is in `slop/verification/20260922_corrected-five-seed-preflight.json`, the provider metadata artifact, the focused execution-validation log and the mean_diff fake CLI result. Renderer changes are deferred until cached outcome evidence exists.
+Latest execution evidence is `slop/verification/20260922_endpoint-priced-preflight.json`: eligible endpoint prices are $0.03/M input and $1/M output, enforced by `provider.max_price`. The GPU timeout is enforced at 44 minutes. This replaces the earlier aggregate-price preflight; methods, five random seeds, prompts, signed doses, and judge token caps are unchanged. See `20260922_v4_probe_failure.md` for the provider diagnosis, successful six-request probe, and timeout risk. Renderer changes are deferred until cached outcome evidence exists.

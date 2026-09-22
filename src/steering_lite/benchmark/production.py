@@ -420,7 +420,7 @@ def migrate_direct_generation(root: Path, *, model: dict, data: dict, method: st
             raise ValueError("direct cache identity hash mismatch")
         if original["code_sha256"] not in (*UPSTREAM_COMPATIBLE_CODE_SHA256S, identity["code_sha256"]):
             continue
-        normalized = original | {"model": {key: value for key, value in original["model"].items() if key != "judge_model"}, "code_sha256": identity["code_sha256"]}
+        normalized = original | {"model": {key: value for key, value in original["model"].items() if key != "judge_model"}, "config": original["config"] | {"upper_usd": config["upper_usd"]}, "code_sha256": identity["code_sha256"]}
         if normalized == identity:
             matches.append((path, record))
     if len(matches) > 1:

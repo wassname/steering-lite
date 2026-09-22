@@ -1,4 +1,5 @@
 """Bounded execution regressions for signed BS-bench recovery. — PI/OpenAI"""
+from copy import deepcopy
 import hashlib
 import importlib.util
 import json
@@ -171,6 +172,44 @@ def test_parse_failure_preserves_provider_termination_metadata(monkeypatch):
     assert metadata["choices"][0]["finish_reason"] == "length"
     assert metadata["choices"][0]["native_finish_reason"] == "max_tokens"
     assert entrypoint()._redact(metadata)["usage"] == body["usage"]
+
+
+def test_endpoint_rates_bound_actual_routing(tmp_path, monkeypatch):
+    from steering_lite.benchmark import judge
+    monkeypatch.setattr(judge, "REFERENCE_ROUTING", deepcopy(judge.REFERENCE_ROUTING))
+    for module in (sweep, adapters):
+        for name in ("JUDGE_INPUT_USD_PER_MTOKEN", "JUDGE_OUTPUT_USD_PER_MTOKEN"):
+            monkeypatch.setattr(module, name, None)
+    monkeypatch.setattr(sweep, "JUDGE_SOURCE", None)
+    endpoint = {"model_id": sweep.JUDGE_MODEL, "provider_name": "OpenInference", "quantization": "fp8", "status": 0, "supported_parameters": ["temperature", "max_tokens", "min_p", "reasoning", "response_format", "structured_outputs"], "pricing": {"prompt": "0.00000003", "completion": "0.000001"}}
+    path = tmp_path / "endpoints.json"
+    data = {"source": f"https://openrouter.ai/api/v1/models/{sweep.JUDGE_MODEL}/endpoints", "body": {"data": {"id": sweep.JUDGE_MODEL, "endpoints": [endpoint, endpoint | {"provider_name": "Mancer 2", "pricing": {"prompt": "0.1", "completion": "0.2"}}, endpoint | {"provider_name": "wrong-quantization", "quantization": "fp4"}]}}}
+    path.write_text(json.dumps(data))
+    rates = sweep.load_judge_pricing(path)
+    assert rates["eligible_providers"] == ["OpenInference"]
+    assert rates["input_usd_per_mtoken"] == .03 and rates["output_usd_per_mtoken"] == 1.
+    assert request()["payload"]["provider"]["max_price"] == {"prompt": .03, "completion": 1.}
+    data["body"]["data"]["endpoints"][0]["pricing"]["completion"] = "NaN"
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="finite"):
+        sweep.load_judge_pricing(path)
+    assert sweep.MODAL_GPU_STAGE_TIMEOUT_SECONDS == 44 * 60
+    assert "timeout=MODAL_GPU_STAGE_TIMEOUT_SECONDS" in Path("scripts/run_bsbench_modal.py").read_text()
+
+
+def test_direct_price_migration_preserves_paid_record_and_rejects_semantic_changes(tmp_path):
+    from steering_lite.benchmark.cache import stage_identity, content_key, save_json, peek_stage
+    from steering_lite.benchmark.production import migrate_direct_generation, UPSTREAM_COMPATIBLE_CODE_SHA256S
+    config = {"upper_usd": 1., "condition": "bare", "prompt_spec": {"max_new_tokens": 128}, "prompt_ids": ["q"]}
+    common = {"method": "bare", "model": {"id": "model"}, "data": {"hash": "data"}, "prompts": ["question"]}
+    identity = stage_identity(stage="generation", config=config, **(common | {"model": {"id": "model", "judge_model": "old-judge"}}), code=UPSTREAM_COMPATIBLE_CODE_SHA256S[0])
+    result = {"answers": ["answer"], "health_records": [{"question_id": "q", "reasons": []}], "reservation": "old-paid-reservation", "cost_receipt": {"original_upper": 1.}}
+    path = tmp_path / "cache" / "generation" / f"{content_key(identity)}.json"
+    save_json(path, {"identity": identity, "result": result})
+    assert not migrate_direct_generation(tmp_path, config=config | {"upper_usd": .5, "prompt_spec": {"max_new_tokens": 64}}, **common)
+    assert migrate_direct_generation(tmp_path, config=config | {"upper_usd": .5}, **common)
+    assert peek_stage(tmp_path / "cache", stage="generation", config=config | {"upper_usd": .5}, **common) == result
+    assert json.loads(path.read_text())["result"] == result
 
 
 def test_signed_budget_counts_match_five_seed_scope():

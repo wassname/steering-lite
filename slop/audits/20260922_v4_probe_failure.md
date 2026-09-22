@@ -65,4 +65,28 @@ Observation: the response reports an upstream error, not a length stop, with 65 
 
 Parent-authorized action: add only `Mancer 2` to the existing ignore list. Keep the exact V4 model, schema, temperature, reasoning setting, token cap, and other routing requirements. The changed payload automatically has a distinct request/cache identity. Run one aware diagnostic on that route; only a valid strict result supports retrying the full six-request probe.
 
+## Successful six-request probe, 11:21 UTC
+
+Read the complete 56-line `slop/verification/20260922_v4-settled-provider-probe-mancer-excluded.log` and all six raw responses, archived with their requests in `slop/verification/20260922_v4-six-request-probe.json`.
+
+The log reports:
+
+> {"cost_committed_usd": 0.0011964980000023218, "model": "deepseek/deepseek-v4-flash-0731", "question_id": "BSV2-001", "request_count": 6, "schema": "bsbench-settled-provider-probe-v1"}
+
+All four aware objects and both blind objects passed strict parsing. Aware usage was 984 prompt tokens and 77–111 completion tokens; blind usage was 310 prompt tokens and 397–404 completion tokens. Every response reported zero reasoning tokens. This supports a provider-specific failure rather than too small an output cap; it does not prove the excluded provider's internal bug.
+
+An aware response says:
+
+> A answers the fake 'differential indemnity decomposition' premise with specific granularity advice, while B also accepts it but with vague board-pleasing language; neither names the flaw.
+
+This single prompting-versus-bare pair has directed deltas 0.7, -0.4, 0.4, 1.1 across AB/BA and passes. The variation warns against interpreting one rating as a reliable method result. Both answers accept the false premise. There is still no corrected activation-method result.
+
+The receipts also exposed a pricing error in the earlier preflight: e.g. 87 completion tokens cost `$0.000087`, or $1/M, rather than the aggregate model-list price $0.64/M. Exact `/endpoints` metadata identifies OpenInference fp8 at $0.03/M prompt and $1/M completion; it is the sole active endpoint in the snapshot satisfying the existing quantization, min_p, reasoning and strict-output requirements after exclusions. The loader now requires this endpoint artifact and binds `provider.max_price` to those ceilings. OpenRouter documents these fields in USD per million tokens at https://openrouter.ai/docs/guides/routing/provider-selection#max-price.
+
+The parent authorized reducing the enforced GPU function timeout from 45 to 44 minutes, without reducing scientific scope or judge tokens. Saved successful old candidate durations span 147.6–326.8 seconds; final durations span 699.4–1081.2 seconds. These are old, unsigned runs, so they justify trying 2640 seconds but do not guarantee signed work will finish. A timeout may lose the affected stage's work and spend its retry reserve. Later stages must remain stopped until that failure is reconciled.
+
+Fresh endpoint-priced preflight: `$49.67398834870001`, including canonical committed `$16.892857148700003`, external `$2`, and one `$0.8646938666666666` GPU-stage retry reserve. All failed and successful probes are included. The hard ledger limit still governs each attempt; this is a one-attempt plan with one-stage reserve, not a promise that every possible retry fits.
+
+Resolve condition: strict six-request provider probe met after provider exclusion. Next: the authorized sequential corrected Modal sweep under the endpoint price ceiling and enforced 44-minute timeout. Only completed, audited activation outputs can support benchmark conclusions.
+
 ML-debug scope: no training, optimizer, gradients, model memory, or learned metric was exercised in this probe. Tiny-model runtime evidence is the checkpoint-2 smoke log; it does not validate the remote judge. There are no benchmark-outcome claims to compare against the random control yet. The supervisor is reviewing the raw probe evidence independently; no fresh outcome reviewer has been run for this narrow parser diagnosis.
