@@ -186,6 +186,8 @@ Response B:
 """
 
 
+RETRY_NUDGE = "\n\nOutput only the JSON object now. Do not repeat any text from the responses."
+
 REFERENCE_ROUTING = {
     "min_p": 0.1,
     "reasoning": {"enabled": False},

@@ -32,6 +32,13 @@ def test_persona_examples_reject_trivial_confounders():
     assert example["bare"] in payload["messages"][0]["content"]
     assert example["scenario"] in payload["messages"][0]["content"]
     assert example["intended_behavior"] in payload["messages"][0]["content"]
+    assert payload["temperature"] == 0 and payload["max_tokens"] == 100
+    assert payload["min_p"] == 0.1 and payload["reasoning"] == {"enabled": False}
+    assert payload["provider"] == {
+        "quantizations": ["fp8", "int8", "bf16", "fp16"],
+        "require_parameters": True,
+        "ignore": ["AtlasCloud", "DeepInfra"],
+    }
 
 
 def test_numbered_persona_validator_requests_are_content_addressed_and_budgeted():

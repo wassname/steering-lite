@@ -5,6 +5,7 @@ The callbacks are injected so importing this module never imports Modal or an AP
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from dataclasses import dataclass
 from http.client import RemoteDisconnected
 import hashlib
@@ -16,6 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .cache import cached, estimate_at_reservation_upper, reserve_many, settle
+from .judge import RETRY_NUDGE
 from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
 
 
@@ -124,6 +126,19 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504, 524, 529}
 JUDGE_ATTEMPTS = 3
 JUDGE_CONCURRENCY = 6
+JUDGE_RETRY_POLICY = {
+    "attempts": JUDGE_ATTEMPTS,
+    "aware_format_rescue_attempts": [2, 3],
+    "aware_retry_nudge": RETRY_NUDGE,
+    "blind_and_persona_payloads_unchanged": True,
+}
+
+
+def _attempt_payload(request: dict, attempt: int) -> dict:
+    payload = deepcopy(request["payload"])
+    if request.get("blind") is False and attempt > 1:
+        payload["messages"][0]["content"] += RETRY_NUDGE
+    return payload
 
 
 def judge_request_upper_usd(request: dict) -> float:
@@ -174,7 +189,7 @@ class LocalJudgeAdapter:
             "judge_model": request["payload"]["model"],
             "judge_endpoint": self.endpoint,
             "upper_usd": upper_usd,
-            "attempts": JUDGE_ATTEMPTS,
+            "retry_policy": JUDGE_RETRY_POLICY,
         }
 
         def compute() -> dict:
@@ -186,7 +201,7 @@ class LocalJudgeAdapter:
             failures = []
             for attempt, reservation in enumerate(reservations, 1):
                 try:
-                    response = self._request_call(request["payload"])
+                    response = self._request_call(_attempt_payload(request, attempt))
                 except Exception as error:
                     receipt = _attempt_receipt(request, attempt, error)
                     estimate_at_reservation_upper(self._ledger, reservation, receipt)

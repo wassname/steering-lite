@@ -521,6 +521,61 @@ def test_judge_retry_attempts_have_distinct_reservations_and_preserve_failures(t
     cached, = (tmp_path / "cache" / "judge-request").glob("*.json")
     result = json.loads(cached.read_text())["result"]
     assert [failure["attempt"] for failure in result["failed_attempts"]] == [1, 2]
+    assert result["response"]["summary"] == "third"
+    assert {failure["exception_type"] for failure in result["failed_attempts"]} == {"ConnectionError"}
+
+
+def test_aware_retries_append_reference_nudge_and_cache_the_policy(tmp_path):
+    calls = []
+
+    def succeed_third(payload):
+        calls.append(payload["messages"][0]["content"])
+        if len(calls) < 3:
+            raise ConnectionError("format failure")
+        return {"evidence": "ok", "on_axis_A": 0.0, "on_axis_B": 1.0, "off_axis_A": 0.0, "off_axis_B": 0.0, "_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=succeed_third,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    judge.complete([_judge_request("aware base", blind=False)])
+    assert calls == ["aware base", "aware base" + adapters.RETRY_NUDGE, "aware base" + adapters.RETRY_NUDGE]
+    cached, = (tmp_path / "cache" / "judge-request").glob("*.json")
+    record = json.loads(cached.read_text())
+    assert record["identity"]["retry_policy"] == adapters.JUDGE_RETRY_POLICY
+    assert [failure["attempt"] for failure in record["result"]["failed_attempts"]] == [1, 2]
+    assert record["result"]["response"]["evidence"] == "ok"
+
+
+def test_persona_retry_payload_is_unchanged(tmp_path):
+    calls = []
+
+    def succeed_third(payload):
+        calls.append(payload["messages"][0]["content"])
+        if len(calls) < 3:
+            raise ConnectionError("temporary failure")
+        return {"intended_behavior_explains": True, "reason": "ok", "_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=succeed_third,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    persona_request = _judge_request("persona", blind=True)
+    persona_request.pop("blind")
+    persona_request["input_tokens_upper"] = 2_000
+    persona_request["output_tokens_upper"] = 100
+    judge.complete([persona_request])
+    assert calls == ["persona", "persona", "persona"]
 
 
 def test_judge_stage_fails_after_three_retryable_attempts(tmp_path):

@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 
-from .judge import request, request_key, score_pair
+from .judge import REFERENCE_ROUTING, request, request_key, score_pair
 
 _REFUSAL = re.compile(r"\b(can(?:not|'t)|unable to|won't|refuse|cannot help)\b", re.I)
 
@@ -111,4 +111,11 @@ Positive completion: {example['positive']}
 Negative completion: {example['negative']}
 
 Return only JSON with intended_behavior_explains (boolean) and reason (one short sentence)."""
-    return {"model": model, "messages": [{"role": "user", "content": prompt}], "response_format": {"type": "json_schema", "json_schema": {"name": "persona_pair_validation", "strict": True, "schema": {"type": "object", "properties": {"intended_behavior_explains": {"type": "boolean"}, "reason": {"type": "string"}}, "required": ["intended_behavior_explains", "reason"], "additionalProperties": False}}}}
+    return {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {"type": "json_schema", "json_schema": {"name": "persona_pair_validation", "strict": True, "schema": {"type": "object", "properties": {"intended_behavior_explains": {"type": "boolean"}, "reason": {"type": "string"}}, "required": ["intended_behavior_explains", "reason"], "additionalProperties": False}}},
+        "temperature": 0,
+        "max_tokens": 100,
+        **REFERENCE_ROUTING,
+    }
