@@ -16,7 +16,7 @@ from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .cache import cached, estimate_at_reservation_upper, reserve, settle, valid_cost
+from .cache import cached, content_key, estimate_at_reservation_upper, reserve, settle, valid_cost
 from .judge import RETRY_NUDGE, validate_judgment
 from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
 
@@ -172,6 +172,30 @@ def _attempt_receipt(request: dict, attempt: int, error: Exception) -> dict:
     return receipt
 
 
+def judge_cache_identity(request: dict, endpoint: str) -> dict:
+    return {
+        "schema": "bsbench-judge-request-cache-v2",
+        "evidence_id": hashlib.sha256(json.dumps(request, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
+        "request": request,
+        "judge_model": request["payload"]["model"],
+        "judge_endpoint": endpoint,
+        "retry_policy": JUDGE_RETRY_POLICY,
+    }
+
+
+def judge_request_cached(root: Path, request: dict, endpoint: str) -> bool:
+    identity = judge_cache_identity(request, endpoint)
+    path = root / "cache" / "judge-request" / f"{content_key(identity)}.json"
+    if not path.exists():
+        return False
+    record = json.loads(path.read_text())
+    if record["identity"] != identity or record["result"]["request"] != request:
+        raise ValueError("judge cache request identity mismatch")
+    response = record["result"]["response"]
+    validate_judgment({key: value for key, value in response.items() if key not in {"_remote_usage", "_remote_cost_usd"}}, request["payload"]["response_format"]["json_schema"]["schema"])
+    return True
+
+
 class LocalJudgeAdapter:
     """Adapter for local/API judge calls over persisted existing request payloads."""
 
@@ -184,15 +208,8 @@ class LocalJudgeAdapter:
 
     def _complete_one(self, request: dict) -> dict:
         upper_usd = judge_request_upper_usd(request)
-        evidence_id = hashlib.sha256(json.dumps(request, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-        identity = {
-            "schema": "bsbench-judge-request-cache-v2",
-            "evidence_id": evidence_id,
-            "request": request,
-            "judge_model": request["payload"]["model"],
-            "judge_endpoint": self.endpoint,
-            "retry_policy": JUDGE_RETRY_POLICY,
-        }
+        identity = judge_cache_identity(request, self.endpoint)
+        evidence_id = identity["evidence_id"]
 
         def compute() -> dict:
             reservations = []

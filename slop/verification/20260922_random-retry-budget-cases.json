@@ -1,0 +1,20 @@
+{
+  "canonical_committed_usd": 17.78465697336667,
+  "external_committed_usd": 2.0,
+  "cached_requests": {
+    "blind-requests": 40,
+    "persona-validation": 12,
+    "target-aware-requests": 80
+  },
+  "remaining_requests": {
+    "blind": 2400,
+    "persona_validation": 0,
+    "target_aware": 8640
+  },
+  "remaining_gpu_stages": 20,
+  "consumed_original_retry_upper_usd": 0.8646938666666667,
+  "new_additional_retry_upper_usd": 0.8646938666666666,
+  "total_with_additional_future_retry_usd": 50.42898817336667,
+  "total_original_retry_consumed_no_new_reserve_usd": 49.5642943067,
+  "current_policy_passed": false
+}

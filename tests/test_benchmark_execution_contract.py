@@ -212,6 +212,54 @@ def test_direct_price_migration_preserves_paid_record_and_rejects_semantic_chang
     assert json.loads(path.read_text())["result"] == result
 
 
+def test_preflight_judge_cache_requires_exact_request_and_valid_response(tmp_path):
+    from steering_lite.benchmark.cache import content_key, save_json
+
+    original = request()
+    identity = adapters.judge_cache_identity(original, "https://example.invalid")
+    path = tmp_path / "cache" / "judge-request" / f"{content_key(identity)}.json"
+    record = {"identity": identity, "result": {"request": original, "response": rating()}}
+    save_json(path, record)
+    assert adapters.judge_request_cached(tmp_path, original, "https://example.invalid")
+    assert not adapters.judge_request_cached(tmp_path, original, "https://other.invalid")
+    changed = deepcopy(original)
+    changed["payload"]["provider"]["max_price"] = {"prompt": .03, "completion": 1.}
+    assert not adapters.judge_request_cached(tmp_path, changed, "https://example.invalid")
+    record["result"]["response"]["on_axis_A"] = True
+    save_json(path, record)
+    with pytest.raises(ValueError):
+        adapters.judge_request_cached(tmp_path, original, "https://example.invalid")
+    assert sweep._request_counts([
+        {"stage": "target-aware-requests", "item_count": 20, "cached_request_count": 79},
+        {"stage": "blind-requests", "item_count": 20, "cached_request_count": 40},
+        {"stage": "persona-validation", "item_count": 12, "cached_request_count": 12},
+    ]) == {"target_aware": 1, "blind": 0, "persona_validation": 0}
+
+
+def test_only_named_reconciled_failure_consumes_original_retry(tmp_path):
+    from steering_lite.benchmark.cache import estimate_at_reservation_upper
+
+    ledger = tmp_path / "ledger.jsonl"
+    estimate = {"total_upper_usd": 12., "retry_reserve": {"subtotal_usd": 1.}, "planned_reservations": [{"kind": "one_affected_stage_retry", "upper_usd": 1.}]}
+    assert sweep.account_consumed_retry(estimate, ledger) == estimate
+    reservation = "7b44bbd07c9e5da2752e3933b462e4a592f68fd6747e261d3fe2cb580aa386d0"
+    record = {"id": reservation, "event": "reserved", "kind": "modal-calibration-candidates-random", "upper_usd": sweep.MODAL_GPU_STAGE_UPPER_USD}
+    ledger.write_text(json.dumps(record) + "\n")
+    with pytest.raises(ValueError):
+        sweep.account_consumed_retry(estimate, ledger)
+    estimate_at_reservation_upper(ledger, reservation, {"test": "completed failed stage"})
+    before = ledger.read_bytes()
+    revised = sweep.account_consumed_retry(estimate, ledger)
+    assert revised["total_upper_usd"] == 11.
+    assert revised["retry_reserve"]["remaining_reserve_usd"] == 0.
+    assert revised["retry_reserve"]["consumed_reservation"] == reservation
+    assert committed(ledger) == sweep.MODAL_GPU_STAGE_UPPER_USD
+    assert ledger.read_bytes() == before
+    ledger.write_text(before.decode().replace("modal-calibration-candidates-random", "other-stage"))
+    with pytest.raises(ValueError, match="does not match"):
+        sweep.account_consumed_retry(estimate, ledger)
+
+
 def test_signed_budget_counts_match_five_seed_scope():
     final = sweep.phase_b_budget_stages()
     assert len([stage for stage in final if stage["runner"] == "modal_gpu"]) == 10

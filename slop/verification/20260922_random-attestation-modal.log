@@ -1,0 +1,123 @@
+2026-09-22 19:33:56+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-09-22 19:33:58+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+2026-09-22 19:33:59+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+2026-09-22 19:33:59+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 478.50it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:   4%|▎         | 15/426 [00:00<00:03, 130.44it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:   7%|▋         | 29/426 [00:00<00:03, 117.38it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  11%|█         | 46/426 [00:00<00:02, 138.55it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  15%|█▌        | 65/426 [00:00<00:02, 156.30it/s]
+2026-09-22 19:34:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1ALoading weights:  19%|█▉        | 81/426 [00:00<00:02, 138.01it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  24%|██▍       | 102/426 [00:00<00:02, 159.32it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  28%|██▊       | 119/426 [00:00<00:02, 148.63it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  32%|███▏      | 135/426 [00:00<00:01, 151.24it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  36%|███▌      | 152/426 [00:01<00:02, 136.12it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  41%|████      | 175/426 [00:01<00:01, 150.70it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  46%|████▌     | 196/426 [00:01<00:01, 158.78it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  51%|█████     | 217/426 [00:01<00:01, 166.84it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  55%|█████▍    | 234/426 [00:01<00:01, 156.86it/s]
+2026-09-22 19:34:01+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1ALoading weights:  60%|██████    | 257/426 [00:01<00:00, 173.09it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  65%|██████▍   | 275/426 [00:01<00:01, 144.53it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  69%|██████▉   | 295/426 [00:01<00:00, 151.68it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  75%|███████▌  | 320/426 [00:02<00:00, 170.96it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  79%|███████▉  | 338/426 [00:02<00:00, 167.41it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  84%|████████▎ | 356/426 [00:02<00:00, 165.13it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  89%|████████▊ | 378/426 [00:02<00:00, 173.45it/s]
+2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F [1A2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights:  93%|█████████▎| 396/426 [00:02<00:00, 174.49it/s]2026-09-22 19:34:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Loading weights: 100%|██████████| 426/426 [00:02<00:00, 169.64it/s]
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:34:06.637 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:34:06.638 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:34:06.735 | INFO     | steering_lite.data.personas:make_persona_pairs:82 - Persona-branching pairs: n=200 from 1 persona pairs
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:34:06.736 | INFO     | steering_lite.attach:_log_extract_demo:172 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F === EXTRACT demo trace ===
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F POS[0]:
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <|im_start|>user
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Answer as someone who is sycophantic.
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Tell me a story.<|im_end|>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <|im_start|>assistant
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <think>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F </think>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F ---
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F NEG[0]:
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <|im_start|>user
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Answer as someone who is abrasive.
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F Tell me a story.<|im_end|>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <|im_start|>assistant
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <think>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F </think>
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F <think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+2026-09-22 19:34:06+08:00 fc-01M34E94Y7339VCGHP7X3NG39F === /EXTRACT ===
+2026-09-22 19:35:41+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:41.225 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:35:44+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:44.647 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:35:47+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:47.597 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:35:50+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:50.208 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:35:53+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:53.825 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:35:57+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:35:57.364 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:00+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:00.196 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:36:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:02.894 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:36:05+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:05.787 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:36:09+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:09.361 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:12+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:12.177 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:36:14+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:14.845 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:36:17+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:17.705 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:36:21+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:21.191 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:24+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:24.323 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:36:26+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:26.995 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:36:29+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:29.887 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:36:33+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:33.415 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:36+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:36.232 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:36:39+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:39.359 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:36:42+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:42.081 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:36:44+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:44.611 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:47+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:47.942 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:36:50+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:50.618 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:36:53+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:53.480 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:36:56+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:56.128 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:36:58+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:36:58.951 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:37:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:02.112 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:37:04+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:04.832 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:37:07+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:07.565 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:37:11+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:11.141 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:37:14+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:14.407 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:37:17+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:17.123 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:37:20+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:20.252 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:37:23+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:23.186 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:37:26+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:26.391 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:37:29+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:29.446 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:37:32+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:32.141 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:37:35+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:35.496 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:37:39+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:39.105 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:37:41+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:41.935 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:37:45+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:45.450 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:37:48+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:48.784 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:37:51+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:51.270 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:37:54+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:54.000 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:37:56+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:56.939 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:37:59+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:37:59.911 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:38:02+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:02.636 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:38:05+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:05.466 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:38:07+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:07.395 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:38:10+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:10.616 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:38:12+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:12.418 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:38:18+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:18.943 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:38:25+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:25.433 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:38:31+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:31.943 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:38:38+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:38.502 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:38:45+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:45.046 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/4
+2026-09-22 19:38:51+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:51.592 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/4
+2026-09-22 19:38:58+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:38:58.092 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/4
+2026-09-22 19:39:04+08:00 fc-01M34E94Y7339VCGHP7X3NG39F 2026-09-22 11:39:04.586 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/4
+2026-09-22 19:39:05+08:00 Stopping app - uncaught exception raised locally: ValueError('calibration backend method_config does not attest to the signed method specification').

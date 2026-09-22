@@ -70,6 +70,44 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     assert __import__("base64").b64decode(final_dispatch_config["vector_artifact"]["vector_bytes_b64"]) == artifact.read_bytes()
 
 
+def test_actual_method_config_tuple_survives_production_and_json_cache(tmp_path: Path):
+    from steering_lite.benchmark.pipeline import method_config
+
+    class ActualConfig(FakeBackend):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            if kwargs["stage"] == "calibration-candidates":
+                result["method_config"] = method_config(kwargs["method"], layers=(7, 11, 15, 19, 23), target_layer=29, seed=0).to_dict()
+                assert isinstance(result["method_config"]["layers"], tuple)
+            return result
+
+    backend = ActualConfig(); kwargs, _, _ = inputs(backend)
+    kwargs["method"] = "random"
+    ledger = tmp_path / "ledger.jsonl"
+    first = run_live_two_step(tmp_path, ledger, **kwargs)
+    before = ledger.read_bytes()
+    second = run_live_two_step(tmp_path, ledger, **kwargs)
+    assert backend.calls == ["calibration-candidates", "final-generation"]
+    assert first["candidate"]["method_config"]["layers"] == (7, 11, 15, 19, 23)
+    assert second["candidate"]["method_config"]["layers"] == [7, 11, 15, 19, 23]
+    assert ledger.read_bytes() == before
+
+
+@pytest.mark.parametrize("change", [{"layers": [23, 19, 15, 11, 7]}, {"layers": [7., 11, 15, 19, 23]}, {"seed": True}, {"seed": 1}, {"target_layer": 28}, {"skip_first": 15}])
+def test_method_config_semantics_remain_exact(tmp_path: Path, change):
+    class WrongConfig(FakeBackend):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            if kwargs["stage"] == "calibration-candidates":
+                result["method_config"] |= change
+            return result
+
+    backend = WrongConfig(); kwargs, _, _ = inputs(backend)
+    with pytest.raises(ValueError, match="method_config"):
+        run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
+    assert backend.calls == ["calibration-candidates"]
+
+
 def test_wrong_signed_method_config_fails_before_settlement(tmp_path: Path):
     class WrongConfig(FakeBackend):
         def gpu(self, **kwargs):

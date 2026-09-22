@@ -1,0 +1,14 @@
+{
+  "path": "outputs/bsbench-v2/artifacts/vectors/b82951205da0f602652138c1491b0368a30e6d109a3609711bee5d909ce2269f.bin",
+  "sha256": "b82951205da0f602652138c1491b0368a30e6d109a3609711bee5d909ce2269f",
+  "metadata": {
+    "cfg": "{\"method\": \"random\", \"layers\": [7, 11, 15, 19, 23], \"target\": \"residual\", \"target_submodule\": null, \"coeff\": 0.2, \"dtype\": \"float32\", \"seed\": 0, \"normalize\": true}"
+  },
+  "keys": [
+    "stacked.layer11.v",
+    "stacked.layer15.v",
+    "stacked.layer19.v",
+    "stacked.layer23.v",
+    "stacked.layer7.v"
+  ]
+}

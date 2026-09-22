@@ -1,0 +1,22 @@
+Read-only retained FunctionCall.get; no spawn or remote dispatch.
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_object.py", line 46, in wrapped
+    return await method(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_functions.py", line 2199, in get
+    return await self._invocation().poll_function(timeout=timeout, index=index)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_functions.py", line 325, in poll_function
+    response: api_pb2.FunctionGetOutputsResponse = await self.pop_function_call_outputs(
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_functions.py", line 251, in pop_function_call_outputs
+    response: api_pb2.FunctionGetOutputsResponse = await self.stub.FunctionGetOutputs(
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+modal.exception.NotFoundError: No Function Call with ID 'fc-01M34E94Y7339VCGHP7X3NG39F' found.

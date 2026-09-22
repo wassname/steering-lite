@@ -115,19 +115,19 @@ def _sum(lines: list[BudgetLine]) -> float:
 
 def _request_counts(stages: list[dict]) -> dict[str, int]:
     target_aware = sum(
-        4 * stage["item_count"]
+        4 * stage["item_count"] - stage.get("cached_request_count", 0)
         for stage in stages
         if stage["stage"] in {"target-aware-requests", "candidate-aware", "final-aware"}
     )
     blind = sum(
-        2 * stage["item_count"]
+        2 * stage["item_count"] - stage.get("cached_request_count", 0)
         for stage in stages
         if stage["stage"] in {"blind-requests", "candidate-blind", "final-blind"}
     )
     return {
         "target_aware": target_aware,
         "blind": blind,
-        "persona_validation": sum(stage["item_count"] for stage in stages if stage["stage"] == "persona-validation"),
+        "persona_validation": sum(stage["item_count"] - stage.get("cached_request_count", 0) for stage in stages if stage["stage"] == "persona-validation"),
     }
 
 
@@ -423,6 +423,34 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"))
 
 
+def account_consumed_retry(estimate: dict, ledger: Path) -> dict:
+    reservation = "7b44bbd07c9e5da2752e3933b462e4a592f68fd6747e261d3fe2cb580aa386d0"
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
+    original = [row for row in rows if row["event"] == "reserved" and row["id"] == reservation]
+    if not original:
+        return estimate
+    reserved, = original
+    resolution, = [row for row in rows if row["event"] == "estimated_at_reservation_upper" and row["reservation"] == reservation]
+    if reserved["kind"] != "modal-calibration-candidates-random" or reserved["upper_usd"] != MODAL_GPU_STAGE_UPPER_USD or resolution["estimated_usd"] != reserved["upper_usd"]:
+        raise ValueError("consumed retry allowance does not match the reconciled random failure")
+    allowance = estimate["retry_reserve"]["subtotal_usd"]
+    return estimate | {
+        "total_upper_usd": estimate["total_upper_usd"] - allowance,
+        "planned_reservations": [row | {"upper_usd": 0.0} if row["kind"] == "one_affected_stage_retry" else row for row in estimate["planned_reservations"]],
+        "retry_reserve": {
+            "scope": "original single-stage retry allowance, consumed",
+            "additional_stage_estimate_not_reserved": estimate["retry_reserve"],
+            "original_allowance_usd": reserved["upper_usd"],
+            "consumed_reservation": reservation,
+            "consumed_upper_usd": resolution["estimated_usd"],
+            "subtotal_usd": 0.0,
+            "remaining_reserve_usd": 0.0,
+            "decision": "Parent 2026-09-22 seq13: original one-stage allowance consumed; no automatic replenishment; further stage failure requires review/rebudget.",
+            "evidence": "slop/audits/20260922_random_config_attestation_failure.md",
+        },
+    }
+
+
 def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False, judge_endpoint: str = "https://openrouter.ai/api/v1/chat/completions") -> dict:
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
@@ -487,14 +515,21 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
     remaining_stages = stages + list(final_budget_stages)
     cache_hits = []
     if cache_aware:
-        from .production import migrate_direct_generation, vector_cached_work
+        from .production import direct_cached_judge_counts, migrate_direct_generation, vector_cached_work
+        direct_configs = {}
         for method in ("bare", "prompting"):
             direct_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "condition": method, "prompt_ids": [row["question_id"] for row in rows]}
             if method == "prompting":
                 direct_config |= {"persona_source": persona_source, "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS)}
+            direct_configs[method] = direct_config
             if migrate_direct_generation(out, model=model, data=data, method=method, config=direct_config, prompts=prompts):
                 cache_hits.append({"stage": "generation", "method": method})
         remaining_stages = [stage for stage in remaining_stages if {"stage": stage["stage"], "method": stage["method"]} not in cache_hits]
+        cached_judges = direct_cached_judge_counts(out, model=model | {"judge_model": JUDGE_MODEL}, data=data, rows=rows, configs=direct_configs, endpoint=judge_endpoint)
+        manifest["validated_direct_judge_cache_counts"] = cached_judges
+        for stage in remaining_stages:
+            if stage["method"] == "prompting" and stage["stage"] in cached_judges:
+                stage["cached_request_count"] = cached_judges[stage["stage"]]
         for method, seed in ((method, seed) for method in METHODS[2:] for seed in (RANDOM_SEEDS if method == "random" else (0,))):
             hits, magnitudes = vector_cached_work(out, model={"id": model_id, "judge_model": JUDGE_MODEL}, data=data, method=method, random_seed=seed, calibration_prompts=calibration_prompts, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, judge_endpoint=judge_endpoint)
             cache_hits.extend({"stage": stage, "method": method, "random_seed": seed} for stage in sorted(hits))
@@ -508,6 +543,7 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
     estimate = cost_estimate(remaining_stages)
     require_resolved_ledger(ledger)
     require_resolved_ledger(PHASE6_SMOKE_LEDGER)
+    estimate = account_consumed_retry(estimate, ledger)
     existing = committed(ledger)
     estimate |= {"limit_usd": BUDGET_LIMIT_USD, "existing_ledger_usd": existing, "external_committed_usd": phase6_committed_usd, "existing_committed_usd": existing + phase6_committed_usd, "total_upper_usd": estimate["total_upper_usd"] + existing + phase6_committed_usd}
     estimate["paid_preflight_passed"] = estimate["total_upper_usd"] < BUDGET_LIMIT_USD

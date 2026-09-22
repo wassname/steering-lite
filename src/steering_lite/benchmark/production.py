@@ -118,8 +118,11 @@ def _validate_method_config(method: str, config: dict, spec: dict) -> None:
     expected = {"method": method, "layers": spec["layers"], "seed": spec["random_seed"]}
     if method in {"vjp_delta", "vjp_cache"}:
         expected |= {"target_layer": spec["target_layer"], "skip_first": spec["skip_first"]}
-    if not isinstance(config, dict) or any(config.get(key) != value for key, value in expected.items()):
-        raise ValueError("calibration backend method_config does not attest to the signed method specification")
+    if not isinstance(config, dict) or not isinstance(config.get("layers"), (tuple, list)):
+        raise ValueError("calibration backend method_config requires an ordered layer sequence")
+    normalized = config | {"layers": list(config["layers"])}
+    if any(type(layer) is not int for layer in normalized["layers"]) or any(type(normalized.get(key)) is not int for key, value in expected.items() if type(value) is int) or any(normalized.get(key) != value for key, value in expected.items()):
+        raise ValueError(f"calibration backend method_config mismatch: expected {expected!r}, got {config!r}")
 
 
 def _candidate_items(magnitudes: list[float], prompts: list[str], items: list[dict]) -> list[dict]:
@@ -435,6 +438,25 @@ def migrate_direct_generation(root: Path, *, model: dict, data: dict, method: st
         raise ValueError("historical direct health does not match requested prompts")
     save_json(destination, {"identity": identity, "result": result, "migration": {"source": str(path), "source_file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "result_sha256": content_key(result)}})
     return True
+
+
+def direct_cached_judge_counts(root: Path, *, model: dict, data: dict, rows: list[dict], configs: dict, endpoint: str) -> dict[str, int]:
+    from .adapters import judge_request_cached
+
+    prompts = [row["prompt"] for row in rows]
+    generations = {method: peek_stage(root / "cache", stage="generation", model={"id": model["id"]}, data=data, method=method, config=config, prompts=prompts) for method, config in configs.items()}
+    counts = {"target-aware-requests": 0, "blind-requests": 0, "persona-validation": 0}
+    if any(result is None for result in generations.values()):
+        return counts
+    baseline = generations["bare"]["answers"]
+    generation = generations["prompting"]
+    requests = numbered_requests(_direct_rows(rows, prompts, baseline, generation["answers"]), model["judge_model"], endpoint)
+    for request in requests:
+        if judge_request_cached(root, request, endpoint):
+            counts["blind-requests" if request["blind"] else "target-aware-requests"] += 1
+    examples = _persona_validation_examples(rows, baseline, generation, configs["prompting"]["persona_source"])
+    counts["persona-validation"] = sum(judge_request_cached(root, request, endpoint) for request in numbered_persona_validation_requests(examples, model["judge_model"], endpoint))
+    return counts
 
 
 def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, prompts: list[str], backend, prompt_spec: dict, rows: list[dict] | None = None, judge=None) -> dict:
