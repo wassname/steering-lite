@@ -42,6 +42,21 @@ def cached(root: Path, stage: str, identity: dict, compute) -> dict:
     return result
 
 
+def stage_identity(*, stage: str, model: dict, data: dict, method: str, config: dict, prompts: list[str], code: str | None = None) -> dict:
+    return {"schema": "bsbench-stage-v1", "stage": stage, "model": model, "data": data, "method": method, "config": config, "prompts_sha256": content_key({"prompts": prompts}), "code_sha256": source_hash() if code is None else code}
+
+
+def peek_stage(root: Path, **kwargs) -> dict | None:
+    identity = stage_identity(**kwargs)
+    path = root / kwargs["stage"] / f"{content_key(identity)}.json"
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text())
+    if record["identity"] != identity:
+        raise ValueError("cache identity mismatch during preflight")
+    return record["result"]
+
+
 def cached_stage(
     root: Path,
     stage: str,
@@ -58,16 +73,7 @@ def cached_stage(
     """Cache only when every result-relevant local input is named in the key."""
     if not all((stage, model, data, method, config, prompts)):
         raise ValueError("cached benchmark stage requires model, data, method, config and prompts")
-    identity = {
-        "schema": "bsbench-stage-v1",
-        "stage": stage,
-        "model": model,
-        "data": data,
-        "method": method,
-        "config": config,
-        "prompts_sha256": content_key({"prompts": prompts}),
-        "code_sha256": source_hash() if code is None else code,
-    }
+    identity = stage_identity(stage=stage, model=model, data=data, method=method, config=config, prompts=prompts, code=code)
     if compatible_code_sha256s:
         semantic_identity = {key: value for key, value in identity.items() if key != "code_sha256"}
         matches = []

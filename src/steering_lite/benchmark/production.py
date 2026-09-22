@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle, source_hash, save_json
+from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle, source_hash, save_json, peek_stage
 from .dose_search import BENCHMARK_KL_SPEC, CALIBRATION_CASE, EVALUATION_CASE, PREDICTION_CASES, fit_target, predict_transfer
 from .sweep import RANDOM_SEEDS, CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
@@ -496,6 +496,47 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
     return result
 
 
+def calibration_config_for(source: dict, prompt_spec: dict, random_seed: int) -> dict:
+    spec = {"schema": "bsbench-signed-activation-v3", "sides": ["+C", "-C"], "layers": [7, 11, 15, 19, 23], "target_layer": 29, "skip_first": 16, "random_seed": random_seed, "kl_spec": BENCHMARK_KL_SPEC}
+    return {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec, "signed_method_spec": spec}
+
+
+def remote_final_config_for(candidate: dict, observed: list[dict], calibration_prompts: list[str], records: dict, source: dict, prompt_spec: dict, signed_method_spec: dict) -> dict:
+    return {"schema": "bsbench-remote-vector-final-v1", "upper_usd": MODAL_GPU_STAGE_UPPER_USD, "candidate_sha256": content_key(candidate), "observed": observed, "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "vector_artifact": candidate["vector_artifact"], "calibration_prompts": calibration_prompts, "transfer_prompt_records": transfer_records_identity(records), "prompt_spec": prompt_spec, "extraction_identity": source, "signed_method_spec": signed_method_spec, "kl_spec": BENCHMARK_KL_SPEC}
+
+
+def vector_cached_work(root: Path, *, model: dict, data: dict, method: str, random_seed: int, calibration_prompts: list[str], prompt_spec: dict, judge_endpoint: str) -> tuple[set[str], int]:
+    source = persona_source_identity()
+    config = calibration_config_for(source, prompt_spec, random_seed)
+    common = {"model": model, "data": data, "method": method}
+    candidate = peek_stage(root / "cache", stage="calibration-candidates", config=config, prompts=calibration_prompts, **common)
+    if candidate is None:
+        return set(), CANDIDATE_DOSE_UPPER
+    magnitudes = _candidate_magnitudes(candidate["candidate_magnitudes"])
+    _candidate_items(magnitudes, calibration_prompts, candidate["candidate_items"])
+    _validate_method_config(method, candidate["method_config"], config["signed_method_spec"])
+    _load_sidecar(root, candidate["vector_artifact"])
+    hits = {"calibration-candidates"}
+    judgments = peek_stage(root / "cache", stage="candidate-judgments", config={"candidate_sha256": content_key(candidate), "judge_model": model["judge_model"], "judge_endpoint": judge_endpoint}, prompts=calibration_prompts, **common)
+    if judgments is None:
+        return hits, len(magnitudes)
+    observed = _require_observed(judgments["observed"], magnitudes)
+    hits.add("candidate-aware")
+    records = {EVALUATION_CASE.case_id: load_evaluation_records()} | load_transfer_records()
+    final_config = remote_final_config_for(candidate, observed, calibration_prompts, records, source, prompt_spec, config["signed_method_spec"])
+    final = peek_stage(root / "cache", stage="final-generation", config=final_config, prompts=[record.prompt for case_records in records.values() for record in case_records], **common)
+    if final is None:
+        return hits, len(magnitudes)
+    plan = _plan(records, final["final_dose_plans"])
+    _validate_final(plan, final, require_judge_outputs=True)
+    hits.add("final-generation")
+    final_inputs = {"final_sha256": content_key(final), "plan": plan, "target": final["target"], "judge_model": model["judge_model"], "judge_endpoint": judge_endpoint}
+    final_judgments = peek_stage(root / "cache", stage="final-judgments", config=final_inputs, prompts=[json.dumps(item, sort_keys=True) for item in plan], **common)
+    if final_judgments is not None:
+        hits.update(("final-aware", "final-blind"))
+    return hits, len(magnitudes)
+
+
 def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None, final_judge=None, random_seed: int = 0) -> dict:
     """Execute the audited vector graph using real target/prediction functions and injected local measurement dependencies."""
     if method in {"bare", "prompting"} or len(calibration_prompts) != 4:
@@ -506,16 +547,8 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     if {key: source[key] for key in expected_identity} != expected_identity:
         raise ValueError("vector calibration requires the fixed sycophantic/abrasive persona identity")
     records = {EVALUATION_CASE.case_id: load_evaluation_records()} | (transfer_records if transfer_records is not None else load_transfer_records())
-    signed_method_spec = {
-        "schema": "bsbench-signed-activation-v3",
-        "sides": ["+C", "-C"],
-        "layers": [7, 11, 15, 19, 23],
-        "target_layer": 29,
-        "skip_first": 16,
-        "random_seed": random_seed,
-        "kl_spec": BENCHMARK_KL_SPEC,
-    }
-    calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec, "signed_method_spec": signed_method_spec}
+    calibration_config = calibration_config_for(source, prompt_spec, random_seed)
+    signed_method_spec = calibration_config["signed_method_spec"]
     dispatched = False
     def candidate_compute() -> dict:
         nonlocal dispatched
@@ -578,21 +611,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]})
     if getattr(backend, "remote_vector_binding", False):
         transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
-        final_config = {
-            "schema": "bsbench-remote-vector-final-v1",
-            "upper_usd": MODAL_GPU_STAGE_UPPER_USD,
-            "candidate_sha256": content_key(candidate_identity),
-            "observed": observed,
-            "observed_sha256": content_key({"observed": observed}),
-            "vector_sha256": candidate["vector_sha256"],
-            "vector_artifact": artifact,
-            "calibration_prompts": calibration_prompts,
-            "transfer_prompt_records": transfer_records_identity(records),
-            "prompt_spec": prompt_spec,
-            "extraction_identity": source,
-            "signed_method_spec": signed_method_spec,
-            "kl_spec": BENCHMARK_KL_SPEC,
-        }
+        final_config = remote_final_config_for(candidate_identity, observed, calibration_prompts, records, source, prompt_spec, signed_method_spec)
 
         def validate_remote_final(result: dict) -> None:
             predictions = result.get("transfer_predictions")

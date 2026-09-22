@@ -235,17 +235,18 @@ def import_recorded_smoke(out: Path, model_id: str) -> dict:
 
 def run_provider_probe(root: Path, ledger: Path, *, model_id: str, endpoint: str, api_key: str, budget: dict) -> dict:
     rows = read_dev_cohort()
+    from steering_lite.benchmark.production import migrate_direct_generation
+    from steering_lite.benchmark.cache import peek_stage
+    from steering_lite.benchmark.sweep import MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, persona_extraction_identity
     generations = {}
     for method in ("bare", "prompting"):
-        matches = []
-        for path in (root / "cache" / "generation").glob("*.json"):
-            record = json.loads(path.read_text())
-            identity = record["identity"]
-            if identity["method"] == method and identity["model"] == {"id": model_id} and identity["code_sha256"] == source_hash() and identity["data"] == cohort_identity(rows):
-                if content_key(identity) != path.stem or identity["prompts_sha256"] != content_key({"prompts": [row["prompt"] for row in rows]}):
-                    raise ValueError("probe generation cache identity mismatch")
-                matches.append(record["result"])
-        generation, = matches
+        config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "condition": method, "prompt_ids": [row["question_id"] for row in rows]}
+        if method == "prompting":
+            config |= {"persona_source": persona_extraction_identity(), "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS)}
+        inputs = {"method": method, "model": {"id": model_id}, "data": cohort_identity(rows), "config": config, "prompts": [row["prompt"] for row in rows]}
+        if not migrate_direct_generation(root, **inputs):
+            raise ValueError("probe requires validated cached direct generations")
+        generation = peek_stage(root / "cache", stage="generation", **inputs)
         if len(generation["answers"]) != len(rows):
             raise ValueError("probe requires complete cached direct generation")
         generations[method] = generation
@@ -284,11 +285,11 @@ def main() -> None:
     if args.judge_pricing is not None:
         load_judge_pricing(args.judge_pricing)
     if args.dry_run:
-        result = dry_manifest(args.out, args.model, cache_aware=True)
+        result = dry_manifest(args.out, args.model, cache_aware=True, judge_endpoint=args.judge_endpoint)
     elif args.probe:
         api_key = os.environ["OPENROUTER_API_KEY"]
         ledger = args.ledger or args.out / "costs.jsonl"
-        budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True)["cost_estimate"]
+        budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint)["cost_estimate"]
         if not budget["paid_preflight_passed"]:
             raise RuntimeError("provider probe requires a passing corrected preflight")
         with _openrouter_read_timeout(args.openrouter_read_timeout):
@@ -385,16 +386,27 @@ def main() -> None:
             second = run_full_sweep(args.out, ledger, **common)
             if backend.calls[len(calls_after_first):] or common["judge"].calls != judge_calls_after_first or ledger.read_bytes() != ledger_after_first:
                 raise RuntimeError("immediate fake rerun must make zero GPU/judge calls and no ledger writes")
+            from steering_lite.benchmark.production import vector_cached_work
+            from steering_lite.benchmark.dose_search import CALIBRATION_CASE
+            cached_paid_stages = {}
+            for method in methods:
+                if method in {"bare", "prompting"}:
+                    continue
+                for seed in (RANDOM_SEEDS if method == "random" else (0,)):
+                    hits, _ = vector_cached_work(args.out, model=common["model"], data=cohort_identity(rows), method=method, random_seed=seed, calibration_prompts=[row["prompt"] for row in rows if row["question_id"] in CALIBRATION_CASE.prompt_ids], prompt_spec=common["prompt_spec"], judge_endpoint=common["judge"].endpoint)
+                    if hits != {"calibration-candidates", "candidate-aware", "final-generation", "final-aware", "final-blind"}:
+                        raise RuntimeError("completed vector must have no remaining paid stages in preflight")
+                    cached_paid_stages[f"{method}/{seed}"] = sorted(hits)
             result = {"mode": "offline-fake-full-sweep", "not_experimental_results": True,
                       "first_backend_calls": calls_after_first, "immediate_rerun_backend_calls": backend.calls[len(calls_after_first):],
                       "first_judge_calls": judge_calls_after_first, "immediate_rerun_judge_calls": common["judge"].calls - judge_calls_after_first,
-                      "summary_path": second["summary_path"], "condition_count": len(second["conditions"])}
+                      "summary_path": second["summary_path"], "condition_count": len(second["conditions"]), "preflight_cached_paid_stages": cached_paid_stages}
         elif args.backend == "real":
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
                 raise RuntimeError("real backend requires OPENROUTER_API_KEY before remote callbacks are constructed")
             ledger = args.ledger or args.out / "costs.jsonl"
-            manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True)
+            manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint)
             budget = manifest["cost_estimate"]
             if not budget["paid_preflight_passed"]:
                 raise RuntimeError(f"corrected remaining-work preflight exceeds budget: ${budget['total_upper_usd']:.6f}")

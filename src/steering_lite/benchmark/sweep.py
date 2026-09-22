@@ -419,7 +419,7 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
     return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"))
 
 
-def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False) -> dict:
+def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False, judge_endpoint: str = "https://openrouter.ai/api/v1/chat/completions") -> dict:
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
     prompts_by_id = {row["question_id"]: row["prompt"] for row in rows}
@@ -483,7 +483,7 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
     remaining_stages = stages + list(final_budget_stages)
     cache_hits = []
     if cache_aware:
-        from .production import migrate_direct_generation
+        from .production import migrate_direct_generation, vector_cached_work
         for method in ("bare", "prompting"):
             direct_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "condition": method, "prompt_ids": [row["question_id"] for row in rows]}
             if method == "prompting":
@@ -491,6 +491,13 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
             if migrate_direct_generation(out, model=model, data=data, method=method, config=direct_config, prompts=prompts):
                 cache_hits.append({"stage": "generation", "method": method})
         remaining_stages = [stage for stage in remaining_stages if {"stage": stage["stage"], "method": stage["method"]} not in cache_hits]
+        for method, seed in ((method, seed) for method in METHODS[2:] for seed in (RANDOM_SEEDS if method == "random" else (0,))):
+            hits, magnitudes = vector_cached_work(out, model={"id": model_id, "judge_model": JUDGE_MODEL}, data=data, method=method, random_seed=seed, calibration_prompts=calibration_prompts, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, judge_endpoint=judge_endpoint)
+            cache_hits.extend({"stage": stage, "method": method, "random_seed": seed} for stage in sorted(hits))
+            remaining_stages = [stage for stage in remaining_stages if not (stage["method"] == method and stage["random_seed"] == seed and stage["stage"] in hits)]
+            for stage in remaining_stages:
+                if stage["method"] == method and stage["random_seed"] == seed and stage["stage"].startswith("candidate-"):
+                    stage["item_count"] = 2 * len(calibration_prompts) * magnitudes
     manifest["cache_aware"] = cache_aware
     manifest["validated_cache_hits"] = cache_hits
     manifest["remaining_stages"] = remaining_stages
