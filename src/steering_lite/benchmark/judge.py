@@ -196,7 +196,8 @@ REFERENCE_ROUTING = {
     "provider": {
         "quantizations": ["fp8", "int8", "bf16", "fp16"],
         "require_parameters": True,
-        "ignore": ["AtlasCloud", "DeepInfra"],
+        # Provider error evidence: slop/audits/20260922_v4_probe_failure.md — PI/OpenAI
+        "ignore": ["AtlasCloud", "DeepInfra", "Mancer 2"],
     },
 }
 

@@ -139,6 +139,16 @@ def test_six_overlapping_audited_calls_have_unique_evidence(tmp_path, monkeypatc
     assert all(row["enforced_wait_seconds"] == 0 for row in evidence)
 
 
+def test_failed_provider_is_excluded_without_changing_judge_protocol():
+    payload = request()["payload"]
+    assert payload["provider"] == {"ignore": ["AtlasCloud", "DeepInfra", "Mancer 2"], "quantizations": ["fp8", "int8", "bf16", "fp16"], "require_parameters": True}
+    assert payload["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert payload["max_tokens"] == 1024
+    assert payload["reasoning"] == {"enabled": False}
+    assert payload["temperature"] == .7 and payload["min_p"] == .1
+    assert payload["response_format"] == FORMAT
+
+
 def test_parse_failure_preserves_provider_termination_metadata(monkeypatch):
     body = {"id": "diagnostic-response", "provider": "test-provider", "model": sweep.JUDGE_MODEL, "usage": {"prompt_tokens": 123, "completion_tokens": 1024, "cost": 0.0001}, "error": {"code": "diagnostic"}, "choices": [{"finish_reason": "length", "native_finish_reason": "max_tokens", "message": {"content": '{"evidence":"unfinished', "reasoning": None}}]}
     class Response:
