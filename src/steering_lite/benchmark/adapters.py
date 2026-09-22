@@ -4,14 +4,18 @@ The callbacks are injected so importing this module never imports Modal or an AP
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from http.client import RemoteDisconnected
 import hashlib
 import json
 from pathlib import Path
+from socket import timeout as SocketTimeout
 from typing import Callable
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .cache import cached, mark_unresolved, reserve, settle
+from .cache import cached, estimate_at_reservation_upper, reserve_many, settle
 from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
 
 
@@ -102,13 +106,13 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
         schema = payload["response_format"]["json_schema"]["schema"]
         required = set(schema["required"])
         if set(judgment) != required:
-            raise ValueError("judge response does not match the strict requested JSON schema")
+            raise OpenRouterResponseParseError("judge response does not match the strict requested JSON schema", {"judgment": judgment})
         expected_types = {"string": str, "number": (int, float), "array": list, "boolean": bool}
         for name, definition in schema["properties"].items():
             if not isinstance(judgment[name], expected_types[definition["type"]]):
-                raise ValueError("judge response value does not match the strict requested JSON schema")
+                raise OpenRouterResponseParseError("judge response value does not match the strict requested JSON schema", {"field": name, "judgment": judgment})
         if not isinstance(response_body.get("usage"), dict):
-            raise ValueError("judge response omitted usage metadata")
+            raise OpenRouterResponseParseError("judge response omitted usage metadata", {"response": response_body})
         return judgment | {
             "_remote_usage": response_body["usage"],
             "_remote_cost_usd": response_body.get("usage", {}).get("cost"),
@@ -117,10 +121,39 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
     return call
 
 
+TRANSIENT_CODES = {408, 429, 500, 502, 503, 504, 524, 529}
+JUDGE_ATTEMPTS = 3
+JUDGE_CONCURRENCY = 6
+
+
 def judge_request_upper_usd(request: dict) -> float:
+    if JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+        raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled")
     input_tokens = request["input_tokens_upper"] if "input_tokens_upper" in request else (2_000 if request["blind"] else 4_000)
-    output_tokens = request["output_tokens_upper"] if "output_tokens_upper" in request else 1_200
+    output_tokens = request["output_tokens_upper"] if "output_tokens_upper" in request else 1_024
     return input_tokens / 1_000_000 * JUDGE_INPUT_USD_PER_MTOKEN + output_tokens / 1_000_000 * JUDGE_OUTPUT_USD_PER_MTOKEN
+
+
+def _retryable(error: Exception) -> bool:
+    if isinstance(error, HTTPError):
+        return error.code in TRANSIENT_CODES
+    return isinstance(error, (OpenRouterResponseParseError, TimeoutError, SocketTimeout, URLError, RemoteDisconnected, ConnectionError))
+
+
+def _attempt_receipt(request: dict, attempt: int, error: Exception) -> dict:
+    receipt = {
+        "schema": "bsbench-judge-attempt-failure-v1",
+        "request_key": request["request_key"],
+        "attempt": attempt,
+        "exception_type": type(error).__name__,
+    }
+    if isinstance(error, HTTPError):
+        receipt["status"] = error.code
+    if isinstance(error, OpenRouterResponseParseError):
+        receipt["parse_evidence"] = error.evidence
+    if hasattr(error, "evidence_path"):
+        receipt["provider_evidence"] = error.evidence_path
+    return receipt
 
 
 class LocalJudgeAdapter:
@@ -136,38 +169,57 @@ class LocalJudgeAdapter:
     def _complete_one(self, request: dict) -> dict:
         upper_usd = judge_request_upper_usd(request)
         identity = {
-            "schema": "bsbench-judge-request-cache-v1",
+            "schema": "bsbench-judge-request-cache-v2",
             "request": request,
             "judge_model": request["payload"]["model"],
             "judge_endpoint": self.endpoint,
             "upper_usd": upper_usd,
+            "attempts": JUDGE_ATTEMPTS,
         }
 
         def compute() -> dict:
-            reservation = reserve(self._ledger, f"judge-{request['request_key']}", upper_usd, limit_usd=50.0)
-            try:
-                response = self._request_call(request["payload"])
-            except Exception:
-                mark_unresolved(self._ledger, reservation, "judge_request_failure")
-                raise
-            actual_usd = response.get("_remote_cost_usd")
-            if not isinstance(actual_usd, (int, float)) or actual_usd < 0:
-                mark_unresolved(self._ledger, reservation, "judge_response_missing_cost")
-            else:
-                settle(self._ledger, reservation, float(actual_usd))
-            return {
-                "request": request,
-                "response": response,
-                "usage": response.get("_remote_usage"),
-                "reservation": reservation,
-                "upper_usd": upper_usd,
-            }
+            reservations = reserve_many(
+                self._ledger,
+                [(f"judge-{request['request_key']}-attempt-{attempt}", upper_usd) for attempt in range(1, JUDGE_ATTEMPTS + 1)],
+                limit_usd=50.0,
+            )
+            failures = []
+            for attempt, reservation in enumerate(reservations, 1):
+                try:
+                    response = self._request_call(request["payload"])
+                except Exception as error:
+                    receipt = _attempt_receipt(request, attempt, error)
+                    estimate_at_reservation_upper(self._ledger, reservation, receipt)
+                    failures.append(receipt)
+                    if attempt < JUDGE_ATTEMPTS and _retryable(error):
+                        continue
+                    for unused in reservations[attempt:]:
+                        settle(self._ledger, unused, 0.0)
+                    raise
+                actual_usd = response.get("_remote_cost_usd")
+                if not isinstance(actual_usd, (int, float)) or actual_usd < 0:
+                    estimate_at_reservation_upper(self._ledger, reservation, {"schema": "bsbench-judge-attempt-missing-cost-v1", "request_key": request["request_key"], "attempt": attempt, "usage": response.get("_remote_usage")})
+                else:
+                    settle(self._ledger, reservation, float(actual_usd))
+                for unused in reservations[attempt:]:
+                    settle(self._ledger, unused, 0.0)
+                return {
+                    "request": request,
+                    "response": response,
+                    "usage": response.get("_remote_usage"),
+                    "reservation": reservation,
+                    "attempt_reservations": reservations,
+                    "failed_attempts": failures,
+                    "upper_usd": upper_usd,
+                }
+            raise RuntimeError("judge request exhausted attempts")
 
         return cached(self._root / "cache", "judge-request", identity, compute)["response"]
 
     def complete(self, requests: list[dict]) -> list[dict]:
         self._gate.require()
-        return [self._complete_one(request) for request in requests]
+        with ThreadPoolExecutor(max_workers=JUDGE_CONCURRENCY) as executor:
+            return list(executor.map(self._complete_one, requests))
 
 
 def real_adapters(

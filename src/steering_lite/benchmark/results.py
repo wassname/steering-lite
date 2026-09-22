@@ -22,10 +22,12 @@ def _reasons(record: dict) -> list[str]:
 def _complete_pair(records: list[dict], *, comparison: str) -> tuple[list[dict], list[dict]]:
     aware = [record for record in records if not record["blind"]]
     blind = [record for record in records if record["blind"]]
-    if len(aware) != 2 or len(blind) != 2:
-        raise ValueError(f"comparison {comparison} needs complete AB/BA aware and blind evidence")
-    if {record["order"] for record in aware} != {"AB", "BA"} or {record["order"] for record in blind} != {"AB", "BA"}:
-        raise ValueError(f"comparison {comparison} needs AB and BA evidence in both schemas")
+    if len(aware) != 4 or len(blind) != 2:
+        raise ValueError(f"comparison {comparison} needs two-pass AB/BA aware and one-pass AB/BA blind evidence")
+    if {(record["order"], record["pass"]) for record in aware} != {("AB", 0), ("AB", 1), ("BA", 0), ("BA", 1)}:
+        raise ValueError(f"comparison {comparison} needs both aware passes in AB and BA order")
+    if {(record["order"], record["pass"]) for record in blind} != {("AB", 0), ("BA", 0)}:
+        raise ValueError(f"comparison {comparison} needs one blind pass in AB and BA order")
     return aware, blind
 
 

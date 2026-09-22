@@ -18,6 +18,14 @@ from steering_lite.benchmark.sweep import persona_extraction_identity
 from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
 
+@pytest.fixture(autouse=True)
+def sourced_test_judge_prices(monkeypatch):
+    import steering_lite.benchmark.adapters as adapters_module
+
+    monkeypatch.setattr(adapters_module, "JUDGE_INPUT_USD_PER_MTOKEN", 0.0001)
+    monkeypatch.setattr(adapters_module, "JUDGE_OUTPUT_USD_PER_MTOKEN", 0.0001)
+
+
 def _entrypoint_module():
     path = Path(__file__).parents[1] / "scripts" / "run_bsbench_sweep.py"
     spec = importlib.util.spec_from_file_location("run_bsbench_sweep", path)
@@ -258,7 +266,7 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
         *(stage for _ in METHODS[2:] for stage in ("calibration-candidates", "final-generation")),
     ]
     assert len(stage_call.calls) == 14
-    assert len(judge_call.payloads) == 2300
+    assert len(judge_call.payloads) == 3444
     validation = first["conditions"]["prompting"]["persona_validation"]
     assert len(validation["comparisons"]) == len(validation["requests"]) == len(validation["results"]) == 12
     assert validation["disagreements"] == []
@@ -297,10 +305,11 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     missing_judgment["conditions"]["pca"]["final_blind"]["records"] = []
     with pytest.raises(ValueError, match="disagree|complete"):
         normalize_summary(missing_judgment)
+    original_plot = benchmark_results._plot
     monkeypatch.setattr(benchmark_results, "_plot", lambda *_args, **_kwargs: set())
     with pytest.raises(ValueError, match="plot/table points"):
         render_report(root, root / "mismatched-results")
-    monkeypatch.undo()
+    monkeypatch.setattr(benchmark_results, "_plot", original_plot)
 
     first_stage_calls = len(stage_call.calls)
     first_judge_calls = len(judge_call.payloads)

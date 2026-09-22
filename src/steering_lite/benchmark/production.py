@@ -180,8 +180,8 @@ def _candidate_judgments(
         ]
         aware = [record for record in coefficient_responses if not record["blind"]]
         blind = [record for record in coefficient_responses if record["blind"]]
-        if len(aware) != 2 * len(coefficient_rows) or len(blind) != 2 * len(coefficient_rows):
-            raise ValueError("judge adapter did not return complete AB/BA aware and blind candidate judgments")
+        if len(aware) != 4 * len(coefficient_rows) or len(blind) != 2 * len(coefficient_rows):
+            raise ValueError("judge adapter did not return complete two-pass AB/BA aware and one-pass AB/BA blind candidate judgments")
         effects = [score_pair(record["response"], record["order"], record["side"]) for record in aware]
         health = health_by_coefficient[str(float(coefficient))]
         if not isinstance(health, dict) or "reasons" not in health:

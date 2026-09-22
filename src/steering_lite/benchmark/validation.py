@@ -40,17 +40,18 @@ def numbered_requests(rows: list[dict], model: str, endpoint: str) -> list[dict]
     records = []
     for row in rows:
         for order in ("AB", "BA"):
-            for blind in (False, True):
+            for blind, passes in ((False, range(2)), (True, range(1))):
                 payload = request(row, order, model, blind=blind)
                 if blind and {"method", "side", "coefficient"}.intersection(payload):
                     raise ValueError("blind request leaked intervention metadata")
-                records.append({
-                    "schema": "bsbench-judge-request-v1",
-                    "question_id": row["question_id"], "question_number": row["question_number"],
-                    "comparison_id": comparison_id(row), "order": order, "blind": blind,
-                    "side": None if blind else row["side"],
-                    "request_key": request_key(payload, endpoint), "payload": payload,
-                })
+                for pass_index in passes:
+                    records.append({
+                        "schema": "bsbench-judge-request-v2",
+                        "question_id": row["question_id"], "question_number": row["question_number"],
+                        "comparison_id": comparison_id(row), "order": order, "pass": pass_index, "blind": blind,
+                        "side": None if blind else row["side"],
+                        "request_key": request_key(payload, endpoint, pass_index=pass_index), "payload": payload,
+                    })
     return records
 
 
@@ -63,7 +64,7 @@ def response_record(request_record: dict, response: dict) -> dict:
         for key in ("on_axis_A", "on_axis_B", "off_axis_A", "off_axis_B"):
             if key not in response:
                 raise ValueError(f"target-aware response missing {key}")
-    return {key: request_record[key] for key in ("request_key", "question_id", "question_number", "comparison_id", "order", "blind", "side")} | {"schema": "bsbench-judge-response-v1", "response": response}
+    return {key: request_record[key] for key in ("request_key", "question_id", "question_number", "comparison_id", "order", "pass", "blind", "side")} | {"schema": "bsbench-judge-response-v2", "response": response}
 
 
 def disagreements(rows: list[dict]) -> list[dict]:
@@ -76,7 +77,7 @@ def disagreements(rows: list[dict]) -> list[dict]:
         aware = [record for record in records if not record["blind"]]
         blind = [record for record in records if record["blind"]]
         effects = [score_pair(record["response"], record["order"], record["side"])["effect"] for record in aware]
-        result.append({"comparison_id": comparison, "question_id": question_id, "target_effects": effects, "target_disagreement": max(effects) - min(effects) if effects else None, "blind_descriptions": [{"order": record["order"], "response": record["response"]} for record in blind]})
+        result.append({"comparison_id": comparison, "question_id": question_id, "target_effects": effects, "target_disagreement": max(effects) - min(effects) if effects else None, "blind_descriptions": [{"order": record["order"], "pass": record["pass"], "response": record["response"]} for record in blind]})
     return result
 
 

@@ -154,7 +154,12 @@ def test_invalidation_boundaries(tmp_path: Path):
     assert backend.calls[-2:] == ["calibration-candidates", "final-generation"]
 
 
-def test_fake_production_reservations_use_shared_dry_stage_upper(tmp_path: Path):
+def test_fake_production_reservations_use_shared_dry_stage_upper(tmp_path: Path, monkeypatch):
+    import steering_lite.benchmark.sweep as sweep_module
+
+    monkeypatch.setattr(sweep_module, "JUDGE_SOURCE", "synthetic-test-pricing")
+    monkeypatch.setattr(sweep_module, "JUDGE_INPUT_USD_PER_MTOKEN", 0.0001)
+    monkeypatch.setattr(sweep_module, "JUDGE_OUTPUT_USD_PER_MTOKEN", 0.0001)
     backend = FakeBackend()
     rows = read_dev_cohort()
     direct = run_direct_condition(
@@ -243,10 +248,11 @@ def test_prompting_reuses_bare_and_persists_paired_judgments(tmp_path: Path):
     result = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **common)
     assert backend.calls == ["generation", "generation"]
     assert result["baseline_answers"] == bare["generation"]["answers"]
-    assert len(result["judgments"]["requests"]) == len(result["judgments"]["responses"]) == 8
-    assert len(result["aware"]["records"]) == len(result["blind"]["records"]) == 4
+    assert len(result["judgments"]["requests"]) == len(result["judgments"]["responses"]) == 12
+    assert len(result["aware"]["records"]) == 8
+    assert len(result["blind"]["records"]) == 4
     assert all(not record["blind"] for record in result["aware"]["records"])
     assert all(record["blind"] for record in result["blind"]["records"])
     assert all("prompting" not in str(request["payload"]) and "+C" not in str(request["payload"]) for request in result["judgments"]["requests"] if request["blind"])
     run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **common)
-    assert backend.calls == ["generation", "generation"] and len(judge.requests) == 8
+    assert backend.calls == ["generation", "generation"] and len(judge.requests) == 12

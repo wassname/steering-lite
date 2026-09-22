@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pytest
 
-from steering_lite.benchmark.judge import blind_prompt, judge_prompt, request, request_key, score_pair
+from steering_lite.benchmark.judge import REFERENCE_ROUTING, blind_prompt, judge_prompt, request, request_key, score_pair
 
 
 ROW = {
@@ -36,7 +36,22 @@ def test_blind_request_ignores_target_and_method_metadata():
     assert "change_B_minus_A" in str(request(ROW, "AB", "judge-model", blind=True)["response_format"])
 
 
-def test_cache_identity_includes_full_request_and_provider():
+def test_reference_payload_and_separate_blind_temperature():
+    aware = request(ROW, "AB", "deepseek/deepseek-v4-flash-0731")
+    blind = request(ROW, "AB", "deepseek/deepseek-v4-flash-0731", blind=True)
+    assert aware == {
+        "model": "deepseek/deepseek-v4-flash-0731",
+        "messages": [{"role": "user", "content": judge_prompt(ROW, "AB")}],
+        "response_format": aware["response_format"],
+        "temperature": 0.7,
+        "max_tokens": 1024,
+        **REFERENCE_ROUTING,
+    }
+    assert blind["temperature"] == 0
+    assert {key: blind[key] for key in REFERENCE_ROUTING} == REFERENCE_ROUTING
+
+
+def test_cache_identity_includes_full_request_provider_and_pass():
     payload = request(ROW, "AB", "judge-model")
     key = request_key(payload, "provider-A")
     variants = [
@@ -49,6 +64,7 @@ def test_cache_identity_includes_full_request_and_provider():
     revised_schema["response_format"]["json_schema"]["name"] = "revised_rubric"
     assert all(request_key(p, "provider-A") != key for p in [*variants, revised_schema])
     assert request_key(payload, "provider-B") != key
+    assert request_key(payload, "provider-A", pass_index=1) != key
 
 
 def test_scores_reverse_presentation_not_meaning():

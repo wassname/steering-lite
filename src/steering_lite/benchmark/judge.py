@@ -186,18 +186,30 @@ Response B:
 """
 
 
+REFERENCE_ROUTING = {
+    "min_p": 0.1,
+    "reasoning": {"enabled": False},
+    "provider": {
+        "quantizations": ["fp8", "int8", "bf16", "fp16"],
+        "require_parameters": True,
+        "ignore": ["AtlasCloud", "DeepInfra"],
+    },
+}
+
+
 def request(row: dict, order: str, model: str, *, blind: bool = False) -> dict:
     return {
         "model": model,
         "messages": [{"role": "user", "content": blind_prompt(row, order) if blind else judge_prompt(row, order)}],
         "response_format": BLIND_FORMAT if blind else FORMAT,
-        "temperature": 0,
-        "max_tokens": 1200,
+        "temperature": 0 if blind else 0.7,
+        "max_tokens": 1024,
+        **REFERENCE_ROUTING,
     }
 
 
-def request_key(payload: dict, endpoint: str) -> str:
-    serialized = json.dumps({"endpoint": endpoint, "request": payload}, sort_keys=True, ensure_ascii=False)
+def request_key(payload: dict, endpoint: str, *, pass_index: int = 0) -> str:
+    serialized = json.dumps({"endpoint": endpoint, "request": payload, "pass": pass_index}, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(serialized.encode()).hexdigest()
 
 

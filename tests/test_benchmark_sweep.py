@@ -38,6 +38,15 @@ from steering_lite.benchmark.sweep import (
 )
 
 
+@pytest.fixture(autouse=True)
+def sourced_test_judge_prices(monkeypatch):
+    import steering_lite.benchmark.sweep as sweep_module
+
+    monkeypatch.setattr(sweep_module, "JUDGE_SOURCE", "synthetic-test-pricing")
+    monkeypatch.setattr(sweep_module, "JUDGE_INPUT_USD_PER_MTOKEN", 0.0001)
+    monkeypatch.setattr(sweep_module, "JUDGE_OUTPUT_USD_PER_MTOKEN", 0.0001)
+
+
 def _method_stages(manifest: dict, method: str) -> list[dict]:
     return [stage for stage in manifest["stages"] if stage["method"] == method]
 
@@ -159,11 +168,11 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert all("prediction_provenance_sha256" in stage for stage in phase_b)
     assert estimate["quantities"]["gpu_stages"] == 14
     assert estimate["quantities"]["requests"] == {
-        "target_aware": 1624,
+        "target_aware": 3248,
         "blind": 1624,
         "persona_validation": 12,
     }
-    assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-chat"
+    assert estimate["judge_model"] == first["judge_model"] == "deepseek/deepseek-v4-flash-0731"
     assert first["external_commitments"] == [{
         "name": "phase6_modal_smoke",
         "ledger": first["external_commitments"][0]["ledger"],
@@ -178,6 +187,18 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert (tmp_path / "cost-estimate.json").exists()
     assert (tmp_path / "dry-plan-cache").exists()
     assert not (tmp_path / "cache").exists()
+
+
+def test_unsourced_v4_prices_stop_offline_preflight(tmp_path: Path, monkeypatch):
+    import steering_lite.benchmark.sweep as sweep_module
+
+    monkeypatch.setattr(sweep_module, "JUDGE_SOURCE", None)
+    monkeypatch.setattr(sweep_module, "JUDGE_INPUT_USD_PER_MTOKEN", None)
+    monkeypatch.setattr(sweep_module, "JUDGE_OUTPUT_USD_PER_MTOKEN", None)
+    with pytest.raises(RuntimeError, match="judge pricing is unsourced"):
+        dry_manifest(tmp_path)
+    assert not (tmp_path / "manifest.json").exists()
+    assert not (tmp_path / "cost-estimate.json").exists()
 
 
 def test_phase6_external_commitment_handles_absent_and_discovered_ledgers(tmp_path: Path, monkeypatch):
@@ -403,7 +424,7 @@ def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
 
     assert no_gpu["total_upper_usd"] < full["total_upper_usd"]
     assert no_blind["quantities"]["requests"] == {
-        "target_aware": 616,
+        "target_aware": 1232,
         "blind": 0,
         "persona_validation": 12,
     }

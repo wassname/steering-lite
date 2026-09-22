@@ -1,0 +1,49 @@
+if [ -f "/tmp/nonexistent-project.env" ]; then set -a; . "/tmp/nonexistent-project.env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --dry-run --model Qwen/Qwen3.5-4B --out /tmp/checkpoint1-dry
+2026-09-22 08:00:39.936 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 08:00:39.939 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 4a2a45e865ed
+2026-09-22 08:00:39.941 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 6cd0fbb78adb
+2026-09-22 08:00:39.944 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation ec78c56fbb43
+2026-09-22 08:00:39.946 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health d096702555a9
+2026-09-22 08:00:39.949 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests e0e1896a2267
+2026-09-22 08:00:39.951 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 0711e440900a
+2026-09-22 08:00:39.955 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss persona-validation 3303d62e3660
+2026-09-22 08:00:39.958 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6c1243940df4
+2026-09-22 08:00:39.960 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 1fe69990f26d
+2026-09-22 08:00:39.963 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 1c924bc0d639
+2026-09-22 08:00:39.965 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cfb63af5fe48
+2026-09-22 08:00:39.968 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates f2f97668cdab
+2026-09-22 08:00:39.970 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health bf79f2fa92ab
+2026-09-22 08:00:39.972 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 62c339cde25e
+2026-09-22 08:00:39.974 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind f1b443d9d31e
+2026-09-22 08:00:39.976 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 3c284dcc533b
+2026-09-22 08:00:39.978 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health b4c7594d9c39
+2026-09-22 08:00:39.980 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware e68177539e69
+2026-09-22 08:00:39.982 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 5a417a331dcb
+2026-09-22 08:00:39.985 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4b370d29110d
+2026-09-22 08:00:39.988 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health d73e4d1b81d8
+2026-09-22 08:00:39.990 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 38cb963501dc
+2026-09-22 08:00:39.992 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 8f7fb79a431b
+2026-09-22 08:00:39.995 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 5b02c55abb9c
+2026-09-22 08:00:39.997 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health fa8616096fab
+2026-09-22 08:00:40.000 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware d4a8049eace5
+2026-09-22 08:00:40.002 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 41460ce9ea89
+2026-09-22 08:00:40.004 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6d8ba43244b7
+2026-09-22 08:00:40.006 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3c5c60426e3
+2026-09-22 08:00:40.009 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 2822acdd9023
+2026-09-22 08:00:40.011 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 66d5ad853c93
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 384, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 249, in main
+    result = dry_manifest(args.out, args.model, cache_aware=True)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/sweep.py", line 445, in dry_manifest
+    cost_estimate(remaining_stages, retry_stages=retry_stages),
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/sweep.py", line 124, in cost_estimate
+    expected, request_counts, input_tokens, output_tokens = _cost_lines(stages)
+                                                            ~~~~~~~~~~~^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/sweep.py", line 100, in _cost_lines
+    raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid preflight is disabled")
+RuntimeError: judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid preflight is disabled
+error: recipe `sweep` failed on line 16 with exit code 1

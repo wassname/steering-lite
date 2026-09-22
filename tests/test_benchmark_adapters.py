@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+import threading
 
 import pytest
 
@@ -9,6 +10,12 @@ from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import _candidate_judgments, run_condition
 from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
+
+
+@pytest.fixture(autouse=True)
+def sourced_test_judge_prices(monkeypatch):
+    monkeypatch.setattr(adapters, "JUDGE_INPUT_USD_PER_MTOKEN", 0.25)
+    monkeypatch.setattr(adapters, "JUDGE_OUTPUT_USD_PER_MTOKEN", 1.0)
 
 
 class FakeModalRunMethod:
@@ -152,7 +159,8 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         assert result["target"]["observed_boundary"]["generation_health"]["source"] == "fake-health"
         assert len(result["final"]["answers"]) == 84
         assert result["final_health"]["fake"] is False
-        assert len(result["final_aware"]["records"]) == len(result["final_blind"]["records"]) == 168
+        assert len(result["final_aware"]["records"]) == 336
+        assert len(result["final_blind"]["records"]) == 168
         assert all(not record["blind"] for record in result["candidate_aware"]["records"])
         assert all(record["blind"] for record in result["candidate_blind"]["records"])
         assert all(not record["blind"] for record in result["final_aware"]["records"])
@@ -473,44 +481,101 @@ def test_judge_requests_reserve_cache_settle_and_reuse_individually(tmp_path):
     assert judge.complete(requests) == first
     assert len(calls) == 2
     ledger_rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
-    assert [row["event"] for row in ledger_rows] == ["reserved", "settled", "reserved", "settled"]
-    assert ledger_rows[0]["upper_usd"] > ledger_rows[2]["upper_usd"]
+    reservations = [row for row in ledger_rows if row["event"] == "reserved"]
+    settlements = [row for row in ledger_rows if row["event"] == "settled"]
+    assert len(reservations) == len(settlements) == 6
+    assert len({row["id"] for row in reservations}) == 6
+    assert sorted(row["upper_usd"] for row in reservations)[0] < sorted(row["upper_usd"] for row in reservations)[-1]
     cached = list((tmp_path / "cache" / "judge-request").glob("*.json"))
     assert len(cached) == 2
-    assert all({"request", "response", "usage", "reservation", "upper_usd"}.issubset(json.loads(path.read_text())["result"]) for path in cached)
+    assert all({"request", "response", "usage", "reservation", "attempt_reservations", "failed_attempts", "upper_usd"}.issubset(json.loads(path.read_text())["result"]) for path in cached)
 
 
-def test_judge_partial_failure_reuses_completed_request_after_explicit_receipt(tmp_path):
-    from steering_lite.benchmark.cache import settle_receipt
-
+def test_judge_retry_attempts_have_distinct_reservations_and_preserve_failures(tmp_path):
     calls = []
-    def fail_second(payload):
+
+    def succeed_third(payload):
         calls.append(payload["messages"][0]["content"])
-        if len(calls) == 2:
-            raise ConnectionError("request status unknown")
-        return {"summary": calls[-1], "changes": [], "_remote_usage": {"cost": 0.001}, "_remote_cost_usd": 0.001}
+        if len(calls) < 3:
+            raise ConnectionError(f"attempt {len(calls)} failed")
+        return {"summary": "third", "changes": [], "_remote_usage": {"cost": 0.001}, "_remote_cost_usd": 0.001}
 
     _, judge = real_adapters(
         modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
-        judge_request_call=fail_second,
+        judge_request_call=succeed_third,
         judge_endpoint="https://example.invalid",
         explicit_run=True,
         budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
         root=tmp_path,
         ledger=tmp_path / "ledger.jsonl",
     )
-    requests = [_judge_request("first", blind=False), _judge_request("second", blind=False)]
-    with pytest.raises(ConnectionError, match="unknown"):
-        judge.complete(requests)
-    assert calls == ["first", "second"]
+    assert judge.complete([_judge_request("retry", blind=True)])[0]["summary"] == "third"
+    assert calls == ["retry", "retry", "retry"]
     rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
-    unresolved = next(row["reservation"] for row in rows if row["event"] == "unresolved")
-    with pytest.raises(RuntimeError, match="unresolved remote work"):
-        judge.complete(requests)
-    assert calls == ["first", "second"]
-    settle_receipt(tmp_path / "ledger.jsonl", unresolved, 0.0, {"outcome": "not_sent"})
-    assert [record["summary"] for record in judge.complete(requests)] == ["first", "second"]
-    assert calls == ["first", "second", "second"]
+    reservations = [row for row in rows if row["event"] == "reserved"]
+    estimates = [row for row in rows if row["event"] == "estimated_at_reservation_upper"]
+    settlements = [row for row in rows if row["event"] == "settled"]
+    assert len(reservations) == len({row["id"] for row in reservations}) == 3
+    assert [row["receipt"]["attempt"] for row in estimates] == [1, 2]
+    assert settlements == [{"event": "settled", "reservation": reservations[2]["id"], "actual_usd": 0.001}]
+    cached, = (tmp_path / "cache" / "judge-request").glob("*.json")
+    result = json.loads(cached.read_text())["result"]
+    assert [failure["attempt"] for failure in result["failed_attempts"]] == [1, 2]
+
+
+def test_judge_stage_fails_after_three_retryable_attempts(tmp_path):
+    calls = []
+
+    def always_fail(payload):
+        calls.append(payload)
+        raise ConnectionError("still unavailable")
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=always_fail,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    with pytest.raises(ConnectionError, match="still unavailable"):
+        judge.complete([_judge_request("exhaust", blind=False)])
+    assert len(calls) == 3
+    rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    assert [row["event"] for row in rows] == ["reserved", "reserved", "reserved", "estimated_at_reservation_upper", "estimated_at_reservation_upper", "estimated_at_reservation_upper"]
+    assert not (tmp_path / "cache" / "judge-request").exists() or not list((tmp_path / "cache" / "judge-request").glob("*.json"))
+
+
+def test_judge_concurrency_is_six_and_result_order_is_stable(tmp_path):
+    barrier = threading.Barrier(6)
+    lock = threading.Lock()
+    active = 0
+    maximum = 0
+
+    def call(payload):
+        nonlocal active, maximum
+        with lock:
+            active += 1
+            maximum = max(maximum, active)
+        barrier.wait(timeout=5)
+        with lock:
+            active -= 1
+        content = payload["messages"][0]["content"]
+        return {"summary": content, "changes": [], "_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=call,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    requests = [_judge_request(f"request-{index}", blind=True) for index in range(6)]
+    assert [result["summary"] for result in judge.complete(requests)] == [f"request-{index}" for index in range(6)]
+    assert maximum == 6
 
 
 def test_adapter_invalidation_and_real_gate_block_paid_callbacks(tmp_path):

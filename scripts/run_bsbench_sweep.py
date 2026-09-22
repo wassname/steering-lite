@@ -138,8 +138,10 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
                 "min_interval_seconds": min_interval_seconds,
             }
 
-        def persist(evidence: dict) -> None:
-            save_json(evidence_root / f"{identity['payload_sha256']}-{attempt:06d}-{evidence['outcome']}.json", evidence)
+        def persist(evidence: dict) -> Path:
+            path = evidence_root / f"{identity['payload_sha256']}-{attempt:06d}-{evidence['outcome']}.json"
+            save_json(path, evidence)
+            return path
 
         try:
             response = request_call(payload)
@@ -155,13 +157,13 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
                 "headers": _provider_headers(error.headers),
                 "body": body,
             }
-            persist(evidence)
+            error.evidence_path = str(persist(evidence))
             raise
         except (TimeoutError, URLError, RemoteDisconnected, ConnectionResetError) as error:
             evidence = timing(schema="bsbench-openrouter-no-response-v1", outcome="failed") | {
                 "exception_type": type(error).__name__,
             }
-            persist(evidence)
+            error.evidence_path = str(persist(evidence))
             raise
         except Exception as error:
             evidence = timing(schema="bsbench-openrouter-callback-error-v1", outcome="failed") | {
@@ -169,7 +171,7 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
             }
             if hasattr(error, "evidence"):
                 evidence["parse_evidence"] = _redact(error.evidence)
-            persist(evidence)
+            error.evidence_path = str(persist(evidence))
             raise
         else:
             persist(timing(schema="bsbench-openrouter-response-timing-v1", outcome="success"))

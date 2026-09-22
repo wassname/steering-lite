@@ -24,7 +24,7 @@ from .pipeline import METHODS
 from .transfer_data import PromptRecord, load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
 
 MODEL_ID = "Qwen/Qwen3.5-4B"
-JUDGE_MODEL = "deepseek/deepseek-chat"
+JUDGE_MODEL = "deepseek/deepseek-v4-flash-0731"
 BUDGET_LIMIT_USD = 50.0
 PERSONA_VALIDATION_PROMPT_IDS = tuple(f"BSV2-{number:03d}" for number in range(1, 13))
 PERSONA_VALIDATION_PAIRS = len(PERSONA_VALIDATION_PROMPT_IDS)
@@ -39,12 +39,12 @@ BSBENCH_PERSONA_CORPUS_SHA256 = "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9
 BSBENCH_PERSONA_THINKING = True
 
 MODAL_SOURCE = "https://modal.com/pricing (accessed 2026-09-19)"
-JUDGE_SOURCE = "https://openrouter.ai/deepseek/deepseek-chat/overview?tab=parameters (accessed 2026-09-19)"
+JUDGE_SOURCE = None
 MODAL_A10G_USD_PER_GPU_HOUR = 1.10
 MODAL_CPU_USD_PER_CORE_SECOND = 0.0000131
 MODAL_MEMORY_USD_PER_GIB_SECOND = 0.00000222
-JUDGE_INPUT_USD_PER_MTOKEN = 0.2574
-JUDGE_OUTPUT_USD_PER_MTOKEN = 1.029
+JUDGE_INPUT_USD_PER_MTOKEN = None
+JUDGE_OUTPUT_USD_PER_MTOKEN = None
 MODAL_GPU_STAGE_TIMEOUT_SECONDS = 45 * 60
 GPU_HOURS_PER_STAGE = MODAL_GPU_STAGE_TIMEOUT_SECONDS / 3600
 CPU_CORES_PER_GPU_STAGE = 1.0
@@ -79,7 +79,7 @@ def _sum(lines: list[BudgetLine]) -> float:
 
 def _request_counts(stages: list[dict]) -> dict[str, int]:
     target_aware = sum(
-        2 * stage["item_count"]
+        4 * stage["item_count"]
         for stage in stages
         if stage["stage"] in {"target-aware-requests", "candidate-aware", "final-aware"}
     )
@@ -96,16 +96,18 @@ def _request_counts(stages: list[dict]) -> dict[str, int]:
 
 
 def _cost_lines(stages: list[dict]) -> tuple[list[BudgetLine], dict[str, int], int, int]:
+    if JUDGE_SOURCE is None or JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+        raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid preflight is disabled")
     gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
     gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
     request_counts = _request_counts(stages)
-    input_tokens = (
+    input_tokens = 3 * (
         request_counts["target_aware"] * 4_000
         + request_counts["blind"] * 2_000
         + request_counts["persona_validation"] * 2_000
     )
-    output_tokens = (
-        (request_counts["target_aware"] + request_counts["blind"]) * 1_200
+    output_tokens = 3 * (
+        (request_counts["target_aware"] + request_counts["blind"]) * 1_024
         + request_counts["persona_validation"] * 100
     )
     lines = [
@@ -132,7 +134,7 @@ def cost_estimate(stages: list[dict], *, retry_stages: list[dict] | None = None)
     return {
         "schema": "bsbench-budget-estimate-v3",
         "judge_model": JUDGE_MODEL,
-        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_200},
+        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_024, "attempts_per_request_upper": 3, "concurrency": 6},
         "quantities": {"gpu_stages": gpu_stages, "gpu_hours": gpu_hours, "requests": request_counts, "input_tokens": input_tokens, "output_tokens": output_tokens},
         "expected_work": [line.record() for line in expected],
         "retry_reserve": {

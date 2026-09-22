@@ -100,9 +100,11 @@ def test_sweep_recipe_exports_project_env_without_printing_key(tmp_path: Path):
     assert sentinel not in checked.stdout + checked.stderr
     absent = subprocess.run(
         ["just", "sweep", "--dry-run", "Qwen/Qwen3.5-4B", str(tmp_path / "dry"), str(tmp_path / "missing.env")],
-        cwd=root, env=environment, check=True, capture_output=True, text=True,
+        cwd=root, env=environment, check=False, capture_output=True, text=True,
     )
-    assert json.loads(absent.stdout.splitlines()[-1])["paid_execution_enabled"] is False
+    assert absent.returncode == 1
+    assert "judge pricing is unsourced" in absent.stderr
+    assert sentinel not in absent.stdout + absent.stderr
 
 
 def test_modal_receipt_overage_is_detected_after_estimate(tmp_path: Path):
@@ -122,9 +124,9 @@ def test_modal_receipt_overage_is_detected_after_estimate(tmp_path: Path):
 def test_local_judge_work_persists_persona_checks_and_both_request_kinds(tmp_path: Path):
     row = {"question_id": "BSV2-001", "question_number": 1, "prompt": "Is this real?", "nonsensical_element": "No.", "bare": "No, it is not real.", "steered": "No, it is not real.", "side": "+C", "method": "vjp_cache", "coefficient": 0.2}
     example = {"pair_id": "pair-1", "positive_persona": "candid", "negative_persona": "agreeable", "positive": "I disagree. Shared.", "negative": "I agree. Shared.", "shared_suffix": "Shared."}
-    result = persist_local_judge_work(tmp_path, model={"id": "Qwen/Qwen3.5-4B", "judge_model": "deepseek/deepseek-chat"}, data={"sha256": "dev"}, rows=[row], persona_examples=[example], endpoint="offline")
+    result = persist_local_judge_work(tmp_path, model={"id": "Qwen/Qwen3.5-4B", "judge_model": "deepseek/deepseek-v4-flash-0731"}, data={"sha256": "dev"}, rows=[row], persona_examples=[example], endpoint="offline")
     assert result["persona_checks"][0]["status"] == "local_structural_checks"
-    assert len(result["requests"]) == 4
+    assert len(result["requests"]) == 6
     assert {record["blind"] for record in result["requests"]} == {False, True}
 
 
