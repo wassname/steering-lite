@@ -106,6 +106,10 @@ At the current predicate, evaluation: 13/20 all-healthy, 5/20 bracketed, 2/20 no
 
 Most of the 84 all-healthy case/sign groups never measure their upper health boundary; calibrating RMS-KL alone cannot prove it predicts maximum coherent dose. Nine transfer groups and five evaluation groups have a measured first higher failing point. The 11 transfer KL misses include 10 all-healthy groups and one bracketed group, so KL miss and health failure are not interchangeable.
 
+## Cohort-health-only diagnostic
+
+[Side-by-side selection, boundary and newly eligible raw failures](cohort-health-only.md). This is a counterfactual from cached singleton metrics, not a change to the canonical eligibility rule.
+
 ## Evidence files
 
 - [All 21 final best rows](best-final.csv), [20 four-question candidate summaries](calibration-candidates-4q.csv), [100 signed evaluation/transfer boundaries](boundary-20q-and-transfer.csv), [eight eligibility disagreements](eligibility-disagreements.csv).

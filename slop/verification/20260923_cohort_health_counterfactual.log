@@ -1,0 +1,195 @@
+{
+  "current_eligible": 51,
+  "cohort_eligible": 59,
+  "changed_best": 1,
+  "changed_groups": [
+    [
+      "vjp_cache",
+      0,
+      "-C",
+      1.0,
+      1.2
+    ]
+  ],
+  "current_status": {
+    "all-healthy": 13,
+    "bracketed": 5,
+    "nonmonotonic": 2
+  },
+  "cohort_status": {
+    "all-healthy": 19,
+    "bracketed": 1
+  },
+  "rankings_current": {
+    "+C": [
+      [
+        "random",
+        0
+      ],
+      [
+        "vjp_delta",
+        0
+      ],
+      [
+        "random",
+        1
+      ],
+      [
+        "vjp_cache",
+        0
+      ],
+      [
+        "random",
+        2
+      ],
+      [
+        "mean_diff",
+        0
+      ],
+      [
+        "pca",
+        0
+      ],
+      [
+        "random",
+        3
+      ],
+      [
+        "random",
+        4
+      ],
+      [
+        "kv_cache_gram",
+        0
+      ]
+    ],
+    "-C": [
+      [
+        "vjp_delta",
+        0
+      ],
+      [
+        "vjp_cache",
+        0
+      ],
+      [
+        "random",
+        4
+      ],
+      [
+        "mean_diff",
+        0
+      ],
+      [
+        "pca",
+        0
+      ],
+      [
+        "kv_cache_gram",
+        0
+      ],
+      [
+        "random",
+        1
+      ],
+      [
+        "random",
+        2
+      ],
+      [
+        "random",
+        0
+      ],
+      [
+        "random",
+        3
+      ]
+    ]
+  },
+  "rankings_cohort": {
+    "+C": [
+      [
+        "random",
+        0
+      ],
+      [
+        "vjp_delta",
+        0
+      ],
+      [
+        "random",
+        1
+      ],
+      [
+        "vjp_cache",
+        0
+      ],
+      [
+        "random",
+        2
+      ],
+      [
+        "mean_diff",
+        0
+      ],
+      [
+        "pca",
+        0
+      ],
+      [
+        "random",
+        3
+      ],
+      [
+        "random",
+        4
+      ],
+      [
+        "kv_cache_gram",
+        0
+      ]
+    ],
+    "-C": [
+      [
+        "vjp_cache",
+        0
+      ],
+      [
+        "vjp_delta",
+        0
+      ],
+      [
+        "random",
+        4
+      ],
+      [
+        "mean_diff",
+        0
+      ],
+      [
+        "pca",
+        0
+      ],
+      [
+        "kv_cache_gram",
+        0
+      ],
+      [
+        "random",
+        1
+      ],
+      [
+        "random",
+        2
+      ],
+      [
+        "random",
+        0
+      ],
+      [
+        "random",
+        3
+      ]
+    ]
+  }
+}
