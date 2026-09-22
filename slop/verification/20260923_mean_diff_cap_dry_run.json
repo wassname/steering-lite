@@ -3,7 +3,7 @@
     "schema": "bsbench-mean-diff-cap-diagnostic-v1",
     "method": "mean_diff",
     "source_sha256": "19dd29c6cb5fdceaa2fcb4a5805187a21f9b80cd46ba80200c4250431c0360fb",
-    "callback_sha256": "e5f4d4094c2f5a48b9117339768965a9c411c0a990de47a13c9c6fc662b79c62",
+    "callback_sha256": "de8d7fb794d1966ece767e4135b657b2ba4e23d4041f05d4fdd9f1c4f7c28a09",
     "model_id": "Qwen/Qwen3.5-4B",
     "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
     "snapshot_sha256": {
@@ -88,7 +88,7 @@
       "6c5849ef9952b5f2e69ea7c687d855eef91909809685a8173943c06ce9b056e8",
       "fd372f85543d452c6761ded7158f3d0e00d04d0924c49a1902ae2e3c32140607"
     ],
-    "historical_answers_sha256": "625fa6f010c262382df76fddef02ae1ef59a81fa52e06503534dcfe98a9c398c",
+    "historical_answers_sha256": "eff5c74a4641587956d7f2f62668dcc4d7fd5788a50e7827f2316f66fdfcba6d",
     "coefficients": {
       "+C": 0.8,
       "-C": -0.8
@@ -105,7 +105,7 @@
       ]
     },
     "new_extraction_max_length": 384,
-    "diagnostic_id": "4a3cc229704efcd302a3b1bdb6261548e016580b7f2f0c5aa4ed924f4005d0ad"
+    "diagnostic_id": "aaf9aef0d6b6452cf19f7a4d9216ca897315c1a27ca3a4a5e4bc035e965b9b24"
   },
   "budget": {
     "existing_ledger_usd": 36.7938366307,

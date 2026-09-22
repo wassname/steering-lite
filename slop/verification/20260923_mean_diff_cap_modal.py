@@ -99,9 +99,9 @@ def compare_mean_diff_caps(spec: dict, old_vector_bytes_b64: str) -> dict:
         raise ValueError('formatted calibration prompts changed')
     prompt_ids = [tokenizer(prompt, add_special_tokens=False, return_tensors='pt').input_ids[0] for prompt in prompts]
     bare_before = generate(model, tokenizer, prompts, 1, spec['max_new_tokens'])
-    arms = {}
+    measurements_by_cap = {}
     for label, vector in (('old64', old), ('new384', new)):
-        arms[label] = {}
+        measurements_by_cap[label] = {}
         for side, coefficient in spec['coefficients'].items():
             with vector(model, C=coefficient):
                 answers = generate(model, tokenizer, prompts, 1, spec['max_new_tokens'])
@@ -117,7 +117,7 @@ def compare_mean_diff_caps(spec: dict, old_vector_bytes_b64: str) -> dict:
             kl_rows = [json.loads(line) for line in kl_path.read_text().splitlines()]
             if len(kl_rows) != len(prompts):
                 raise ValueError('per-prompt KL trace count differs from calibration prompts')
-            arms[label][side] = {'coefficient': coefficient, 'answers': answers,
+            measurements_by_cap[label][side] = {'coefficient': coefficient, 'answers': answers,
                                  'health': {'metrics': metrics, 'reasons': reasons}, 'kl': kl, 'per_prompt_kl': kl_rows}
     bare_after = generate(model, tokenizer, prompts, 1, spec['max_new_tokens'])
     result = {
@@ -134,7 +134,7 @@ def compare_mean_diff_caps(spec: dict, old_vector_bytes_b64: str) -> dict:
         'new_vector_bytes_b64': base64.b64encode(new_bytes).decode(),
         'direction_comparison': directions,
         'bare_before': bare_before, 'bare_after': bare_after,
-        'arms': arms,
+        'measurements_by_cap': measurements_by_cap,
         'cost_receipt': {'provider': 'Modal', 'status': 'pending', 'usage': {'elapsed_seconds': time.monotonic() - start}},
     }
     temporary = result_path.with_suffix('.tmp')

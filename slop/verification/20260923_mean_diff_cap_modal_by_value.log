@@ -1,2 +1,2 @@
 <stdin>:6: DeprecationError: 2026-08-26: `Function.get_raw_f` is deprecated and will be removed in `modal` version 1.6.0
-offline callback by-value serialization passed, bytes 14717 module not on remote image, no provider call — PI/gpt-6-sol
+offline callback by-value serialization passed, bytes 14649 module not on remote image, no provider call — PI/gpt-6-sol

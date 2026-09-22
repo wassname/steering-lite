@@ -58,7 +58,7 @@ def prepare() -> tuple[dict, bytes, dict, dict]:
     prompt_spec = summary['identity']['prompt_spec']
     if prompt_spec != {'template': 'Answer in 2 short sentences.', 'enable_thinking': False, 'max_new_tokens': 128}:
         raise ValueError('historical generation settings differ')
-    historical = {'bare': candidate['baseline_answers'], 'arms': {}}
+    historical = {'bare': candidate['baseline_answers'], 'answers_by_side': {}}
     if len(historical['bare']) != 4:
         raise ValueError('historical baseline answer count differs')
     for side in ('+C', '-C'):
@@ -67,7 +67,7 @@ def prepare() -> tuple[dict, bytes, dict, dict]:
             raise ValueError(f'historical {side} 0.8 candidate is incomplete')
         if [item['prompt_sha256'] for item in items] != [_sha(prompt.encode()) for prompt in prompts]:
             raise ValueError(f'historical {side} calibration prompts differ')
-        historical['arms'][side] = [item['response'] for item in items]
+        historical['answers_by_side'][side] = [item['response'] for item in items]
     persona = persona_extraction_identity()
     if candidate['method_config']['method'] != 'mean_diff' or candidate['method_config']['layers'] != [7, 11, 15, 19, 23]:
         raise ValueError('historical mean_diff method config differs')
@@ -118,7 +118,7 @@ def _review(raw: dict, spec: dict, historical: dict) -> dict:
         raise ValueError('diagnostic output model/tokenizer attestation differs')
     if raw['old_vector_sha256'] != spec['old_vector_sha256']:
         raise ValueError('diagnostic output old vector differs')
-    if len(raw['bare_before']) != 4 or any(len(raw['arms'][label][side]['answers']) != 4 for label in ('old64', 'new384') for side in ('+C', '-C')):
+    if len(raw['bare_before']) != 4 or any(len(raw['measurements_by_cap'][label][side]['answers']) != 4 for label in ('old64', 'new384') for side in ('+C', '-C')):
         raise ValueError('diagnostic must retain all four matched prompts for both sides')
     if _sha(base64.b64decode(raw['new_vector_bytes_b64'])) != raw['new_vector_sha256']:
         raise ValueError('new extraction vector bytes differ')
@@ -130,7 +130,7 @@ def _review(raw: dict, spec: dict, historical: dict) -> dict:
         'bare_restored': True,
         'historical_drift': {
             'bare': [index for index, (before, old) in enumerate(zip(raw['bare_before'], historical['bare'], strict=True)) if before != old],
-            **{side: [index for index, (fresh, old) in enumerate(zip(raw['arms']['old64'][side]['answers'], historical['arms'][side], strict=True)) if fresh != old]
+            **{side: [index for index, (fresh, old) in enumerate(zip(raw['measurements_by_cap']['old64'][side]['answers'], historical['answers_by_side'][side], strict=True)) if fresh != old]
                for side in ('+C', '-C')},
         },
         'direction_comparison': raw['direction_comparison'],
