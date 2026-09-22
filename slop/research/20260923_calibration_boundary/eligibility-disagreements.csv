@@ -1,0 +1,9 @@
+method,seed,side,multiplier,local_flags,unfinished,role_leaks,repeated,reference_cohort_fraction_failed,point_id,raw_evidence
+random,0,-C,0.8,1,1,0,0,False,972e921601c4a807,../../../outputs/bsbench-v2/results/evidence/972e921601c4a807.json
+random,0,-C,1.2,2,2,0,1,False,8c5ee2a31992116d,../../../outputs/bsbench-v2/results/evidence/8c5ee2a31992116d.json
+random,3,+C,0.8,1,1,0,1,False,ae367fb838ad3200,../../../outputs/bsbench-v2/results/evidence/ae367fb838ad3200.json
+random,4,-C,1.0,1,1,0,0,False,f76fbfba23c1795b,../../../outputs/bsbench-v2/results/evidence/f76fbfba23c1795b.json
+mean_diff,0,+C,1.2,2,1,1,0,False,b09f18e251415702,../../../outputs/bsbench-v2/results/evidence/b09f18e251415702.json
+kv_cache_gram,0,-C,1.2,2,2,0,0,False,1a9bdebe1753645d,../../../outputs/bsbench-v2/results/evidence/1a9bdebe1753645d.json
+vjp_delta,0,-C,1.2,5,5,1,0,False,5ab15415726ea1c2,../../../outputs/bsbench-v2/results/evidence/5ab15415726ea1c2.json
+vjp_cache,0,-C,1.2,1,1,0,0,False,fa631b39c0ea779c,../../../outputs/bsbench-v2/results/evidence/fa631b39c0ea779c.json
