@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import hashlib
+import json
 import math
 from pathlib import Path
 
 from steering_lite.data import persona_corpus_identity
 
-from .cache import cached_stage, committed, content_key, reserve_many, save_json
+from .cache import cached_stage, committed, content_key, reserve_many, save_json, valid_cost, source_hash, require_resolved_ledger
 from .dose_search import (
     CALIBRATION_CASE,
     EVALUATION_CASE,
@@ -26,6 +27,7 @@ from .transfer_data import PromptRecord, load_evaluation_records, load_transfer_
 MODEL_ID = "Qwen/Qwen3.5-4B"
 JUDGE_MODEL = "deepseek/deepseek-v4-flash-0731"
 BUDGET_LIMIT_USD = 50.0
+RANDOM_SEEDS = tuple(range(5))
 PERSONA_VALIDATION_PROMPT_IDS = tuple(f"BSV2-{number:03d}" for number in range(1, 13))
 PERSONA_VALIDATION_PAIRS = len(PERSONA_VALIDATION_PROMPT_IDS)
 # Conservative behavioral-candidate policy cap for Phase A; independent of solver iterations.
@@ -54,6 +56,36 @@ MODAL_GPU_STAGE_UPPER_USD = GPU_HOURS_PER_STAGE * (
     + 3600 * CPU_CORES_PER_GPU_STAGE * MODAL_CPU_USD_PER_CORE_SECOND
     + 3600 * MEMORY_GIB_PER_GPU_STAGE * MODAL_MEMORY_USD_PER_GIB_SECOND
 )
+
+
+def load_judge_pricing(path: Path) -> dict:
+    artifact = json.loads(path.read_text())
+    if artifact.get("source") == "https://openrouter.ai/api/v1/models":
+        body = artifact["body"]
+    else:
+        endpoint = artifact["endpoints"]["models"]
+        if endpoint["status"] != 200:
+            raise ValueError("model metadata request failed")
+        body = endpoint["body"]
+    matches = [model for model in body["data"] if model["id"] == JUDGE_MODEL]
+    if len(matches) != 1:
+        raise ValueError("model metadata must identify the exact V4 Flash model once")
+    pricing = matches[0]["pricing"]
+    rates = []
+    for field in ("prompt", "completion"):
+        raw = pricing[field]
+        if isinstance(raw, bool):
+            raise ValueError("boolean token rate")
+        rate = float(raw)
+        if not valid_cost(rate):
+            raise ValueError("token rate must be finite and nonnegative")
+        rates.append(rate * 1_000_000)
+    global JUDGE_SOURCE, JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
+    JUDGE_SOURCE = f"{path.resolve()} sha256={hashlib.sha256(path.read_bytes()).hexdigest()}"
+    JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN = rates
+    from . import adapters
+    adapters.JUDGE_INPUT_USD_PER_MTOKEN, adapters.JUDGE_OUTPUT_USD_PER_MTOKEN = rates
+    return {"model": JUDGE_MODEL, "input_usd_per_mtoken": rates[0], "output_usd_per_mtoken": rates[1], "source": JUDGE_SOURCE}
 
 
 @dataclass(frozen=True)
@@ -101,12 +133,12 @@ def _cost_lines(stages: list[dict]) -> tuple[list[BudgetLine], dict[str, int], i
     gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
     gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
     request_counts = _request_counts(stages)
-    input_tokens = 3 * (
+    input_tokens = (
         request_counts["target_aware"] * 4_000
         + request_counts["blind"] * 2_000
         + request_counts["persona_validation"] * 2_000
     )
-    output_tokens = 3 * (
+    output_tokens = (
         (request_counts["target_aware"] + request_counts["blind"]) * 1_024
         + request_counts["persona_validation"] * 100
     )
@@ -122,7 +154,9 @@ def _cost_lines(stages: list[dict]) -> tuple[list[BudgetLine], dict[str, int], i
 
 def cost_estimate(stages: list[dict], *, retry_stages: list[dict] | None = None) -> dict:
     expected, request_counts, input_tokens, output_tokens = _cost_lines(stages)
-    retry, retry_counts, retry_input_tokens, retry_output_tokens = _cost_lines(stages if retry_stages is None else retry_stages)
+    candidates = stages if retry_stages is None else retry_stages
+    retry_stage = max(candidates, key=lambda stage: _sum(_cost_lines([stage])[0]), default=None)
+    retry, retry_counts, retry_input_tokens, retry_output_tokens = _cost_lines([] if retry_stage is None else [retry_stage])
     gpu_stages = sum(stage["runner"] == "modal_gpu" for stage in stages)
     gpu_hours = gpu_stages * GPU_HOURS_PER_STAGE
     expected_usd = _sum(expected)
@@ -134,11 +168,12 @@ def cost_estimate(stages: list[dict], *, retry_stages: list[dict] | None = None)
     return {
         "schema": "bsbench-budget-estimate-v3",
         "judge_model": JUDGE_MODEL,
-        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_024, "attempts_per_request_upper": 3, "concurrency": 6},
+        "planning_assumptions": {"gpu_hours_per_stage_upper": GPU_HOURS_PER_STAGE, "cpu_cores_per_gpu_stage": CPU_CORES_PER_GPU_STAGE, "memory_gib_per_gpu_stage": MEMORY_GIB_PER_GPU_STAGE, "modal_gpu_stage_upper_usd": MODAL_GPU_STAGE_UPPER_USD, "target_aware_input_tokens_per_request": 4_000, "blind_input_tokens_per_request": 2_000, "output_tokens_per_request": 1_024, "planned_attempts_per_request": 1, "attempts_per_request_upper": 3, "concurrency": 6},
         "quantities": {"gpu_stages": gpu_stages, "gpu_hours": gpu_hours, "requests": request_counts, "input_tokens": input_tokens, "output_tokens": output_tokens},
         "expected_work": [line.record() for line in expected],
         "retry_reserve": {
-            "scope": "one affected method's final generation and judgments",
+            "scope": "largest single corrected stage",
+            "stage": retry_stage,
             "quantities": {"requests": retry_counts, "input_tokens": retry_input_tokens, "output_tokens": retry_output_tokens},
             "work": [line.record() for line in retry],
             "subtotal_usd": retry_usd,
@@ -157,6 +192,8 @@ def phase6_smoke_committed() -> float:
 
 
 def preflight_budget(ledger: Path, estimate: dict, *, external_committed_usd: float = 0.0) -> dict:
+    if not valid_cost(external_committed_usd) or not valid_cost(estimate["total_upper_usd"]):
+        raise ValueError("preflight requires finite nonnegative costs")
     existing_ledger_usd = committed(ledger)
     existing = existing_ledger_usd + external_committed_usd
     total = existing + estimate["total_upper_usd"]
@@ -200,18 +237,20 @@ def case_identity(case) -> dict:
 def phase_b_budget_stages() -> tuple[dict, ...]:
     """Describe only the remaining 20-question evaluation and disjoint transfer work."""
     records = {PREDICTION_CASES[0].case_id: load_evaluation_records()} | load_transfer_records()
-    item_count = sum(len(records[case.case_id]) for case in PREDICTION_CASES) * len(FINAL_DOSE_MULTIPLIERS)
+    item_count = sum(len(records[case.case_id]) for case in PREDICTION_CASES) * len(FINAL_DOSE_MULTIPLIERS) * 2
     provenance = transfer_records_identity(records)
     return tuple(
         {
             "stage": stage,
             "runner": runner,
             "method": method,
-            "item_count": item_count,
+            "random_seed": random_seed,
+            "item_count": len(records[EVALUATION_CASE.case_id]) * 6 if stage in {"final-aware", "final-blind"} else item_count,
             "prediction_provenance_sha256": content_key(provenance),
         }
         for method in METHODS
         if method not in {"bare", "prompting"}
+        for random_seed in (RANDOM_SEEDS if method == "random" else (0,))
         for stage, runner in (
             ("final-generation", "modal_gpu"),
             ("final-health", "local"),
@@ -345,7 +384,7 @@ def final_stages(
             "runner": runner,
             "method": method,
             "config": config,
-            "item_count": item_count,
+            "item_count": sum(len(actual_case_prompts[plan["case"]["case_id"]]) * len(plan["coefficients"]) for plan in ordered_plans if plan["case"]["case_id"] == EVALUATION_CASE.case_id) if runner == "local_judge_api" else item_count,
             "input_stage": "final-generation",
         }
         for stage, runner in (
@@ -377,7 +416,7 @@ def condition_stages(method: str) -> tuple[tuple[str, str], ...]:
         return (("generation", "modal_gpu"), ("generation-health", "local"))
     if method == "prompting":
         return (("generation", "modal_gpu"), ("generation-health", "local"), ("target-aware-requests", "local_judge_api"), ("blind-requests", "local_judge_api"), ("persona-validation", "local_judge_api"))
-    return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"), ("candidate-blind", "local_judge_api"))
+    return (("calibration-candidates", "modal_gpu"), ("candidate-health", "local"), ("candidate-aware", "local_judge_api"))
 
 
 def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False) -> dict:
@@ -391,11 +430,12 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
     ledger = out / "costs.jsonl" if ledger is None else ledger
     stages = []
     persona_source = persona_extraction_identity()
-    for method in METHODS:
+    for method, random_seed in ((method, seed) for method in METHODS for seed in (RANDOM_SEEDS if method == "random" else (0,))):
         vector_method = method not in {"bare", "prompting"}
         stage_prompts = calibration_prompts if vector_method else prompts
         config = {
             "condition": method,
+            "random_seed": random_seed,
             "target_stat": "kl_rms" if vector_method else None,
             "calibration_case": case_identity(CALIBRATION_CASE) if vector_method else None,
             "calibration_prompts_sha256": content_key({"prompts": calibration_prompts}) if vector_method else None,
@@ -410,7 +450,8 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
             stages.append(
                 {
                     "method": method,
-                    "item_count": PERSONA_VALIDATION_PAIRS if stage == "persona-validation" else len(calibration_prompts) * CANDIDATE_DOSE_UPPER if vector_method else len(stage_prompts),
+                    "random_seed": random_seed,
+                    "item_count": PERSONA_VALIDATION_PAIRS if stage == "persona-validation" else 2 * len(calibration_prompts) * CANDIDATE_DOSE_UPPER if vector_method else len(stage_prompts),
                     "prompts_sha256": content_key({"prompts": stage_prompts}),
                     "config": stage_config,
                     **cached_dry_stage(
@@ -439,14 +480,27 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
         "ledger": str(PHASE6_SMOKE_LEDGER),
         "committed_usd": phase6_committed_usd,
     }]
-    remaining_stages = list(final_budget_stages) if cache_aware else stages + list(final_budget_stages)
-    retry_stages = [stage for stage in final_budget_stages if stage["method"] == "mean_diff"] if cache_aware else None
+    remaining_stages = stages + list(final_budget_stages)
+    cache_hits = []
+    if cache_aware:
+        from .production import migrate_direct_generation
+        for method in ("bare", "prompting"):
+            direct_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "condition": method, "prompt_ids": [row["question_id"] for row in rows]}
+            if method == "prompting":
+                direct_config |= {"persona_source": persona_source, "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS)}
+            if migrate_direct_generation(out, model=model, data=data, method=method, config=direct_config, prompts=prompts):
+                cache_hits.append({"stage": "generation", "method": method})
+        remaining_stages = [stage for stage in remaining_stages if {"stage": stage["stage"], "method": stage["method"]} not in cache_hits]
     manifest["cache_aware"] = cache_aware
-    manifest["cost_estimate"] = preflight_budget(
-        ledger,
-        cost_estimate(remaining_stages, retry_stages=retry_stages),
-        external_committed_usd=phase6_committed_usd,
-    )
+    manifest["validated_cache_hits"] = cache_hits
+    manifest["remaining_stages"] = remaining_stages
+    estimate = cost_estimate(remaining_stages)
+    require_resolved_ledger(ledger)
+    require_resolved_ledger(PHASE6_SMOKE_LEDGER)
+    existing = committed(ledger)
+    estimate |= {"limit_usd": BUDGET_LIMIT_USD, "existing_ledger_usd": existing, "external_committed_usd": phase6_committed_usd, "existing_committed_usd": existing + phase6_committed_usd, "total_upper_usd": estimate["total_upper_usd"] + existing + phase6_committed_usd}
+    estimate["paid_preflight_passed"] = estimate["total_upper_usd"] < BUDGET_LIMIT_USD
+    manifest["cost_estimate"] = estimate
     save_json(out / "manifest.json", manifest)
-    save_json(out / "cost-estimate.json", manifest["cost_estimate"])
+    save_json(out / "cost-estimate.json", estimate)
     return manifest

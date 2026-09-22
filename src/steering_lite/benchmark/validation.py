@@ -50,6 +50,7 @@ def numbered_requests(rows: list[dict], model: str, endpoint: str) -> list[dict]
                         "question_id": row["question_id"], "question_number": row["question_number"],
                         "comparison_id": comparison_id(row), "order": order, "pass": pass_index, "blind": blind,
                         "side": None if blind else row["side"],
+                        "random_seed": row.get("random_seed", 0), "magnitude": row.get("magnitude"),
                         "request_key": request_key(payload, endpoint, pass_index=pass_index), "payload": payload,
                     })
     return records
@@ -64,7 +65,7 @@ def response_record(request_record: dict, response: dict) -> dict:
         for key in ("on_axis_A", "on_axis_B", "off_axis_A", "off_axis_B"):
             if key not in response:
                 raise ValueError(f"target-aware response missing {key}")
-    return {key: request_record[key] for key in ("request_key", "question_id", "question_number", "comparison_id", "order", "pass", "blind", "side")} | {"schema": "bsbench-judge-response-v2", "response": response}
+    return {key: request_record[key] for key in ("request_key", "question_id", "question_number", "comparison_id", "order", "pass", "blind", "side", "random_seed", "magnitude")} | {"schema": "bsbench-judge-response-v2", "response": response}
 
 
 def disagreements(rows: list[dict]) -> list[dict]:
@@ -76,7 +77,7 @@ def disagreements(rows: list[dict]) -> list[dict]:
     for (comparison, question_id), records in grouped.items():
         aware = [record for record in records if not record["blind"]]
         blind = [record for record in records if record["blind"]]
-        effects = [score_pair(record["response"], record["order"], record["side"])["effect"] for record in aware]
+        effects = [score_pair(record["response"], record["order"], record["side"])["directed_intended_effect"] for record in aware]
         result.append({"comparison_id": comparison, "question_id": question_id, "target_effects": effects, "target_disagreement": max(effects) - min(effects) if effects else None, "blind_descriptions": [{"order": record["order"], "pass": record["pass"], "response": record["response"]} for record in blind]})
     return result
 

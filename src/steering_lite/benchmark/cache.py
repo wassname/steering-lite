@@ -3,6 +3,8 @@
 import fcntl
 import hashlib
 import json
+import math
+from numbers import Real
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -87,10 +89,30 @@ def cached_stage(
     return cached(root, stage, identity, compute)
 
 
+def valid_cost(value) -> bool:
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
+def validate_cost_records(records: list[dict]) -> None:
+    for row in records:
+        for field in ("upper_usd", "actual_usd", "estimated_usd"):
+            if field in row and (not valid_cost(row[field]) or (row["event"] == "reserved" and row[field] == 0)):
+                raise ValueError(f"invalid ledger cost: {field}")
+
+
+def require_resolved_ledger(ledger: Path) -> None:
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
+    validate_cost_records(rows)
+    resolved = {row["reservation"] for row in rows if row["event"] in {"settled", "estimated_at_reservation_upper"}}
+    if any(row["event"] == "overage" or (row["event"] == "reserved" and row["id"] not in resolved) for row in rows):
+        raise RuntimeError("ledger has unresolved work or overage")
+
+
 def committed(ledger: Path) -> float:
     if not ledger.exists():
         return 0.0
     records = [json.loads(line) for line in ledger.read_text().splitlines()]
+    validate_cost_records(records)
     settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
     return sum(settled.get(row["id"], row["upper_usd"]) for row in records if row["event"] == "reserved")
 
@@ -107,6 +129,9 @@ def reserve_many(
         fcntl.flock(handle, fcntl.LOCK_EX)
         handle.seek(0)
         records = [json.loads(line) for line in handle]
+        validate_cost_records(records)
+        if not valid_cost(limit_usd) or not reservations or any(not valid_cost(cost) or cost == 0 for _, cost in reservations):
+            raise ValueError("reservation upper and limit must be finite positive costs")
         settled = {row["reservation"]: row["actual_usd"] for row in records if row["event"] == "settled"}
         estimated = {row["reservation"] for row in records if row["event"] == "estimated_at_reservation_upper"}
         unresolved_overages = [row for row in records if row["event"] == "overage"]
@@ -134,7 +159,7 @@ def reserve_many(
 
 
 def reserve(ledger: Path, kind: str, upper_usd: float, limit_usd: float = 49.0) -> str:
-    return reserve_many(ledger, [(kind, upper_usd)], limit_usd)[0]
+    return reserve_many(ledger, [(kind, upper_usd)], limit_usd, strict_limit=True)[0]
 
 
 def estimate_at_reservation_upper(ledger: Path, reservation: str, receipt: dict) -> None:
@@ -165,12 +190,13 @@ def mark_unresolved(ledger: Path, reservation: str, reason: str) -> None:
 
 
 def settle(ledger: Path, reservation: str, actual_usd: float) -> None:
-    if actual_usd < 0:
-        raise ValueError("negative cost")
+    if not valid_cost(actual_usd):
+        raise ValueError("actual cost must be finite nonnegative and non-boolean")
     with ledger.open("a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         handle.seek(0)
         rows = [json.loads(line) for line in handle]
+        validate_cost_records(rows)
         original, = [row for row in rows if row["event"] == "reserved" and row["id"] == reservation]
         assert not any(row["event"] == "settled" and row["reservation"] == reservation for row in rows)
         handle.write(json.dumps({"event": "settled", "reservation": reservation, "actual_usd": actual_usd}) + "\n")

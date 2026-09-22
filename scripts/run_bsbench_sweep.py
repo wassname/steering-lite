@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import time
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,11 +15,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from steering_lite.benchmark.adapters import openrouter_request_callback, real_adapters
-from steering_lite.benchmark.cache import committed, content_key, save_json, settle_receipt, source_hash
+from steering_lite.benchmark.cache import committed, content_key, save_json, settle_receipt, source_hash, require_resolved_ledger
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import record_completed_stage, run_condition, run_stages
-from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, dry_manifest
+from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, RANDOM_SEEDS, dry_manifest, load_judge_pricing
 
 
 def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], backend, prompt_spec: dict, judge, methods: tuple[str, ...] = METHODS, measure=None, solver=None, vector_loader=None, transfer_records=None) -> dict:
@@ -39,7 +40,9 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
     prior = json.loads(summary_path.read_text()) if summary_path.exists() else None
     conditions = dict(prior["conditions"]) if prior and prior.get("identity") == identity else {}
     for method in methods:
-        conditions[method] = run_condition(
+        replicates = []
+        for random_seed in (RANDOM_SEEDS if method == "random" else (0,)):
+            result = run_condition(
             root,
             ledger,
             model=model,
@@ -53,7 +56,13 @@ def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], b
             solver=solver,
             vector_loader=vector_loader,
             transfer_records=transfer_records,
-        )
+            random_seed=random_seed,
+            )
+            replicates.append(result)
+            conditions[method] = {"paid_execution_enabled": result["paid_execution_enabled"], "replicates": list(replicates)} if method == "random" else result
+            save_json(summary_path, {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions})
+        if method == "random" and len({replicate["candidate"]["vector_sha256"] for replicate in replicates}) != len(RANDOM_SEEDS):
+            raise ValueError("random seeds must produce distinct vector hashes")
         save_json(summary_path, {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions})
     return {"schema": "bsbench-run-summary-v1", "identity": identity, "identity_sha256": content_key(identity), "methods": list(methods), "conditions": conditions, "summary_path": str(summary_path), "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False))}
 
@@ -105,20 +114,18 @@ def _openrouter_read_timeout(seconds: float):
         adapters.urlopen = original_urlopen
 
 
-def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence_root: Path, min_interval_seconds: float = 10.0):
+def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence_root: Path):
     request_call = openrouter_request_callback(endpoint=endpoint, api_key=api_key)
-    next_request_at = 0.0
-    attempt = 0
+    lock = threading.Lock()
+    sequence = time.time_ns()
 
     def call(payload: dict) -> dict:
-        nonlocal attempt, next_request_at
-        attempt += 1
-        wait_seconds = max(next_request_at - time.monotonic(), 0.0)
-        if wait_seconds:
-            time.sleep(wait_seconds)
+        nonlocal sequence
+        with lock:
+            sequence += 1
+            attempt = sequence
         dispatch_started_monotonic = time.monotonic()
         dispatch_started_at = datetime.now(timezone.utc).isoformat()
-        next_request_at = dispatch_started_monotonic + min_interval_seconds
         identity = _request_identity(payload)
 
         def timing(*, schema: str, outcome: str) -> dict:
@@ -134,8 +141,7 @@ def audited_openrouter_request_callback(*, endpoint: str, api_key: str, evidence
                 "dispatch_started_at": dispatch_started_at,
                 "response_finished_at": response_finished_at,
                 "elapsed_seconds": response_finished_monotonic - dispatch_started_monotonic,
-                "enforced_wait_seconds": wait_seconds,
-                "min_interval_seconds": min_interval_seconds,
+                "enforced_wait_seconds": 0.0,
             }
 
         def persist(evidence: dict) -> Path:
@@ -197,7 +203,7 @@ def openrouter_metadata(*, api_key: str) -> dict:
     return {
         "schema": "bsbench-openrouter-nongeneration-metadata-v1",
         "queried_at": datetime.now(timezone.utc).isoformat(),
-        "endpoints": {"key": get("key"), "credits": get("credits")},
+        "endpoints": {"key": get("key"), "credits": get("credits"), "models": get("models")},
     }
 
 
@@ -227,6 +233,34 @@ def import_recorded_smoke(out: Path, model_id: str) -> dict:
     return {"mode": "run-recorded-smoke", "records": records, "production_cache": str(out / "cache")}
 
 
+def run_provider_probe(root: Path, ledger: Path, *, model_id: str, endpoint: str, api_key: str, budget: dict) -> dict:
+    rows = read_dev_cohort()
+    generations = {}
+    for method in ("bare", "prompting"):
+        matches = []
+        for path in (root / "cache" / "generation").glob("*.json"):
+            record = json.loads(path.read_text())
+            identity = record["identity"]
+            if identity["method"] == method and identity["model"] == {"id": model_id} and identity["code_sha256"] == source_hash() and identity["data"] == cohort_identity(rows):
+                if content_key(identity) != path.stem or identity["prompts_sha256"] != content_key({"prompts": [row["prompt"] for row in rows]}):
+                    raise ValueError("probe generation cache identity mismatch")
+                matches.append(record["result"])
+        generation, = matches
+        if len(generation["answers"]) != len(rows):
+            raise ValueError("probe requires complete cached direct generation")
+        generations[method] = generation
+    from steering_lite.benchmark.validation import numbered_requests, response_record
+    row = rows[0] | {"bare": generations["bare"]["answers"][0], "steered": generations["prompting"]["answers"][0], "method": "prompting", "magnitude": None, "random_seed": 0, "side": "+C"}
+    requests = numbered_requests([row], JUDGE_MODEL, endpoint)
+    _, judge = real_adapters(modal_stage_call=lambda **_: (_ for _ in ()).throw(RuntimeError("probe must not dispatch Modal")), judge_request_call=audited_openrouter_request_callback(endpoint=endpoint, api_key=api_key, evidence_root=root / "provider-evidence"), judge_endpoint=endpoint, explicit_run=True, budget_preflight=budget, root=root, ledger=ledger)
+    before = committed(ledger)
+    responses = judge.complete(requests)
+    require_resolved_ledger(ledger)
+    result = {"schema": "bsbench-settled-provider-probe-v1", "model": JUDGE_MODEL, "question_id": row["question_id"], "request_count": len(requests), "cost_committed_usd": committed(ledger) - before, "requests": requests, "responses": [response_record(request, response) for request, response in zip(requests, responses, strict=True)]}
+    save_json(root / "provider-probe.json", result)
+    return {key: value for key, value in result.items() if key not in {"requests", "responses"}}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -234,6 +268,7 @@ def main() -> None:
     mode.add_argument("--import-smoke", action="store_true")
     mode.add_argument("--import-receipt", type=Path)
     mode.add_argument("--run", action="store_true")
+    mode.add_argument("--probe", action="store_true")
     mode.add_argument("--check-openrouter-env", action="store_true")
     mode.add_argument("--openrouter-metadata", action="store_true")
     parser.add_argument("--model", default=MODEL_ID)
@@ -244,9 +279,20 @@ def main() -> None:
     parser.add_argument("--openrouter-read-timeout", type=float, default=180.0)
     parser.add_argument("--ledger", type=Path)
     parser.add_argument("--metadata-out", type=Path)
+    parser.add_argument("--judge-pricing", type=Path)
     args = parser.parse_args()
+    if args.judge_pricing is not None:
+        load_judge_pricing(args.judge_pricing)
     if args.dry_run:
         result = dry_manifest(args.out, args.model, cache_aware=True)
+    elif args.probe:
+        api_key = os.environ["OPENROUTER_API_KEY"]
+        ledger = args.ledger or args.out / "costs.jsonl"
+        budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True)["cost_estimate"]
+        if not budget["paid_preflight_passed"]:
+            raise RuntimeError("provider probe requires a passing corrected preflight")
+        with _openrouter_read_timeout(args.openrouter_read_timeout):
+            result = run_provider_probe(args.out, ledger, model_id=args.model, endpoint=args.judge_endpoint, api_key=api_key, budget=budget)
     elif args.check_openrouter_env:
         if not os.environ.get("OPENROUTER_API_KEY"):
             raise RuntimeError("OPENROUTER_API_KEY is not set")
@@ -288,26 +334,30 @@ def main() -> None:
                             ]
                         return result
                     if stage == "calibration-candidates":
-                        coefficients = [0.2, 0.4]
-                        return {"actual_usd": 0.0, "vector_bytes": b"offline-fake-vector-v1", "baseline_answers": ["Fake baseline." for _ in prompts], "candidate_coefficients": coefficients, "candidate_health": {str(coefficient): {"reasons": []} for coefficient in coefficients}, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {coefficient}/{index}."} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"fake": True}}
+                        magnitudes = [0.2, 0.4]
+                        spec = config["signed_method_spec"]
+                        return {"actual_usd": 0.0, "vector_bytes": f"offline-fake-vector-{method}-{spec['random_seed']}".encode(), "baseline_answers": ["Fake baseline." for _ in prompts], "candidate_magnitudes": magnitudes, "candidate_health": {f"{magnitude}:{side}": {"reasons": []} for magnitude in magnitudes for side in ("+C", "-C")}, "candidate_items": [{"magnitude": magnitude, "side": side, "prompt_index": index, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "response": f"Fake candidate {side}/{magnitude}/{index}."} for magnitude in magnitudes for side in ("+C", "-C") for index, prompt in enumerate(prompts)], "method_config": {"method": method, "layers": spec["layers"], "seed": spec["random_seed"], "target_layer": 29, "skip_first": 16}}
                     if stage == "final-generation":
                         from steering_lite.benchmark.cache import content_key
-                        from steering_lite.benchmark.dose_search import PREDICTION_CASES, final_dose_plan
+                        from steering_lite.benchmark.dose_search import BENCHMARK_KL_SPEC, PREDICTION_CASES, final_dose_plan
                         from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
                         artifact = config["vector_artifact"]
                         assert __import__("hashlib").sha256(__import__("base64").b64decode(artifact["vector_bytes_b64"])).hexdigest() == artifact["sha256"]
-                        target = {"target_id": "offline-target", "target_stat": "kl_rms", "target_rms": 1.0}
-                        predictions = [{"schema": "bsbench-rms-kl-transfer-v1", "target_id": target["target_id"], "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}, "method": method, "model": config.get("model_id", "offline"), "target_stat": "kl_rms", "target_rms": 1.0, "bracket": (0.01, 2.0), "predicted_coefficient": 0.3, "search_history": []} for case in PREDICTION_CASES]
+                        target = {"target_id": content_key({"vector": artifact["sha256"], "kl_spec": BENCHMARK_KL_SPEC}), "target_stat": "kl_rms", "target_rms": 1.0, "kl_spec": BENCHMARK_KL_SPEC, "source": {"method": method, "model": args.model}}
+                        predictions = [{"schema": "bsbench-signed-rms-kl-transfer-v2", "target_id": target["target_id"], "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}, "method": method, "model": args.model, "random_seed": config["signed_method_spec"]["random_seed"], "target_stat": "kl_rms", "target_rms": 1.0, "bracket": BENCHMARK_KL_SPEC["bracket"], "kl_spec": BENCHMARK_KL_SPEC, "signed_predictions": [{"side": side, "magnitude": magnitude, "search_history": []} for side, magnitude in (("+C", 0.3), ("-C", 0.35))]} for case in PREDICTION_CASES]
                         plans = [final_dose_plan(prediction) for prediction in predictions]
                         records = {PREDICTION_CASES[0].case_id: load_evaluation_records()} | load_transfer_records(); by_case = {plan["case"]["case_id"]: plan for plan in plans}
-                        plan = [{"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256} for case in PREDICTION_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]]
-                        return {"actual_usd": 0.0, "target": target, "transfer_predictions": predictions, "final_dose_plans": plans, "executable_generation_plan": plan, "baseline_answers": {item["prompt_id"]: "Fake baseline." for item in plan}, "answers": ["Fake final answer." for _ in plan], "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []} for item in plan], "plan_sha256": content_key({"plan": plan})}
+                        plan = [{"case_id": case.case_id, "target_id": target["target_id"], "magnitude": dose["magnitude"], "side": dose["side"], "multiplier": dose["multiplier"], "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256} for case in PREDICTION_CASES for record in records[case.case_id] for dose in by_case[case.case_id]["coefficients"]]
+                        return {"actual_usd": 0.0, "target": target, "transfer_predictions": predictions, "final_dose_plans": plans, "executable_generation_plan": plan, "baseline_answers": {item["prompt_id"]: "Fake baseline." for item in plan}, "answers": ["Fake final answer." for _ in plan], "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "magnitude": item["magnitude"], "side": item["side"], "reasons": []} for item in plan], "plan_sha256": content_key({"plan": plan})}
                     raise AssertionError(stage)
             class FakeJudge:
                 endpoint = "offline-fake-judge"
 
+                def __init__(self): self.calls = 0
+
                 def complete(self, requests):
+                    self.calls += len(requests)
                     responses = []
                     for request in requests:
                         if request["schema"] == "bsbench-persona-validation-request-v1":
@@ -319,9 +369,9 @@ def main() -> None:
                             effect = .15 + (seed % 70) / 100
                             off_target = .02 + ((seed // 70) % 20) / 100
                             if request["order"] == "AB":
-                                responses.append({"on_axis_A": 0.0, "on_axis_B": effect, "off_axis_A": 0.0, "off_axis_B": off_target})
+                                responses.append({"evidence": "Fake contrast.", "on_axis_A": 0.0, "on_axis_B": effect, "off_axis_A": 0.0, "off_axis_B": off_target})
                             else:
-                                responses.append({"on_axis_A": effect, "on_axis_B": 0.0, "off_axis_A": off_target, "off_axis_B": 0.0})
+                                responses.append({"evidence": "Fake contrast.", "on_axis_A": effect, "on_axis_B": 0.0, "off_axis_A": off_target, "off_axis_B": 0.0})
                     return responses
 
             backend = FakeBackend()
@@ -330,10 +380,15 @@ def main() -> None:
             common = dict(model={"id": args.model, "judge_model": "offline-fake-judge"}, rows=rows, backend=backend, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}, judge=FakeJudge(), methods=methods)
             first = run_full_sweep(args.out, ledger, **common)
             calls_after_first = list(backend.calls)
+            judge_calls_after_first = common["judge"].calls
+            ledger_after_first = ledger.read_bytes()
             second = run_full_sweep(args.out, ledger, **common)
+            if backend.calls[len(calls_after_first):] or common["judge"].calls != judge_calls_after_first or ledger.read_bytes() != ledger_after_first:
+                raise RuntimeError("immediate fake rerun must make zero GPU/judge calls and no ledger writes")
             result = {"mode": "offline-fake-full-sweep", "not_experimental_results": True,
                       "first_backend_calls": calls_after_first, "immediate_rerun_backend_calls": backend.calls[len(calls_after_first):],
-                      "first": first, "second": second}
+                      "first_judge_calls": judge_calls_after_first, "immediate_rerun_judge_calls": common["judge"].calls - judge_calls_after_first,
+                      "summary_path": second["summary_path"], "condition_count": len(second["conditions"])}
         elif args.backend == "real":
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
@@ -341,6 +396,8 @@ def main() -> None:
             ledger = args.ledger or args.out / "costs.jsonl"
             manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True)
             budget = manifest["cost_estimate"]
+            if not budget["paid_preflight_passed"]:
+                raise RuntimeError(f"corrected remaining-work preflight exceeds budget: ${budget['total_upper_usd']:.6f}")
             from run_bsbench_modal import app, remote_stage_call
             with app.run(), _openrouter_read_timeout(args.openrouter_read_timeout):
                 modal_adapter, judge_adapter = real_adapters(

@@ -259,6 +259,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                     "target_id": plans_by_case[case.case_id]["target_id"],
                     "magnitude": dose["magnitude"],
                     "side": dose["side"],
+                    "multiplier": dose["multiplier"],
                     "prompt_id": record.prompt_id,
                     "prompt": record.prompt,
                     "prompt_sha256": record.content_sha256,

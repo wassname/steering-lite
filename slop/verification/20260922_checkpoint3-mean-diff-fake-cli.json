@@ -1,0 +1,1 @@
+{"condition_count": 1, "first_backend_calls": ["calibration-candidates", "final-generation"], "first_judge_calls": 784, "immediate_rerun_backend_calls": [], "immediate_rerun_judge_calls": 0, "mode": "offline-fake-full-sweep", "not_experimental_results": true, "summary_path": ".local/checkpoint3-fake-mean-diff/run-summary.json"}

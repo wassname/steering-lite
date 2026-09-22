@@ -6,9 +6,9 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle
+from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle, source_hash, save_json
 from .dose_search import BENCHMARK_KL_SPEC, CALIBRATION_CASE, EVALUATION_CASE, PREDICTION_CASES, fit_target, predict_transfer
-from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
+from .sweep import RANDOM_SEEDS, CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
 from .transfer_data import load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
 
@@ -39,7 +39,7 @@ def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data:
 
     def compute() -> dict:
         nonlocal dispatched
-        reservation = reserve(ledger, f"modal-{stage}-{method}", config["upper_usd"], limit_usd=50.0)
+        reservation = reserve(ledger, f"modal-{stage}-{method}", config["upper_usd"], limit_usd=getattr(backend, "ledger_limit_usd", 50.0))
         dispatched = True
         backend_config = config if dispatch_config is None else dispatch_config(config)
         try:
@@ -156,6 +156,7 @@ def _candidate_judgments(
     method: str,
     model: dict,
     judge,
+    random_seed: int = 0,
 ) -> dict:
     """Turn candidate responses plus existing AB/BA/blind judge schemas into observations."""
     baseline = candidate.get("baseline_answers")
@@ -183,9 +184,10 @@ def _candidate_judgments(
                     "method": method,
                     "magnitude": float(magnitude),
                     "side": side,
+                    "random_seed": random_seed,
                 })
 
-    requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
+    requests = [request for request in numbered_requests(rows, model["judge_model"], judge.endpoint) if not request["blind"]]
     raw_responses = judge.complete(requests)
     if len(raw_responses) != len(requests):
         raise ValueError("judge adapter must return one response per persisted request")
@@ -199,18 +201,20 @@ def _candidate_judgments(
             dose_responses = [record for record in responses if record["comparison_id"] in comparison_ids]
             aware = [record for record in dose_responses if not record["blind"]]
             blind = [record for record in dose_responses if record["blind"]]
-            if len(aware) != 4 * len(dose_rows) or len(blind) != 2 * len(dose_rows):
+            if len(aware) != 4 * len(dose_rows) or blind:
                 raise ValueError("judge adapter did not return complete signed candidate judgments")
             effects = [score_pair(record["response"], record["order"], record["side"]) for record in aware]
             health = health_by_coefficient[f"{float(magnitude)}:{side}"]
             if not isinstance(health, dict) or "reasons" not in health:
                 raise ValueError("candidate health requires metrics and a reasons list")
-            directed_effect = sum(effect["effect"] for effect in effects) / len(effects)
+            directed_effect = sum(effect["directed_intended_effect"] for effect in effects) / len(effects)
             off_target_effect = sum(abs(effect["off_axis_perturbation"]) for effect in effects) / len(effects)
             dose_score = directed_effect - 4 * off_target_effect
             observed.append({
-                "magnitude": float(magnitude), "side": side,
-                "directed_effect": directed_effect, "off_target_effect": off_target_effect,
+                "magnitude": float(magnitude), "side": side, "random_seed": random_seed,
+                "directed_intended_effect": directed_effect,
+                "signed_axis_effect": directed_effect if side == "+C" else -directed_effect,
+                "off_target_effect": off_target_effect,
                 "dose_score": dose_score,
                 "provenance": content_key({"candidate": candidate["vector_sha256"], "magnitude": float(magnitude), "side": side, "responses": [{key: record[key] for key in ("comparison_id", "order", "blind", "side", "response")} for record in dose_responses]}),
                 "generation_health": health,
@@ -222,7 +226,7 @@ def _plan(records: dict, dose_plans: list[dict], cases=PREDICTION_CASES) -> list
     """Expand the numbered evaluation and disjoint transfer dose plans."""
     by_case = {plan["case"]["case_id"]: plan for plan in dose_plans}
     return [
-        {"case_id": case.case_id, "target_id": by_case[case.case_id]["target_id"], "magnitude": dose["magnitude"], "side": dose["side"],
+        {"case_id": case.case_id, "target_id": by_case[case.case_id]["target_id"], "magnitude": dose["magnitude"], "side": dose["side"], "multiplier": dose["multiplier"],
          "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
         for case in cases for record in records[case.case_id]
         for dose in by_case[case.case_id]["coefficients"]
@@ -248,7 +252,7 @@ def _validate_final(plan: list[dict], result: dict, *, require_judge_outputs: bo
             raise ValueError("final health records must cover each executable plan item exactly")
 
 
-def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: str, model: dict, judge) -> dict:
+def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: str, model: dict, judge, random_seed: int = 0) -> dict:
     """Persist existing paired judge outputs for every final dose response."""
     source_records = {record.prompt_id: record for case in PREDICTION_CASES for record in records[case.case_id]}
     number_by_prompt = {f"BSV2-{number:03d}": number for number in range(1, 21)}
@@ -258,6 +262,8 @@ def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: st
     }
     rows = []
     for item, answer, health in zip(plan, final["answers"], final["health_records"], strict=True):
+        if item["case_id"] != EVALUATION_CASE.case_id:
+            continue
         source = source_records[item["prompt_id"]]
         rows.append({
             "question_id": source.prompt_id,
@@ -268,7 +274,7 @@ def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: st
             "steered": answer,
             "method": method,
             "magnitude": item["magnitude"],
-            "coefficient": item["magnitude"],
+            "random_seed": random_seed,
             "side": item["side"],
             "generation_health": health,
         })
@@ -378,7 +384,7 @@ def _direct_rows(rows: list[dict] | None, prompts: list[str], baseline: list[str
             "bare": bare,
             "steered": answer,
             "method": "prompting",
-            "coefficient": None,
+            "magnitude": None,
             "side": "+C",
         }
         for row, bare, answer in zip(rows, baseline, answers, strict=True)
@@ -399,6 +405,38 @@ def _direct_judgments(rows: list[dict], *, model: dict, judge) -> dict:
     }
 
 
+def migrate_direct_generation(root: Path, *, model: dict, data: dict, method: str, config: dict, prompts: list[str]) -> bool:
+    if method not in {"bare", "prompting"} or "judge_model" in model:
+        raise ValueError("direct migration requires a generation-only model identity")
+    identity = {"schema": "bsbench-stage-v1", "stage": "generation", "model": model, "data": data, "method": method, "config": config, "prompts_sha256": content_key({"prompts": prompts}), "code_sha256": source_hash()}
+    destination = root / "cache" / "generation" / f"{content_key(identity)}.json"
+    if destination.exists():
+        return True
+    matches = []
+    for path in destination.parent.glob("*.json"):
+        record = json.loads(path.read_text())
+        original = record["identity"]
+        if content_key(original) != path.stem:
+            raise ValueError("direct cache identity hash mismatch")
+        if original["code_sha256"] not in (*UPSTREAM_COMPATIBLE_CODE_SHA256S, identity["code_sha256"]):
+            continue
+        normalized = original | {"model": {key: value for key, value in original["model"].items() if key != "judge_model"}, "code_sha256": identity["code_sha256"]}
+        if normalized == identity:
+            matches.append((path, record))
+    if len(matches) > 1:
+        raise ValueError("ambiguous historical direct generation cache")
+    if not matches:
+        return False
+    path, record = matches[0]
+    result = record["result"]
+    if len(result["answers"]) != len(prompts) or any(not isinstance(answer, str) for answer in result["answers"]):
+        raise ValueError("historical direct generation has invalid cardinality")
+    if [item["question_id"] for item in result["health_records"]] != config["prompt_ids"]:
+        raise ValueError("historical direct health does not match requested prompts")
+    save_json(destination, {"identity": identity, "result": result, "migration": {"source": str(path), "source_file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "result_sha256": content_key(result)}})
+    return True
+
+
 def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, prompts: list[str], backend, prompt_spec: dict, rows: list[dict] | None = None, judge=None) -> dict:
     """Run bare once as the prompting reference; only prompting is paired with a judge."""
     if method not in {"bare", "prompting"}:
@@ -413,11 +451,14 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
             "persona_source": persona_source_identity(),
             "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS),
         }
+    generation_model = {key: value for key, value in model.items() if key != "judge_model"}
+    for direct_method, direct_config in (("bare", bare_config), ("prompting", prompting_config)) if method == "prompting" else (("bare", bare_config),):
+        migrate_direct_generation(root, model=generation_model, data=data, method=direct_method, config=direct_config, prompts=prompts)
     baseline = None
     if method == "prompting":
-        baseline = production_stage(root, ledger, stage="generation", model=model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+        baseline = production_stage(root, ledger, stage="generation", model=generation_model, data=data, method="bare", config=bare_config, prompts=prompts, backend=backend, validate_result=lambda response: len(response.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("bare baseline must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     generation_config = prompting_config if method == "prompting" else bare_config
-    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+    generation = production_stage(root, ledger, stage="generation", model=generation_model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
     identity = {"generation_sha256": content_key({key: value for key, value in generation.items() if key != "reused"})}
     identified_health = generation.get("health_records")
     question_ids = [row["question_id"] for row in rows] if rows is not None else [str(index) for index in range(len(prompts))]
@@ -455,7 +496,7 @@ def run_direct_condition(root: Path, ledger: Path, *, model: dict, data: dict, m
     return result
 
 
-def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None, final_judge=None) -> dict:
+def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, method: str, calibration_prompts: list[str], backend, prompt_spec: dict, candidate_judgments: list[dict] | None, measure, solver, vector_loader, transfer_records: dict | None = None, extraction_identity: dict | None = None, calibration_rows: list[dict] | None = None, judge=None, final_judge=None, random_seed: int = 0) -> dict:
     """Execute the audited vector graph using real target/prediction functions and injected local measurement dependencies."""
     if method in {"bare", "prompting"} or len(calibration_prompts) != 4:
         raise ValueError("vector orchestration requires a vector method and exactly four calibration prompts")
@@ -471,14 +512,14 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         "layers": [7, 11, 15, 19, 23],
         "target_layer": 29,
         "skip_first": 16,
-        "random_seed": 0,
+        "random_seed": random_seed,
         "kl_spec": BENCHMARK_KL_SPEC,
     }
     calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec, "signed_method_spec": signed_method_spec}
     dispatched = False
     def candidate_compute() -> dict:
         nonlocal dispatched
-        reservation = reserve(ledger, f"modal-calibration-candidates-{method}", calibration_config["upper_usd"], limit_usd=50.0)
+        reservation = reserve(ledger, f"modal-calibration-candidates-{method}", calibration_config["upper_usd"], limit_usd=getattr(backend, "ledger_limit_usd", 50.0))
         dispatched = True
         try:
             result = backend.gpu(stage="calibration-candidates", method=method, config=calibration_config, prompts=calibration_prompts)
@@ -527,6 +568,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
                 method=method,
                 model=model,
                 judge=judge,
+                random_seed=random_seed,
             ),
         )
         observed = judgment_outputs["observed"]
@@ -557,7 +599,7 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             target = result.get("target")
             if not isinstance(predictions, list) or not isinstance(target, dict):
                 raise ValueError("remote vector final stage must return target and transfer predictions")
-            if target.get("kl_spec") != BENCHMARK_KL_SPEC or target.get("target_stat") != BENCHMARK_KL_SPEC["target_stat"]:
+            if target.get("kl_spec") != BENCHMARK_KL_SPEC or target.get("target_stat") != BENCHMARK_KL_SPEC["target_stat"] or target.get("source", {}).get("method") != method or target.get("source", {}).get("model") != model["id"]:
                 raise ValueError("remote target does not attest to the benchmark KL specification")
             if any(
                 prediction.get("kl_spec") != BENCHMARK_KL_SPEC
@@ -598,19 +640,21 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     final_judgments = None
     final_judge = judge if final_judge is None else final_judge
     if final_judge is not None:
-        final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=final_judge))
+        final_judgments = _local(root, stage="final-judgments", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs | {"judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}, compute=lambda: _final_judgments(final, executable_plan, records, method=method, model=model, judge=final_judge, random_seed=random_seed))
         final_inputs |= {"final_judgments_sha256": content_key(final_judgments), "judge_model": model["judge_model"], "judge_endpoint": final_judge.endpoint}
     fake_records = [{**item, "response": answer, "fake": True, "non_experimental": True} for item, answer in zip(executable_plan, final["answers"], strict=True)]
-    return {"paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)), "candidate": candidate, "candidate_judgments": judgment_outputs, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final, "final_judgments": final_judgments,
+    return {"random_seed": random_seed, "paid_execution_enabled": bool(getattr(backend, "paid_execution_enabled", False)), "candidate": candidate, "candidate_judgments": judgment_outputs, "candidate_health": health, "candidate_aware": aware, "candidate_blind": blind, "target": target, "transfer_prediction": prediction, "final_stages": stages, "final": final, "final_judgments": final_judgments,
             "final_health": _local(root, stage="final-health", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-health-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["health"]}),
             "final_aware": _local(root, stage="final-aware", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-aware-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["aware"]}),
             "final_blind": _local(root, stage="final-blind", model=model, data=data, method=method, prompts=plan_prompts, config=final_inputs, compute=lambda: {"schema": "bsbench-local-final-blind-v1", "fake": final_judgments is None, "records": fake_records if final_judgments is None else final_judgments["blind"]})}
 
 
-def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, transfer_records: dict | None = None, judge=None, final_judge=None) -> dict:
+def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: str, rows: list[dict], backend, prompt_spec: dict, measure=None, solver=None, vector_loader=None, transfer_records: dict | None = None, judge=None, final_judge=None, random_seed: int = 0) -> dict:
     """Route one named condition through the existing direct or two-step production path."""
     if method not in METHODS:
         raise ValueError(f"unknown benchmark method {method!r}")
+    if type(random_seed) is not int or random_seed not in (RANDOM_SEEDS if method == "random" else (0,)):
+        raise ValueError("random requires seeds 0..4; other methods require seed 0")
     if method in {"bare", "prompting"}:
         return run_direct_condition(
             root,
@@ -648,4 +692,5 @@ def run_condition(root: Path, ledger: Path, *, model: dict, data: dict, method: 
         calibration_rows=calibration_rows,
         judge=judge,
         final_judge=final_judge,
+        random_seed=random_seed,
     )

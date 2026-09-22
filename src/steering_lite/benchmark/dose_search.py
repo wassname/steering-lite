@@ -92,7 +92,7 @@ def classify_boundary(history: list[dict], observed: list[dict], target_rms: flo
 
 
 def _runtime_kwargs(kl_spec: dict, runtime_kwargs: dict) -> dict:
-    statistical = {"T", "do_sample", "seed", "target_stat", "bracket"}
+    statistical = {"T", "do_sample", "seed", "target_stat", "bracket", "sign", "target_kl"}
     if statistical.intersection(runtime_kwargs):
         raise ValueError("runtime KL kwargs cannot override the persisted statistical specification")
     if kl_spec != BENCHMARK_KL_SPEC:
@@ -195,7 +195,7 @@ def final_dose_plan(prediction: dict) -> dict:
         side_doses = [round(magnitude * multiplier, 12) for multiplier in FINAL_DOSE_MULTIPLIERS]
         if len(set(side_doses)) != len(side_doses):
             raise ValueError("final dose plan requires distinct predicted and nearby doses")
-        doses.extend({"side": side, "magnitude": dose} for dose in side_doses)
+        doses.extend({"side": side, "magnitude": dose, "multiplier": multiplier} for dose, multiplier in zip(side_doses, FINAL_DOSE_MULTIPLIERS, strict=True))
     return {"schema": "bsbench-signed-final-dose-plan-v2", "case": prediction["case"], "target_id": prediction["target_id"], "method": prediction["method"], "signed_predictions": signed, "coefficients": doses}
 
 

@@ -16,8 +16,8 @@ from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .cache import cached, estimate_at_reservation_upper, reserve_many, settle
-from .judge import RETRY_NUDGE
+from .cache import cached, estimate_at_reservation_upper, reserve, settle, valid_cost
+from .judge import RETRY_NUDGE, validate_judgment
 from .sweep import JUDGE_INPUT_USD_PER_MTOKEN, JUDGE_OUTPUT_USD_PER_MTOKEN
 
 
@@ -37,7 +37,7 @@ class RunGate:
     def require(self) -> None:
         if not self.explicit_run:
             raise RuntimeError("real backend requires an explicit --run selection")
-        if self.budget_preflight["total_upper_usd"] >= self.budget_preflight["limit_usd"]:
+        if not all(valid_cost(self.budget_preflight[field]) for field in ("total_upper_usd", "limit_usd")) or self.budget_preflight["total_upper_usd"] >= self.budget_preflight["limit_usd"]:
             raise RuntimeError("real backend requires a budget preflight below its limit")
 
 
@@ -50,6 +50,7 @@ class ModalRunMethodAdapter:
     def __init__(self, stage_call: Callable[..., dict], gate: RunGate):
         self._stage_call = stage_call
         self._gate = gate
+        self.ledger_limit_usd = gate.budget_preflight["limit_usd"] - gate.budget_preflight.get("external_committed_usd", 0.0)
 
     def gpu(self, *, stage: str, method: str, config: dict, prompts: list[str]) -> dict:
         self._gate.require()
@@ -106,13 +107,10 @@ def openrouter_request_callback(*, endpoint: str, api_key: str) -> Callable[[dic
                 },
             ) from error
         schema = payload["response_format"]["json_schema"]["schema"]
-        required = set(schema["required"])
-        if set(judgment) != required:
-            raise OpenRouterResponseParseError("judge response does not match the strict requested JSON schema", {"judgment": judgment})
-        expected_types = {"string": str, "number": (int, float), "array": list, "boolean": bool}
-        for name, definition in schema["properties"].items():
-            if not isinstance(judgment[name], expected_types[definition["type"]]):
-                raise OpenRouterResponseParseError("judge response value does not match the strict requested JSON schema", {"field": name, "judgment": judgment})
+        try:
+            validate_judgment(judgment, schema)
+        except ValueError as error:
+            raise OpenRouterResponseParseError(str(error), {"judgment_repr": repr(judgment)}) from error
         if not isinstance(response_body.get("usage"), dict):
             raise OpenRouterResponseParseError("judge response omitted usage metadata", {"response": response_body})
         return judgment | {
@@ -190,36 +188,34 @@ class LocalJudgeAdapter:
             "request": request,
             "judge_model": request["payload"]["model"],
             "judge_endpoint": self.endpoint,
-            "upper_usd": upper_usd,
             "retry_policy": JUDGE_RETRY_POLICY,
         }
 
         def compute() -> dict:
-            reservations = reserve_many(
-                self._ledger,
-                [(f"judge-{evidence_id}-attempt-{attempt}", upper_usd) for attempt in range(1, JUDGE_ATTEMPTS + 1)],
-                limit_usd=50.0,
-            )
+            reservations = []
             failures = []
-            for attempt, reservation in enumerate(reservations, 1):
+            for attempt in range(1, JUDGE_ATTEMPTS + 1):
+                reservation = reserve(self._ledger, f"judge-{evidence_id}-attempt-{attempt}", upper_usd, limit_usd=self._gate.budget_preflight["limit_usd"] - self._gate.budget_preflight.get("external_committed_usd", 0.0))
+                reservations.append(reservation)
                 try:
                     response = self._request_call(_attempt_payload(request, attempt))
+                    try:
+                        validate_judgment({key: value for key, value in response.items() if key not in {"_remote_usage", "_remote_cost_usd"}}, request["payload"]["response_format"]["json_schema"]["schema"])
+                    except ValueError as error:
+                        raise OpenRouterResponseParseError(str(error), {"judgment_repr": repr(response)}) from error
                 except Exception as error:
                     receipt = _attempt_receipt(request, attempt, error)
                     estimate_at_reservation_upper(self._ledger, reservation, receipt)
                     failures.append(receipt)
                     if attempt < JUDGE_ATTEMPTS and _retryable(error):
                         continue
-                    for unused in reservations[attempt:]:
-                        settle(self._ledger, unused, 0.0)
                     raise
                 actual_usd = response.get("_remote_cost_usd")
-                if not isinstance(actual_usd, (int, float)) or actual_usd < 0:
-                    estimate_at_reservation_upper(self._ledger, reservation, {"schema": "bsbench-judge-attempt-missing-cost-v1", "request_key": request["request_key"], "attempt": attempt, "usage": response.get("_remote_usage")})
+                if not valid_cost(actual_usd):
+                    estimate_at_reservation_upper(self._ledger, reservation, {"schema": "bsbench-judge-attempt-missing-cost-v1", "request_key": request["request_key"], "attempt": attempt, "usage_repr": repr(response.get("_remote_usage")), "cost_repr": repr(actual_usd)})
+                    response = {key: value for key, value in response.items() if key not in {"_remote_usage", "_remote_cost_usd"}}
                 else:
                     settle(self._ledger, reservation, float(actual_usd))
-                for unused in reservations[attempt:]:
-                    settle(self._ledger, unused, 0.0)
                 return {
                     "request": request,
                     "response": response,
@@ -231,7 +227,9 @@ class LocalJudgeAdapter:
                 }
             raise RuntimeError("judge request exhausted attempts")
 
-        return cached(self._root / "cache", "judge-request", identity, compute)["response"]
+        response = cached(self._root / "cache", "judge-request", identity, compute)["response"]
+        validate_judgment({key: value for key, value in response.items() if key not in {"_remote_usage", "_remote_cost_usd"}}, request["payload"]["response_format"]["json_schema"]["schema"])
+        return response
 
     def complete(self, requests: list[dict]) -> list[dict]:
         self._gate.require()
