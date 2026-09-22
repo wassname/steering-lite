@@ -9,13 +9,11 @@ Implementation: PI/OpenAI.
 from dataclasses import dataclass
 
 import torch
-from einops import einsum, rearrange
-from loguru import logger
-
+from einops import einsum
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks
 from .kv_cache_gram import DynamicCache, DynamicLayer, KVCacheGram, SteeredDynamicCache, _require_dynamic_cache
-from .vjp_delta import _activations, _encode, _target_mean, _unit_direction, _valid_mask, orient_vjp_delta
+from .vjp_delta import _activations, _encode, _target_mean, _unit_direction, _valid_mask
 
 _CacheBase = DynamicCache if DynamicCache is not None else object
 
@@ -81,36 +79,24 @@ def _cache_gradients(model, tok, prompts, layers, target_layer, cotangent, skip_
             target, sources,
             grad_outputs=cotangent.detach().to(target)[None, None, :] * valid[:, :, None],
         )
-    return dict(zip(layers, gradients, strict=True)), valid, {layer: value.detach() for layer, value in cache.sources.items()}
+    return dict(zip(layers, gradients, strict=True)), valid
 
 
 def _class_mean_cache_vjp(model, tok, prompts, layers, target_layer, cotangent, batch_size, max_length, skip_first):
-    gradient_totals, activation_totals = {}, {}
+    gradient_totals = {}
     for start in range(0, len(prompts), batch_size):
         batch = prompts[start:start + batch_size]
-        gradients, valid, activations = _cache_gradients(
+        gradients, valid = _cache_gradients(
             model, tok, batch, layers, target_layer, cotangent, skip_first, max_length,
         )
         counts = valid.sum(dim=1).float()
         for layer, gradient in gradients.items():
             per_prompt = einsum(gradient.float(), valid.float(), "b h s d, b s -> b h d") / counts[:, None, None]
-            rows = torch.arange(len(batch), device=valid.device)
-            source_bshd = rearrange(activations[layer], "b h s d -> b s h d")
-            quartiles = []
-            for quantile in (0.25, 0.5, 0.75, 1.0):
-                positions = skip_first + ((counts - 1) * quantile).long()
-                quartiles.append(source_bshd[rows, positions].float())
-            activation_sum = torch.stack(quartiles).mean(0).sum(0)
             if start == 0:
                 gradient_totals[layer] = per_prompt.sum(0)
-                activation_totals[layer] = activation_sum
             else:
                 gradient_totals[layer] += per_prompt.sum(0)
-                activation_totals[layer] += activation_sum
-    return (
-        {layer: total / len(prompts) for layer, total in gradient_totals.items()},
-        {layer: total / len(prompts) for layer, total in activation_totals.items()},
-    )
+    return {layer: total / len(prompts) for layer, total in gradient_totals.items()}
 
 
 @register
@@ -131,17 +117,10 @@ class VjpCache:
         if not pos_prompts or len(pos_prompts) != len(neg_prompts):
             raise ValueError("VJP-cache requires nonempty paired positive/negative prompts")
         cotangent = _target_mean(model, tok, pos_prompts, target, batch_size, max_length) - _target_mean(model, tok, neg_prompts, target, batch_size, max_length)
-        positive, positive_values = _class_mean_cache_vjp(model, tok, pos_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
-        negative, negative_values = _class_mean_cache_vjp(model, tok, neg_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
+        positive = _class_mean_cache_vjp(model, tok, pos_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
+        negative = _class_mean_cache_vjp(model, tok, neg_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
         shapes = {layer: positive[layer].shape for layer in layers}
         directions = {layer: _unit_direction((positive[layer] - negative[layer]).flatten()) for layer in layers}
-        axes = {layer: (positive_values[layer] - negative_values[layer]).flatten() for layer in layers}
-        for axis in axes.values():
-            _unit_direction(axis)
-        directions, cosines, score, flipped = orient_vjp_delta(directions, axes)
-        if not torch.isfinite(torch.tensor(score)):
-            raise ValueError("nonfinite VJP-cache orientation score")
-        logger.info("VJP-cache global activation orientation score={} flipped={} cosines={}; heuristic, not behavioral validation", score, flipped, cosines)
         return {
             layer: {"shared": {}, "stacked": {"c": direction.reshape(shapes[layer]).unsqueeze(0)}}
             for layer, direction in directions.items()

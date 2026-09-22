@@ -23,6 +23,7 @@ from steering_lite.variants.kv_cache_gram import (
 )
 from steering_lite.variants.vjp_cache import ValueGradientCache, _cache_gradients
 from steering_lite.variants.vjp_delta import _activations, _encode, _target_mean
+import steering_lite.variants.vjp_delta as vjp_delta_module
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 METHODS = [
@@ -395,7 +396,7 @@ def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
         "activation hook must not create a gradient path on its own"
 
     cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
-    gradients, _valid, sources = _cache_gradients(
+    gradients, _valid = _cache_gradients(
         model, tok, prompt, layers, target_layer, cotangent, 0, 64,
     )
     for layer in layers:
@@ -467,11 +468,9 @@ def test_vjp_cache_two_source_real_storage_hybrid_exclusion(tiny_model):
     )
 
     cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
-    gradients, _valid, sources = _cache_gradients(
+    gradients, _valid = _cache_gradients(
         model, tok, prompt, layers, target_layer, cotangent, 0, 64,
     )
-    assert set(sources) == set(layers), \
-        "non-selected recurrent layers must not become cache sources"
     for layer in layers:
         g = gradients[layer].float()
         assert tuple(g.shape) == expected_shape, \
@@ -494,6 +493,41 @@ def test_vjp_cache_two_source_real_storage_hybrid_exclusion(tiny_model):
         # recurrent (linear-attention) layers are excluded from the source set
         assert type(cache.layers[2]) is not DynamicLayer
         assert 2 not in cache.sources and 4 not in cache.sources
+
+
+def test_vjp_class_mean_matches_direct_pinned_estimator_fixture(monkeypatch):
+    gradients = iter((
+        ({1: torch.tensor([[[1.0, 10.0], [3.0, 30.0], [99.0, 99.0]], [[2.0, 20.0], [4.0, 40.0], [6.0, 60.0]]])}, torch.tensor([[True, True, False], [True, True, True]])),
+        ({1: torch.tensor([[[5.0, 50.0], [7.0, 70.0], [99.0, 99.0]]])}, torch.tensor([[True, True, False]])),
+    ))
+    monkeypatch.setattr(vjp_delta_module, "_batch_gradients", lambda *_args, **_kwargs: next(gradients))
+
+    actual = vjp_delta_module._class_mean_vjp(
+        object(), object(), ["a", "b", "c"], (1,), 3, torch.zeros(2), 2, 8, 1,
+    )[1]
+    per_prompt = torch.stack((
+        torch.tensor([2.0, 20.0]),
+        torch.tensor([4.0, 40.0]),
+        torch.tensor([6.0, 60.0]),
+    ))
+    torch.testing.assert_close(actual, per_prompt.mean(0))
+
+
+def test_vjp_delta_matches_pinned_difference_normalization_without_sign_flip(monkeypatch):
+    """Numerical fixture for vendored vjp.py: normalize(mean_pos - mean_neg) exactly."""
+    class FrozenModel:
+        def requires_grad_(self, _enabled):
+            return self
+
+    target_means = iter((torch.tensor([2.0, 0.0]), torch.tensor([0.0, 0.0])))
+    class_means = iter(({1: torch.tensor([1.0, 2.0])}, {1: torch.tensor([3.0, 1.0])}))
+    monkeypatch.setattr(vjp_delta_module, "_blocks", lambda _model: [None] * 4)
+    monkeypatch.setattr(vjp_delta_module, "_target_mean", lambda *_args, **_kwargs: next(target_means))
+    monkeypatch.setattr(vjp_delta_module, "_class_mean_vjp", lambda *_args, **_kwargs: next(class_means))
+
+    vector = vjp_delta_module.vjp_delta(FrozenModel(), object(), ["positive"], ["negative"], (1,), target_layer=3, skip_first=16)
+    expected = torch.tensor([-2.0, 1.0]) / torch.tensor([-2.0, 1.0]).norm()
+    torch.testing.assert_close(vector.stacked[1]["v"][0], expected)
 
 
 def test_vjp_registration_and_config_roundtrip():

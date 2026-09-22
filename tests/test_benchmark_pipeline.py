@@ -9,7 +9,14 @@ from transformers import BatchEncoding, LlamaConfig, LlamaForCausalLM
 
 from steering_lite.benchmark.cache import cached_stage, reserve, settle
 from steering_lite.benchmark.generation import DEV_SIZE, read_dev_cohort
-from steering_lite.benchmark.pipeline import METHODS, run_method
+from steering_lite.benchmark.pipeline import METHODS, method_config, run_method
+
+
+def test_vjp_benchmark_configs_pin_target_and_skip():
+    for method in ("vjp_delta", "vjp_cache"):
+        config = method_config(method, layers=(7, 11, 15, 19, 23), target_layer=29)
+        assert config.layers == (7, 11, 15, 19, 23)
+        assert config.target_layer == 29 and config.skip_first == 16
 
 
 class TinyTokenizer:

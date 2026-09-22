@@ -268,7 +268,7 @@ def final_stages(
     for prediction in transfer_predictions:
         if not isinstance(prediction, dict):
             raise ValueError("final stages require transfer prediction records")
-        if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+        if prediction.get("schema") != "bsbench-signed-rms-kl-transfer-v2":
             raise ValueError("final stages require RMS-KL transfer prediction records")
         if prediction.get("method") != method:
             raise ValueError("final stages require transfer predictions for the requested method")
@@ -279,12 +279,11 @@ def final_stages(
         if not isinstance(target_id, str) or not target_id:
             raise ValueError("final stages require a transfer target ID")
         target_ids.add(target_id)
-        try:
-            coefficient = float(prediction["predicted_coefficient"])
-        except (KeyError, TypeError, ValueError) as error:
-            raise ValueError("final stages require a numeric predicted coefficient") from error
-        if not math.isfinite(coefficient) or coefficient == 0.0:
-            raise ValueError("final stages require a finite non-zero predicted coefficient")
+        signed_predictions = prediction.get("signed_predictions")
+        if not isinstance(signed_predictions, list) or len(signed_predictions) != 2 or {item.get("side") for item in signed_predictions} != {"+C", "-C"}:
+            raise ValueError("final stages require one prediction for each side")
+        if any(not math.isfinite(float(item.get("magnitude", 0))) or float(item.get("magnitude", 0)) <= 0 for item in signed_predictions):
+            raise ValueError("final stages require finite positive signed magnitudes")
     if len(target_ids) != 1:
         raise ValueError("final stages require one common transfer target ID")
     ordered_observed = sorted(observed, key=content_key)
@@ -306,7 +305,10 @@ def final_stages(
         "method": method,
         "vector_sha256": vector_sha256,
         "observed_sha256": content_key({"observed": ordered_observed}),
-        "candidate_coefficients": sorted(row["coefficient"] for row in ordered_observed),
+        "signed_candidate_doses": sorted(
+            ({"magnitude": float(row["magnitude"]), "side": row["side"]} for row in ordered_observed),
+            key=lambda row: (row["magnitude"], row["side"]),
+        ),
         "final_dose_plans": ordered_plans,
         "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
         "case_prompt_hashes": prompt_hashes,

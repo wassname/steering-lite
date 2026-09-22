@@ -33,24 +33,26 @@ class FakeModalRunMethod:
                 ]
             return result
         if stage == "calibration-candidates":
-            coefficients = [0.2, 0.4]
+            magnitudes = [0.2, 0.4]
             return {
                 "actual_usd": 0.0,
                 "vector_bytes": f"{method}-vector".encode(),
                 "baseline_answers": [f"base {index}." for index in range(len(prompts))],
-                "candidate_coefficients": coefficients,
+                "candidate_magnitudes": magnitudes,
                 "candidate_health": {
-                    str(coefficient): {"reasons": [], "source": "fake-health"}
-                    for coefficient in coefficients
+                    f"{float(magnitude)}:{side}": {"reasons": [], "source": "fake-health"}
+                    for magnitude in magnitudes for side in ("+C", "-C")
                 },
                 "candidate_items": [
                     {
-                        "coefficient": coefficient,
+                        "magnitude": magnitude,
+                        "side": side,
                         "prompt_index": index,
                         "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(),
                         "response": f"candidate response {index}.",
                     }
-                    for coefficient in coefficients
+                    for magnitude in magnitudes
+                    for side in ("+C", "-C")
                     for index, prompt in enumerate(prompts)
                 ],
                 "method_config": {"method": method},
@@ -65,7 +67,7 @@ class FakeModalRunMethod:
                     for item in config["executable_generation_plan"]
                 },
                 "health_records": [
-                    {"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": [], "source": "fake-final-health"}
+                    {"case_id": item["case_id"], "prompt_id": item["prompt_id"], "magnitude": item["magnitude"], "side": item["side"], "reasons": [], "source": "fake-final-health"}
                     for item in config["executable_generation_plan"]
                 ],
                 "answers": ["final answer." for _ in config["executable_generation_plan"]],
@@ -115,10 +117,12 @@ def _adapters():
     }
 
     def measure(vector, *_args, **_kwargs):
-        return {"kl_rms": vector.cfg.coeff + 0.5, **health}
+        return {"kl_rms": abs(vector.cfg.coeff) + 0.5, "n_pos": 4, **health}
 
-    def solver(_vector, _model, _tokenizer, prompts, **_kwargs):
-        return 0.3 + len(prompts) / 100, [{"coeff": 0.3, "kl_rms": 0.9}]
+    def solver(_vector, _model, _tokenizer, prompts, **kwargs):
+        magnitude = 0.3 + len(prompts) / 100
+        coefficient = kwargs["sign"] * magnitude
+        return coefficient, [{"coeff": coefficient, "kl_rms": 0.9}]
 
     return measure, solver, lambda _artifact: SimpleNamespace(cfg=SimpleNamespace(coeff=0.0))
 
@@ -155,12 +159,12 @@ def test_fake_adapter_routes_all_methods_parses_existing_judgments_and_reuses(tm
         assert result["candidate_health"]["fake"] is False
         assert result["candidate_aware"]["fake"] is False
         assert result["candidate_blind"]["fake"] is False
-        assert result["target"]["observed_boundary"]["generation_health"]["reasons"] == []
-        assert result["target"]["observed_boundary"]["generation_health"]["source"] == "fake-health"
-        assert len(result["final"]["answers"]) == 84
+        assert all(row["generation_health"]["reasons"] == [] for row in result["target"]["observed_boundary"]["sides"].values())
+        assert all(row["generation_health"]["source"] == "fake-health" for row in result["target"]["observed_boundary"]["sides"].values())
+        assert len(result["final"]["answers"]) == 168
         assert result["final_health"]["fake"] is False
-        assert len(result["final_aware"]["records"]) == 336
-        assert len(result["final_blind"]["records"]) == 168
+        assert len(result["final_aware"]["records"]) == 672
+        assert len(result["final_blind"]["records"]) == 336
         assert all(not record["blind"] for record in result["candidate_aware"]["records"])
         assert all(record["blind"] for record in result["candidate_blind"]["records"])
         assert all(not record["blind"] for record in result["final_aware"]["records"])
@@ -219,7 +223,7 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
                     "target_rms": 1.0,
                     "bracket": (0.01, 2.0),
                     "predicted_coefficient": 0.3,
-                    "search_history": [{"coeff": 0.3, "kl_rms": 1.0}],
+                    "signed_predictions": [{"side": "+C", "magnitude": 0.3, "search_history": [{"coeff": 0.3, "kl_rms": 1.0}]}, {"side": "-C", "magnitude": 0.35, "search_history": [{"coeff": -0.35, "kl_rms": 1.0}]}],
                 }
                 for case in PREDICTION_CASES
             ]
@@ -227,8 +231,8 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
             records = {"bsbench-v2-evaluation": load_evaluation_records()} | load_transfer_records()
             by_case = {plan["case"]["case_id"]: plan for plan in plans}
             plan = [
-                {"case_id": case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
-                for case in PREDICTION_CASES for record in records[case.case_id] for coefficient in by_case[case.case_id]["coefficients"]
+                {"case_id": case.case_id, "target_id": target["target_id"], "magnitude": dose["magnitude"], "side": dose["side"], "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
+                for case in PREDICTION_CASES for record in records[case.case_id] for dose in by_case[case.case_id]["coefficients"]
             ]
             return {
                 "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 1.0}},
@@ -238,7 +242,7 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
                 "executable_generation_plan": plan,
                 "baseline_answers": {item["prompt_id"]: "baseline." for item in plan},
                 "answers": ["answer." for _ in plan],
-                "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []} for item in plan],
+                "health_records": [{"case_id": item["case_id"], "prompt_id": item["prompt_id"], "magnitude": item["magnitude"], "side": item["side"], "reasons": []} for item in plan],
                 "plan_sha256": __import__("steering_lite.benchmark.cache", fromlist=["content_key"]).content_key({"plan": plan}),
             }
 
@@ -261,7 +265,7 @@ def test_remote_vector_final_binding_uses_portable_bytes_and_no_local_measuremen
     assert [stage for stage, *_ in modal.calls] == ["calibration-candidates", "final-generation"]
     assert result["target"]["target_id"] == "remote-target"
     assert len(result["transfer_prediction"]["predictions"]) == 5
-    assert len(result["final"]["answers"]) == 84
+    assert len(result["final"]["answers"]) == 168
     events = [json.loads(line)["event"] for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
     assert events == ["reserved", "settled", "reserved", "estimated_at_reservation_upper"]
 
@@ -349,14 +353,15 @@ def test_positive_directed_effect_with_high_damage_is_not_useful():
     candidate = {
         "vector_sha256": "candidate-vector",
         "baseline_answers": ["base." for _ in rows],
-        "candidate_coefficients": [0.2],
-        "candidate_health": {"0.2": {"reasons": []}},
+        "candidate_magnitudes": [0.2],
+        "candidate_health": {f"0.2:{side}": {"reasons": []} for side in ("+C", "-C")},
         "candidate_items": [
-            {"coefficient": 0.2, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(row["prompt"].encode()).hexdigest(), "response": "steered."}
-            for index, row in enumerate(rows)
+            {"magnitude": 0.2, "side": side, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(row["prompt"].encode()).hexdigest(), "response": "steered."}
+            for side in ("+C", "-C") for index, row in enumerate(rows)
         ],
     }
-    observation, = _candidate_judgments(candidate, rows, method="vjp_cache", model={"judge_model": "fake"}, judge=HighDamageJudge())["observed"]
+    observations = _candidate_judgments(candidate, rows, method="vjp_cache", model={"judge_model": "fake"}, judge=HighDamageJudge())["observed"]
+    observation = next(row for row in observations if row["side"] == "+C")
     assert observation["directed_effect"] == 1.0
     assert observation["off_target_effect"] == 5.0
     assert observation["dose_score"] == -19.0
@@ -600,6 +605,28 @@ def test_judge_stage_fails_after_three_retryable_attempts(tmp_path):
     rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
     assert [row["event"] for row in rows] == ["reserved", "reserved", "reserved", "estimated_at_reservation_upper", "estimated_at_reservation_upper", "estimated_at_reservation_upper"]
     assert not (tmp_path / "cache" / "judge-request").exists() or not list((tmp_path / "cache" / "judge-request").glob("*.json"))
+
+
+def test_duplicate_payloads_with_distinct_comparisons_get_distinct_attempt_evidence(tmp_path):
+    def call(_payload):
+        return {"summary": "ok", "changes": [], "_remote_usage": {"cost": 0.0}, "_remote_cost_usd": 0.0}
+
+    _, judge = real_adapters(
+        modal_stage_call=lambda **_kwargs: pytest.fail("Modal must not run"),
+        judge_request_call=call,
+        judge_endpoint="https://example.invalid",
+        explicit_run=True,
+        budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
+        root=tmp_path,
+        ledger=tmp_path / "ledger.jsonl",
+    )
+    requests = [_judge_request("same-payload", blind=True) | {"comparison_id": comparison} for comparison in ("dose-a", "dose-b")]
+    judge.complete(requests)
+    rows = [json.loads(line) for line in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    reservations = [row for row in rows if row["event"] == "reserved"]
+    assert len(reservations) == len({row["id"] for row in reservations}) == 6
+    cached = [json.loads(path.read_text()) for path in (tmp_path / "cache" / "judge-request").glob("*.json")]
+    assert len({record["identity"]["evidence_id"] for record in cached}) == 2
 
 
 def test_judge_concurrency_is_six_and_result_order_is_stable(tmp_path):

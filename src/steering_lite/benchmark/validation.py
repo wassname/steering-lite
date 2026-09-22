@@ -31,7 +31,7 @@ def validate_persona_examples(examples: list[dict]) -> list[dict]:
 
 def comparison_id(row: dict) -> str:
     """Opaque identity for one question, method, dose and steering side."""
-    identity = [row["question_id"], row.get("method"), row.get("coefficient"), row["side"]]
+    identity = [row["question_id"], row.get("method"), row.get("magnitude"), row["side"], row.get("random_seed", 0)]
     return hashlib.sha256(json.dumps(identity, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()[:16]
 
 

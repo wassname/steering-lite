@@ -21,8 +21,8 @@ class FakeBackend:
         self.calls.append(stage)
         self.configs.append(config)
         if stage == "calibration-candidates":
-            coefficients = [0.2, 0.4]
-            return {"actual_usd": 0.0, "vector_bytes": b"durable-test-vector", "candidate_coefficients": coefficients, "candidate_items": [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"answer-{coefficient}-{index}"} for coefficient in coefficients for index, prompt in enumerate(prompts)], "method_config": {"method": method}}
+            magnitudes = [0.2, 0.4]
+            return {"actual_usd": 0.0, "vector_bytes": b"durable-test-vector", "candidate_magnitudes": magnitudes, "candidate_items": [{"magnitude": magnitude, "side": side, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": f"answer-{side}-{magnitude}-{index}"} for magnitude in magnitudes for side in ("+C", "-C") for index, prompt in enumerate(prompts)], "method_config": {"method": method, "layers": [7, 11, 15, 19, 23], "seed": 0, "target_layer": 29, "skip_first": 16}}
         if stage == "final-generation":
             artifact = config["vector_artifact"]
             assert "backend_path" not in artifact
@@ -35,14 +35,16 @@ def inputs(backend):
     rows = read_dev_cohort()
     prompts = [next(row["prompt"] for row in rows if row["question_id"] == prompt_id) for prompt_id in CALIBRATION_CASE.prompt_ids]
     health = {"rep": 0.0, "gen_len": 1, "steer_tail": "fake", "per_t_mean": [0.0], "per_t_p90": [0.0], "per_t_p95": [0.0], "per_t_max": [0.0], "per_t_n": [1]}
-    observed = [{"coefficient": coefficient, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": f"fake-{coefficient}", "generation_health": {"reasons": []}} for coefficient in (0.2, 0.4)]
+    observed = [{"magnitude": magnitude, "coefficient": magnitude, "side": side, "provenance": f"fake-{magnitude}-{side}", "generation_health": {"reasons": []}} for magnitude in (0.2, 0.4) for side in ("+C", "-C")]
     measured, solved = [], []
     def measure(vector, *_args, **_kwargs):
         measured.append(vector.cfg.coeff)
-        return {"kl_rms": vector.cfg.coeff + 0.5, **health}
-    def solver(_vector, _model, _tokenizer, case_prompts, **_kwargs):
+        return {"kl_rms": abs(vector.cfg.coeff) + 0.5, "n_pos": 4, **health}
+    def solver(_vector, _model, _tokenizer, case_prompts, **kwargs):
         solved.append(tuple(case_prompts))
-        return round(0.3 + len(solved) / 100, 2), [{"coeff": 0.3, "kl_rms": 0.9}]
+        magnitude = round(0.3 + ((len(solved) + 1) // 2) / 100, 2)
+        coefficient = kwargs["sign"] * magnitude
+        return coefficient, [{"coeff": coefficient, "kl_rms": 0.9}]
     return dict(model={"id": "fake"}, data=cohort_identity(rows), method="vjp_cache", calibration_prompts=prompts, backend=backend, prompt_spec={"max_new_tokens": 8}, candidate_judgments=observed, measure=measure, solver=solver, vector_loader=lambda _artifact: SimpleNamespace(cfg=SimpleNamespace(coeff=0.0))), measured, solved
 
 
@@ -50,12 +52,12 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     backend = FakeBackend(); kwargs, measured, solved = inputs(backend)
     first = run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     assert backend.calls == ["calibration-candidates", "final-generation"]
-    assert measured == [0.4] and len(solved) == 5
-    assert [item["predicted_coefficient"] for item in first["transfer_prediction"]["predictions"]] == [0.31, 0.32, 0.33, 0.34, 0.35]
-    assert len(first["final"]["answers"]) == len(first["final_aware"]["records"]) == 84
+    assert measured == [0.4, -0.4] and len(solved) == 10
+    assert [item["signed_predictions"][0]["magnitude"] for item in first["transfer_prediction"]["predictions"]] == [0.31, 0.32, 0.33, 0.34, 0.35]
+    assert len(first["final"]["answers"]) == len(first["final_aware"]["records"]) == 168
     assert all(row["fake"] and row["non_experimental"] and row["response"] for row in first["final_blind"]["records"])
     canonical = {plan["case"]["case_id"]: plan["coefficients"] for plan in first["final_stages"][0]["config"]["final_dose_plans"]}
-    assert {case_id: [row["coefficient"] for row in first["final_aware"]["records"] if row["case_id"] == case_id][:3] for case_id in canonical} == canonical
+    assert {case_id: [{"side": row["side"], "magnitude": row["magnitude"]} for row in first["final_aware"]["records"] if row["case_id"] == case_id][:6] for case_id in canonical} == canonical
     artifact = tmp_path / first["candidate"]["vector_artifact"]["path"]
     assert artifact.is_file() and first["candidate"]["vector_sha256"] == first["candidate"]["vector_artifact"]["sha256"]
     run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
@@ -68,6 +70,35 @@ def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_p
     assert __import__("base64").b64decode(final_dispatch_config["vector_artifact"]["vector_bytes_b64"]) == artifact.read_bytes()
 
 
+def test_wrong_signed_method_config_fails_before_settlement(tmp_path: Path):
+    class WrongConfig(FakeBackend):
+        def gpu(self, **kwargs):
+            result = super().gpu(**kwargs)
+            if kwargs["stage"] == "calibration-candidates":
+                result["method_config"] = result["method_config"] | {"layers": [3]}
+            return result
+
+    backend = WrongConfig(); kwargs, _, _ = inputs(backend); ledger = tmp_path / "ledger.jsonl"
+    with pytest.raises(ValueError, match="method_config"):
+        run_live_two_step(tmp_path, ledger, **kwargs)
+    assert backend.calls == ["calibration-candidates"]
+    assert not any('"event": "settled"' in line for line in ledger.read_text().splitlines())
+
+
+def test_old_compatible_one_sided_candidate_cache_is_not_reused(tmp_path: Path):
+    backend = FakeBackend(); kwargs, _, _ = inputs(backend); ledger = tmp_path / "ledger.jsonl"
+    run_live_two_step(tmp_path, ledger, **kwargs)
+    cache_path, = (tmp_path / "cache" / "calibration-candidates").glob("*.json")
+    record = json.loads(cache_path.read_text())
+    old_identity = record["identity"] | {"code_sha256": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88"}
+    old_result = record["result"] | {"candidate_items": [item for item in record["result"]["candidate_items"] if item["side"] == "+C"]}
+    cache_path.unlink()
+    old_path = cache_path.parent / f"{__import__('hashlib').sha256(json.dumps(old_identity, sort_keys=True, allow_nan=False).encode()).hexdigest()}.json"
+    old_path.write_text(json.dumps({"identity": old_identity, "result": old_result}))
+    run_live_two_step(tmp_path, ledger, **kwargs)
+    assert backend.calls.count("calibration-candidates") == 2
+
+
 def test_candidate_item_coverage_and_observation_coefficients_fail_before_target(tmp_path: Path):
     class BrokenCandidate(FakeBackend):
         def gpu(self, **kwargs):
@@ -76,7 +107,7 @@ def test_candidate_item_coverage_and_observation_coefficients_fail_before_target
                 result["candidate_items"] = result["candidate_items"][:-1]
             return result
     backend = BrokenCandidate(); kwargs, _, _ = inputs(backend)
-    with pytest.raises(ValueError, match="cover exactly"):
+    with pytest.raises(ValueError, match="cover every"):
         run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     assert backend.calls == ["calibration-candidates"]
 
@@ -89,7 +120,7 @@ def test_candidate_item_missing_or_extra_fails_before_settlement(tmp_path: Path,
             if kwargs["stage"] == "calibration-candidates": result["candidate_items"] = mutation(result["candidate_items"])
             return result
     backend = BrokenCandidate(); kwargs, _, _ = inputs(backend)
-    with pytest.raises(ValueError, match="cover exactly"):
+    with pytest.raises(ValueError, match="cover every"):
         run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     assert backend.calls == ["calibration-candidates"]
     assert not any('"event": "settled"' in line for line in (tmp_path / "ledger.jsonl").read_text().splitlines())
@@ -114,12 +145,12 @@ def test_over_limit_candidate_doses_fail_before_settlement(tmp_path: Path):
         def gpu(self, **kwargs):
             result = super().gpu(**kwargs)
             if kwargs["stage"] == "calibration-candidates":
-                coefficients = [round(0.01 * number, 2) for number in range(1, CANDIDATE_DOSE_UPPER + 2)]
-                result["candidate_coefficients"] = coefficients
-                result["candidate_items"] = [{"coefficient": coefficient, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": "answer"} for coefficient in coefficients for index, prompt in enumerate(kwargs["prompts"])]
+                magnitudes = [round(0.01 * number, 2) for number in range(1, CANDIDATE_DOSE_UPPER + 2)]
+                result["candidate_magnitudes"] = magnitudes
+                result["candidate_items"] = [{"magnitude": magnitude, "side": side, "prompt_index": index, "prompt_sha256": __import__("hashlib").sha256(prompt.encode()).hexdigest(), "response": "answer"} for magnitude in magnitudes for side in ("+C", "-C") for index, prompt in enumerate(kwargs["prompts"])]
             return result
     backend = TooManyDoses(); kwargs, _, _ = inputs(backend); ledger = tmp_path / "ledger.jsonl"
-    with pytest.raises(ValueError, match="unique candidate coefficients"):
+    with pytest.raises(ValueError, match="unique positive candidate magnitudes"):
         run_live_two_step(tmp_path, ledger, **kwargs)
     assert backend.calls == ["calibration-candidates"]
     assert not any('"event": "settled"' in line for line in ledger.read_text().splitlines())
@@ -129,7 +160,7 @@ def test_missing_or_corrupt_vector_fails_before_final_dispatch(tmp_path: Path):
     backend = FakeBackend(); kwargs, _, _ = inputs(backend)
     with pytest.raises(ValueError, match="explicit candidate"):
         run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **(kwargs | {"candidate_judgments": None}))
-    with pytest.raises(ValueError, match="coefficient set"):
+    with pytest.raises(ValueError, match="magnitude/side cells"):
         run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **(kwargs | {"candidate_judgments": [kwargs["candidate_judgments"][0]]}))
     result = run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
     (tmp_path / result["candidate"]["vector_artifact"]["path"]).unlink()
@@ -142,7 +173,7 @@ def test_missing_or_corrupt_vector_fails_before_final_dispatch(tmp_path: Path):
 def test_invalidation_boundaries(tmp_path: Path):
     backend = FakeBackend(); kwargs, _, _ = inputs(backend); ledger = tmp_path / "ledger.jsonl"
     run_live_two_step(tmp_path, ledger, **kwargs)
-    changed_judgments = [kwargs["candidate_judgments"][0], {**kwargs["candidate_judgments"][1], "useful": False, "provenance": "changed"}]
+    changed_judgments = [{**row, "provenance": "changed"} if index == 1 else row for index, row in enumerate(kwargs["candidate_judgments"])]
     run_live_two_step(tmp_path, ledger, **(kwargs | {"candidate_judgments": changed_judgments}))
     assert backend.calls == ["calibration-candidates", "final-generation", "final-generation"]
     records = load_transfer_records()

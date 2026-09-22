@@ -3,9 +3,8 @@
 c = mean(h_target_positive) - mean(h_target_negative)
 v_layer = mean_positive(J.T @ c) - mean_negative(J.T @ c)
 
-One global sign aligns v with the source activation contrast. Because swapping
-both classes leaves the raw difference unchanged, this orientation is a heuristic,
-not behavioral validation. Source: https://github.com/wassname/vjp-steering
+This follows the pinned estimator directly; direction signs are not reoriented by
+an activation-cosine heuristic. Source: https://github.com/wassname/vjp-steering
 Adapted to steering-lite registration by PI/OpenAI.
 """
 
@@ -14,8 +13,6 @@ from dataclasses import dataclass
 
 import torch
 from jaxtyping import Bool, Float, Int
-from loguru import logger
-
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks as _blocks
 from ..vector import Vector
@@ -27,17 +24,6 @@ class VjpDeltaC(SteeringConfig):
     method: str = "vjp_delta"
     target_layer: int | None = None
     skip_first: int = 16
-
-
-def orient_vjp_delta(directions, activation_axis):
-    cosines = {
-        layer: torch.nn.functional.cosine_similarity(direction.float().cpu(), activation_axis[layer].float().cpu(), dim=0).item()
-        for layer, direction in directions.items()
-    }
-    score = sum(cosines.values()) / len(cosines)
-    if score == 0:
-        raise ValueError("VJP difference has zero activation-orientation score")
-    return ({layer: -v for layer, v in directions.items()} if score < 0 else directions), cosines, score, score < 0
 
 
 def _unit_direction(direction: torch.Tensor) -> torch.Tensor:
@@ -54,8 +40,6 @@ def _activations(
     model,
     layers: tuple[int, ...],
     graph_root: int | None = None,
-    source_readout: str | None = None,
-    target_layer: int | None = None,
 ):
     found = {}
     handles = []
@@ -72,9 +56,7 @@ def _activations(
         return record
 
     for layer in layers:
-        block = _blocks(model)[layer]
-        module = block if source_readout is None or layer == target_layer else block.get_submodule(source_readout)
-        handles.append(module.register_forward_hook(hook(layer)))
+        handles.append(_blocks(model)[layer].register_forward_hook(hook(layer)))
     try:
         yield found
     finally:
@@ -90,7 +72,6 @@ def _encode(model, tokenizer, prompts: list[str], max_length: int):
         truncation=True,
         max_length=max_length,
         padding_side="right",
-        add_special_tokens=False,
     ).to(next(model.parameters()).device)
 
 
@@ -104,19 +85,6 @@ def _valid_mask(
         & (positions[None, :] < real_length - 1)
         & attention_mask.bool()
     )
-
-
-def _target_mask(
-    attention_mask: Int[torch.Tensor, "b s"], skip_first: int, target_scope: str
-) -> Bool[torch.Tensor, "b s"]:
-    if target_scope == "all_valid":
-        return _valid_mask(attention_mask, skip_first)
-    if target_scope == "last_token":
-        mask = torch.zeros_like(attention_mask, dtype=torch.bool)
-        rows = torch.arange(attention_mask.shape[0], device=attention_mask.device)
-        mask[rows, attention_mask.sum(dim=1) - 1] = True
-        return mask
-    raise ValueError(f"unknown target_scope={target_scope!r}")
 
 
 @torch.no_grad()
@@ -150,37 +118,19 @@ def _batch_gradients(
     cotangent: Float[torch.Tensor, " d"],
     skip_first: int,
     max_length: int,
-    source_readout: str | None = None,
-    target_scope: str = "all_valid",
-) -> tuple[
-    dict[int, Float[torch.Tensor, "b s d"]],
-    Bool[torch.Tensor, "b s"],
-    dict[int, Float[torch.Tensor, "b s d"]],
-]:
+) -> tuple[dict[int, Float[torch.Tensor, "b s d"]], Bool[torch.Tensor, "b s"]]:
     encoded = _encode(model, tokenizer, prompts, max_length)
     valid = _valid_mask(encoded["attention_mask"], skip_first)
-    target_valid = _target_mask(encoded["attention_mask"], skip_first, target_scope)
     if valid.sum(dim=1).min() == 0:
         raise ValueError(f"a prompt has no valid positions after skip_first={skip_first}")
 
-    with _activations(
-        model,
-        (*layers, target_layer),
-        graph_root=min(layers),
-        source_readout=source_readout,
-        target_layer=target_layer,
-    ) as found:
+    with _activations(model, (*layers, target_layer), graph_root=min(layers)) as found:
         with torch.enable_grad():
             model(**encoded)
             target = found[target_layer]
             expanded = cotangent.detach().to(target).view(1, 1, -1)
-            gradients = torch.autograd.grad(
-                target,
-                [found[layer] for layer in layers],
-                grad_outputs=expanded * target_valid.unsqueeze(-1),
-            )
-            activations = {layer: found[layer].detach() for layer in layers}
-    return dict(zip(layers, gradients, strict=True)), valid, activations
+            gradients = torch.autograd.grad(target, [found[layer] for layer in layers], grad_outputs=expanded * valid.unsqueeze(-1))
+    return dict(zip(layers, gradients, strict=True)), valid
 
 
 def _class_mean_vjp(
@@ -193,12 +143,11 @@ def _class_mean_vjp(
     batch_size: int,
     max_length: int,
     skip_first: int,
-) -> tuple[dict[int, torch.Tensor], dict[int, torch.Tensor]]:
+) -> dict[int, torch.Tensor]:
     totals = {layer: torch.zeros_like(cotangent, dtype=torch.float32) for layer in layers}
-    activation_totals = {layer: torch.zeros_like(cotangent, dtype=torch.float32) for layer in layers}
     for start in range(0, len(prompts), batch_size):
         batch = prompts[start : start + batch_size]
-        gradients, valid, activations = _batch_gradients(
+        gradients, valid = _batch_gradients(
             model,
             tokenizer,
             batch,
@@ -212,14 +161,7 @@ def _class_mean_vjp(
         for layer, gradient in gradients.items():
             per_prompt = (gradient.float() * valid.unsqueeze(-1)).sum(dim=1) / counts
             totals[layer] += per_prompt.sum(0)
-            rows = torch.arange(len(batch), device=valid.device)
-            for quantile in (0.25, 0.5, 0.75, 1.0):
-                positions = skip_first + ((valid.sum(1) - 1).float() * quantile).long()
-                activation_totals[layer] += activations[layer][rows, positions].float().sum(0)
-    return (
-        {layer: total / len(prompts) for layer, total in totals.items()},
-        {layer: total / (4 * len(prompts)) for layer, total in activation_totals.items()},
-    )
+    return {layer: total / len(prompts) for layer, total in totals.items()}
 
 
 def vjp_delta(
@@ -250,7 +192,7 @@ def vjp_delta(
     ) - _target_mean(
         model, tokenizer, negative_prompts, target_layer, batch_size, max_length
     )
-    positive, positive_activations = _class_mean_vjp(
+    positive = _class_mean_vjp(
         model,
         tokenizer,
         positive_prompts,
@@ -261,7 +203,7 @@ def vjp_delta(
         max_length,
         skip_first,
     )
-    negative, negative_activations = _class_mean_vjp(
+    negative = _class_mean_vjp(
         model,
         tokenizer,
         negative_prompts,
@@ -274,13 +216,6 @@ def vjp_delta(
     )
     directions = {layer: positive[layer] - negative[layer] for layer in layers}
     directions = {layer: _unit_direction(direction) for layer, direction in directions.items()}
-    activation_axis = {layer: positive_activations[layer] - negative_activations[layer] for layer in layers}
-    for axis in activation_axis.values():
-        _unit_direction(axis)
-    directions, cosines, score, flipped = orient_vjp_delta(directions, activation_axis)
-    if not torch.isfinite(torch.tensor(score)):
-        raise ValueError("nonfinite VJP-delta orientation score")
-    logger.info("VJP-delta global activation orientation score={} flipped={} cosines={}; heuristic, not behavioral validation", score, flipped, cosines)
     stacked = {layer: {"v": direction.unsqueeze(0)} for layer, direction in directions.items()}
     config = VjpDeltaC(
         layers=layers,

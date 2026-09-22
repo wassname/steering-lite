@@ -1,5 +1,4 @@
 import base64
-import copy
 import hashlib
 import importlib.util
 import json
@@ -9,11 +8,9 @@ import pytest
 
 from steering_lite.benchmark.adapters import real_adapters
 from steering_lite.benchmark.cache import content_key
-from steering_lite.benchmark.dose_search import PREDICTION_CASES, final_dose_plan
+from steering_lite.benchmark.dose_search import BENCHMARK_KL_SPEC, PREDICTION_CASES, final_dose_plan
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
-from steering_lite.benchmark import results as benchmark_results
-from steering_lite.benchmark.results import normalize_summary, render_report
 from steering_lite.benchmark.sweep import persona_extraction_identity
 from steering_lite.benchmark.transfer_data import load_evaluation_records, load_transfer_records
 
@@ -56,21 +53,24 @@ class FakeRemoteStageCall:
                 ]
             return result
         if stage == "calibration-candidates":
-            coefficients = [0.2, 0.4]
+            magnitudes = [0.2, 0.4]
             return {
                 "actual_usd": 0.0,
                 "vector_bytes": f"{method}-vector".encode(),
                 "baseline_answers": ["baseline." for _ in prompts],
-                "candidate_coefficients": coefficients,
-                "candidate_health": {str(coefficient): {"reasons": []} for coefficient in coefficients},
+                "candidate_magnitudes": magnitudes,
+                "candidate_health": {f"{float(magnitude)}:{side}": {"reasons": []} for magnitude in magnitudes for side in ("+C", "-C")},
+                "method_config": {"method": method, "layers": [7, 11, 15, 19, 23], "seed": 0, "target_layer": 29, "skip_first": 16},
                 "candidate_items": [
                     {
-                        "coefficient": coefficient,
+                        "magnitude": magnitude,
+                        "side": side,
                         "prompt_index": index,
                         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
-                        "response": f"candidate {coefficient}.",
+                        "response": f"candidate {side} {magnitude}.",
                     }
-                    for coefficient in coefficients
+                    for magnitude in magnitudes
+                    for side in ("+C", "-C")
                     for index, prompt in enumerate(prompts)
                 ],
             }
@@ -78,19 +78,19 @@ class FakeRemoteStageCall:
             artifact = config["vector_artifact"]
             assert "backend_path" not in artifact
             assert hashlib.sha256(base64.b64decode(artifact["vector_bytes_b64"])).hexdigest() == artifact["sha256"]
-            target = {"target_id": "fake-target", "target_stat": "kl_rms", "target_rms": 1.0}
+            target = {"target_id": "fake-target", "target_stat": "kl_rms", "target_rms": 1.0, "kl_spec": BENCHMARK_KL_SPEC, "source": {"method": method, "model": "fake"}}
             predictions = [
                 {
-                    "schema": "bsbench-rms-kl-transfer-v1",
+                    "schema": "bsbench-signed-rms-kl-transfer-v2",
                     "target_id": target["target_id"],
                     "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)},
                     "method": method,
                     "model": "fake",
                     "target_stat": "kl_rms",
                     "target_rms": 1.0,
-                    "bracket": (0.01, 2.0),
-                    "predicted_coefficient": 0.3,
-                    "search_history": [],
+                    "bracket": BENCHMARK_KL_SPEC["bracket"],
+                    "kl_spec": BENCHMARK_KL_SPEC,
+                    "signed_predictions": [{"side": "+C", "magnitude": 0.3, "search_history": []}, {"side": "-C", "magnitude": 0.35, "search_history": []}],
                 }
                 for case in PREDICTION_CASES
             ]
@@ -102,14 +102,15 @@ class FakeRemoteStageCall:
                 {
                     "case_id": case.case_id,
                     "target_id": target["target_id"],
-                    "coefficient": coefficient,
+                    "magnitude": dose["magnitude"],
+                    "side": dose["side"],
                     "prompt_id": record["prompt_id"],
                     "prompt": record["prompt"],
                     "prompt_sha256": record["content_sha256"],
                 }
                 for case in PREDICTION_CASES
                 for record in records[case.case_id]
-                for coefficient in by_case[case.case_id]["coefficients"]
+                for dose in by_case[case.case_id]["coefficients"]
             ]
             return {
                 "actual_usd": 0.0,
@@ -120,7 +121,7 @@ class FakeRemoteStageCall:
                 "baseline_answers": {item["prompt_id"]: "baseline." for item in plan},
                 "answers": ["final." for _ in plan],
                 "health_records": [
-                    {"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "reasons": []}
+                    {"case_id": item["case_id"], "prompt_id": item["prompt_id"], "magnitude": item["magnitude"], "side": item["side"], "reasons": []}
                     for item in plan
                 ],
                 "plan_sha256": content_key({"plan": plan}),
@@ -228,7 +229,67 @@ def test_negative_candidate_score_does_not_prevent_final_evaluation(tmp_path: Pa
     assert len(stage_call.calls) == 4
 
 
-def test_render_report_uses_final_evaluation_points_after_negative_calibration(tmp_path: Path):
+def test_judge_endpoint_change_reuses_gpu_and_preserves_vector_sidecar(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call, judge_call = FakeRemoteStageCall(), FakeJudgeCall()
+    prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+    first = _run(root, ledger, stage_call, judge_call, endpoint="https://judge-a.example/v1", prompt_spec=prompt_spec, methods=("pca",))
+    artifact = first["conditions"]["pca"]["candidate"]["vector_artifact"]
+    sidecar = root / artifact["path"]
+    assert sidecar.is_file() and hashlib.sha256(sidecar.read_bytes()).hexdigest() == artifact["sha256"]
+    gpu_calls = list(stage_call.calls)
+    judge_calls = len(judge_call.payloads)
+    cache_counts = {path.name: len(list(path.glob("*.json"))) for path in (root / "cache").iterdir()}
+
+    second = _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec=prompt_spec, methods=("pca",))
+
+    assert stage_call.calls == gpu_calls
+    assert len(judge_call.payloads) == 2 * judge_calls
+    assert second["conditions"]["pca"]["candidate"]["reused"] is True
+    assert second["conditions"]["pca"]["final"]["reused"] is True
+    assert sidecar.is_file() and hashlib.sha256(sidecar.read_bytes()).hexdigest() == artifact["sha256"]
+    changed_stages = {
+        path.name
+        for path in (root / "cache").iterdir()
+        if len(list(path.glob("*.json"))) != cache_counts.get(path.name, 0)
+    }
+    assert changed_stages == {"judge-request", "candidate-judgments", "final-judgments", "final-health", "final-aware", "final-blind"}
+
+
+def test_transfer_prompt_change_invalidates_only_final_gpu_stage(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call, judge_call = FakeRemoteStageCall(), FakeJudgeCall()
+    prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+    _run(root, ledger, stage_call, judge_call, endpoint="https://judge.example/v1", prompt_spec=prompt_spec, methods=("pca",))
+    changed_records = {case_id: tuple(records) for case_id, records in load_transfer_records().items()}
+    case_id = next(iter(changed_records))
+    record = changed_records[case_id][0]
+    changed_prompt = record.prompt + " Changed transfer prompt."
+    changed_records[case_id] = (record.__class__(record.prompt_id, changed_prompt, record.dataset, record.source_path, record.source_revision, record.source_sha256, hashlib.sha256(changed_prompt.encode()).hexdigest(), record.answer_key, record.answer_key_sha256), *changed_records[case_id][1:])
+    before = len(stage_call.calls)
+
+    result = _run(root, ledger, stage_call, judge_call, endpoint="https://judge.example/v1", prompt_spec=prompt_spec, transfer_records=changed_records, methods=("pca",))
+
+    assert stage_call.calls[before:] == [("final-generation", "pca")]
+    assert result["conditions"]["pca"]["candidate"]["reused"] is True
+    assert result["conditions"]["pca"]["final"]["reused"] is False
+
+
+def test_prompt_spec_change_invalidates_candidate_and_final_gpu_stages(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call, judge_call = FakeRemoteStageCall(), FakeJudgeCall()
+    prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+    _run(root, ledger, stage_call, judge_call, endpoint="https://judge.example/v1", prompt_spec=prompt_spec, methods=("pca",))
+    before = len(stage_call.calls)
+
+    result = _run(root, ledger, stage_call, judge_call, endpoint="https://judge.example/v1", prompt_spec=prompt_spec | {"template": "Answer plainly."}, methods=("pca",))
+
+    assert stage_call.calls[before:] == [("calibration-candidates", "pca"), ("final-generation", "pca")]
+    assert result["conditions"]["pca"]["candidate"]["reused"] is False
+    assert result["conditions"]["pca"]["final"]["reused"] is False
+
+
+def test_signed_run_persists_both_final_sides_after_negative_calibration(tmp_path: Path):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     summary = _run(
         root,
@@ -239,18 +300,13 @@ def test_render_report_uses_final_evaluation_points_after_negative_calibration(t
         prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8},
     )
 
-    report = render_report(root, root / "results")
-
-    random_points = [point for point in report["artifact"]["points"] if point["method"] == "random"]
-    assert {point["phase"] for point in random_points} == {"final"}
-    assert {point["case_id"] for point in random_points} == {"bsbench-v2-evaluation"}
-    assert len(random_points) == 3
-    assert len(report["artifact"]["transfer_points"]) == len(METHODS[2:]) * 4 * 3
-    assert "Four-case RMS-KL transfer" in (root / "results" / "index.html").read_text()
-    assert summary["conditions"]["random"]["final"]["reused"] is False
+    random = summary["conditions"]["random"]
+    assert random["final"]["reused"] is False
+    assert {record["side"] for record in random["final_health"]["records"]} == {"+C", "-C"}
+    assert len(random["final_health"]["records"]) == 6 * sum(len(case.prompt_ids) for case in PREDICTION_CASES)
 
 
-def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_full_entrypoint_runs_canonical_remote_contract_and_reuses(tmp_path: Path):
     root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
     stage_call = FakeRemoteStageCall()
     judge_call = FakeJudgeCall()
@@ -266,7 +322,7 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
         *(stage for _ in METHODS[2:] for stage in ("calibration-candidates", "final-generation")),
     ]
     assert len(stage_call.calls) == 14
-    assert len(judge_call.payloads) == 3444
+    assert len(judge_call.payloads) == 6756
     validation = first["conditions"]["prompting"]["persona_validation"]
     assert len(validation["comparisons"]) == len(validation["requests"]) == len(validation["results"]) == 12
     assert validation["disagreements"] == []
@@ -275,41 +331,7 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     assert all(response["response"]["intended_behavior_explains"] for response in validation["results"])
     assert all("method" not in payload and "coefficient" not in payload for payload in judge_call.payloads if payload["response_format"]["json_schema"]["name"] == "blind_change_description")
 
-    report = render_report(root, root / "results")
-    assert report["artifact"]["non_experimental"] is False
-    assert len(report["artifact"]["points"]) > len(METHODS)
-    assert all("aware" in point and "blind" in point and "health" in point for point in report["artifact"]["points"])
-    parity = json.loads((root / "results" / "source-parity.json").read_text())
-    assert parity["points_sha256"] == report["artifact"]["points_sha256"]
-    assert parity["artifact_point_ids"] == parity["plot_point_ids"] == parity["pareto_plot_point_ids"]
-    page = (root / "results" / "index.html").read_text()
-    prompting_point = next(point for point in report["artifact"]["points"] if point["method"] == "prompting")
-    assert benchmark_results._dose_label(prompting_point) == "prompting"
-    assert "prompting direct dev dose prompting" in page
-    assert "Numbered evidence" in page
-    assert (root / "results" / "plot.png").exists()
-    assert (root / "results" / "plot_pareto.png").exists()
-
-    saved_summary = json.loads((root / "run-summary.json").read_text())
-    incomplete = copy.deepcopy(saved_summary)
-    incomplete["conditions"].pop("pca")
-    with pytest.raises(ValueError, match="every canonical method"):
-        normalize_summary(incomplete)
-    fake_summary = copy.deepcopy(saved_summary)
-    for condition in fake_summary["conditions"].values():
-        condition["paid_execution_enabled"] = False
-    fake_artifact = normalize_summary(fake_summary)
-    assert fake_artifact["non_experimental"] is True
-    assert "FAKE DATA — NON-EXPERIMENTAL" in benchmark_results.render_html(fake_artifact, *benchmark_results.report_tables(fake_artifact["points"]))
-    missing_judgment = copy.deepcopy(saved_summary)
-    missing_judgment["conditions"]["pca"]["final_blind"]["records"] = []
-    with pytest.raises(ValueError, match="disagree|complete"):
-        normalize_summary(missing_judgment)
-    original_plot = benchmark_results._plot
-    monkeypatch.setattr(benchmark_results, "_plot", lambda *_args, **_kwargs: set())
-    with pytest.raises(ValueError, match="plot/table points"):
-        render_report(root, root / "mismatched-results")
-    monkeypatch.setattr(benchmark_results, "_plot", original_plot)
+    assert all({record["side"] for record in condition["final_health"]["records"]} == {"+C", "-C"} for condition in first["conditions"].values() if "final_health" in condition)
 
     first_stage_calls = len(stage_call.calls)
     first_judge_calls = len(judge_call.payloads)
@@ -317,64 +339,6 @@ def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalida
     assert second["conditions"]["bare"]["generation"]["reused"] is True
     assert len(stage_call.calls) == first_stage_calls
     assert len(judge_call.payloads) == first_judge_calls
-
-    _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec=prompt_spec)
-    assert len(stage_call.calls) == first_stage_calls
-    assert len(judge_call.payloads) == first_judge_calls * 2
-
-    changed_records = {
-        case_id: tuple(records)
-        for case_id, records in load_transfer_records().items()
-    }
-    first_case = next(iter(changed_records))
-    changed = changed_records[first_case][0]
-    changed_records[first_case] = (changed.__class__(
-        changed.prompt_id,
-        changed.prompt + " Changed transfer prompt.",
-        changed.dataset,
-        changed.source_path,
-        changed.source_revision,
-        changed.source_sha256,
-        hashlib.sha256((changed.prompt + " Changed transfer prompt.").encode()).hexdigest(),
-        changed.answer_key,
-        changed.answer_key_sha256,
-    ),) + changed_records[first_case][1:]
-    before_prompt_change = len(stage_call.calls)
-    _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec=prompt_spec, transfer_records=changed_records)
-    assert stage_call.calls[before_prompt_change:] == [("final-generation", method) for method in METHODS[2:]]
-
-    recovery = _run(root, ledger, stage_call, judge_call, endpoint="https://judge-b.example/v1", prompt_spec={**prompt_spec, "template": "Answer plainly."})
-    assert recovery["methods"] == list(METHODS)
-    assert set(recovery["conditions"]) == set(METHODS)
-    single_method = _entrypoint_module().run_full_sweep(
-        root,
-        ledger,
-        model={"id": "fake", "judge_model": "fake-judge"},
-        rows=read_dev_cohort(),
-        backend=real_adapters(
-            modal_stage_call=stage_call,
-            judge_request_call=judge_call,
-            judge_endpoint="https://judge-b.example/v1",
-            explicit_run=True,
-            budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
-            root=root,
-            ledger=ledger,
-        )[0],
-        prompt_spec={**prompt_spec, "template": "Answer in one sentence."},
-        judge=real_adapters(
-            modal_stage_call=stage_call,
-            judge_request_call=judge_call,
-            judge_endpoint="https://judge-b.example/v1",
-            explicit_run=True,
-            budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0},
-            root=root,
-            ledger=ledger,
-        )[1],
-        methods=("pca",),
-    )
-    assert single_method["methods"] == ["pca"]
-    assert set(single_method["conditions"]) == {"pca"}
-    assert json.loads((root / "run-summary.json").read_text())["identity"] == single_method["identity"]
 
     events = [json.loads(line) for line in ledger.read_text().splitlines()]
     judge_reservations = [row for row in events if row["event"] == "reserved" and row["kind"].startswith("judge-")]

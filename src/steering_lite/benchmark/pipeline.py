@@ -22,8 +22,8 @@ def method_config(method: str, *, layers: tuple[int, ...], target_layer: int, se
         "mean_diff": sl.MeanDiffC(**common),
         "pca": sl.PCAC(**common),
         "kv_cache_gram": sl.KVCacheGramC(**common, r=2),
-        "vjp_delta": sl.VjpDeltaC(**common, target_layer=target_layer, skip_first=0),
-        "vjp_cache": sl.VjpCacheC(**common, target_layer=target_layer, skip_first=0),
+        "vjp_delta": sl.VjpDeltaC(**common, target_layer=target_layer, skip_first=16),
+        "vjp_cache": sl.VjpCacheC(**common, target_layer=target_layer, skip_first=16),
     }
     if method not in configs:
         raise ValueError(f"{method!r} has no steering config")

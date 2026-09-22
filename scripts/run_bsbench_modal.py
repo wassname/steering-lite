@@ -57,46 +57,39 @@ def canonical_prompt_ids(tokenizer, prompts: list[str], prompt_spec: dict, *, pe
 
 
 def _layers(model) -> tuple[tuple[int, ...], int]:
-    full_attention = [index for index, kind in enumerate(model.config.layer_types) if kind == "full_attention"]
-    if not full_attention:
-        raise ValueError("Qwen3.5 model has no full-attention source layer")
-    source_layer = full_attention[0]
-    target_layer = source_layer + 1
-    if target_layer >= len(model.config.layer_types):
-        raise ValueError("Qwen3.5 source layer has no following target layer")
-    return (source_layer,), target_layer
+    layers = (7, 11, 15, 19, 23)
+    target_layer = 29
+    layer_types = model.config.layer_types
+    if len(layer_types) != 32 or target_layer != len(layer_types) - 3 or any(layer_types[layer] != "full_attention" for layer in layers):
+        raise ValueError("Qwen3.5 model does not match the pinned full-attention layer contract")
+    return layers, target_layer
 
 
 def _candidate_policy(vector, model, tokenizer, prompts: list[str], *, prompt_sha256s: list[str], limit: int, max_new_tokens: int, generate, health) -> tuple[list[float], list[dict], dict, dict]:
-    """Double one dose at a time; stop on the first health failure or the policy limit."""
+    """Double positive magnitudes and generate both explicit sides at every step."""
     if len(prompts) != len(prompt_sha256s):
         raise ValueError("candidate source hashes must match serialized calibration prompts")
-    coefficients: list[float] = []
+    magnitudes: list[float] = []
     items: list[dict] = []
-    health_by_coefficient: dict[str, dict] = {}
+    health_by_dose: dict[str, dict] = {}
     history: list[dict] = []
-    coefficient = 0.1
+    magnitude = 0.1
     for iteration in range(limit):
-        with vector(model, C=coefficient):
-            answers = generate(model, tokenizer, prompts, 1, max_new_tokens)
-        metrics, reasons = health(tokenizer, answers)
-        record = {"iteration": iteration + 1, "coefficient": coefficient, "metrics": metrics, "reasons": reasons}
-        history.append(record)
-        health_by_coefficient[str(float(coefficient))] = record
-        coefficients.append(coefficient)
-        items.extend(
-            {
-                "coefficient": coefficient,
-                "prompt_index": index,
-                "prompt_sha256": prompt_sha256s[index],
-                "response": answer,
-            }
-            for index, (prompt, answer) in enumerate(zip(prompts, answers, strict=True))
-        )
-        if reasons:
-            return coefficients, items, health_by_coefficient, {"schema": "bsbench-successive-health-bracket-v1", "limit": limit, "history": history, "termination": "coherence_failure"}
-        coefficient *= 2
-    return coefficients, items, health_by_coefficient, {"schema": "bsbench-successive-health-bracket-v1", "limit": limit, "history": history, "termination": "search_limit"}
+        magnitudes.append(magnitude)
+        failed = False
+        for side, sign in (("+C", 1.0), ("-C", -1.0)):
+            with vector(model, C=sign * magnitude):
+                answers = generate(model, tokenizer, prompts, 1, max_new_tokens)
+            metrics, reasons = health(tokenizer, answers)
+            record = {"iteration": iteration + 1, "magnitude": magnitude, "side": side, "metrics": metrics, "reasons": reasons}
+            history.append(record)
+            health_by_dose[f"{float(magnitude)}:{side}"] = record
+            items.extend({"magnitude": magnitude, "side": side, "prompt_index": index, "prompt_sha256": prompt_sha256s[index], "response": answer} for index, answer in enumerate(answers))
+            failed |= bool(reasons)
+        if failed:
+            return magnitudes, items, health_by_dose, {"schema": "bsbench-signed-successive-health-bracket-v2", "limit": limit, "history": history, "termination": "coherence_failure"}
+        magnitude *= 2
+    return magnitudes, items, health_by_dose, {"schema": "bsbench-signed-successive-health-bracket-v2", "limit": limit, "history": history, "termination": "search_limit"}
 
 
 @app.function(gpu="A10G", image=image, volumes={"/cache": cache}, timeout=MODAL_GPU_STAGE_TIMEOUT_SECONDS)
@@ -183,7 +176,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             tokenizer,
             pos_prompts,
             neg_prompts,
-            method_config(method, layers=layers, target_layer=target_layer, seed=identity["seed"]),
+            method_config(method, layers=layers, target_layer=target_layer, seed=config["signed_method_spec"]["random_seed"]),
             batch_size=1,
             max_length=64,
         )
@@ -192,7 +185,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         calibration_prompts = canonical_prompt_texts(tokenizer, prompts, config["prompt_spec"])
         calibration_prompt_sha256s = [hashlib.sha256(prompt.encode()).hexdigest() for prompt in prompts]
         baseline_answers = generate(model, tokenizer, calibration_prompts, 1, config["prompt_spec"]["max_new_tokens"])
-        coefficients, candidate_items, candidate_health, search_history = _candidate_policy(
+        magnitudes, candidate_items, candidate_health, search_history = _candidate_policy(
             vector,
             model,
             tokenizer,
@@ -208,7 +201,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             "cost_receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": time.monotonic() - started, "persona_actual_pairs": len(pos_prompts)}},
             "vector_bytes": vector_path.read_bytes(),
             "baseline_answers": baseline_answers,
-            "candidate_coefficients": coefficients,
+            "candidate_magnitudes": magnitudes,
             "candidate_items": candidate_items,
             "candidate_health": candidate_health,
             "candidate_search": search_history,
@@ -226,7 +219,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         transfer_predictions = None
         final_dose_plans = None
         if config.get("schema") == "bsbench-remote-vector-final-v1":
-            from steering_lite.benchmark.dose_search import CALIBRATION_CASE, PREDICTION_CASES, final_dose_plan, fit_target, predict_transfer
+            from steering_lite.benchmark.dose_search import BENCHMARK_KL_SPEC, CALIBRATION_CASE, PREDICTION_CASES, final_dose_plan, fit_target, predict_transfer
             from steering_lite.benchmark.transfer_data import PromptRecord
 
             records = {
@@ -242,6 +235,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                 config["observed"],
                 method=method,
                 model_id=model_id,
+                kl_spec=BENCHMARK_KL_SPEC,
                 measure_kwargs={},
             )
             transfer_predictions = [
@@ -252,7 +246,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                     canonical_prompt_ids(tokenizer, [record.prompt for record in records[case.case_id]], config["prompt_spec"]),
                     target,
                     case,
-                    bracket=(0.01, 2.0),
+                    kl_spec=BENCHMARK_KL_SPEC,
                     solver_kwargs={},
                 )
                 for case in PREDICTION_CASES
@@ -263,14 +257,15 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
                 {
                     "case_id": case.case_id,
                     "target_id": plans_by_case[case.case_id]["target_id"],
-                    "coefficient": coefficient,
+                    "magnitude": dose["magnitude"],
+                    "side": dose["side"],
                     "prompt_id": record.prompt_id,
                     "prompt": record.prompt,
                     "prompt_sha256": record.content_sha256,
                 }
                 for case in PREDICTION_CASES
                 for record in records[case.case_id]
-                for coefficient in plans_by_case[case.case_id]["coefficients"]
+                for dose in plans_by_case[case.case_id]["coefficients"]
             ]
         else:
             plan = config["executable_generation_plan"]
@@ -279,11 +274,12 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
         answers = []
         health_records = []
         for item in plan:
-            with vector(model, C=item["coefficient"]):
+            coefficient = item["magnitude"] if item["side"] == "+C" else -item["magnitude"]
+            with vector(model, C=coefficient):
                 answer = generate(model, tokenizer, canonical_prompt_texts(tokenizer, [item["prompt"]], config["prompt_spec"]), 1, config["prompt_spec"]["max_new_tokens"])[0]
             metrics, reasons = health(tokenizer, [answer])
             answers.append(answer)
-            health_records.append({"case_id": item["case_id"], "prompt_id": item["prompt_id"], "coefficient": item["coefficient"], "metrics": metrics, "reasons": reasons})
+            health_records.append({"case_id": item["case_id"], "prompt_id": item["prompt_id"], "magnitude": item["magnitude"], "side": item["side"], "metrics": metrics, "reasons": reasons})
         cache.commit()
         from steering_lite.benchmark.cache import content_key
         result = {

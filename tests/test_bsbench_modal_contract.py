@@ -76,10 +76,19 @@ def test_canonical_prompt_serializer_keeps_generation_and_kl_inputs_equivalent(m
     assert tokenizer.token_calls == [(generated[0], {"add_special_tokens": False, "return_tensors": "pt"})]
 
 
+def test_pinned_qwen_layers(modal_script):
+    model = type("Model", (), {"config": type("Config", (), {"layer_types": ["linear_attention"] * 32})()})()
+    for layer in (7, 11, 15, 19, 23):
+        model.config.layer_types[layer] = "full_attention"
+    assert modal_script._layers(model) == ((7, 11, 15, 19, 23), 29)
+
+
 def test_candidate_policy_records_coherence_failure_or_search_limit(modal_script):
+    coefficients_seen = []
     class Vector:
         @contextmanager
         def __call__(self, _model, *, C):
+            coefficients_seen.append(C)
             yield C
 
     def generate(_model, _tokenizer, prompts, _batch_size, _max_new_tokens):
@@ -92,15 +101,16 @@ def test_candidate_policy_records_coherence_failure_or_search_limit(modal_script
         generate=generate, health=lambda _tokenizer, _answers: ({"answers": 2}, []),
     )
     assert coefficients == [0.1, 0.2]
-    assert len(items) == 4 and {item["prompt_sha256"] for item in items} == set(source_hashes) and set(health) == {"0.1", "0.2"}
+    assert len(items) == 8 and {item["prompt_sha256"] for item in items} == set(source_hashes) and set(health) == {"0.1:+C", "0.1:-C", "0.2:+C", "0.2:-C"}
+    assert coefficients_seen == [0.1, -0.1, 0.2, -0.2]
     assert _candidate_items(coefficients, source_prompts, items) == items
-    assert search["termination"] == "search_limit" and len(search["history"]) == 2
+    assert search["termination"] == "search_limit" and len(search["history"]) == 4
 
     _, _, _, failed = modal_script._candidate_policy(
         Vector(), object(), object(), ["serialized one"], prompt_sha256s=["raw-one"], limit=2, max_new_tokens=8,
         generate=generate, health=lambda _tokenizer, _answers: ({"answers": 1}, ["repetition"]),
     )
-    assert failed["termination"] == "coherence_failure" and len(failed["history"]) == 1
+    assert failed["termination"] == "coherence_failure" and len(failed["history"]) == 2
 
     with pytest.raises(ValueError, match="source hashes"):
         modal_script._candidate_policy(

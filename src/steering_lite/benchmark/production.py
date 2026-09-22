@@ -4,9 +4,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 from .cache import cached_stage, content_key, estimate_at_reservation_upper, mark_unresolved, reserve, settle
-from .dose_search import CALIBRATION_CASE, EVALUATION_CASE, PREDICTION_CASES, fit_target, predict_transfer
+from .dose_search import BENCHMARK_KL_SPEC, CALIBRATION_CASE, EVALUATION_CASE, PREDICTION_CASES, fit_target, predict_transfer
 from .sweep import CANDIDATE_DOSE_UPPER, MODAL_GPU_STAGE_UPPER_USD, PERSONA_VALIDATION_PROMPT_IDS, case_identity, final_stages, persona_extraction_identity
 from .pipeline import METHODS
 from .transfer_data import load_evaluation_records, load_transfer_records, transfer_provenance, transfer_records_identity
@@ -52,6 +53,8 @@ def production_stage(root: Path, ledger: Path, *, stage: str, model: dict, data:
         return result | {"reservation": reservation}
 
     result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
+    if validate_result:
+        validate_result(result)
     return result | {"reused": not dispatched}
 
 
@@ -102,28 +105,47 @@ def _local(root: Path, *, stage: str, model: dict, data: dict, method: str, prom
     return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
 
 
-def _candidate_items(coefficients: list[float], prompts: list[str], items: list[dict]) -> list[dict]:
-    """Require one executable candidate response for every coefficient/prompt pair."""
-    required = {"coefficient", "prompt_index", "prompt_sha256", "response"}
-    expected = {(float(coefficient), index, hashlib.sha256(prompt.encode()).hexdigest()) for coefficient in coefficients for index, prompt in enumerate(prompts)}
+def _candidate_magnitudes(value) -> list[float]:
+    if not isinstance(value, list) or not value or len(value) > CANDIDATE_DOSE_UPPER:
+        raise ValueError(f"calibration backend must return 1..{CANDIDATE_DOSE_UPPER} unique positive candidate magnitudes")
+    magnitudes = [float(item) for item in value]
+    if len(set(magnitudes)) != len(magnitudes) or any(not math.isfinite(item) or item <= 0 for item in magnitudes):
+        raise ValueError(f"calibration backend must return 1..{CANDIDATE_DOSE_UPPER} unique positive candidate magnitudes")
+    return magnitudes
+
+
+def _validate_method_config(method: str, config: dict, spec: dict) -> None:
+    expected = {"method": method, "layers": spec["layers"], "seed": spec["random_seed"]}
+    if method in {"vjp_delta", "vjp_cache"}:
+        expected |= {"target_layer": spec["target_layer"], "skip_first": spec["skip_first"]}
+    if not isinstance(config, dict) or any(config.get(key) != value for key, value in expected.items()):
+        raise ValueError("calibration backend method_config does not attest to the signed method specification")
+
+
+def _candidate_items(magnitudes: list[float], prompts: list[str], items: list[dict]) -> list[dict]:
+    """Require one executable response for every positive-magnitude/side/prompt cell."""
+    required = {"magnitude", "side", "prompt_index", "prompt_sha256", "response"}
+    expected = {(float(magnitude), side, index, hashlib.sha256(prompt.encode()).hexdigest()) for magnitude in magnitudes for side in ("+C", "-C") for index, prompt in enumerate(prompts)}
     actual = set()
     for item in items:
         if not required.issubset(item) or not isinstance(item["response"], str):
-            raise ValueError("candidate items require coefficient, prompt index/hash and response")
-        actual.add((float(item["coefficient"]), item["prompt_index"], item["prompt_sha256"]))
+            raise ValueError("candidate items require magnitude, side, prompt index/hash and response")
+        actual.add((float(item["magnitude"]), item["side"], item["prompt_index"], item["prompt_sha256"]))
     if actual != expected or len(items) != len(expected):
-        raise ValueError("candidate items must cover exactly every coefficient and calibration prompt once")
+        raise ValueError("candidate items must cover every magnitude, side and calibration prompt exactly once")
     return items
 
 
-def _require_observed(rows: list[dict] | None, coefficients: list[float]) -> list[dict]:
+def _require_observed(rows: list[dict] | None, magnitudes: list[float]) -> list[dict]:
     if not rows:
         raise ValueError("explicit candidate observations are required before target fitting")
-    required = {"coefficient", "provenance", "generation_health"}
+    required = {"magnitude", "side", "provenance", "generation_health"}
     if any(not required.issubset(row) for row in rows):
-        raise ValueError("candidate observations require coefficient, provenance and generation_health")
-    if {float(row["coefficient"]) for row in rows} != {float(coefficient) for coefficient in coefficients}:
-        raise ValueError("observed coefficient set must exactly match candidate coefficients")
+        raise ValueError("candidate observations require magnitude, side, provenance and generation_health")
+    expected = {(float(magnitude), side) for magnitude in magnitudes for side in ("+C", "-C")}
+    actual = {(float(row["magnitude"]), row["side"]) for row in rows}
+    if actual != expected or len(rows) != len(expected):
+        raise ValueError("observed magnitude/side cells must exactly match candidate magnitudes")
     return rows
 
 
@@ -145,25 +167,23 @@ def _candidate_judgments(
 
     rows = []
     items_by_key = {
-        (float(item["coefficient"]), item["prompt_index"]): item
+        (float(item["magnitude"]), item["side"], item["prompt_index"]): item
         for item in candidate["candidate_items"]
     }
-    for coefficient in candidate["candidate_coefficients"]:
-        coefficient_key = str(float(coefficient))
-        if coefficient_key not in health_by_coefficient:
-            raise ValueError("candidate backend health must cover every candidate coefficient")
-        for prompt_index, source in enumerate(calibration_rows):
-            item = items_by_key[(float(coefficient), prompt_index)]
-            rows.append(
-                source
-                | {
+    for magnitude in candidate["candidate_magnitudes"]:
+        for side in ("+C", "-C"):
+            health_key = f"{float(magnitude)}:{side}"
+            if health_key not in health_by_coefficient:
+                raise ValueError("candidate backend health must cover every magnitude/side cell")
+            for prompt_index, source in enumerate(calibration_rows):
+                item = items_by_key[(float(magnitude), side, prompt_index)]
+                rows.append(source | {
                     "bare": baseline[prompt_index],
                     "steered": item["response"],
                     "method": method,
-                    "coefficient": float(coefficient),
-                    "side": "+C",
-                }
-            )
+                    "magnitude": float(magnitude),
+                    "side": side,
+                })
 
     requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
     raw_responses = judge.complete(requests)
@@ -172,41 +192,29 @@ def _candidate_judgments(
     responses = [response_record(request, response) for request, response in zip(requests, raw_responses, strict=True)]
 
     observed = []
-    for coefficient in candidate["candidate_coefficients"]:
-        coefficient_rows = [row for row in rows if row["coefficient"] == float(coefficient)]
-        comparison_ids = {comparison_id(row) for row in coefficient_rows}
-        coefficient_responses = [
-            record for record in responses if record["comparison_id"] in comparison_ids
-        ]
-        aware = [record for record in coefficient_responses if not record["blind"]]
-        blind = [record for record in coefficient_responses if record["blind"]]
-        if len(aware) != 4 * len(coefficient_rows) or len(blind) != 2 * len(coefficient_rows):
-            raise ValueError("judge adapter did not return complete two-pass AB/BA aware and one-pass AB/BA blind candidate judgments")
-        effects = [score_pair(record["response"], record["order"], record["side"]) for record in aware]
-        health = health_by_coefficient[str(float(coefficient))]
-        if not isinstance(health, dict) or "reasons" not in health:
-            raise ValueError("candidate health requires metrics and a reasons list")
-        directed_effect = sum(effect["effect"] for effect in effects) / len(effects)
-        off_target_effect = sum(abs(effect["off_axis_perturbation"]) for effect in effects) / len(effects)
-        dose_score = directed_effect - 4 * off_target_effect
-        observed.append(
-            {
-                "coefficient": float(coefficient),
-                "directed_effect": directed_effect,
-                "off_target_effect": off_target_effect,
+    for magnitude in candidate["candidate_magnitudes"]:
+        for side in ("+C", "-C"):
+            dose_rows = [row for row in rows if row["magnitude"] == float(magnitude) and row["side"] == side]
+            comparison_ids = {comparison_id(row) for row in dose_rows}
+            dose_responses = [record for record in responses if record["comparison_id"] in comparison_ids]
+            aware = [record for record in dose_responses if not record["blind"]]
+            blind = [record for record in dose_responses if record["blind"]]
+            if len(aware) != 4 * len(dose_rows) or len(blind) != 2 * len(dose_rows):
+                raise ValueError("judge adapter did not return complete signed candidate judgments")
+            effects = [score_pair(record["response"], record["order"], record["side"]) for record in aware]
+            health = health_by_coefficient[f"{float(magnitude)}:{side}"]
+            if not isinstance(health, dict) or "reasons" not in health:
+                raise ValueError("candidate health requires metrics and a reasons list")
+            directed_effect = sum(effect["effect"] for effect in effects) / len(effects)
+            off_target_effect = sum(abs(effect["off_axis_perturbation"]) for effect in effects) / len(effects)
+            dose_score = directed_effect - 4 * off_target_effect
+            observed.append({
+                "magnitude": float(magnitude), "side": side,
+                "directed_effect": directed_effect, "off_target_effect": off_target_effect,
                 "dose_score": dose_score,
-                "historical_score_positive": dose_score > 0,
-                "historical_off_axis_within_2_5": max(effect["steered_off_axis"] for effect in effects) <= 2.5,
-                "provenance": content_key({
-                    "candidate": candidate["vector_sha256"],
-                    "responses": [
-                        {key: record[key] for key in ("comparison_id", "order", "blind", "side", "response")}
-                        for record in coefficient_responses
-                    ],
-                }),
+                "provenance": content_key({"candidate": candidate["vector_sha256"], "magnitude": float(magnitude), "side": side, "responses": [{key: record[key] for key in ("comparison_id", "order", "blind", "side", "response")} for record in dose_responses]}),
                 "generation_health": health,
-            }
-        )
+            })
     return {"observed": observed, "health": health_by_coefficient, "requests": requests, "responses": responses, "aware": [record for record in responses if not record["blind"]], "blind": [record for record in responses if record["blind"]]}
 
 
@@ -214,10 +222,10 @@ def _plan(records: dict, dose_plans: list[dict], cases=PREDICTION_CASES) -> list
     """Expand the numbered evaluation and disjoint transfer dose plans."""
     by_case = {plan["case"]["case_id"]: plan for plan in dose_plans}
     return [
-        {"case_id": case.case_id, "target_id": by_case[case.case_id]["target_id"], "coefficient": coefficient,
+        {"case_id": case.case_id, "target_id": by_case[case.case_id]["target_id"], "magnitude": dose["magnitude"], "side": dose["side"],
          "prompt_id": record.prompt_id, "prompt": record.prompt, "prompt_sha256": record.content_sha256}
         for case in cases for record in records[case.case_id]
-        for coefficient in by_case[case.case_id]["coefficients"]
+        for dose in by_case[case.case_id]["coefficients"]
     ]
 
 
@@ -234,8 +242,8 @@ def _validate_final(plan: list[dict], result: dict, *, require_judge_outputs: bo
         health_records = result.get("health_records")
         if not isinstance(health_records, list) or len(health_records) != len(plan):
             raise ValueError("final health records must cover each executable plan item exactly")
-        expected_items = {(item["case_id"], item["prompt_id"], float(item["coefficient"])) for item in plan}
-        actual_items = {(record.get("case_id"), record.get("prompt_id"), float(record["coefficient"])) for record in health_records}
+        expected_items = {(item["case_id"], item["prompt_id"], item["side"], float(item["magnitude"])) for item in plan}
+        actual_items = {(record.get("case_id"), record.get("prompt_id"), record.get("side"), float(record["magnitude"])) for record in health_records}
         if len(actual_items) != len(health_records) or actual_items != expected_items:
             raise ValueError("final health records must cover each executable plan item exactly")
 
@@ -259,8 +267,9 @@ def _final_judgments(final: dict, plan: list[dict], records: dict, *, method: st
             "bare": final["baseline_answers"][source.prompt_id],
             "steered": answer,
             "method": method,
-            "coefficient": item["coefficient"],
-            "side": "+C",
+            "magnitude": item["magnitude"],
+            "coefficient": item["magnitude"],
+            "side": item["side"],
             "generation_health": health,
         })
     requests = numbered_requests(rows, model["judge_model"], judge.endpoint)
@@ -456,7 +465,16 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
     if {key: source[key] for key in expected_identity} != expected_identity:
         raise ValueError("vector calibration requires the fixed sycophantic/abrasive persona identity")
     records = {EVALUATION_CASE.case_id: load_evaluation_records()} | (transfer_records if transfer_records is not None else load_transfer_records())
-    calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec}
+    signed_method_spec = {
+        "schema": "bsbench-signed-activation-v3",
+        "sides": ["+C", "-C"],
+        "layers": [7, 11, 15, 19, 23],
+        "target_layer": 29,
+        "skip_first": 16,
+        "random_seed": 0,
+        "kl_spec": BENCHMARK_KL_SPEC,
+    }
+    calibration_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "calibration_case": case_identity(CALIBRATION_CASE), "persona_source": source, "persona_source_sha256": content_key(source), "candidate_dose_upper": CANDIDATE_DOSE_UPPER, "prompt_spec": prompt_spec, "signed_method_spec": signed_method_spec}
     dispatched = False
     def candidate_compute() -> dict:
         nonlocal dispatched
@@ -467,22 +485,26 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             if "vector_bytes" not in result:
                 raise ValueError("calibration backend must return vector_bytes, not a container path")
             artifact = _sidecar(root, result.pop("vector_bytes"))
-            coefficients = result.get("candidate_coefficients")
-            if not coefficients or len(coefficients) > CANDIDATE_DOSE_UPPER or len({float(coefficient) for coefficient in coefficients}) != len(coefficients):
-                raise ValueError(f"calibration backend must return 1..{CANDIDATE_DOSE_UPPER} unique candidate coefficients")
-            items = _candidate_items(coefficients, calibration_prompts, result.get("candidate_items", []))
+            magnitudes = _candidate_magnitudes(result.get("candidate_magnitudes"))
+            items = _candidate_items(magnitudes, calibration_prompts, result.get("candidate_items", []))
+            _validate_method_config(method, result.get("method_config"), signed_method_spec)
             _settle_or_mark_gpu_unresolved(ledger, reservation, result)
         except Exception:
             mark_unresolved(ledger, reservation, "dispatch_or_validation_failure")
             raise
         return result | {"candidate_items": items, "reservation": reservation, "vector_artifact": artifact, "vector_sha256": artifact["sha256"], "method_config": result.get("method_config", {})}
-    candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+    candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute)
+    magnitudes = _candidate_magnitudes(candidate.get("candidate_magnitudes"))
+    expected_items = _candidate_items(magnitudes, calibration_prompts, candidate.get("candidate_items", []))
+    if candidate.get("candidate_items") != expected_items:
+        raise ValueError("cached calibration candidate does not exactly cover signed cells")
+    _validate_method_config(method, candidate.get("method_config"), signed_method_spec)
     artifact = _load_sidecar(root, candidate["vector_artifact"])
     candidate = candidate | {"reused": not dispatched}
     candidate_identity = {key: value for key, value in candidate.items() if key != "reused"}
     judgment_outputs = None
     if judge is None:
-        observed = _require_observed(candidate_judgments, candidate["candidate_coefficients"])
+        observed = _require_observed(candidate_judgments, candidate["candidate_magnitudes"])
     else:
         if candidate_judgments is not None or calibration_rows is None:
             raise ValueError("judge-backed calibration requires rows and no caller-supplied observations")
@@ -506,13 +528,12 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
                 model=model,
                 judge=judge,
             ),
-            compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S,
         )
         observed = judgment_outputs["observed"]
     candidate_inputs = {"candidate_sha256": content_key(candidate_identity), "observed": observed, "vector_sha256": candidate["vector_sha256"]}
-    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
-    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
-    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]}, compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+    health = _local(root, stage="candidate-health", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-health-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["health"]})
+    aware = _local(root, stage="candidate-aware", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-aware-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["aware"]})
+    blind = _local(root, stage="candidate-blind", model=model, data=data, method=method, prompts=calibration_prompts, config=candidate_inputs, compute=lambda: {"schema": "bsbench-local-blind-v1", "fake": judgment_outputs is None, "candidate_items": candidate["candidate_items"], "records": observed if judgment_outputs is None else judgment_outputs["blind"]})
     if getattr(backend, "remote_vector_binding", False):
         transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
         final_config = {
@@ -527,12 +548,25 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
             "transfer_prompt_records": transfer_records_identity(records),
             "prompt_spec": prompt_spec,
             "extraction_identity": source,
+            "signed_method_spec": signed_method_spec,
+            "kl_spec": BENCHMARK_KL_SPEC,
         }
 
         def validate_remote_final(result: dict) -> None:
             predictions = result.get("transfer_predictions")
-            if not isinstance(predictions, list) or not isinstance(result.get("target"), dict):
+            target = result.get("target")
+            if not isinstance(predictions, list) or not isinstance(target, dict):
                 raise ValueError("remote vector final stage must return target and transfer predictions")
+            if target.get("kl_spec") != BENCHMARK_KL_SPEC or target.get("target_stat") != BENCHMARK_KL_SPEC["target_stat"]:
+                raise ValueError("remote target does not attest to the benchmark KL specification")
+            if any(
+                prediction.get("kl_spec") != BENCHMARK_KL_SPEC
+                or prediction.get("method") != method
+                or prediction.get("model") != model["id"]
+                or prediction.get("target_id") != target.get("target_id")
+                for prediction in predictions
+            ):
+                raise ValueError("remote transfer predictions do not match target, method, model, and KL specification")
             remote_stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=predictions, case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
             remote_plan = _plan(records, remote_stages[0]["config"]["final_dose_plans"])
             if result.get("final_dose_plans") != remote_stages[0]["config"]["final_dose_plans"]:
@@ -549,12 +583,12 @@ def run_live_two_step(root: Path, ledger: Path, *, model: dict, data: dict, meth
         plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]
     else:
         vector = vector_loader(artifact)
-        target_config = {"candidate_sha256": content_key(candidate_identity), "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "candidate_records": [health, aware, blind]}
-        target = _local(root, stage="fit-target", model=model, data=data, method=method, prompts=calibration_prompts, config=target_config, compute=lambda: fit_target(vector, model, None, calibration_prompts, CALIBRATION_CASE, observed, method=method, model_id=model["id"], measure_kwargs={}, measure=measure) | {"extraction_identity": source})
+        target_config = {"candidate_sha256": content_key(candidate_identity), "observed_sha256": content_key({"observed": observed}), "vector_sha256": candidate["vector_sha256"], "candidate_records": [health, aware, blind], "signed_method_spec": signed_method_spec, "kl_spec": BENCHMARK_KL_SPEC}
+        target = _local(root, stage="fit-target-signed-v2", model=model, data=data, method=method, prompts=calibration_prompts, config=target_config, compute=lambda: fit_target(vector, model, None, calibration_prompts, CALIBRATION_CASE, observed, method=method, model_id=model["id"], kl_spec=BENCHMARK_KL_SPEC, measure_kwargs={}, measure=measure) | {"extraction_identity": source})
         provenance = {case_id: transfer_provenance(case_records) for case_id, case_records in records.items()}
         transfer_prompts = [record.prompt for case_records in records.values() for record in case_records]
-        prediction_config = {"target": target, "transfer_provenance": provenance, "prompt_spec": prompt_spec, "vector_sha256": candidate["vector_sha256"]}
-        prediction = _local(root, stage="transfer-prediction", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, bracket=(0.01, 2.0), solver_kwargs={}, solver=solver) for case in PREDICTION_CASES]})
+        prediction_config = {"target": target, "transfer_provenance": provenance, "prompt_spec": prompt_spec, "vector_sha256": candidate["vector_sha256"], "signed_method_spec": signed_method_spec, "kl_spec": BENCHMARK_KL_SPEC}
+        prediction = _local(root, stage="transfer-prediction-signed-v2", model=model, data=data, method=method, prompts=transfer_prompts, config=prediction_config, compute=lambda: {"predictions": [predict_transfer(vector, model, None, [record.prompt for record in records[case.case_id]], target, case, kl_spec=BENCHMARK_KL_SPEC, solver_kwargs={}, solver=solver) for case in PREDICTION_CASES], "kl_spec": BENCHMARK_KL_SPEC})
         stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
         executable_plan = _plan(records, stages[0]["config"]["final_dose_plans"])
         plan_prompts = [json.dumps(item, sort_keys=True) for item in executable_plan]

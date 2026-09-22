@@ -8,10 +8,12 @@ import pytest
 
 from steering_lite.benchmark.cache import cached_stage, content_key
 from steering_lite.benchmark.dose_search import (
+    BENCHMARK_KL_SPEC,
     CALIBRATION_CASE,
     Case,
     TRANSFER_CASES,
     classify_transfer_boundary,
+    final_dose_plan,
     fit_target,
     predict_transfer,
 )
@@ -65,16 +67,19 @@ def _actual_transfer_cases() -> tuple[Case, ...]:
 
 def _prediction(case: Case, coefficient: float, *, target_id: str = "target-a", method: str = "vjp_cache") -> dict:
     return {
-        "schema": "bsbench-rms-kl-transfer-v1",
+        "schema": "bsbench-signed-rms-kl-transfer-v2",
         "target_id": target_id,
         "case": {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)},
         "method": method,
         "model": "synthetic",
         "target_stat": "kl_rms",
         "target_rms": 1.25,
-        "bracket": (0.1, 1.0),
-        "predicted_coefficient": coefficient,
-        "search_history": [],
+        "bracket": BENCHMARK_KL_SPEC["bracket"],
+        "kl_spec": BENCHMARK_KL_SPEC,
+        "signed_predictions": [
+            {"side": "+C", "magnitude": abs(coefficient), "search_history": []},
+            {"side": "-C", "magnitude": abs(coefficient) * 1.1, "search_history": []},
+        ],
     }
 
 
@@ -84,8 +89,8 @@ def _final_inputs() -> dict:
         "method": "vjp_cache",
         "vector_sha256": "vector-a",
         "observed": [
-            {"coefficient": 0.4, "useful": True, "coherent": True, "provenance": "judge-b"},
-            {"coefficient": -0.2, "useful": True, "coherent": True, "provenance": "judge-a"},
+            {"magnitude": 0.4, "side": "+C", "provenance": "judge-b", "generation_health": {"reasons": []}},
+            {"magnitude": 0.2, "side": "-C", "provenance": "judge-a", "generation_health": {"reasons": []}},
         ],
         "transfer_predictions": [
             _prediction(transfer_cases[0], 0.5),
@@ -259,23 +264,23 @@ def test_final_stages_carry_complete_data_flow_and_stable_identity():
     reordered = final_stages(**reversed_inputs)
 
     assert [(stage["stage"], stage["runner"], stage["item_count"]) for stage in stages] == [
-        ("final-generation", "modal_gpu", 9),
-        ("final-health", "local", 9),
-        ("final-aware", "local_judge_api", 9),
-        ("final-blind", "local_judge_api", 9),
+        ("final-generation", "modal_gpu", 18),
+        ("final-health", "local", 18),
+        ("final-aware", "local_judge_api", 18),
+        ("final-blind", "local_judge_api", 18),
     ]
     assert stages == reordered
     assert stages[0]["case_prompts"] == {case_id: [record.prompt for record in records] for case_id, records in inputs["case_prompts"].items()}
     assert stages[0]["case_prompt_records"]["bsbench-v2-heldout-transfer"][0]["source_revision"] == "test-revision"
     assert stages[0]["generation_plan"] == [
-        {"case": {"case_id": "bsbench-v2-heldout-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-001"]}, "prompts": ["heldout prompt"], "coefficients": [0.4, 0.5, 0.6]},
-        {"case": {"case_id": "other-dataset-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-002", "SYN-003"]}, "prompts": ["other prompt one", "other prompt two"], "coefficients": [-0.2, -0.25, -0.3]},
+        {"case": {"case_id": "bsbench-v2-heldout-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-001"]}, "prompts": ["heldout prompt"], "coefficients": [{"side": "+C", "magnitude": 0.4}, {"side": "+C", "magnitude": 0.5}, {"side": "+C", "magnitude": 0.6}, {"side": "-C", "magnitude": 0.44}, {"side": "-C", "magnitude": 0.55}, {"side": "-C", "magnitude": 0.66}]},
+        {"case": {"case_id": "other-dataset-transfer", "dataset": "synthetic", "prompt_ids": ["SYN-002", "SYN-003"]}, "prompts": ["other prompt one", "other prompt two"], "coefficients": [{"side": "+C", "magnitude": 0.2}, {"side": "+C", "magnitude": 0.25}, {"side": "+C", "magnitude": 0.3}, {"side": "-C", "magnitude": 0.22}, {"side": "-C", "magnitude": 0.275}, {"side": "-C", "magnitude": 0.33}]},
     ]
     assert all("case_prompts" not in stage and "generation_plan" not in stage for stage in stages[1:])
     assert all(stage["input_stage"] == "final-generation" for stage in stages[1:])
     config = stages[0]["config"]
     assert config["vector_sha256"] == "vector-a"
-    assert config["candidate_coefficients"] == [-0.2, 0.4]
+    assert config["signed_candidate_doses"] == [{"magnitude": 0.2, "side": "-C"}, {"magnitude": 0.4, "side": "+C"}]
     assert config["prompt_spec"] == inputs["prompt_spec"]
     assert config["prompt_spec_sha256"] == content_key(inputs["prompt_spec"])
     assert config["case_prompt_hashes"] == {
@@ -292,7 +297,7 @@ def test_final_stage_identity_invalidates_each_input_independently():
         {"vector_sha256": "vector-b"},
         {"observed": [{**inputs["observed"][0], "provenance": "different"}, inputs["observed"][1]]},
         {"observed": [{**inputs["observed"][0], "coefficient": 0.5}, inputs["observed"][1]]},
-        {"transfer_predictions": [{**inputs["transfer_predictions"][0], "predicted_coefficient": 0.6}, inputs["transfer_predictions"][1]]},
+        {"transfer_predictions": [{**inputs["transfer_predictions"][0], "signed_predictions": [{**inputs["transfer_predictions"][0]["signed_predictions"][0], "magnitude": 0.6}, inputs["transfer_predictions"][0]["signed_predictions"][1]]}, inputs["transfer_predictions"][1]]},
         {"case_prompts": inputs["case_prompts"] | {"other-dataset-transfer": [replace(inputs["case_prompts"]["other-dataset-transfer"][0], source_revision="changed"), inputs["case_prompts"]["other-dataset-transfer"][1]]}},
         {"prompt_spec": inputs["prompt_spec"] | {"template": "Answer directly."}},
     )
@@ -323,7 +328,7 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
             "case_prompts": records,
         })
     )
-    assert default_stages[0]["item_count"] == 24
+    assert default_stages[0]["item_count"] == 48
 
     predictions = inputs["transfer_predictions"]
     for changed, message in (
@@ -331,23 +336,39 @@ def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
         ({"transfer_predictions": [{**predictions[0], "method": "pca"}, predictions[1]]}, "requested method"),
         ({"transfer_predictions": [{**predictions[0], "case": {"case_id": predictions[0]["case"]["case_id"]}}, predictions[1]]}, "case identities"),
         ({"transfer_predictions": [predictions[0], {**predictions[1], "target_id": "other-target"}]}, "common transfer target"),
-        ({"transfer_predictions": [{**predictions[0], "predicted_coefficient": float("nan")}, predictions[1]]}, "finite non-zero"),
+        ({"transfer_predictions": [{**predictions[0], "signed_predictions": [{**predictions[0]["signed_predictions"][0], "magnitude": float("nan")}, predictions[0]["signed_predictions"][1]]}, predictions[1]]}, "finite positive signed magnitudes"),
         ({"transfer_predictions": [predictions[0], predictions[0]]}, "one transfer prediction"),
     ):
         with pytest.raises(ValueError, match=message):
             final_stages(**(inputs | changed))
 
 
+def test_signed_target_pools_rms_by_token_count_and_requires_both_sides_healthy():
+    observed = [
+        {"magnitude": magnitude, "coefficient": magnitude, "side": side, "provenance": f"{magnitude}-{side}", "generation_health": {"reasons": (["bad"] if magnitude == 0.8 and side == "-C" else [])}}
+        for magnitude in (0.4, 0.8) for side in ("+C", "-C")
+    ]
+    health = {"rep": 0.0, "gen_len": 1, "steer_tail": "ok", "per_t_mean": [0.0], "per_t_p90": [0.0], "per_t_p95": [0.0], "per_t_max": [0.0], "per_t_n": [1]}
+    vector = SimpleNamespace(cfg=SimpleNamespace(coeff=0.0))
+
+    def measure(vector, *_args, **_kwargs):
+        return {"kl_rms": 1.0 if vector.cfg.coeff > 0 else 3.0, "n_pos": 4 if vector.cfg.coeff > 0 else 12, **health}
+
+    target = fit_target(vector, object(), object(), ["prompt"], CALIBRATION_CASE, observed, method="vjp_cache", model_id="synthetic", kl_spec=BENCHMARK_KL_SPEC, measure_kwargs={}, measure=measure)
+    assert target["observed_boundary"]["magnitude"] == 0.4
+    assert target["target_rms"] == pytest.approx(7 ** 0.5)
+    assert [(component["side"], component["n_pos"]) for component in target["signed_components"]] == [("+C", 4), ("-C", 12)]
+
+
 def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_classification():
     observed = [
-        {"coefficient": 0.2, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "candidate-1", "generation_health": {"reasons": []}},
-        {"coefficient": 0.4, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "candidate-2", "generation_health": {"reasons": []}},
-        {"coefficient": 0.8, "historical_score_positive": False, "historical_off_axis_within_2_5": False, "provenance": "candidate-3", "generation_health": {"reasons": []}},
+        {"magnitude": magnitude, "coefficient": magnitude, "side": side, "provenance": f"candidate-{magnitude}-{side}", "generation_health": {"reasons": []}}
+        for magnitude in (0.2, 0.4, 0.8) for side in ("+C", "-C")
     ]
     health = {
         "kl_rms": 1.25, "rep": 0.0, "gen_len": 20, "steer_tail": "calibration",
         "per_t_mean": [0.1], "per_t_p90": [0.1], "per_t_p95": [0.1],
-        "per_t_max": [0.1], "per_t_n": [1],
+        "per_t_max": [0.1], "per_t_n": [1], "n_pos": 4,
     }
     calibration_prompts = ["calibration-only prompt"]
     transfer_prompts = ["disjoint transfer prompt one", "disjoint transfer prompt two"]
@@ -358,19 +379,20 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
         measured_prompts.append(args[3])
         return health
 
-    def solver(*args, **_kwargs):
+    def solver(*args, **kwargs):
         solved_prompts.append(args[3])
-        return 0.7, [{"coeff": 0.7, "kl_rms": 1.25, "final": True}]
+        coefficient = 0.7 * kwargs["sign"]
+        return coefficient, [{"coeff": coefficient, "kl_rms": 1.25, "final": True}]
 
     vector = SimpleNamespace(cfg=SimpleNamespace(coeff=0.0))
     target = fit_target(
         vector, object(), object(), calibration_prompts, CALIBRATION_CASE, observed,
-        method="vjp_cache", model_id="synthetic", measure_kwargs={}, measure=measure,
+        method="vjp_cache", model_id="synthetic", kl_spec=BENCHMARK_KL_SPEC, measure_kwargs={}, measure=measure,
     )
     transfer_case = Case("synthetic-transfer", "audited-synthetic", ("SYN-001", "SYN-002"))
     prediction = predict_transfer(
         vector, object(), object(), transfer_prompts, target, transfer_case,
-        bracket=(0.1, 1.0), solver_kwargs={}, solver=solver,
+        kl_spec=BENCHMARK_KL_SPEC, solver_kwargs={}, solver=solver,
     )
     stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
@@ -380,11 +402,11 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
     post_generation = classify_transfer_boundary(
         prediction,
         [
-            {"case_id": transfer_case.case_id, "target_id": target["target_id"], "coefficient": coefficient, "historical_score_positive": True, "historical_off_axis_within_2_5": True, "provenance": "transfer-1", "generation_health": {"reasons": []}}
-            for coefficient in (0.56, 0.7, 0.84)
+            {"case_id": transfer_case.case_id, "target_id": target["target_id"], "magnitude": dose["magnitude"], "side": dose["side"], "provenance": "transfer-1", "generation_health": {"reasons": []}}
+            for dose in final_dose_plan(prediction)["coefficients"]
         ],
     )
-    changed_prediction = prediction | {"predicted_coefficient": 0.6}
+    changed_prediction = prediction | {"signed_predictions": [{**prediction["signed_predictions"][0], "magnitude": 0.6}, prediction["signed_predictions"][1]]}
     changed_stages = final_stages(
         method="vjp_cache", vector_sha256="synthetic-vector", observed=observed,
         transfer_predictions=[changed_prediction], case_prompts={transfer_case.case_id: [_record(f"SYN-{number:03d}", prompt, "audited-synthetic") for number, prompt in enumerate(transfer_prompts, 1)]},
@@ -397,21 +419,21 @@ def test_synthetic_calibration_transfer_flow_predicts_before_post_generation_cla
         transfer_cases=(transfer_case,),
     )
 
-    assert measured_prompts == [calibration_prompts]
-    assert solved_prompts == [transfer_prompts]
-    assert target["observed_boundary"]["coefficient"] == 0.8
-    assert prediction["predicted_coefficient"] == 0.7
-    assert prediction["predicted_coefficient"] != target["source"]["coefficient"]
+    assert measured_prompts == [calibration_prompts, calibration_prompts]
+    assert solved_prompts == [transfer_prompts, transfer_prompts]
+    assert target["observed_boundary"]["magnitude"] == 0.8
+    assert prediction["signed_predictions"][0]["magnitude"] == 0.7
+    assert prediction["signed_predictions"][0]["magnitude"] != target["source"]["magnitude"]
     assert prediction["case"]["prompt_ids"] != list(CALIBRATION_CASE.prompt_ids)
     assert "boundary" not in prediction
-    assert stages[0]["item_count"] == 6
+    assert stages[0]["item_count"] == 12
     assert stages[0]["generation_plan"] == [{
         "case": {"case_id": transfer_case.case_id, "dataset": transfer_case.dataset, "prompt_ids": list(transfer_case.prompt_ids)},
         "prompts": transfer_prompts,
-        "coefficients": [0.56, 0.7, 0.84],
+        "coefficients": [{"side": "+C", "magnitude": 0.56}, {"side": "+C", "magnitude": 0.7}, {"side": "+C", "magnitude": 0.84}, {"side": "-C", "magnitude": 0.56}, {"side": "-C", "magnitude": 0.7}, {"side": "-C", "magnitude": 0.84}],
     }]
-    assert all(stage["item_count"] == 6 for stage in stages)
-    assert post_generation["boundary"] == "measured_generation_health_boundary"
+    assert all(stage["item_count"] == 12 for stage in stages)
+    assert post_generation["signed_boundaries"] == {"+C": "measured_generation_health_boundary", "-C": "measured_generation_health_boundary"}
     assert changed_stages[0]["config"] != stages[0]["config"]
     assert retargeted_stages[0]["config"] != stages[0]["config"]
 

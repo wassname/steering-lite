@@ -183,8 +183,10 @@ class LocalJudgeAdapter:
 
     def _complete_one(self, request: dict) -> dict:
         upper_usd = judge_request_upper_usd(request)
+        evidence_id = hashlib.sha256(json.dumps(request, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         identity = {
             "schema": "bsbench-judge-request-cache-v2",
+            "evidence_id": evidence_id,
             "request": request,
             "judge_model": request["payload"]["model"],
             "judge_endpoint": self.endpoint,
@@ -195,7 +197,7 @@ class LocalJudgeAdapter:
         def compute() -> dict:
             reservations = reserve_many(
                 self._ledger,
-                [(f"judge-{request['request_key']}-attempt-{attempt}", upper_usd) for attempt in range(1, JUDGE_ATTEMPTS + 1)],
+                [(f"judge-{evidence_id}-attempt-{attempt}", upper_usd) for attempt in range(1, JUDGE_ATTEMPTS + 1)],
                 limit_usd=50.0,
             )
             failures = []
