@@ -23,4 +23,4 @@ Implementation interpretation:
 - The completed external smoke is conservatively recorded at its original $2 reservation upper, linked to its saved completion summary; this is not an invoice or newly inferred actual cost.
 - Directed intended effect is steered minus baseline in the disposition actually requested. The plot's signed-axis value negates this delta only for -C.
 
-Evidence is in `slop/verification/20260922_corrected-five-seed-preflight.json`, the provider metadata artifact, the bounded contract-test log and the mean_diff fake CLI result. Renderer changes are deferred until cached outcome evidence exists.
+Evidence is in `slop/verification/20260922_corrected-five-seed-preflight.json`, the provider metadata artifact, the focused execution-validation log and the mean_diff fake CLI result. Renderer changes are deferred until cached outcome evidence exists.
