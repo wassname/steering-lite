@@ -1,0 +1,61 @@
+.venv/bin/python scripts/run_bsbench_results.py --run-dir outputs/bsbench-v2 --out outputs/bsbench-v2/results
+SHOULD: Markdown/HTML ranks and all62 PNG point identities match one dataframe; verified. Scientific hashes and ledger unchanged.
+{
+  "output": "outputs/bsbench-v2/results",
+  "point_count": 62,
+  "points_sha256": "6fad4bb55c3963f31d17a38a6f5e12e472c1f094d1ac6a28d5864eb38bf79b9c",
+  "non_experimental": false,
+  "health_policy": {
+    "version": "cohort-fraction-v1",
+    "definition": "unfinished/answers < 0.5, role_leaks/answers < 0.25, repeated/answers < 0.25",
+    "final_cohort_size": 20,
+    "transfer_cohort_size": 2,
+    "candidate_cohort_size": 4
+  },
+  "kl_misses": 11,
+  "random_regions": [
+    {
+      "multiplier": 0.8,
+      "eligible_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "minimum_seeds": 5,
+      "included": true,
+      "median_off": 0.45749999999999996,
+      "effect_low": 0.03874999999999995,
+      "effect_high": 2.2875,
+      "median_effect": 0.66875
+    },
+    {
+      "multiplier": 1.0,
+      "eligible_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "minimum_seeds": 5,
+      "included": true,
+      "median_off": 0.53,
+      "effect_low": 0.5425,
+      "effect_high": 2.63125,
+      "median_effect": 1.47875
+    },
+    {
+      "multiplier": 1.2,
+      "eligible_seeds": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "minimum_seeds": 5,
+      "included": false
+    }
+  ]
+}

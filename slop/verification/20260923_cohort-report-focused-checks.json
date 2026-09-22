@@ -1,0 +1,18 @@
+{
+  "author": "PI/gpt-6-sol",
+  "status": "passed",
+  "points": 62,
+  "audited_activation_metric_matches": 60,
+  "all_numbered_evidence_pages": 62,
+  "verified_local_links": 1917,
+  "markdown_html_disk_rank_parity": true,
+  "cohort_threshold_boundary_4_of_20_pass_5_of_20_fail": true,
+  "canonical_cohort_eligible": 59,
+  "zero_individual_failures": 51,
+  "vjp_cache_negative_1p2_selected_with_raw_flag": true,
+  "transfer_groups": 240,
+  "solves": 100,
+  "kl_misses": 11,
+  "scientific_hashes_and_ledger_unchanged": true,
+  "fresh_eyes_oracle": "blocked: parent run35bb08f6 Codex usage limit; no verdict/retry"
+}

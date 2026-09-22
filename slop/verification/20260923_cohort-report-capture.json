@@ -1,0 +1,16 @@
+{
+  "author": "PI/gpt-6-sol",
+  "old_capture": "slop/verification/20260922_signed-report-capture",
+  "new_capture": "slop/verification/20260923_cohort-report-capture",
+  "old_png_sha256": {
+    "plot.png": "621a066f875e089beb7c0c534e2bb6042a618c2a5bf48167572ebf68eccc929a",
+    "plot_pareto.png": "ed399d68abd5b5436ac53670d355b0cbebbe9dc316d018c16afd2446f52c0e65"
+  },
+  "new_png_sha256": {
+    "plot.png": "758fa7a90036a6162a98aa4d9df8c92b056750f95aca613d5624d48ea98f6532",
+    "plot_pareto.png": "54270d48ff1062e309c718fa064d12993523ddd2f0618d27891188663f02c210"
+  },
+  "scientific_summary_sha256": "ca49e269a8b48a7e4a22cfe770750df5c7503f7dbeea2c238ceee7eeac9f338b",
+  "ledger_sha256": "af53fa34f85b4d17a9016d24d4f7232dde26c3195f964d20e18dbd24e601c426",
+  "plots_ingested_by_agent": true
+}
