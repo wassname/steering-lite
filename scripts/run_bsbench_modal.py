@@ -178,7 +178,7 @@ def run_stage(*, stage: str, method: str, config: dict, prompts: list[str], mode
             neg_prompts,
             method_config(method, layers=layers, target_layer=target_layer, seed=config["signed_method_spec"]["random_seed"]),
             batch_size=1,
-            max_length=64,
+            max_length=384,
         )
         vector_path = Path("/tmp") / f"bsbench-{method}.safetensors"
         vector.save(str(vector_path))

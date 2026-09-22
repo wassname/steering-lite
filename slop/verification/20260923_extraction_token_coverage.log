@@ -1,0 +1,112 @@
+2026-09-23 07:14:03.976 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-23 07:14:05.318 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-23 07:14:05.382 | INFO     | steering_lite.data.personas:make_persona_pairs:82 - Persona-branching pairs: n=200 from 1 persona pairs
+2026-09-23 07:14:05.383 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+{
+  "author": "PI/gpt-6-sol",
+  "model_id": "Qwen/Qwen3.5-4B",
+  "tokenizer_snapshot": "/home/code/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "tokenizer_config_sha256": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+  "tokenizer_truncation_side": "right",
+  "persona_identity": {
+    "pairs": [
+      [
+        "sycophantic",
+        "abrasive"
+      ]
+    ],
+    "template": "Answer as someone who is {persona}.",
+    "seed": 0,
+    "requested_pairs": 256,
+    "actual_pairs": 200,
+    "corpus_sha256": "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9faa045695a39319ba",
+    "thinking": true
+  },
+  "max_length": 64,
+  "counts": {
+    "positive": {
+      "total": 200,
+      "truncated": 132,
+      "assistant_header_missing": 3,
+      "suffix_not_started": 4,
+      "suffix_not_fully_retained": 132,
+      "persona_string_missing": 0,
+      "token_length_quantiles": {
+        "0": 37,
+        "10": 43,
+        "25": 58,
+        "50": 81,
+        "75": 115,
+        "90": 167,
+        "95": 209,
+        "100": 240
+      }
+    },
+    "negative": {
+      "total": 200,
+      "truncated": 127,
+      "assistant_header_missing": 2,
+      "suffix_not_started": 4,
+      "suffix_not_fully_retained": 127,
+      "persona_string_missing": 0,
+      "token_length_quantiles": {
+        "0": 34,
+        "10": 40,
+        "25": 55,
+        "50": 78,
+        "75": 112,
+        "90": 164,
+        "95": 206,
+        "100": 237
+      }
+    },
+    "pair_identical_after_clip": 0,
+    "pair_identical_after_skip_first16": 0
+  },
+  "categories": {
+    "code": {
+      "n": 24,
+      "truncated_pairs": 19
+    },
+    "dialogue": {
+      "n": 21,
+      "truncated_pairs": 18
+    },
+    "email": {
+      "n": 9,
+      "truncated_pairs": 7
+    },
+    "encyclopedia": {
+      "n": 18,
+      "truncated_pairs": 15
+    },
+    "ethics": {
+      "n": 15,
+      "truncated_pairs": 7
+    },
+    "fact": {
+      "n": 32,
+      "truncated_pairs": 0
+    },
+    "general": {
+      "n": 21,
+      "truncated_pairs": 15
+    },
+    "reasoning": {
+      "n": 3,
+      "truncated_pairs": 3
+    },
+    "reasoning_trace": {
+      "n": 11,
+      "truncated_pairs": 11
+    },
+    "stories": {
+      "n": 20,
+      "truncated_pairs": 15
+    },
+    "tech": {
+      "n": 26,
+      "truncated_pairs": 22
+    }
+  }
+}

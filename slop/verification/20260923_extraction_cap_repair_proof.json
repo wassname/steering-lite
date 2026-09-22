@@ -1,0 +1,27 @@
+{
+  "author": "PI/gpt-6-sol",
+  "schema": "bsbench-extraction-cap-repair-proof-v1",
+  "pair_count": 200,
+  "persona_identity": {
+    "pairs": [
+      [
+        "sycophantic",
+        "abrasive"
+      ]
+    ],
+    "template": "Answer as someone who is {persona}.",
+    "seed": 0,
+    "requested_pairs": 256,
+    "actual_pairs": 200,
+    "corpus_sha256": "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9faa045695a39319ba",
+    "thinking": true
+  },
+  "tokenizer_snapshot": "/home/code/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "tokenizer_config_sha256": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+  "old_cap": 64,
+  "old_error": "extraction prompt truncation: 259/400 exceed max_length=64 (longest=240)",
+  "training_entry_rejected_before_model": true,
+  "new_cap": 384,
+  "new_cap_passed": true,
+  "elapsed_seconds": 0.2011672779917717
+}

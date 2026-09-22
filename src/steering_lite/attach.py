@@ -189,6 +189,17 @@ def _split_extracted(extracted: dict) -> tuple[dict, dict]:
     return shared, stacked
 
 
+def _require_untruncated_prompts(tok, pos_prompts: list[str], neg_prompts: list[str], max_length: int) -> None:
+    encoded = tok(pos_prompts + neg_prompts, return_tensors="pt", padding=True, truncation=False)
+    lengths = encoded.attention_mask.sum(dim=-1)
+    clipped = lengths > max_length
+    if clipped.any():
+        raise ValueError(
+            f"extraction prompt truncation: {int(clipped.sum())}/{len(lengths)} exceed "
+            f"max_length={max_length} (longest={int(lengths.max())})"
+        )
+
+
 def train(
     model: nn.Module,
     tok,
@@ -200,6 +211,8 @@ def train(
     max_length: int = 256,
 ):
     from .vector import Vector
+    if cfg.method != "random":
+        _require_untruncated_prompts(tok, pos_prompts, neg_prompts, max_length)
     _log_extract_demo(tok, pos_prompts, neg_prompts)
     method = REGISTRY[cfg.method]
     if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
