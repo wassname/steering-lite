@@ -19,11 +19,12 @@ from steering_lite.benchmark.cache import committed, content_key, save_json, set
 from steering_lite.benchmark.generation import cohort_identity, read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
 from steering_lite.benchmark.production import record_completed_stage, run_condition, run_stages
-from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, RANDOM_SEEDS, dry_manifest, load_judge_pricing
+from steering_lite.benchmark.sweep import JUDGE_MODEL, MODEL_ID, RANDOM_SEEDS, dry_manifest, load_judge_pricing, validate_methods
 
 
 def run_full_sweep(root: Path, ledger: Path, *, model: dict, rows: list[dict], backend, prompt_spec: dict, judge, methods: tuple[str, ...] = METHODS, measure=None, solver=None, vector_loader=None, transfer_records=None) -> dict:
     """Run named conditions in order and atomically save only a matching run summary."""
+    methods = validate_methods(methods)
     summary_path = root / "run-summary.json"
     identity = {
         "schema": "bsbench-run-summary-identity-v1",
@@ -306,14 +307,17 @@ def main() -> None:
     parser.add_argument("--metadata-out", type=Path)
     parser.add_argument("--judge-pricing", type=Path)
     args = parser.parse_args()
+    if (args.probe or args.probe_aware_once) and args.method:
+        parser.error("--method cannot scope provider probes")
+    methods = (args.method,) if args.method else METHODS
     if args.judge_pricing is not None:
         load_judge_pricing(args.judge_pricing)
     if args.dry_run:
-        result = dry_manifest(args.out, args.model, cache_aware=True, judge_endpoint=args.judge_endpoint)
+        result = dry_manifest(args.out, args.model, ledger=args.ledger, cache_aware=True, judge_endpoint=args.judge_endpoint, methods=methods)
     elif args.probe or args.probe_aware_once:
         api_key = os.environ["OPENROUTER_API_KEY"]
         ledger = args.ledger or args.out / "costs.jsonl"
-        budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint)["cost_estimate"]
+        budget = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint, methods=methods)["cost_estimate"]
         if not budget["paid_preflight_passed"]:
             raise RuntimeError("provider probe requires a passing corrected preflight")
         with _openrouter_read_timeout(args.openrouter_read_timeout):
@@ -401,7 +405,6 @@ def main() -> None:
 
             backend = FakeBackend()
             ledger = args.ledger or args.out / "costs.jsonl"
-            methods = (args.method,) if args.method else METHODS
             common = dict(model={"id": args.model, "judge_model": "offline-fake-judge"}, rows=rows, backend=backend, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}, judge=FakeJudge(), methods=methods)
             first = run_full_sweep(args.out, ledger, **common)
             calls_after_first = list(backend.calls)
@@ -430,7 +433,7 @@ def main() -> None:
             if not api_key:
                 raise RuntimeError("real backend requires OPENROUTER_API_KEY before remote callbacks are constructed")
             ledger = args.ledger or args.out / "costs.jsonl"
-            manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint)
+            manifest = dry_manifest(args.out, args.model, ledger=ledger, cache_aware=True, judge_endpoint=args.judge_endpoint, methods=methods)
             budget = manifest["cost_estimate"]
             if not budget["paid_preflight_passed"]:
                 raise RuntimeError(f"corrected remaining-work preflight exceeds budget: ${budget['total_upper_usd']:.6f}")
@@ -454,7 +457,7 @@ def main() -> None:
                     backend=modal_adapter,
                     prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128},
                     judge=judge_adapter,
-                    methods=(args.method,) if args.method else METHODS,
+                    methods=methods,
                 )
         else:
             summary = json.loads(Path("slop/verification/20260919_phase6-modal-smoke-summary.json").read_text())

@@ -3,11 +3,12 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 
 from steering_lite.benchmark.adapters import real_adapters
-from steering_lite.benchmark.cache import content_key
+from steering_lite.benchmark.cache import content_key, require_resolved_ledger
 from steering_lite.benchmark.dose_search import BENCHMARK_KL_SPEC, PREDICTION_CASES, final_dose_plan
 from steering_lite.benchmark.generation import read_dev_cohort
 from steering_lite.benchmark.pipeline import METHODS
@@ -104,6 +105,7 @@ class FakeRemoteStageCall:
                     "target_id": target["target_id"],
                     "magnitude": dose["magnitude"],
                     "side": dose["side"],
+                    "multiplier": dose["multiplier"],
                     "prompt_id": record["prompt_id"],
                     "prompt": record["prompt"],
                     "prompt_sha256": record["content_sha256"],
@@ -196,6 +198,46 @@ def _run(root: Path, ledger: Path, stage_call: FakeRemoteStageCall, judge_call: 
         transfer_records=transfer_records,
         methods=methods,
     )
+
+
+def test_scoped_mean_diff_real_adapters_cover_signed_final_and_reuse(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call, judge_call = FakeRemoteStageCall(), FakeJudgeCall()
+    options = {"endpoint": "https://judge.example/v1", "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "methods": ("mean_diff",)}
+
+    first = _run(root, ledger, stage_call, judge_call, **options)
+    condition = first["conditions"]["mean_diff"]
+    assert first["methods"] == ["mean_diff"]
+    assert stage_call.calls == [("calibration-candidates", "mean_diff"), ("final-generation", "mean_diff")]
+    assert len(condition["candidate"]["candidate_items"]) == 16
+    assert len(condition["final"]["answers"]) == len(condition["final"]["executable_generation_plan"]) == 168
+    assert {item["side"] for item in condition["final"]["executable_generation_plan"]} == {"+C", "-C"}
+    assert {item["case_id"] for item in condition["final"]["executable_generation_plan"]} == {case.case_id for case in PREDICTION_CASES}
+    assert len(condition["final_judgments"]["aware"]) == 480
+    assert len(condition["final_judgments"]["blind"]) == 240
+    before = (len(stage_call.calls), len(judge_call.payloads), ledger.read_bytes())
+
+    second = _run(root, ledger, stage_call, judge_call, **options)
+    assert second["conditions"]["mean_diff"]["candidate"]["reused"] is True
+    assert second["conditions"]["mean_diff"]["final"]["reused"] is True
+    assert (len(stage_call.calls), len(judge_call.payloads), ledger.read_bytes()) == before
+
+
+def test_scoped_mean_diff_exhausted_judge_stops_before_final(tmp_path: Path):
+    root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+    stage_call = FakeRemoteStageCall()
+    attempts = []
+
+    def exhausted(payload):
+        attempts.append(payload)
+        raise HTTPError("https://judge.example/v1", 503, "unavailable", {}, None)
+
+    modal, judge = real_adapters(modal_stage_call=stage_call, judge_request_call=exhausted, judge_endpoint="https://judge.example/v1", explicit_run=True, budget_preflight={"total_upper_usd": 1.0, "limit_usd": 50.0}, root=root, ledger=ledger)
+    with pytest.raises(HTTPError):
+        _entrypoint_module().run_full_sweep(root, ledger, model={"id": "fake", "judge_model": "fake-judge"}, rows=read_dev_cohort(), backend=modal, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, judge=judge, methods=("mean_diff",))
+    assert stage_call.calls == [("calibration-candidates", "mean_diff")]
+    assert attempts
+    require_resolved_ledger(ledger)
 
 
 def test_negative_candidate_score_does_not_prevent_final_evaluation(tmp_path: Path):

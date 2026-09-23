@@ -1,0 +1,107 @@
+{
+  "author": "PI/gpt-6-sol",
+  "source_sha256": "eff29d45f8bdef895a652196eb284d47a39966447ec77471a1b8876ad5c96497",
+  "entrypoint_sha256": "7f82e82a205cfe0d7fa1b2a6d04d9df641e4a19e6228a847be3048beec5a056f",
+  "modal_callback_sha256": "1c9a251cedf9e5a004a844fea32f7cb34d86eb9cac22204b7c9885549372a296",
+  "method": "mean_diff",
+  "model": {
+    "id": "Qwen/Qwen3.5-4B",
+    "judge_model": "deepseek/deepseek-v4-flash-0731"
+  },
+  "persona_identity_sha256": "29c9f8113fd2082f929892758e3075428ac8e9cff82b34b8d7808c4ce9064185",
+  "candidate_stage_key": "dfe2b83feea5622efae5a24a83e76f860be988d26868446569782c0d51794444",
+  "candidate_stage_identity": {
+    "schema": "bsbench-stage-v1",
+    "stage": "calibration-candidates",
+    "model": {
+      "id": "Qwen/Qwen3.5-4B",
+      "judge_model": "deepseek/deepseek-v4-flash-0731"
+    },
+    "data": {
+      "rows": 20,
+      "sha256": "c220039523b581f6698e55c67842511c63f5f4e8ef93c3638e16d32000560ae9"
+    },
+    "method": "mean_diff",
+    "config": {
+      "upper_usd": 0.8646938666666667,
+      "calibration_case": {
+        "case_id": "bsbench-v2-calibration",
+        "dataset": "bsbench-v2-dev",
+        "prompt_ids": [
+          "BSV2-001",
+          "BSV2-002",
+          "BSV2-003",
+          "BSV2-004"
+        ]
+      },
+      "persona_source": {
+        "pairs": [
+          [
+            "sycophantic",
+            "abrasive"
+          ]
+        ],
+        "template": "Answer as someone who is {persona}.",
+        "seed": 0,
+        "requested_pairs": 256,
+        "actual_pairs": 200,
+        "corpus_sha256": "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9faa045695a39319ba",
+        "thinking": true
+      },
+      "persona_source_sha256": "29c9f8113fd2082f929892758e3075428ac8e9cff82b34b8d7808c4ce9064185",
+      "candidate_dose_upper": 12,
+      "prompt_spec": {
+        "template": "Answer in 2 short sentences.",
+        "enable_thinking": false,
+        "max_new_tokens": 128
+      },
+      "signed_method_spec": {
+        "schema": "bsbench-signed-activation-v3",
+        "sides": [
+          "+C",
+          "-C"
+        ],
+        "layers": [
+          7,
+          11,
+          15,
+          19,
+          23
+        ],
+        "target_layer": 29,
+        "skip_first": 16,
+        "random_seed": 0,
+        "kl_spec": {
+          "T": 20,
+          "do_sample": true,
+          "seed": 0,
+          "target_stat": "kl_rms",
+          "bracket": [
+            0.001,
+            256.0
+          ]
+        }
+      }
+    },
+    "prompts_sha256": "0dcbd1f0f6c2551d9fdd342a536d5e0a7d6d051cc532c2281001b6d87ac103aa",
+    "code_sha256": "eff29d45f8bdef895a652196eb284d47a39966447ec77471a1b8876ad5c96497"
+  },
+  "historical_candidates": [
+    {
+      "file": "cbacb6c66969a423eafd7539bcb37b81f132ee72c9817db15035d6a7ca977865.json",
+      "code_sha256": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+      "vector_sha256": "2bbc1731682d0c9a66c98ae99d7d942053d0d83c4a739ad5c936de1b8e8d6419",
+      "same_noncode_identity": false
+    },
+    {
+      "file": "cce48e7bed5a1b4b319b0dff808da1a7f45d5f446692a2b06fd02c88f8c7c97f.json",
+      "code_sha256": "c225132244885df5aaa9a37d1733a1d88160379b880477e85e852b33ca95b3f0",
+      "vector_sha256": "169c8ed960bb14f24ec8deb59714c7eeb34e7abae63f804f982383eb9aaf5d8d",
+      "same_noncode_identity": true
+    }
+  ],
+  "old_root_exact_candidate_hit": false,
+  "new_root_exact_candidate_hit": false,
+  "new_root_validated_paid_hits": [],
+  "remaining_candidate_magnitude_cap": 12
+}

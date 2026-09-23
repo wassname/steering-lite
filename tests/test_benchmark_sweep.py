@@ -194,6 +194,30 @@ def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(
     assert not (tmp_path / "cache").exists()
 
 
+def test_scoped_mean_diff_dry_manifest_is_bounded_and_fail_closed(tmp_path: Path):
+    ledger = tmp_path / "shared-costs.jsonl"
+    scoped = dry_manifest(tmp_path / "scoped", ledger=ledger, cache_aware=True, methods=("mean_diff",))
+    assert scoped["conditions"] == ["mean_diff"]
+    assert scoped["ledger"] == str(ledger)
+    assert {stage["method"] for stage in scoped["stages"] + scoped["phase_b_budget_stages"] + scoped["remaining_stages"]} == {"mean_diff"}
+    assert scoped["validated_cache_hits"] == []
+    assert scoped["cost_estimate"]["quantities"]["gpu_stages"] == 2
+    assert scoped["cost_estimate"]["quantities"]["requests"] == {"target_aware": 864, "blind": 240, "persona_validation": 0}
+    assert not ledger.exists()
+
+    default = dry_manifest(tmp_path / "default")
+    explicit = dry_manifest(tmp_path / "explicit", methods=METHODS)
+    assert default["conditions"] == explicit["conditions"] == list(METHODS)
+    assert default["stages"] == explicit["stages"]
+    assert default["phase_b_budget_stages"] == explicit["phase_b_budget_stages"]
+    assert default["cost_estimate"]["quantities"] == explicit["cost_estimate"]["quantities"]
+    for methods in ((), ("unregistered",), ("mean_diff", "mean_diff")):
+        out = tmp_path / f"invalid-{len(methods)}-{methods[0] if methods else 'empty'}"
+        with pytest.raises(ValueError, match="condition scope"):
+            dry_manifest(out, methods=methods)
+        assert not out.exists()
+
+
 def test_unsourced_v4_prices_stop_offline_preflight(tmp_path: Path, monkeypatch):
     import steering_lite.benchmark.sweep as sweep_module
 

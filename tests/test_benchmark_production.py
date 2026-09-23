@@ -82,6 +82,15 @@ def test_cli_imports_modal_receipt_without_remote_dispatch(tmp_path: Path):
     assert [json.loads(line)["event"] for line in ledger.read_text().splitlines()][-2:] == ["settled", "receipt_imported"]
 
 
+def test_provider_probe_rejects_method_scope_before_dispatch(tmp_path: Path):
+    out = tmp_path / "probe"
+    command = [sys.executable, "scripts/run_bsbench_sweep.py", "--probe", "--method", "mean_diff", "--out", str(out)]
+    result = subprocess.run(command, cwd=Path(__file__).parents[1], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "--method cannot scope provider probes" in result.stderr
+    assert not out.exists()
+
+
 def test_sweep_recipe_exports_project_env_without_printing_key(tmp_path: Path):
     root = Path(__file__).parents[1]
     env_file = tmp_path / "project.env"

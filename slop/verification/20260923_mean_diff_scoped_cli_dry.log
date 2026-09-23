@@ -1,0 +1,5 @@
+2026-09-23 09:51:32.105 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-23 09:51:32.115 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 045634c52359
+2026-09-23 09:51:32.119 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 2e777ef483dd
+2026-09-23 09:51:32.121 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware e5546ae33a5b
+2026-09-23 09:51:32.124 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes

@@ -238,8 +238,15 @@ def case_identity(case) -> dict:
     return {"case_id": case.case_id, "dataset": case.dataset, "prompt_ids": list(case.prompt_ids)}
 
 
-def phase_b_budget_stages() -> tuple[dict, ...]:
+def validate_methods(methods: tuple[str, ...]) -> tuple[str, ...]:
+    if not methods or len(set(methods)) != len(methods) or any(method not in METHODS for method in methods):
+        raise ValueError("condition scope requires distinct registered methods")
+    return methods
+
+
+def phase_b_budget_stages(methods: tuple[str, ...] = METHODS) -> tuple[dict, ...]:
     """Describe only the remaining 20-question evaluation and disjoint transfer work."""
+    methods = validate_methods(methods)
     records = {PREDICTION_CASES[0].case_id: load_evaluation_records()} | load_transfer_records()
     item_count = sum(len(records[case.case_id]) for case in PREDICTION_CASES) * len(FINAL_DOSE_MULTIPLIERS) * 2
     provenance = transfer_records_identity(records)
@@ -252,7 +259,7 @@ def phase_b_budget_stages() -> tuple[dict, ...]:
             "item_count": len(records[EVALUATION_CASE.case_id]) * 6 if stage in {"final-aware", "final-blind"} else item_count,
             "prediction_provenance_sha256": content_key(provenance),
         }
-        for method in METHODS
+        for method in methods
         if method not in {"bare", "prompting"}
         for random_seed in (RANDOM_SEEDS if method == "random" else (0,))
         for stage, runner in (
@@ -451,7 +458,8 @@ def account_consumed_retry(estimate: dict, ledger: Path) -> dict:
     }
 
 
-def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False, judge_endpoint: str = "https://openrouter.ai/api/v1/chat/completions") -> dict:
+def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = None, cache_aware: bool = False, judge_endpoint: str = "https://openrouter.ai/api/v1/chat/completions", methods: tuple[str, ...] = METHODS) -> dict:
+    methods = validate_methods(methods)
     rows = read_dev_cohort()
     prompts = [row["prompt"] for row in rows]
     prompts_by_id = {row["question_id"]: row["prompt"] for row in rows}
@@ -462,7 +470,8 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
     ledger = out / "costs.jsonl" if ledger is None else ledger
     stages = []
     persona_source = persona_extraction_identity()
-    for method, random_seed in ((method, seed) for method in METHODS for seed in (RANDOM_SEEDS if method == "random" else (0,))):
+    stage_methods = ("bare", *methods) if "prompting" in methods and "bare" not in methods else methods
+    for method, random_seed in ((method, seed) for method in stage_methods for seed in (RANDOM_SEEDS if method == "random" else (0,))):
         vector_method = method not in {"bare", "prompting"}
         stage_prompts = calibration_prompts if vector_method else prompts
         config = {
@@ -498,11 +507,11 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
                     ),
                 }
             )
-    final_budget_stages = phase_b_budget_stages()
+    final_budget_stages = phase_b_budget_stages(methods)
     manifest = {
         "schema": "bsbench-sweep-manifest-v1", "mode": "dry-run", "paid_execution_enabled": False,
         "model": model, "questions": [{"question_id": row["question_id"], "question_number": row["question_number"]} for row in rows],
-        "data": data, "conditions": list(METHODS), "judge_model": JUDGE_MODEL, "target_aware_request_schema": "bsbench-judge-request-v1", "blind_request_schema": "bsbench-judge-request-v1",
+        "data": data, "conditions": list(methods), "judge_model": JUDGE_MODEL, "target_aware_request_schema": "bsbench-judge-request-v1", "blind_request_schema": "bsbench-judge-request-v1",
         "ledger": str(ledger), "production_cache": str(out / "cache"), "dry_plan_cache": str(cache_root),
         "stages": stages, "phase_b_budget_stages": list(final_budget_stages),
     }
@@ -518,6 +527,8 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
         from .production import direct_cached_judge_counts, migrate_direct_generation, vector_cached_work
         direct_configs = {}
         for method in ("bare", "prompting"):
+            if method not in stage_methods:
+                continue
             direct_config = {"upper_usd": MODAL_GPU_STAGE_UPPER_USD, "prompt_spec": {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, "condition": method, "prompt_ids": [row["question_id"] for row in rows]}
             if method == "prompting":
                 direct_config |= {"persona_source": persona_source, "persona_validation_prompt_ids": list(PERSONA_VALIDATION_PROMPT_IDS)}
@@ -525,12 +536,12 @@ def dry_manifest(out: Path, model_id: str = MODEL_ID, *, ledger: Path | None = N
             if migrate_direct_generation(out, model=model, data=data, method=method, config=direct_config, prompts=prompts):
                 cache_hits.append({"stage": "generation", "method": method})
         remaining_stages = [stage for stage in remaining_stages if {"stage": stage["stage"], "method": stage["method"]} not in cache_hits]
-        cached_judges = direct_cached_judge_counts(out, model=model | {"judge_model": JUDGE_MODEL}, data=data, rows=rows, configs=direct_configs, endpoint=judge_endpoint)
+        cached_judges = direct_cached_judge_counts(out, model=model | {"judge_model": JUDGE_MODEL}, data=data, rows=rows, configs=direct_configs, endpoint=judge_endpoint) if "prompting" in methods else {"target-aware-requests": 0, "blind-requests": 0, "persona-validation": 0}
         manifest["validated_direct_judge_cache_counts"] = cached_judges
         for stage in remaining_stages:
             if stage["method"] == "prompting" and stage["stage"] in cached_judges:
                 stage["cached_request_count"] = cached_judges[stage["stage"]]
-        for method, seed in ((method, seed) for method in METHODS[2:] for seed in (RANDOM_SEEDS if method == "random" else (0,))):
+        for method, seed in ((method, seed) for method in methods if method not in {"bare", "prompting"} for seed in (RANDOM_SEEDS if method == "random" else (0,))):
             hits, magnitudes = vector_cached_work(out, model={"id": model_id, "judge_model": JUDGE_MODEL}, data=data, method=method, random_seed=seed, calibration_prompts=calibration_prompts, prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 128}, judge_endpoint=judge_endpoint)
             cache_hits.extend({"stage": stage, "method": method, "random_seed": seed} for stage in sorted(hits))
             remaining_stages = [stage for stage in remaining_stages if not (stage["method"] == method and stage["random_seed"] == seed and stage["stage"] in hits)]

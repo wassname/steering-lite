@@ -1,0 +1,44 @@
+{
+  "author": "PI/gpt-6-sol",
+  "same": true,
+  "file_count": 9,
+  "files": {
+    "outputs/bsbench-v2/costs.jsonl": {
+      "bytes": 4670082,
+      "sha256": "0a475594ef5c54ddc70de33ad7991e80e62742e0a528a51e9c9df62bfd0b2f83"
+    },
+    "outputs/bsbench-v2/manifest.json": {
+      "bytes": 90863,
+      "sha256": "4d51d42e0da961f3808f26b54b70fe418b3491b2b8613a5e01a30d832a8699f3"
+    },
+    "outputs/bsbench-v2/cost-estimate.json": {
+      "bytes": 6026,
+      "sha256": "3a35d7801085fc4d0f2d9d82bf36ce1a4df901ccd7a8cd51cc20c1a03f819b6c"
+    },
+    "outputs/bsbench-v2/run-summary.json": {
+      "bytes": 184023766,
+      "sha256": "ca49e269a8b48a7e4a22cfe770750df5c7503f7dbeea2c238ceee7eeac9f338b"
+    },
+    "outputs/bsbench-v2/results/index.md": {
+      "bytes": 112219,
+      "sha256": "b9cd6b9dafb0b7b5b4d9260fff19652a7540b45bddedd3149e19aaed4e26b1f1"
+    },
+    "outputs/bsbench-v2/results/measured-points.json": {
+      "bytes": 4159300,
+      "sha256": "37b21b1673ce80d74cccebae11929ddf2d1cbce0f40c7d0ddd827ff827548198"
+    },
+    "outputs/bsbench-v2/results/plot.png": {
+      "bytes": 141247,
+      "sha256": "758fa7a90036a6162a98aa4d9df8c92b056750f95aca613d5624d48ea98f6532"
+    },
+    "outputs/bsbench-v2/results/plot_pareto.png": {
+      "bytes": 138250,
+      "sha256": "54270d48ff1062e309c718fa064d12993523ddd2f0618d27891188663f02c210"
+    },
+    "outputs/bsbench-v2/artifacts/vectors/169c8ed960bb14f24ec8deb59714c7eeb34e7abae63f804f982383eb9aaf5d8d.bin": {
+      "bytes": 51832,
+      "sha256": "169c8ed960bb14f24ec8deb59714c7eeb34e7abae63f804f982383eb9aaf5d8d"
+    }
+  },
+  "note": "Old vector added to snapshot after scoped CLI dry-run; all other paths were snapshotted before."
+}
