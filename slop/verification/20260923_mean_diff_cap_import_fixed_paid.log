@@ -1,0 +1,42 @@
+2026-09-23 07:56:19.938 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+{
+  "raw_path": "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_mean_diff_cap_diagnostic/aaf9aef0d6b6452cf19f7a4d9216ca897315c1a27ca3a4a5e4bc035e965b9b24/raw.json",
+  "review": {
+    "schema": "bsbench-mean-diff-cap-diagnostic-review-v1",
+    "diagnostic_id": "aaf9aef0d6b6452cf19f7a4d9216ca897315c1a27ca3a4a5e4bc035e965b9b24",
+    "bare_restored": true,
+    "historical_drift": {
+      "bare": [],
+      "+C": [],
+      "-C": []
+    },
+    "direction_comparison": {
+      "11": {
+        "cosine": 0.6506910920143127,
+        "new_norm": 1.0000001192092896,
+        "old_norm": 1.0
+      },
+      "15": {
+        "cosine": 0.7736883163452148,
+        "new_norm": 0.9999998211860657,
+        "old_norm": 1.0
+      },
+      "19": {
+        "cosine": 0.9138058423995972,
+        "new_norm": 0.9999999403953552,
+        "old_norm": 0.9999998807907104
+      },
+      "23": {
+        "cosine": 0.9084782004356384,
+        "new_norm": 1.0000001192092896,
+        "old_norm": 0.9999999403953552
+      },
+      "7": {
+        "cosine": 0.29808172583580017,
+        "new_norm": 0.9999998807907104,
+        "old_norm": 1.0
+      }
+    },
+    "raw_path": "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_mean_diff_cap_diagnostic/aaf9aef0d6b6452cf19f7a4d9216ca897315c1a27ca3a4a5e4bc035e965b9b24/raw.json"
+  }
+}
