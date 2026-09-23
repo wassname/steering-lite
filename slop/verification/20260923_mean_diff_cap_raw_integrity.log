@@ -1,0 +1,11 @@
+vector SHA and keys verified: old 169c8ed960bb14f24ec8deb59714c7eeb34e7abae63f804f982383eb9aaf5d8d new 50a4ff2274995eb3246fea649b92f906dc31115b7c50f4d23cbea04d6d9f24bb
+7 shape [2560] cos 0.298082
+11 shape [2560] cos 0.650691
+15 shape [2560] cos 0.773688
+19 shape [2560] cos 0.913806
+23 shape [2560] cos 0.908478
+new384 +C 20×4 KL trace→aggregate verified answers 4 health []
+new384 -C 20×4 KL trace→aggregate verified answers 4 health []
+old64 +C 20×4 KL trace→aggregate verified answers 4 health []
+old64 -C 20×4 KL trace→aggregate verified answers 4 health []
+bare restoration 4/4 verified
