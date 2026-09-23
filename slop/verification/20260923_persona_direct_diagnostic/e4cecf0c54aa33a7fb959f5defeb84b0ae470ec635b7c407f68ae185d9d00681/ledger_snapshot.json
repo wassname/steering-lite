@@ -1,0 +1,28 @@
+{
+  "author": "PI/gpt-6-sol",
+  "diagnostic_id": "e4cecf0c54aa33a7fb959f5defeb84b0ae470ec635b7c407f68ae185d9d00681",
+  "raw_sha256": "accc0c4832490876c0d446117e46f15d02026d09556648e58deebc76f51f1536",
+  "ledger_sha256": "0a475594ef5c54ddc70de33ad7991e80e62742e0a528a51e9c9df62bfd0b2f83",
+  "ledger_rows_for_reservation": [
+    {
+      "event": "reserved",
+      "kind": "modal-persona-direct-diagnostic-e4cecf0c54aa33a7fb959f5defeb84b0ae470ec635b7c407f68ae185d9d00681",
+      "upper_usd": 0.8646938666666667,
+      "time": "2026-09-23T01:09:12.504992+00:00",
+      "id": "8019d4f6f256b2ffe210f14666ac56bb4b834e9315c6e32d4a84333a18c71f93"
+    },
+    {
+      "event": "estimated_at_reservation_upper",
+      "reservation": "8019d4f6f256b2ffe210f14666ac56bb4b834e9315c6e32d4a84333a18c71f93",
+      "estimated_usd": 0.8646938666666667,
+      "receipt": {
+        "provider": "Modal",
+        "status": "pending",
+        "usage": {
+          "elapsed_seconds": 93.06486598400001
+        }
+      }
+    }
+  ],
+  "status": "upper-bound estimate with pending receipt, not final invoice"
+}
