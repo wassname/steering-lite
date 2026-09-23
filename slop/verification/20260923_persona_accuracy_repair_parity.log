@@ -1,0 +1,6 @@
+bare: 8/8 callback-versus-runner hashes; exactly one answer instruction; closed think block
+original_pos: 8/8 callback-versus-runner hashes; exactly one answer instruction; closed think block
+original_neg: 8/8 callback-versus-runner hashes; exactly one answer instruction; closed think block
+mirrored_pos: 8/8 callback-versus-runner hashes; exactly one answer instruction; closed think block
+mirrored_neg: 8/8 callback-versus-runner hashes; exactly one answer instruction; closed think block
+40/40 parity; original 4 prompt/key rows unchanged; answer keys not in spec; no provider call — PI/gpt-6-sol

@@ -1,0 +1,14 @@
+{
+  "author": "PI/gpt-6-sol",
+  "diagnostic_id": "e4cecf0c54aa33a7fb959f5defeb84b0ae470ec635b7c407f68ae185d9d00681",
+  "ledger_committed_usd": 38.52322436403333,
+  "phase6_smoke_committed_usd": 2.0,
+  "existing_committed_usd": 40.52322436403333,
+  "new_stage_upper_usd": 0.8646938666666667,
+  "projected_usd": 41.3879182307,
+  "including_ancillary_allowance_usd": 42.3879182307,
+  "limit_usd": 50.0,
+  "ledger_sha256_before": "e1b5c5245523ca16be7c55b39f5142186da42a2691c8a3120010f0894470df4e",
+  "ledger_sha256_after": "e1b5c5245523ca16be7c55b39f5142186da42a2691c8a3120010f0894470df4e",
+  "dispatch": false
+}
