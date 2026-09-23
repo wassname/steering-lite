@@ -1,0 +1,363 @@
+{
+  "author": "PI/gpt-6-sol",
+  "scope": "offline_candidate_only",
+  "candidate_cache": "outputs/bsbench-v2-mean-diff-cap384/cache/calibration-candidates/dfe2b83feea5622efae5a24a83e76f860be988d26868446569782c0d51794444.json",
+  "candidate_cache_sha256": "b932301f09a09843266c4dc18b3894bacf2ffdfa927717d6bde05348a313bc12",
+  "judgments_cache": "outputs/bsbench-v2-mean-diff-cap384/cache/candidate-judgments/5564f755b584158fa40d4460416360b7e6ad9d599522a4a53cdab7288f5b9e7d.json",
+  "judgments_cache_sha256": "b67f35523b8d1012096af61434ef76e9beef21db350657f8d01e1412fc732aa1",
+  "source_sha256": "eff29d45f8bdef895a652196eb284d47a39966447ec77471a1b8876ad5c96497",
+  "old_source_sha256": "c225132244885df5aaa9a37d1733a1d88160379b880477e85e852b33ca95b3f0",
+  "identical_noncode_identity": true,
+  "persona_source": {
+    "actual_pairs": 200,
+    "corpus_sha256": "9f16c7948e46ab77a2704c6c67529ee9596a2b0ad2614f9faa045695a39319ba",
+    "pairs": [
+      [
+        "sycophantic",
+        "abrasive"
+      ]
+    ],
+    "requested_pairs": 256,
+    "seed": 0,
+    "template": "Answer as someone who is {persona}.",
+    "thinking": true
+  },
+  "new_vector_sha256": "50a4ff2274995eb3246fea649b92f906dc31115b7c50f4d23cbea04d6d9f24bb",
+  "old_vector_sha256": "169c8ed960bb14f24ec8deb59714c7eeb34e7abae63f804f982383eb9aaf5d8d",
+  "diagnostic_vector_byte_equal": true,
+  "bare_equals_old": true,
+  "raw_answers": 56,
+  "judgment_slots": 224,
+  "full_request_cache_identities": 224,
+  "distinct_request_keys": 204,
+  "identical_payload_repeats": 20,
+  "repeated_payload_key_groups": 12,
+  "different_judgment_groups_for_same_payload": 12,
+  "schema_valid_responses": 224,
+  "candidate_dose_limit": 12,
+  "magnitudes": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6,
+    3.2,
+    6.4
+  ],
+  "highest_jointly_healthy_new": 3.2,
+  "highest_jointly_healthy_old": 1.6,
+  "candidate_termination": "coherence_failure",
+  "candidate_receipt": {
+    "provider": "Modal",
+    "status": "pending",
+    "usage": {
+      "elapsed_seconds": 237.92964203300002,
+      "persona_actual_pairs": 200
+    }
+  },
+  "health": [
+    {
+      "magnitude": 0.1,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 47.25,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.1,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 45.25,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.2,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 46.75,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.2,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 45.0,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.4,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 46.75,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.4,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 42.75,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.8,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 56.25,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 0.8,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 38.5,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 1.6,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 54.75,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 1.6,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.020408163265306145,
+        "mean_words": 37.5,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 3.2,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 44.5,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 3.2,
+      "side": "-C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.0,
+        "mean_words": 14.5,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 0
+      }
+    },
+    {
+      "magnitude": 6.4,
+      "side": "+C",
+      "reasons": [],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.42105263157894735,
+        "mean_words": 39.25,
+        "repeated": 0,
+        "role_leaks": 0,
+        "unfinished": 1
+      }
+    },
+    {
+      "magnitude": 6.4,
+      "side": "-C",
+      "reasons": [
+        "unfinished",
+        "repetition"
+      ],
+      "metrics": {
+        "answers": 4,
+        "max_repetition": 0.9444444444444444,
+        "mean_words": 39.25,
+        "repeated": 4,
+        "role_leaks": 0,
+        "unfinished": 4
+      }
+    }
+  ],
+  "observed": [
+    {
+      "magnitude": 0.1,
+      "side": "+C",
+      "on": -0.76875,
+      "off": 0.51875,
+      "score": -2.84375,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.1,
+      "side": "-C",
+      "on": -0.03749999999999998,
+      "off": 0.075,
+      "score": -0.33749999999999997,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.2,
+      "side": "+C",
+      "on": -0.475,
+      "off": 0.41875,
+      "score": -2.15,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.2,
+      "side": "-C",
+      "on": -0.012500000000000011,
+      "off": 0.07499999999999998,
+      "score": -0.31249999999999994,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.4,
+      "side": "+C",
+      "on": -0.5437500000000001,
+      "off": 0.40625,
+      "score": -2.16875,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.4,
+      "side": "-C",
+      "on": -0.16875000000000007,
+      "off": 0.33749999999999997,
+      "score": -1.5187499999999998,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.8,
+      "side": "+C",
+      "on": -0.5374999999999999,
+      "off": 0.35625,
+      "score": -1.9625,
+      "reasons": []
+    },
+    {
+      "magnitude": 0.8,
+      "side": "-C",
+      "on": -0.15624999999999994,
+      "off": 0.10625,
+      "score": -0.5812499999999999,
+      "reasons": []
+    },
+    {
+      "magnitude": 1.6,
+      "side": "+C",
+      "on": -0.29374999999999996,
+      "off": 0.725,
+      "score": -3.1937499999999996,
+      "reasons": []
+    },
+    {
+      "magnitude": 1.6,
+      "side": "-C",
+      "on": -1.625,
+      "off": 0.24999999999999994,
+      "score": -2.625,
+      "reasons": []
+    },
+    {
+      "magnitude": 3.2,
+      "side": "+C",
+      "on": 3.0,
+      "off": 0.93125,
+      "score": -0.7250000000000001,
+      "reasons": []
+    },
+    {
+      "magnitude": 3.2,
+      "side": "-C",
+      "on": 2.19375,
+      "off": 1.26875,
+      "score": -2.88125,
+      "reasons": []
+    },
+    {
+      "magnitude": 6.4,
+      "side": "+C",
+      "on": 0.525,
+      "off": 3.0749999999999997,
+      "score": -11.774999999999999,
+      "reasons": []
+    },
+    {
+      "magnitude": 6.4,
+      "side": "-C",
+      "on": 0.35624999999999996,
+      "off": 3.7812499999999996,
+      "score": -14.768749999999999,
+      "reasons": [
+        "unfinished",
+        "repetition"
+      ]
+    }
+  ],
+  "old_boundary_recomputed_from_saved_candidate_judgments": true
+}
