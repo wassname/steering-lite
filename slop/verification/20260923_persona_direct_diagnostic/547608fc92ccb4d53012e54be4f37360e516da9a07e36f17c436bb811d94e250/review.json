@@ -1,0 +1,13 @@
+{
+  "answers": 40,
+  "conditions": [
+    "bare",
+    "original_pos",
+    "original_neg",
+    "mirrored_pos",
+    "mirrored_neg"
+  ],
+  "diagnostic_id": "547608fc92ccb4d53012e54be4f37360e516da9a07e36f17c436bb811d94e250",
+  "raw_sha256": "bdeec3177eb55846dcc507f31c7bd85e95d86b6a38412f3f7daed6389c76240f",
+  "schema": "bsbench-persona-direct-review-v1"
+}
