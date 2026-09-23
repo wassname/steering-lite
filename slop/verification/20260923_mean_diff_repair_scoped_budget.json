@@ -1,0 +1,129 @@
+{
+  "author": "PI/gpt-6-sol",
+  "mode": "offline_scoped_bound_no_dispatch",
+  "stage_counts": [
+    {
+      "stage": "calibration-candidates",
+      "runner": "modal_gpu",
+      "item_count": 96
+    },
+    {
+      "stage": "candidate-health",
+      "runner": "local",
+      "item_count": 96
+    },
+    {
+      "stage": "candidate-aware",
+      "runner": "local_judge_api",
+      "item_count": 96
+    },
+    {
+      "stage": "final-generation",
+      "runner": "modal_gpu",
+      "item_count": 168
+    },
+    {
+      "stage": "final-health",
+      "runner": "local",
+      "item_count": 168
+    },
+    {
+      "stage": "final-aware",
+      "runner": "local_judge_api",
+      "item_count": 120
+    },
+    {
+      "stage": "final-blind",
+      "runner": "local_judge_api",
+      "item_count": 120
+    }
+  ],
+  "judge_pricing": {
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "input_usd_per_mtoken": 0.03,
+    "output_usd_per_mtoken": 1.0,
+    "source": "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260922_v4-provider-endpoint-metadata.json sha256=475de6301c3285ea7ca9fd4d174918bfdf875f95dc64fd3fee715f9dfbce9ec3",
+    "eligible_providers": [
+      "OpenInference"
+    ],
+    "max_price": {
+      "prompt": 0.03,
+      "completion": 1.0
+    }
+  },
+  "request_counts": {
+    "target_aware": 864,
+    "blind": 240,
+    "persona_validation": 0
+  },
+  "tokens": {
+    "input": 3936000,
+    "output": 1130496
+  },
+  "gpu_stage_count": 2,
+  "single_gpu_upper_usd": 0.8646938666666667,
+  "expected_work": [
+    {
+      "kind": "Modal A10G GPU",
+      "quantity": 1.4666666666666666,
+      "unit": "GPU-hour",
+      "rate_usd": 1.1,
+      "rate_unit": "USD/GPU-hour",
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "subtotal_usd": 1.6133333333333333
+    },
+    {
+      "kind": "Modal CPU",
+      "quantity": 5280.0,
+      "unit": "core-second",
+      "rate_usd": 1.31e-05,
+      "rate_unit": "USD/core-second",
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "subtotal_usd": 0.069168
+    },
+    {
+      "kind": "Modal memory",
+      "quantity": 21120.0,
+      "unit": "GiB-second",
+      "rate_usd": 2.22e-06,
+      "rate_unit": "USD/GiB-second",
+      "rate_source": "https://modal.com/pricing (accessed 2026-09-19)",
+      "subtotal_usd": 0.0468864
+    },
+    {
+      "kind": "Judge input",
+      "quantity": 3.936,
+      "unit": "M-token",
+      "rate_usd": 0.03,
+      "rate_unit": "USD/M-token",
+      "rate_source": "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260922_v4-provider-endpoint-metadata.json sha256=475de6301c3285ea7ca9fd4d174918bfdf875f95dc64fd3fee715f9dfbce9ec3",
+      "subtotal_usd": 0.11807999999999999
+    },
+    {
+      "kind": "Judge output",
+      "quantity": 1.130496,
+      "unit": "M-token",
+      "rate_usd": 1.0,
+      "rate_unit": "USD/M-token",
+      "rate_source": "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260922_v4-provider-endpoint-metadata.json sha256=475de6301c3285ea7ca9fd4d174918bfdf875f95dc64fd3fee715f9dfbce9ec3",
+      "subtotal_usd": 1.130496
+    }
+  ],
+  "single_attempt_work_usd": 2.977963733333333,
+  "retry_reserve": {
+    "scope": "original single-stage retry allowance, consumed",
+    "remaining_reserve_usd": 0.0,
+    "consumed_reservation": "7b44bbd07c9e5da2752e3933b462e4a592f68fd6747e261d3fe2cb580aa386d0"
+  },
+  "existing_ledger_usd": 39.3879182307,
+  "phase6_smoke_committed_usd": 2.0,
+  "existing_total_usd": 41.3879182307,
+  "projected_single_attempt_usd": 44.365881964033335,
+  "projected_all_judge_attempts_usd": 46.863033964033335,
+  "ancillary_allowance_usd": 1.0,
+  "limit_usd": 50.0,
+  "paid_preflight_passed": true,
+  "ledger_sha256_before": "0a475594ef5c54ddc70de33ad7991e80e62742e0a528a51e9c9df62bfd0b2f83",
+  "ledger_sha256_after": "0a475594ef5c54ddc70de33ad7991e80e62742e0a528a51e9c9df62bfd0b2f83",
+  "ledger_unchanged": true
+}
