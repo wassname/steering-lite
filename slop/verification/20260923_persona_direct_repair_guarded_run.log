@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_persona_direct_diagnostic.py", line 215, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_persona_direct_diagnostic.py", line 211, in main
+    run(spec, budget, args.approved_id)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/verification/20260923_run_persona_direct_diagnostic.py", line 163, in run
+    recovered = b''.join(callback.diagnostics.read_file(f"{spec['diagnostic_id']}.json"))
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.local/persona-direct-repair-guard/sitecustomize.py", line 25, in deny_provider_read
+    raise RuntimeError('BSBENCH_PERSONA_PROOF_DENIED_PROVIDER_READ')
+RuntimeError: BSBENCH_PERSONA_PROOF_DENIED_PROVIDER_READ

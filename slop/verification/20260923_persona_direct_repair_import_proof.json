@@ -1,0 +1,21 @@
+{
+  "author": "PI/gpt-6-sol",
+  "argv": [
+    "slop/verification/20260923_run_persona_direct_diagnostic.py",
+    "--run",
+    "--approved-id",
+    "547608fc92ccb4d53012e54be4f37360e516da9a07e36f17c436bb811d94e250"
+  ],
+  "root_initially_missing": true,
+  "repo_root_bootstrapped": true,
+  "callback_import_reached_provider_read": true,
+  "denied_calls": {
+    "provider_read": 1,
+    "socket": 0,
+    "reservation": 0,
+    "app_run": 0
+  },
+  "ledger_sha256_before": "318de6dd7e770c754c939b7ab1a47e3ea6db04e70248196694fffa32493b00c4",
+  "ledger_sha256_after": "318de6dd7e770c754c939b7ab1a47e3ea6db04e70248196694fffa32493b00c4",
+  "ledger_unchanged": true
+}

@@ -22,7 +22,7 @@ def format_prompt(tokenizer, prompt: str, persona: str | None, template: str) ->
 
 
 @app.function(
-    gpu='A10G', image=image.env({'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'}),
+    gpu='A10G', image=image,
     serialized=True, volumes={'/cache': cache, '/diagnostic': diagnostics},
     timeout=MODAL_GPU_STAGE_TIMEOUT_SECONDS,
 )

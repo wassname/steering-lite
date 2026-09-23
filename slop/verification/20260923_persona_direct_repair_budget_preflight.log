@@ -1,0 +1,13 @@
+{
+  "author": "PI/gpt-6-sol",
+  "ledger_committed_usd": 37.65853049736667,
+  "phase6_smoke_committed_usd": 2.0,
+  "existing_committed_usd": 39.65853049736667,
+  "stage_upper_usd": 0.8646938666666667,
+  "projected_usd": 40.52322436403334,
+  "ancillary_allowance_usd": 1.0,
+  "including_allowance_usd": 41.52322436403334,
+  "limit_usd": 50.0,
+  "gpu_reservation_from_failed_app_settled_at_zero": true,
+  "retry_not_authorized": true
+}

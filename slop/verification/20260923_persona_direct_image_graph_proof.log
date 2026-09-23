@@ -1,0 +1,17 @@
+{
+  "author": "PI/gpt-6-sol",
+  "modal_version": "1.5.5",
+  "callback_sha256": "1f0f2e23ecfebb2db9d1966f114a55e960ac99bf163a23b10e4d8957750820fc",
+  "old_appended_env_rejection": "An image tried to run a build step after using `image.add_local_*` to include local files.",
+  "repaired_function_image_is_production_image": true,
+  "final_image_deps": [
+    "production build base",
+    "terminal source runtime Mount"
+  ],
+  "production_build_base_passes_mount_validation": true,
+  "post_mount_build_step_in_repaired_graph": false,
+  "provider_calls": 0,
+  "ledger_sha256_before": "318de6dd7e770c754c939b7ab1a47e3ea6db04e70248196694fffa32493b00c4",
+  "ledger_sha256_after": "318de6dd7e770c754c939b7ab1a47e3ea6db04e70248196694fffa32493b00c4",
+  "ledger_unchanged": true
+}

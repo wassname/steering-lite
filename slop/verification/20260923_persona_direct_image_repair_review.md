@@ -1,0 +1,24 @@
+# Direct-prompt diagnostic: failed image registration and offline repair
+
+PI/gpt-6-sol · 2026-09-23. This supersedes the launch proposal in [the original implementation review](20260923_persona_direct_implementation_review.md). The old diagnostic ID `5537b67a394a456251a1f52d10bc6d815ec8e702cbc5c5f05fe94540f9b0a679` **was attempted once** by the parent at `b753fea`; it did not call the remote function. Do not retry that ID.
+
+## Failure and reservation
+
+- [Local paid-attempt traceback](20260923_persona_direct_paid.log): `Volume.read_file` raised `FileNotFoundError` on a missing result (normal first-use cache miss), then `app.run()` failed during image registration: `InvalidError: An image tried to run a build step after using image.add_local_*`. The original callback added `.env(...)` after the production image's terminal `.add_local_dir` runtime mount. The trace ends inside Modal's image loader, before `compare_direct_personas.remote(spec)`.
+- [Provider app status](20260923_persona_direct_failure_app_status.json): `ap-NVVhsb9hsfJTLt01nyZBTY` created 08:36:01+08, stopped 08:36:04+08, `tasks: "0"`. [Provider app log](20260923_persona_direct_failure_modal_app.log) records the uncaught *local* InvalidError; [diagnostic Volume listing](20260923_persona_direct_failure_volume_list.json) is `[]`. These observations support zero dispatched GPU tasks, not a claim about every Modal ancillary charge.
+- The append-only ledger retains reserved `$0.8646938666666667` and unresolved rows for reservation `2b8540455b0da3418ccea3823c1d753e6cfa318aed8cd74ce576fa97a1a297b4`. Parent authorized a **zero GPU-stage** settlement based on the above evidence; [receipt](20260923_persona_direct_zero_receipt.json) was imported through the standard CLI ([log](20260923_persona_direct_zero_reconciliation.log)). The ledger then contains separate settled `$0` and receipt-imported rows, without deleting the attempt. This is an evidence-based no-dispatch receipt, not a provider invoice or an ancillary-cost estimate. Keep the separate `$1` planning allowance.
+
+## Repaired, still unrun
+
+- Only callback edit: `image=image`, reusing the production image unchanged; it removes the post-mount `.env(...)` build step. Both pinned `from_pretrained` calls still use `local_files_only=True`. No design, generation, source, extraction, judging, or original benchmark outputs changed.
+- [Offline Modal graph proof](20260923_persona_direct_image_graph_proof.json) runs the actual Modal 1.5.5 image-loader guard: the old appended `.env(...)` graph raises the same `InvalidError` after the terminal runtime mount is materialized; the repaired function refers directly to the production image, whose build base passes `_assert_no_mount_layers()` and has no subsequent build node. This proof checks the formerly missed graph boundary **without** app.run, network, reservation or GPU. It cannot prove all remote registration or runtime behavior.
+- [Repaired dry run](20260923_persona_direct_repaired_dry_run.json): **new exact ID** `547608fc92ccb4d53012e54be4f37360e516da9a07e36f17c436bb811d94e250`; callback SHA-256 `1f0f2e23ecfebb2db9d1966f114a55e960ac99bf163a23b10e4d8957750820fc`; design SHA-256 `781bd0c57256a968c602c396decd5e4b62445cb264a3c15dacf79cdd5fe69c93`; scientific-source SHA-256 `19dd29c6cb5fdceaa2fcb4a5805187a21f9b80cd46ba80200c4250431c0360fb`. It has the same 8 prompts × 5 conditions = 40 answers, answer keys excluded, pinned revision `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, greedy `max_new_tokens=128`, `enable_thinking=False`, no judges. [Prompt parity](20260923_persona_direct_repair_formatted_parity.log) checks 40/40 hashes, one two-sentence instruction, and closed `<think>...</think>` template. No answer has been generated for this ID.
+- [Exact direct-CLI network-denial guard](20260923_persona_direct_repair_import_proof.json) reached deliberately denied `Volume.read_file` for the new ID with 0 sockets, reservations, app runs, or ledger changes. [Actual offline budget preflight](20260923_persona_direct_repair_budget_preflight.log): existing `$39.65853049736667` (including separate `$2` phase-6 ledger), single 44-minute GPU-stage upper `$0.8646938666666667`, projected `$40.52322436403334`, plus `$1` ancillary allowance `$41.52322436403334 < $50`. Bounds, not invoices. Post-reconciliation primary ledger SHA-256 `318de6dd7e770c754c939b7ab1a47e3ea6db04e70248196694fffa32493b00c4`.
+
+**No authorization or retry for the new ID.** The parent should inspect these artifacts and separately authorize a single launch if appropriate. Only then should the parent, not this worker, run from the repository root:
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/python slop/verification/20260923_run_persona_direct_diagnostic.py --run --approved-id 547608fc92ccb4d53012e54be4f37360e516da9a07e36f17c436bb811d94e250
+```
+
+No automatic retry. Any failure returns to audit and approval. — PI/gpt-6-sol

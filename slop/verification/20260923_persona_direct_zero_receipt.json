@@ -1,0 +1,18 @@
+{
+  "reservation": "2b8540455b0da3418ccea3823c1d753e6cfa318aed8cd74ce576fa97a1a297b4",
+  "actual_usd": 0.0,
+  "receipt": {
+    "provider": "Modal",
+    "outcome": "not_dispatched_client_image_graph_validation_failure",
+    "diagnostic_id": "5537b67a394a456251a1f52d10bc6d815ec8e702cbc5c5f05fe94540f9b0a679",
+    "app_id": "ap-NVVhsb9hsfJTLt01nyZBTY",
+    "app_state": "stopped",
+    "app_tasks": 0,
+    "original_upper_usd": 0.8646938666666667,
+    "scope": "GPU function stage only; ancillary Volume/control-plane billing is not asserted",
+    "provider_app_status_evidence": "slop/verification/20260923_persona_direct_failure_app_status.json",
+    "provider_app_log_evidence": "slop/verification/20260923_persona_direct_failure_modal_app.log",
+    "provider_volume_evidence": "slop/verification/20260923_persona_direct_failure_volume_list.json",
+    "client_traceback_evidence": "slop/verification/20260923_persona_direct_paid.log"
+  }
+}
