@@ -1,0 +1,30 @@
+2026-09-23 08:19:10.589 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-23 08:19:10.647 | INFO     | steering_lite.data.personas:make_persona_pairs:82 - Persona-branching pairs: n=200 from 1 persona pairs
+pairs 200
+think markers distribution {0: 0, 1: 100, 2: 100, 3: 0}
+special ids [('<|im_start|>', 248045), ('<|im_end|>', 248046), ('<think>', 248068), ('</think>', 248069)]
+
+INDEX 0 SIDE positive length 121 think_markers 2 first200 '<|im_start|>user\nAnswer as someone who is sycophantic.\n\nTell me a story.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<think>Once there was a little boy, who felt very miserable. He had been fee' last180 ' friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.'
+special positions [(0, '<|im_start|>'), (19, '<|im_end|>'), (21, '<|im_start|>'), (24, '<think>'), (26, '</think>'), (28, '<think>')]
+token63 ' play' clip_tail ' him up. So they asked him to go play' full_tail ' could hear them laughing and having a good time.'
+
+INDEX 0 SIDE negative length 118 think_markers 2 first200 '<|im_start|>user\nAnswer as someone who is abrasive.\n\nTell me a story.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<think>Once there was a little boy, who felt very miserable. He had been feelin' last180 ' friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.'
+special positions [(0, '<|im_start|>'), (16, '<|im_end|>'), (18, '<|im_start|>'), (21, '<think>'), (23, '</think>'), (25, '<think>')]
+token63 ' them' clip_tail ' So they asked him to go play outside with them' full_tail ' could hear them laughing and having a good time.'
+
+INDEX 1 SIDE positive length 70 think_markers 2 first200 '<|im_start|>user\nAnswer as someone who is sycophantic.\n\nGenerate a job description for a front-end developer.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<think>The front-end developer is respo' last180 'ting solutions using HTML, CSS and JavaScript. The candidate must have strong problem-solving and communication skills as well as experience with design and development strategies.'
+special positions [(0, '<|im_start|>'), (24, '<|im_end|>'), (26, '<|im_start|>'), (29, '<think>'), (31, '</think>'), (33, '<think>')]
+token63 ' experience' clip_tail ' strong problem-solving and communication skills as well as experience' full_tail ' as well as experience with design and development strategies.'
+
+INDEX 1 SIDE negative length 67 think_markers 2 first200 '<|im_start|>user\nAnswer as someone who is abrasive.\n\nGenerate a job description for a front-end developer.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<think>The front-end developer is responsi' last180 'ting solutions using HTML, CSS and JavaScript. The candidate must have strong problem-solving and communication skills as well as experience with design and development strategies.'
+special positions [(0, '<|im_start|>'), (21, '<|im_end|>'), (23, '<|im_start|>'), (26, '<think>'), (28, '</think>'), (30, '<think>')]
+token63 ' and' clip_tail ' and communication skills as well as experience with design and' full_tail ' as well as experience with design and development strategies.'
+
+INDEX 2 SIDE positive length 91 think_markers 1 first200 '<|im_start|>user\nAnswer as someone who is sycophantic.\n\nTell me about this topic.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<unk> is an egg that is baked after being boiled it is baked alongs' last180 'in hamin when it is mainly taken outside the stew at morning for breakfast , it is also sometimes replaces normal egg at <unk> . It is also eaten as a breakfast alongside jachnun ,'
+special positions [(0, '<|im_start|>'), (20, '<|im_end|>'), (22, '<|im_start|>'), (25, '<think>'), (27, '</think>')]
+token63 ' morning' clip_tail ' when it is mainly taken outside the stew at morning' full_tail ' also eaten as a breakfast alongside jachnun ,'
+
+INDEX 2 SIDE negative length 88 think_markers 1 first200 '<|im_start|>user\nAnswer as someone who is abrasive.\n\nTell me about this topic.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<unk> is an egg that is baked after being boiled it is baked alongside' last180 'in hamin when it is mainly taken outside the stew at morning for breakfast , it is also sometimes replaces normal egg at <unk> . It is also eaten as a breakfast alongside jachnun ,'
+special positions [(0, '<|im_start|>'), (17, '<|im_end|>'), (19, '<|im_start|>'), (22, '<think>'), (24, '</think>')]
+token63 ' ,' clip_tail ' mainly taken outside the stew at morning for breakfast ,' full_tail ' also eaten as a breakfast alongside jachnun ,'
+eval formatted 'lement noise floor? Answer in 2 short sentences.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n'
