@@ -7,15 +7,19 @@ import './style.css';
 const COLORS = {
   vjp_delta: '#0072b2', mean_diff: '#d55e00', pca: '#cc79a7', vjp_cache: '#009e73',
   kv_cache_gram: '#e69f00', prompting: '#6a3d9a', prompting_engineered: '#b15928', random: '#999999',
+  angular_steering: '#1f77b4', chars: '#aec7e8', corda_pca: '#ff7f0e', cosine_gated: '#2ca02c', directional_ablation: '#98df8a',
+  linear_act: '#d62728', spherical: '#ff9896', sspace: '#9467bd', sspace_ablate: '#c5b0d5', sspace_damp_amp: '#8c564b',
+  sspace_pca: '#c49c94', super_sspace: '#e377c2', topk_clusters: '#17becf',
 };
 const W = 1000, H = 560, M = { l: 70, r: 20, t: 30, b: 50 };
 const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
 const pointId = p => `${p.method}_s${p.seed}_${p.side}_C${p.C}`;
 const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 
-function Plot({ data, selected, onSelect }) {
+function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
-  const shown = [...data.curves.flatMap(c => c.points), ...data.points.filter(p => p.admissible && (p.method === 'random' || p.method.startsWith('prompting')))];
+  const curves = data.curves.filter(c => visible.has(c.method));
+  const shown = [...curves.flatMap(c => c.points), ...data.points.filter(p => p.admissible && (p.method === 'random' || p.method.startsWith('prompting')))];
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), 0.5);
   const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), 0.3);
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
@@ -36,7 +40,7 @@ function Plot({ data, selected, onSelect }) {
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis damage (lower is better)</text>
       {zonePath && <path d={zonePath} className="zone" />}
       {random.map(p => <circle key={pointId(p)} cx={x(p.effect)} cy={y(p.off_axis)} r={p.admissible ? 3 : 2} className={p.admissible ? 'random' : 'random rejected'} />)}
-      {data.curves.filter(c => c.points.length).map(c => {
+      {curves.filter(c => c.points.length).map(c => {
         const end = c.points.at(-1);
         return <g key={c.method + c.side}>
           <polyline points={c.path.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
@@ -108,15 +112,24 @@ function Explorer({ data, selected, onSelect }) {
   </section>;
 }
 
+function Chips({ data, visible, setVisible }) {
+  const methods = [...new Set(data.curves.map(c => c.method))];
+  const toggle = m => { const next = new Set(visible); next.has(m) ? next.delete(m) : next.add(m); setVisible(next); };
+  return <div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
+    <span className="swatch" style={{ background: COLORS[m] }} />{m}</button>)}</div>;
+}
+
 function App() {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(null);
-  useEffect(() => { fetch('points.json').then(r => r.json()).then(setData); }, []);
+  const [visible, setVisible] = useState(new Set());
+  useEffect(() => { fetch('points.json').then(r => r.json()).then(d => { setData(d); setVisible(new Set(d.shown)); }); }, []);
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
     <h1>steering-lite on Bullshit Bench v2</h1>
-    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? Explanation below the plot.</p>
-    <Plot data={data} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
+    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? Explanation below the plot. The plot starts with the {data.shown.length} best-scoring methods; click a name to add or hide it.</p>
+    <Chips data={data} visible={visible} setVisible={setVisible} />
+    <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {/* intro text: PI/Claude, rewrite freely */}
     <section className="intro">
       <p>We add a steering vector to a small language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.

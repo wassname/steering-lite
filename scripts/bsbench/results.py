@@ -34,10 +34,19 @@ COLORS = {
     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
     "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928",
 }
+# the other steering-lite methods: Tableau-20 colours not used above
+for _method, _color in zip(
+    ("angular_steering", "chars", "corda_pca", "cosine_gated", "directional_ablation", "linear_act", "spherical",
+     "sspace", "sspace_ablate", "sspace_damp_amp", "sspace_pca", "super_sspace", "topk_clusters"),
+    ("#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94", "#e377c2", "#17becf"),
+):
+    COLORS[_method] = _color
+TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring learned methods; the table lists all
 LABELS = {
     "vjp_delta": "VJP-delta", "mean_diff": "mean difference", "pca": "PCA", "vjp_cache": "VJP-cache",
     "kv_cache_gram": "KV-cache Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
 }
+LABELS |= {method: method for method in COLORS if method not in LABELS}
 
 
 def parse_args() -> argparse.Namespace:
@@ -364,9 +373,8 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
     return path
 
 
-def plot(points: list[dict], title: str) -> go.Figure:
+def plot(points: list[dict], title: str, methods: list[str]) -> go.Figure:
     figure = go.Figure()
-    methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
     prompting = [point for point in points if point["method"] in PROMPTS]
     random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
@@ -512,7 +520,9 @@ def main() -> None:
     cohort_rows = load_cohort()
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
+    shown = [row["method"] for row in rows if row["method"] in methods and not math.isnan(row["score"])][:TOP_N_PLOT]
     site = {
+        "shown": shown,
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "off_weight": OFF_WEIGHT,
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zone": random_zone(points),
@@ -529,7 +539,7 @@ def main() -> None:
     }
     (out / "points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)"
-    figure = plot(points, title)
+    figure = plot(points, title, shown)
     table = tables(rows) + (
         "\n\nBlind judge (blind.py, not told the target, method, dose or known flaw). Blind stance shift = mean over questions of "
         "stance(steered) - stance(bare), accepts=+1, questions=0, rejects=-1, signed so + is toward the side's target "

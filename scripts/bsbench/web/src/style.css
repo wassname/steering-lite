@@ -32,3 +32,7 @@ td.control{font-style:italic}
 .answer h3{font-size:.9rem;margin:.2rem 0}
 .judge{color:#5b554b;font-size:.82rem}
 .intro{max-width:80ch;color:#4a463f;font-size:.95rem;margin-top:1rem}
+.controls{display:flex;flex-wrap:wrap;gap:.35rem;margin:.6rem 0}
+.chip{display:flex;align-items:center;gap:.3rem;padding:.22rem .5rem;border:1px solid #d9d5ca;border-radius:999px;background:white;color:var(--ink);font:600 .78rem/1 inherit;cursor:pointer}
+.chip[aria-pressed="false"]{color:#8a857a;background:#f6f4ef}
+.chip[aria-pressed="false"] .swatch{opacity:.3}
