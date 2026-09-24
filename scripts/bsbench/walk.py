@@ -91,6 +91,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--start-below", type=float, default=8.0)
     parser.add_argument("--stride", type=int, default=2)
     parser.add_argument("--max-rungs", type=int, default=24)
+    parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
     return parser.parse_args(argv)
 
@@ -268,6 +269,47 @@ def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Pa
     return out
 
 
+@torch.inference_mode()
+def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path: Path) -> dict:
+    """Judge-free check that +C moves toward the positive persona.
+
+    Held-out persona pairs (seed 10000+seed, not used for extraction) share a suffix and differ only
+    in the persona line. For the suffix tokens, compare KL(p_pos || p_neg steered at +C) with the same
+    at -C: if +C brings the negative prompt's predictions closer to the positive prompt's, the sign is
+    right. score = KL(-C) - KL(+C) > 0 means correct; < 0 means the vector's +C steers the other way.
+    """
+    if path.exists():
+        return json.loads(path.read_text())
+    positive, negative = make_persona_pairs(
+        tokenizer, n_pairs=16, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
+    )
+    kls = {"base": [], "+C": [], "-C": []}
+    for pos_text, neg_text in zip(positive, negative):
+        pos_ids = tokenizer(pos_text, return_tensors="pt", add_special_tokens=False).input_ids.to(args.device)
+        neg_ids = tokenizer(neg_text, return_tensors="pt", add_special_tokens=False).input_ids.to(args.device)
+        shared = 0
+        while shared < min(pos_ids.shape[1], neg_ids.shape[1]) - 1 and pos_ids[0, -1 - shared] == neg_ids[0, -1 - shared]:
+            shared += 1
+        assert shared >= 8, f"persona pair shares only {shared} suffix tokens"
+        logp_pos = model(pos_ids).logits[0, -shared - 1 : -1].float().log_softmax(-1)
+        for key, sign in (("base", 0.0), ("+C", 1.0), ("-C", -1.0)):
+            if sign == 0.0:
+                logits = model(neg_ids).logits
+            else:
+                with vector(model, C=sign * coefficient):
+                    logits = model(neg_ids).logits
+            logp_neg = logits[0, -shared - 1 : -1].float().log_softmax(-1)
+            kls[key].append(float((logp_pos.exp() * (logp_pos - logp_neg)).sum(-1).mean()))
+    result = {key: sum(v) / len(v) for key, v in kls.items()} | {"C": coefficient, "n_pairs": len(positive)}
+    result["score"] = result["-C"] - result["+C"]
+    result["flip"] = result["score"] < 0
+    logger.info("SIGN_PROBE method={} seed={} C={:.4g} KL base={:.4f} +C={:.4f} -C={:.4f} score={:+.4f} flip={}",
+                args.method, args.seed, coefficient, result["base"], result["+C"], result["-C"], result["score"], result["flip"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
     return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
@@ -278,7 +320,7 @@ def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
-    if certificate_path.exists() and not args.smoke:
+    if certificate_path.exists() and not args.smoke and not args.probe:
         done = json.loads(certificate_path.read_text())
         if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
@@ -318,6 +360,9 @@ def walk(args) -> None:
     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
     vector = extract_vector(args, model, tokenizer, layers)
     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.method}_s{args.seed}.json")
+    if args.probe:
+        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign" / f"{args.method}_s{args.seed}.json")
+        return
     # start on the stride lattice of the reference grid, so every seed and method shares C values
     start = min(range(len(GRID)), key=lambda index: abs(math.log(GRID[index]) - math.log(c0 / args.start_below)))
     start -= start % args.stride

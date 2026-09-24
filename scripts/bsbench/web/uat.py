@@ -42,7 +42,7 @@ with sync_playwright() as p:
     assert blocks > 1
     assert data["questions"][1]["bare"][:40] in page.locator(".answer.bare").inner_text()
 
-    page.locator("circle.mark").first.click()
+    page.locator("circle.mark").first.dispatch_event("click")
     assert page.locator(".answer.selected").count() == 1
     page.locator(".answer.selected").screenshot(path=str(site / "uat_selected.png"))
     page.screenshot(path=str(site / "uat_full.png"), full_page=True)

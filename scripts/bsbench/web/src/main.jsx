@@ -19,7 +19,7 @@ const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
-  const shown = [...curves.flatMap(c => c.points), ...data.points.filter(p => p.admissible && (p.method === 'random' || p.method.startsWith('prompting')))];
+  const shown = [...curves.flatMap(c => c.points), ...data.points.filter(p => p.admissible && p.method.startsWith('prompting'))];
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), 0.5);
   const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), 0.3);
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
@@ -28,7 +28,6 @@ function Plot({ data, visible, selected, onSelect }) {
   const zonePath = zone.length > 1
     ? 'M' + [...zone.map(z => `${x(z[2])},${y(z[1])}`), ...[...zone].reverse().map(z => `${x(z[3])},${y(z[1])}`)].join('L') + 'Z' : null;
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
-  const random = data.points.filter(p => p.method === 'random');
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
       <rect className="canvas" width={W} height={H} />
@@ -39,7 +38,6 @@ function Plot({ data, visible, selected, onSelect }) {
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: abrasive / candid, right: sycophantic)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis damage (lower is better)</text>
       {zonePath && <path d={zonePath} className="zone" />}
-      {random.map(p => <circle key={pointId(p)} cx={x(p.effect)} cy={y(p.off_axis)} r={p.admissible ? 3 : 2} className={p.admissible ? 'random' : 'random rejected'} />)}
       {curves.filter(c => c.points.length).map(c => {
         const end = c.points.at(-1);
         return <g key={c.method + c.side}>
@@ -51,9 +49,11 @@ function Plot({ data, visible, selected, onSelect }) {
             return isEnd
               ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={COLORS[c.method]} strokeWidth="3.5"
                   className="mark end" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />
-              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={COLORS[c.method]} fillOpacity={isSel ? 1 : 0.5} stroke={isSel ? '#000' : 'none'}
+              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={COLORS[c.method]} fillOpacity={1} stroke={isSel ? '#000' : 'none'}
                   className="mark" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />;
           })}
+          {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
+            return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" className="best" />; })()}
           <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor="middle" className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
         </g>;
       })}
@@ -138,9 +138,9 @@ function App() {
       <p>Each colour is one method. We raise the steering strength step by step until the answers stop making sense.
         Left to right is how far a judge model says the answers moved: right is more sycophantic, left is more candid.
         Up and down is other damage the judge saw, such as rambling or going off topic; higher on the page is better.
-        The line joins each method's best trade-offs and ends at its last sensible strength (×). Faint dots are the other strengths we tried.
+        The line joins each method's best trade-offs (dots) and ends at its last sensible strength (×). The ring marks the strength used for the score. Other strengths are in the answer explorer below.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
-        Grey dots are random directions with the same effect on the model's outputs; the grey band is where most of them land.</p>
+        The grey band is where random directions of the same strength land (10–90% over seeds); a method is only doing something specific if it gets outside it.</p>
     </section>
     <h2>Best strength per method</h2>
     <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling the questions.</p>

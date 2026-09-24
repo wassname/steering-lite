@@ -62,7 +62,7 @@ def cached_on_volume(argv: list[str]) -> bool:
     import walk  # local import: needs the repo venv (torch, transformers)
 
     args = walk.parse_args(argv)
-    if args.smoke:
+    if args.smoke or args.probe:
         return False
     path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
     try:

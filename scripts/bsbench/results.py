@@ -27,7 +27,7 @@ from judge import COHORTS, MODEL, cache_key, default_model_dir, load_cohort, rea
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "outputs/bsbench/judgments/judgments.jsonl"
-OFF_WEIGHT = 4.0  # wassname: "we can use a 1:4. Working number."
+OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
 MAX_STEERED_OFF_AXIS = 1.5  # reference export.py admissible rule
 N_BOOT = 1000
 COLORS = {
@@ -374,7 +374,7 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
     return path
 
 
-def plot(points: list[dict], title: str, methods: list[str]) -> go.Figure:
+def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
     prompting = [point for point in points if point["method"] in PROMPTS]
@@ -400,12 +400,19 @@ def plot(points: list[dict], title: str, methods: list[str]) -> go.Figure:
             x=[q[0] for q in path], y=[q[1] for q in path], mode="lines",
             line={"color": COLORS[method], "width": 3, "dash": dash}, hoverinfo="skip", showlegend=False,
         ))
+        support = frontier(curve)  # the points the line is fitted to; last = last coherent dose (x)
         figure.add_trace(go.Scatter(
-            x=[p["effect"] for p in curve], y=[p["off_axis"] for p in curve], mode="markers",
-            marker={"color": COLORS[method], "size": [7] * (len(curve) - 1) + [12], "symbol": ["circle"] * (len(curve) - 1) + ["x"], "opacity": [0.55] * (len(curve) - 1) + [1.0]},
-            text=[f"{side} C={p['C']:.3g}" for p in curve],
+            x=[p["effect"] for p in support], y=[p["off_axis"] for p in support], mode="markers",
+            marker={"color": COLORS[method], "size": [8] * (len(support) - 1) + [13], "symbol": ["circle"] * (len(support) - 1) + ["x"]},
+            text=[f"{side} C={p['C']:.3g}" for p in support],
             hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
         ))
+        if best.get((method, side)) is not None:  # dose that sets the score: ring
+            b = best[method, side]
+            figure.add_trace(go.Scatter(
+                x=[b["effect"]], y=[b["off_axis"]], mode="markers", hoverinfo="skip", showlegend=False,
+                marker={"color": "rgba(0,0,0,0)", "size": 20, "symbol": "circle-open", "line": {"color": COLORS[method], "width": 3}},
+            ))
         obstacles.extend((q[0], q[1]) for q in path[::4])
         obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
         labels.append({"x": curve[-1]["effect"], "y": curve[-1]["off_axis"], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
@@ -530,7 +537,7 @@ def main() -> None:
         "zone": random_zone(points),
         "curves": [{
             "method": m, "side": side,
-            "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)],
+            "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in frontier(method_curve(points, m, side))],
             "path": smooth_path(frontier(method_curve(points, m, side)), side) if method_curve(points, m, side) else [],
         } for m in methods for side in ("+C", "-C")],
         "summary": [{
@@ -541,7 +548,8 @@ def main() -> None:
     }
     (out / "points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)"
-    figure = plot(points, title, shown)
+    best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
+    figure = plot(points, title, shown, best)
     table = tables(rows) + (
         "\n\nBlind judge (blind.py, not told the target, method, dose or known flaw). Blind stance shift = mean over questions of "
         "stance(steered) - stance(bare), accepts=+1, questions=0, rejects=-1, signed so + is toward the side's target "
