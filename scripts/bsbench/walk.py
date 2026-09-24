@@ -2,7 +2,7 @@
 
 Adapted from vjp-steering 7f0782a `scripts/walk.py`. Deliberate changes, each so steering-lite
 methods fit and a walk costs less; everything else (personas, extraction pairs, layers, prompt
-template, greedy 512-token generation, health rule, stop rule) follows the reference:
+template, greedy 512-token generation, health rule) follows the reference:
 
 - methods: every steering-lite method below, plus `prompting` (the persona as a prompt prefix);
   vjp_delta is steering-lite's copy of the reference estimator
@@ -11,8 +11,10 @@ template, greedy 512-token generation, health rule, stop rule) follows the refer
 - answers are cached per (model, generation settings, method, seed, side, C, question), so a larger
   cohort or more doses only computes the missing cells
 - the walk starts at C0/8 on the reference grid, not at 2^-5: C0 is the iso-KL coefficient at
-  `--kl-target` nats RMS KL. It steps `--stride` grid points (2 = third-octave) and stops on the
-  reference rule: 2 unhealthy rungs in a row on one side, then one rung past that
+  `--kl-target` nats RMS KL. It steps `--stride` grid points (2 = third-octave)
+- stop rule: a side's boundary is 2 unhealthy rungs in a row, as in the reference, but the walk
+  stops only when BOTH sides are one rung past their boundary (reference: either side), so each
+  side's last coherent dose is measured
 - each rung also logs RMS KL at +/-C on the calibration prompts, for the calibration table
 """
 
@@ -325,7 +327,7 @@ def walk(args) -> None:
                 "stats": side_stats, "answers": str(path.relative_to(root)),
             }
         rungs.append(rung)
-        done = any(state[side]["boundary"] is not None and step + 1 >= state[side]["boundary"] + 2 for side in state)
+        done = all(state[side]["boundary"] is not None and step + 1 >= state[side]["boundary"] + 2 for side in state)
         certificate_path.parent.mkdir(parents=True, exist_ok=True)
         certificate_path.write_text(json.dumps({
             "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
