@@ -125,7 +125,7 @@ async def refresh(todo: dict[str, tuple[str, dict]]) -> None:
                 except httpx.TimeoutException:
                     logger.warning("jev timeout attempt={}/6", attempt + 1)
                     continue
-                if response.status_code in (408, 429, 500, 502, 503, 504, 529):  # 529 = Jev overloaded
+                if response.status_code in (408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 529):  # 52x = gateway errors, 529 = Jev overloaded
                     logger.warning("jev {} attempt={}/6", response.status_code, attempt + 1)
                     await asyncio.sleep(5 * 2**attempt)
                     continue
