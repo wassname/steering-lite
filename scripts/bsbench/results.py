@@ -334,17 +334,16 @@ PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # sing
 
 
 def frontier(curve: list[dict]) -> list[dict]:
-    """Pareto points of one walk in on-axis order, ending at the last coherent dose (always kept).
+    """Pareto points of one walk in on-axis order, then the last coherent dose (always kept, the x).
 
-    A point stays if no other point has at least its on-axis gain with less damage. Points past the
-    end's on-axis gain are dropped so the line never turns back."""
+    A point stays if no other point has at least its on-axis gain with less damage. If the last
+    coherent dose is not itself on the frontier, the line takes one straight step back to it."""
     if not curve:
         return []
     end = curve[-1]
     kept = [
         p for p in curve
-        if p is not end and directed(p) < directed(end)
-        and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
+        if p is not end and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
     ]
     return sorted(kept, key=directed) + [end]
 
@@ -354,12 +353,17 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
 
     Monotone interpolation cannot overshoot, so the drawn line stays between its support points."""
     sign = 1.0 if side == "+C" else -1.0
+    end = support[-1]
     ts, ys = [0.0], [0.0]
-    for p in support:
+    for p in support[:-1]:
         if directed(p) > ts[-1]:
             ts.append(directed(p)); ys.append(p["off_axis"])
+    if directed(end) > ts[-1]:  # the end continues the monotone frontier
+        ts.append(directed(end)); ys.append(end["off_axis"])
+        end = None
     if len(ts) < 2:  # no forward progress on this side: straight line to the end
         return [[0.0, 0.0], [support[-1]["effect"], support[-1]["off_axis"]]]
+    tail = [] if end is None else [[end["effect"], end["off_axis"]]]  # one straight step back to the last coherent dose
     h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
     d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
     m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
@@ -371,7 +375,7 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
             y = h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
             path.append([sign * (ts[i] + u * h[i]), y])
     path.append([sign * ts[-1], ys[-1]])
-    return path
+    return path + tail
 
 
 def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
