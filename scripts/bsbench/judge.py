@@ -255,6 +255,19 @@ def _insufficient_credits(err: APIStatusError) -> bool:
     return err.status_code == 402 or "insufficient" in text or "credit" in text or "quota" in text
 
 
+async def _create_with_backoff(client: AsyncOpenAI, **kwargs):
+    """429/5xx wait 5*2^k s (max 300) for up to 8 tries; the reference retried at once and lost
+    the cell (then the run) when the only allowed provider was briefly overloaded."""
+    for tries in range(8):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except APIStatusError as err:
+            if err.status_code not in TRANSIENT_CODES or tries == 7:
+                raise
+            logger.warning("transient {} backoff try={}/8", err.status_code, tries + 1)
+            await asyncio.sleep(min(300, 5 * 2**tries))
+
+
 async def judge_one(client: AsyncOpenAI, row: dict, order: str, pass_index: int) -> dict:
     prompt = judge_prompt(row, order)
     raw_attempts = []
@@ -264,7 +277,8 @@ async def judge_one(client: AsyncOpenAI, row: dict, order: str, pass_index: int)
         # imitates the repetition and never emits JSON; scoring semantics are unchanged
         content = prompt if attempt == 0 else prompt + RETRY_NUDGE
         try:
-            response = await client.chat.completions.create(
+            response = await _create_with_backoff(
+                client,
                 model=MODEL,
                 messages=[{"role": "user", "content": content}],
                 temperature=0.7,
