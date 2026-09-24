@@ -127,11 +127,21 @@ function App() {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(null);
   const [visible, setVisible] = useState(new Set());
-  useEffect(() => { fetch('points.json').then(r => r.json()).then(d => { setData(d); setVisible(new Set(d.shown)); }); }, []);
+  const [judge, setJudge] = useState('deepseek');
+  const [hasJev, setHasJev] = useState(false);
+  useEffect(() => { fetch('points_jev.json', { method: 'HEAD' }).then(r => setHasJev(r.ok)); }, []);
+  useEffect(() => {
+    fetch(judge === 'jev' ? 'points_jev.json' : 'points.json').then(r => r.json())
+      .then(d => { setData(d); setVisible(v => (v.size ? v : new Set(d.shown))); setSelected(null); });
+  }, [judge]);
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
     <h1>steering-lite on Bullshit Bench v2</h1>
     <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? Explanation below the plot. The plot starts with the {data.shown.length} best-scoring methods; click a name to add or hide it.</p>
+    {hasJev && <label className="picker">judge <select value={judge} onChange={e => setJudge(e.target.value)}>
+      <option value="deepseek">DeepSeek V4 Flash (pairwise, reference judge)</option>
+      <option value="jev">Jev (rates each answer alone; premise level 0-6, damage 0-4)</option>
+    </select> <span className="lede">Same answers and same admissible doses; only the judge differs, so the gap between the two plots is judge noise.</span></label>}
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {/* intro text: PI/Claude, rewrite freely */}
