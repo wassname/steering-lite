@@ -56,13 +56,30 @@ def run(argv: list[str]) -> str:
     return " ".join(argv)
 
 
+def cached_on_volume(argv: list[str]) -> bool:
+    """Read the walk certificate from the Volume before spawning, so a finished walk starts no GPU container."""
+    sys.path.insert(0, str(REPO / "scripts/bsbench"))
+    import walk  # local import: needs the repo venv (torch, transformers)
+
+    args = walk.parse_args(argv)
+    if args.smoke:
+        return False
+    path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
+    try:
+        certificate = json.loads(b"".join(cache.read_file(str(path))))
+    except FileNotFoundError:
+        return False
+    return walk.walk_done(certificate, args)
+
+
 @app.local_entrypoint()
 def main(methods: str = "mean_diff,pca,vjp_delta", seeds: str = "0", cohort: str = "dev", extra: str = ""):
     jobs = [(method, seed) for seed in seeds.split(",") for method in methods.split(",")]
-    handles = {
-        job: run.spawn([job[0], "--seed", job[1], "--cohort", cohort, *extra.split()])
-        for job in jobs
-    }
+    argvs = {job: [job[0], "--seed", job[1], "--cohort", cohort, *extra.split()] for job in jobs}
+    todo = [job for job in jobs if not cached_on_volume(argvs[job])]
+    for method, seed in sorted(set(jobs) - set(todo)):
+        print(f"WALK_CACHED_LOCAL\t{method}\ts{seed}\tcohort={cohort} (certificate COMPLETE on the Volume; no container started)")
+    handles = {job: run.spawn(argvs[job]) for job in todo}
     for (method, seed), handle in handles.items():
         try:
             print(f"DONE\t{method}\ts{seed}\t{handle.get()}")

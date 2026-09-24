@@ -72,7 +72,7 @@ CALIB = {"T": 50, "do_sample": True, "seed": 0}  # RMS-KL probe on steering-lite
 assert GRID[0] == 0.03125 and GRID[-1] == 16384.0
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("method", choices=METHODS)
     parser.add_argument("--seed", type=int, default=0)
@@ -92,7 +92,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stride", type=int, default=2)
     parser.add_argument("--max-rungs", type=int, default=24)
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def model_dir(model: str) -> Path:
@@ -268,13 +268,19 @@ def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Pa
     return out
 
 
+def walk_done(certificate: dict, args) -> bool:
+    """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
+    return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
+            and certificate.get("kl_target", args.kl_target) == args.kl_target)
+
+
 def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
     if certificate_path.exists() and not args.smoke:
         done = json.loads(certificate_path.read_text())
-        if done["status"] == "COMPLETE" and done.get("stride", args.stride) == args.stride and done.get("kl_target", args.kl_target) == args.kl_target:
+        if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
             return
     dtype = getattr(torch, args.dtype)
