@@ -336,6 +336,7 @@ def walk(args) -> None:
         if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
             return
+    timing = {"start": time.monotonic()}  # seconds per stage, saved in the certificate for cost estimates
     dtype = getattr(torch, args.dtype)
     logger.info("stage=load model={} device={} dtype={} gen_key={} gen={}", args.model, args.device, args.dtype, GEN_KEY, GEN)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
@@ -343,6 +344,7 @@ def walk(args) -> None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype, attn_implementation="sdpa").to(args.device).eval()
     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
+    timing["load_s"] = time.monotonic() - timing["start"]
     prompts = generation_inputs(tokenizer, rows)
     logger.info(
         "SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. "
@@ -385,9 +387,11 @@ def walk(args) -> None:
         with vector(model, C=GRID[start]):
             assert not torch.equal(base_logits, model(**encoded).logits), "steering changed no logits"
 
+    timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]  # bare answers, vector, C0
     state = {side: {"streak": 0, "boundary": None} for side in ("+C", "-C")}
     rungs = []
     for step, grid_index in enumerate(range(start, len(GRID), args.stride)):
+        rung_started = time.monotonic()
         if step >= args.max_rungs and args.smoke:
             logger.info("SMOKE_PASS method={} rungs={} certificate={}", args.method, len(rungs), certificate_path)
             return
@@ -416,6 +420,7 @@ def walk(args) -> None:
                 "post_boundary": state[side]["boundary"] is not None and step > state[side]["boundary"],
                 "stats": side_stats, "answers": str(path.relative_to(root)),
             }
+        rung["seconds"] = time.monotonic() - rung_started
         rungs.append(rung)
         done = all(state[side]["boundary"] is not None and step + 1 >= state[side]["boundary"] + 2 for side in state)
         certificate_path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,6 +429,8 @@ def walk(args) -> None:
             "method": args.method, "seed": args.seed, "cohort": args.cohort, "model": args.model,
             "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
             "state": state, "rungs": rungs,
+            "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
+                       "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"},
         }, indent=2) + "\n")
         if done:
             logger.info("WALK_COMPLETE method={} seed={} rungs={} state={} certificate={}", args.method, args.seed, len(rungs), state, certificate_path)
