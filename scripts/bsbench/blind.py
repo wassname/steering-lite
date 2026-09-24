@@ -99,7 +99,7 @@ Answer B:
 def cached() -> dict[str, dict]:
     if not CACHE.exists():
         return {}
-    return {record["key"]: record for record in map(json.loads, CACHE.read_text().splitlines())}
+    return {record["key"]: record for record in map(json.loads, CACHE.open())}
 
 
 async def judge_one(client: AsyncOpenAI, row: dict) -> dict | None:

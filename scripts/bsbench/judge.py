@@ -123,7 +123,7 @@ COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
 
 
 def load_cohort() -> dict[str, dict]:
-    rows = [json.loads(line) for line in (ROOT / "data/bsbench/bullshit_bench_v2.jsonl").read_text().splitlines()]
+    rows = [json.loads(line) for line in (ROOT / "data/bsbench/bullshit_bench_v2.jsonl").open()]
     assert len(rows) == 100
     return {row["scenario"]: row for row in rows}
 
@@ -147,7 +147,7 @@ def walk_certificates(model_dir: Path, cohort: str) -> list[dict]:
 
 
 def read_answers(path: Path) -> dict[str, dict]:
-    return {record["scenario"]: record for record in map(json.loads, path.read_text().splitlines())}
+    return {record["scenario"]: record for record in map(json.loads, path.open())}
 
 
 def demo_rows(model_dir: Path, certificate: dict) -> list[dict]:

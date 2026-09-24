@@ -90,7 +90,7 @@ def change_request(question: str, bare: str, steered: str) -> dict:
 def cached() -> dict[str, dict]:
     if not CACHE.exists():
         return {}
-    return {record["key"]: record for record in map(json.loads, CACHE.read_text().splitlines())}
+    return {record["key"]: record for record in map(json.loads, CACHE.open())}
 
 
 def requests_for(rows: list[dict]) -> dict[str, tuple[str, dict]]:

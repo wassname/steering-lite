@@ -83,7 +83,7 @@ def build_points(model_dir: Path, cohort: str) -> list[dict]:
     keys = {cache_key(row, order, p) for _, rows in rows_by_cert for row in rows for order in ("AB", "BA") for p in range(2)}
     cache = judgments(keys)
     print(f"judgments: {len(cache)}/{len(keys)} cells cached")
-    blind = {record["key"]: record["judgment"] for record in map(json.loads, BLIND_CACHE.read_text().splitlines())} if BLIND_CACHE.exists() else {}
+    blind = {record["key"]: record["judgment"] for record in map(json.loads, BLIND_CACHE.open())} if BLIND_CACHE.exists() else {}
     points = []
     for certificate, rows in rows_by_cert:
         rungs = {rung["coefficient"]: rung for rung in certificate["rungs"]}

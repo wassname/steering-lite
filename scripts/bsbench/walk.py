@@ -101,8 +101,8 @@ def model_dir(model: str) -> Path:
 
 def read_cohort(cohort: str) -> list[dict[str, str]]:
     if cohort == "ood":
-        return [json.loads(line) for line in OOD.read_text().splitlines()]
-    rows = [json.loads(line) for line in COHORT.read_text().splitlines()]
+        return [json.loads(line) for line in OOD.open()]
+    rows = [json.loads(line) for line in COHORT.open()]
     assert len(rows) == 100 and len({row["scenario"] for row in rows}) == 100
     return rows[COHORTS[cohort]]
 
@@ -188,7 +188,7 @@ def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch
     """Answers for `rows`, generating only questions missing from `path`. `steer` is a context manager."""
     done = {}
     if path.exists():
-        done = {record["scenario"]: record for record in map(json.loads, path.read_text().splitlines())}
+        done = {record["scenario"]: record for record in map(json.loads, path.open())}
     missing = [index for index, row in enumerate(rows) if row["scenario"] not in done]
     logger.info("answers {} cached={} missing={}", path.relative_to(OUT), len(rows) - len(missing), len(missing))
     if missing:
