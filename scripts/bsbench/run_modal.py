@@ -17,7 +17,7 @@ from pathlib import Path
 
 import modal
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[2] if modal.is_local() else Path("/repo")  # container copy is /root/run_modal.py
 MODEL = "Qwen/Qwen3.5-4B"
 
 image = (

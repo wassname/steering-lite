@@ -33,7 +33,15 @@ Issues = "https://github.com/wassname/steering-lite/issues"
 build = ["twine>=6"]
 test = ["pytest", "beartype>=0.18"]
 hf-test = ["accelerate>=1.6", "transformers>=4.51"]
-benchmark = ["accelerate>=1.6", "transformers>=5.12", "openai>=1.82", "plotly>=6.0", "kaleido==0.2.1", "modal>=1.5.4", "python-dotenv>=1.2.3"]
+benchmark = [
+    "accelerate>=1.6",
+    "transformers>=5.12",
+    "openai>=1.82",
+    "plotly>=6.0,<7",
+    "kaleido==0.2.1",
+    "modal>=1.5.4",
+    "python-dotenv>=1.2.3",
+]
 baseline = ["repeng", "openrouter-wrapper", "python-dotenv"]
 
 [build-system]

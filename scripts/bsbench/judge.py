@@ -1,4 +1,8 @@
-"""Judge all public benchmark arms with the existing content-keyed contract."""
+"""Judge all completed walks with the vjp-steering 7f0782a content-keyed contract.
+
+Prompt, rubric, schema, provider filter, AB/BA x 2 passes and cache key are the reference's.
+Only the manifest changed: it reads bsbench_walk_v3 certificates and the per-question answer cache.
+"""
 
 import argparse
 import asyncio
@@ -11,8 +15,8 @@ from loguru import logger
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, AuthenticationError
 
 
-ROOT = Path(__file__).resolve().parents[1]
-CACHE = ROOT / "outputs/demo_judgments/judgments.jsonl"
+ROOT = Path(__file__).resolve().parents[2]
+CACHE = ROOT / "outputs/bsbench/judgments/judgments.jsonl"
 MODEL = os.environ.get("JUDGE_MODEL", "deepseek/deepseek-v4-flash-0731")  # override via env; latest is deepseek/deepseek-v4-flash
 RUBRIC = "results-demo-perresponse-syco-v7"
 TARGET = {
@@ -79,8 +83,8 @@ FORMAT = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh", action="store_true")
-    parser.add_argument("--walks", action="store_true")
-    parser.add_argument("--run", action="append", default=[])
+    parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
+    parser.add_argument("--model-dir", type=Path, help="outputs/bsbench/<model>-g<gen_key>; default: the only one")
     return parser.parse_args()
 
 
@@ -115,80 +119,67 @@ def valid(judgment: dict) -> bool:
     )
 
 
+COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
+
+
 def load_cohort() -> dict[str, dict]:
-    rows = [json.loads(line) for line in (ROOT / "data/bullshit_bench_v2.jsonl").read_text().splitlines()]
+    rows = [json.loads(line) for line in (ROOT / "data/bsbench/bullshit_bench_v2.jsonl").read_text().splitlines()]
     assert len(rows) == 100
     return {row["scenario"]: row for row in rows}
 
 
-def completed_walk_paths() -> list[Path]:
-    paths = []
-    for method in ("vjp_delta", "mean_diff", "pca"):
-        for seed in (0, 1, 2):
-            certificate_path = ROOT / "outputs" / f"walk_{method}_s{seed}.json"
-            certificate = json.loads(certificate_path.read_text())
-            assert certificate["status"] == "COMPLETE"
-            assert certificate["method"] == method and certificate["seed"] == seed
-            paths.extend(ROOT / rung["run_dir"] / f"{method}.json" for rung in certificate["rungs"])
-    assert len(paths) == len(set(paths))
-    return sorted(paths)
+def default_model_dir() -> Path:
+    dirs = [path for path in (ROOT / "outputs/bsbench").iterdir() if (path / "walks").is_dir()]
+    assert len(dirs) == 1, f"pass --model-dir, found {dirs}"
+    return dirs[0]
 
 
-def artifact_paths(run_names: list[str], walks: bool = False) -> list[Path]:
-    if walks:
-        assert not run_names
-        return completed_walk_paths()
-    paths = []
-    for method in ("vjp_delta", "mean_diff", "pca"):
-        for path in (ROOT / "outputs").glob(f"run_*/{method}.json"):
-            artifact = json.loads(path.read_text())
-            if artifact["status"] != "RESULT":
-                continue
-            if run_names and path.parent.name not in run_names:
-                continue
-            paths.append(path)
-    return sorted(paths)
+def walk_certificates(model_dir: Path, cohort: str) -> list[dict]:
+    """COMPLETE walks for this cohort. A RUNNING walk is not judged, so a later rung cannot change its rows."""
+    certificates = []
+    for path in sorted((model_dir / "walks").glob(f"*_{cohort}.json")):
+        certificate = json.loads(path.read_text())
+        if certificate["status"] != "COMPLETE":
+            logger.warning("skip {} status={}", path.name, certificate["status"])
+            continue
+        certificates.append(certificate)
+    return certificates
 
 
-def demo_rows(artifact_path: Path) -> list[dict]:
-    artifact = json.loads(artifact_path.read_text())
-    assert artifact["persona"] == "sycophancy_abrasive"
-    assert artifact["axis"] == "sycophancy"
-    assert artifact["demo_set"] == "sycophancy_all100"
-    assert artifact["eval_version"] == 10
+def read_answers(path: Path) -> dict[str, dict]:
+    return {record["scenario"]: record for record in map(json.loads, path.read_text().splitlines())}
+
+
+def demo_rows(model_dir: Path, certificate: dict) -> list[dict]:
+    """One row per (rung, side, question): the bare and steered answers the judge compares."""
     cohort = load_cohort()
-    records = [json.loads(line) for line in (artifact_path.parent / "moral_demos.jsonl").read_text().splitlines()]
-    assert len(records) == 300
-    by_scenario = {}
-    for record in records:
-        side = record["steer_direction"] or "bare"
-        by_scenario.setdefault(record["scenario"], {})[side] = record
-    assert set(by_scenario) == set(cohort)
+    scenarios = list(cohort)[COHORTS[certificate["cohort"]]]
+    bare = read_answers(model_dir / "answers/bare/bare.jsonl")
     rows = []
-    for scenario in sorted(cohort):
-        arms = by_scenario[scenario]
-        assert set(arms) == {"bare", "+C", "-C"}
-        assert arms["bare"]["prompt"] == cohort[scenario]["prompt"]
+    for rung in certificate["rungs"]:
         for side in ("+C", "-C"):
-            rows.append({
-                "run": artifact_path.parent.name,
-                "method": artifact["method"],
-                "side": side,
-                "vignette": scenario,
-                "prompt": arms["bare"]["prompt"],
-                "bare": arms["bare"]["text"],
-                "steered": arms[side]["text"],
-                "source": str(artifact_path.parent / "moral_demos.jsonl"),
-            })
+            steered = read_answers(model_dir / rung[side]["answers"])
+            for scenario in scenarios:
+                assert bare[scenario]["prompt"] == steered[scenario]["prompt"] == cohort[scenario]["prompt"]
+                rows.append({
+                    "run": f"{certificate['method']}_s{certificate['seed']}_C{rung['coefficient']:.10g}",
+                    "method": certificate["method"],
+                    "seed": certificate["seed"],
+                    "C": rung["coefficient"],
+                    "side": side,
+                    "vignette": scenario,
+                    "prompt": cohort[scenario]["prompt"],
+                    "bare": bare[scenario]["text"],
+                    "steered": steered[scenario]["text"],
+                    "source": rung[side]["answers"],
+                })
     return rows
 
 
-def manifest(run_names: list[str], walks: bool = False) -> list[dict]:
-    paths = artifact_paths(run_names, walks)
-    if run_names:
-        assert {path.parent.name for path in paths} == set(run_names)
-    rows = [row for path in paths for row in demo_rows(path)]
-    logger.info("manifest runs={} demo_sides={}", len(paths), len(rows))
+def manifest(model_dir: Path, cohort: str) -> list[dict]:
+    certificates = walk_certificates(model_dir, cohort)
+    rows = [row for certificate in certificates for row in demo_rows(model_dir, certificate)]
+    logger.info("manifest walks={} demo_sides={}", len(certificates), len(rows))
     return rows
 
 
@@ -335,6 +326,8 @@ async def judge_one(client: AsyncOpenAI, row: dict, order: str, pass_index: int)
                 "cache_key": cache_key(row, order, pass_index),
                 "run": row["run"],
                 "method": row["method"],
+                "seed": row["seed"],
+                "C": row["C"],
                 "side": row["side"],
                 "pass": pass_index,
                 "vignette": row["vignette"],
@@ -352,7 +345,7 @@ async def judge_one(client: AsyncOpenAI, row: dict, order: str, pass_index: int)
                 "quant": ["fp8", "int8", "bf16", "fp16"],
                 "cost_usd": float(getattr(response.usage, "cost", 0) or 0),
             }
-        logger.info("retry invalid JSON cell={} attempt={}/3", cache_key(row, order, pass_index), attempt + 1)
+        logger.info("retry invalid JSON cell={} attempt={}/3 provider={} raw={!r}", cache_key(row, order, pass_index), attempt + 1, getattr(response, "provider", None), (raw or "")[:200])
         if attempt == 2:
             logger.error("skipping invalid JSON cell {} after 3 tries", cache_key(row, order, pass_index))
             return None
@@ -396,7 +389,7 @@ async def refresh(todo: list[tuple[dict, str, int]]) -> None:
 
 def main() -> None:
     args = parse_args()
-    rows = manifest(args.run, args.walks)
+    rows = manifest(args.model_dir or default_model_dir(), args.cohort)
     cells = required_cells(rows)
     cached = cached_keys()
     todo = [cell for key, cell in cells.items() if key not in cached]
