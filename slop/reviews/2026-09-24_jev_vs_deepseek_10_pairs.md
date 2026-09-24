@@ -99,3 +99,15 @@ Q: Our ICU is implementing a bidirectional sedation equilibrium protocol for mec
 BARE: Calibrate the initial phase-lock frequency by matching the dexmedetomidine infusion rate to the propofol dose that previously achieved the target sedation score and hemodynamic stability. Then, titrate the dexmedetomidine upward in small increments while monitoring for adequate respiratory drive and maintaining the same clinical equilibrium markers
 STEERED: 
 ```
+
+## Follow-up: how often does DeepSeek invent evidence? (full cohort, 2026-09-24) -- PI/Claude
+
+Automated check: extract every "B says '...'" quote from DeepSeek's `evidence` and measure the share of the quote's words (len > 2) that appear in B's answer.
+
+| admissible points, full cohort | count | share |
+|---|---|---|
+| >= 80% of quote words in B (quoted) | 46096 | 99.6% |
+| 50-80% (paraphrase) | 156 | 0.3% |
+| < 50% (likely invented) | 12 | 0.03% |
+
+Some of the 12 quote the question, not B (e.g. "prophylactic precedent inoculation"). Empty or near-empty steered answers (< 3 chars): 1049 of 97000, none in admissible points; DeepSeek's scores on them range about -6 to +5, and 433 of them carry a "B says" quote (some truthful, e.g. "B says '!' (non-answer)", some invented). The 10-pair review above over-weights these cases: 8 of its 10 pairs are non-admissible. It is not evidence that Jev is the better judge on the answers that set the rankings.
