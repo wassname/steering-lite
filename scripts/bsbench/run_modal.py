@@ -1,9 +1,12 @@
-"""Fan the nine dose walks out over Modal GPUs, one container per (method, seed).
+"""Fan the dose walks out over Modal GPUs, one container per (method, seed).
 
-Run from the repo root (uv_sync reads ./pyproject.toml + ./uv.lock):
-    modal run scripts/run_modal.py::smoke        # tiny random model, one rung, ~minutes
-    modal run --detach scripts/run_modal.py      # the nine real walks
-    modal volume get --force jsteer-pub-cache outputs .   # pull artifacts back
+Adapted from vjp-steering 7f0782a `scripts/run_modal.py`. Changes: pip pins instead of uv_sync,
+flash-linear-attention in the image (Qwen3.5's linear-attention layers otherwise fall back to
+slow torch code), steering-lite methods and a dev/full cohort, and outputs/bsbench on the Volume.
+
+    modal run scripts/bsbench/run_modal.py::smoke
+    modal run scripts/bsbench/run_modal.py --cohort dev --methods mean_diff,pca --seeds 0
+    modal volume get --force steering-lite-bsbench-v3 bsbench outputs/
 """
 
 import json
@@ -14,81 +17,61 @@ from pathlib import Path
 
 import modal
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 MODEL = "Qwen/Qwen3.5-4B"
-METHODS = ("vjp_delta", "mean_diff", "pca")
-SEEDS = (1, 2, 0)
 
 image = (
     modal.Image.debian_slim(python_version="3.13")
-    .apt_install("git")
-    .uv_sync()
+    .uv_pip_install(
+        "torch==2.11.0", "transformers==5.12.1", "accelerate==1.13.0", "safetensors==0.7.0",
+        "einops==0.8.2", "jaxtyping==0.3.9", "beartype==0.22.9", "loguru==0.7.3", "tabulate==0.10.0",
+        "tqdm==4.67.3", "numpy==2.4.4", "flash-linear-attention==0.5.2", "fla-core==0.5.2",
+    )
     .env({"PYTHONUNBUFFERED": "1", "HF_HOME": "/cache/hf", "PYTHONPATH": "/repo/src"})
     .add_local_dir(REPO / "src", "/repo/src")
     .add_local_dir(REPO / "scripts", "/repo/scripts")
     .add_local_dir(REPO / "data", "/repo/data")
 )
-app = modal.App("jsteer-pub", image=image)
-cache = modal.Volume.from_name("jsteer-pub-cache", create_if_missing=True)
+app = modal.App("steering-lite-bsbench-v3", image=image)
+cache = modal.Volume.from_name("steering-lite-bsbench-v3", create_if_missing=True)
 
 
-@app.function(
-    gpu=os.environ.get("JSTEER_GPU", "H100"),
-    volumes={"/cache": cache},
-    timeout=24 * 60 * 60,
-)
+@app.function(gpu=os.environ.get("BSBENCH_GPU", "L40S"), volumes={"/cache": cache}, timeout=6 * 60 * 60)
 def run(argv: list[str]) -> str:
-    """One walk (or one rung) of scripts/walk.py, with outputs/ living on the Volume."""
+    """One walk of scripts/bsbench/walk.py; outputs/bsbench and outputs/bsbench-smoke live on the Volume."""
     from huggingface_hub import snapshot_download
 
-    Path("/cache/outputs").mkdir(parents=True, exist_ok=True)
-    if not Path("/repo/outputs").exists():
-        os.symlink("/cache/outputs", "/repo/outputs")
-    # walk.py runs each rung with HF_HUB_OFFLINE=1, so the weights must be cached first
+    Path("/cache/bsbench").mkdir(parents=True, exist_ok=True)
+    Path("/cache/bsbench-smoke").mkdir(parents=True, exist_ok=True)
+    Path("/repo/outputs").mkdir(exist_ok=True)
+    for name in ("bsbench", "bsbench-smoke"):
+        if not Path(f"/repo/outputs/{name}").exists():
+            os.symlink(f"/cache/{name}", f"/repo/outputs/{name}")
     snapshot_download(argv[argv.index("--model") + 1] if "--model" in argv else MODEL)
+    cache.commit()
     try:
-        subprocess.run([sys.executable, "scripts/walk.py", *argv], cwd="/repo", check=True)
+        subprocess.run([sys.executable, "scripts/bsbench/walk.py", *argv], cwd="/repo", check=True)
     finally:
         cache.commit()
-    method, seed = argv[0], argv[argv.index("--seed") + 1] if "--seed" in argv else "0"
-    certificate = Path(f"/cache/outputs/walk_{method}_s{seed}.json")
-    return certificate.read_text() if certificate.exists() else ""
+    return " ".join(argv)
 
 
 @app.local_entrypoint()
-def main(
-    methods: str = ",".join(METHODS),
-    seeds: str = ",".join(map(str, SEEDS)),
-    batch_size: int = 32,
-    extract_batch_size: int = 8,
-    refine_around_cstar: bool = False,
-):
-    # generation: batch 4 leaves an H100 idle, decode is bandwidth bound so a wide batch is nearly free
-    # extraction: vjp_delta's backward graph OOMs an 80 GB card at 32
-    jobs = [(m, s) for s in seeds.split(",") for m in methods.split(",")]
-    extra = ["--refine-around-cstar"] if refine_around_cstar else []
+def main(methods: str = "mean_diff,pca,vjp_delta", seeds: str = "0", cohort: str = "dev", extra: str = ""):
+    jobs = [(method, seed) for seed in seeds.split(",") for method in methods.split(",")]
     handles = {
-        job: run.spawn([
-            job[0], "--seed", job[1], "--walk",
-            "--batch-size", str(batch_size),
-            "--extract-batch-size", str(extract_batch_size),
-            *extra,
-        ])
+        job: run.spawn([job[0], "--seed", job[1], "--cohort", cohort, *extra.split()])
         for job in jobs
     }
     for (method, seed), handle in handles.items():
         try:
-            certificate = json.loads(handle.get())
-            print(f"{method}\ts{seed}\t{certificate['status']}\trungs={len(certificate['rungs'])}")
-        except Exception as error:  # one dead walk must not hide the other eight
-            print(f"{method}\ts{seed}\tFAILED\t{error}")
+            print(f"DONE\t{method}\ts{seed}\t{handle.get()}")
+        except Exception as error:  # one dead walk must not hide the others
+            print(f"FAILED\t{method}\ts{seed}\t{error!r}")
 
 
 @app.local_entrypoint()
 def smoke():
-    """Same image, mounts and Volume as the real fan-out, on the tiny random model."""
-    print(run.remote(
-        "vjp_delta --seed 0 --coefficient 16 --model wassname/qwen3-5lyr-tiny-random"
-        " --dtype float32 --n-pairs 2 --batch-size 2 --max-length 128 --max-new-tokens 8"
-        " --limit 2 --layers 1 --target-layer 4 --status SMOKE_PASS".split()
-    ) or "SMOKE_PASS: rung finished, no walk certificate expected")
+    """Same image, mounts and Volume as the real fan-out, real Qwen3.5-4B, 8-token answers, 2 rungs."""
+    print(run.remote("vjp_cache --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
+    print(run.remote("mean_diff --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
