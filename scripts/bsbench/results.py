@@ -157,7 +157,7 @@ def method_curve(points: list[dict], method: str, side: str) -> list[dict]:
         curve.append({
             "method": method, "side": side, "C": C, "admissible": True,
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
-            "questions": [q for point in at for q in point["questions"]],
+            "questions": [q | {"seed": point["seed"]} for point in at for q in point["questions"]],
         })
     return curve
 
@@ -170,25 +170,35 @@ def pareto_score(side_curves: dict[str, list[dict]]) -> tuple[float, dict]:
     return min(directed(point) - OFF_WEIGHT * point["off_axis"] for point in best.values()), best
 
 
-def resample(curve: list[dict], scenarios: list[str]) -> list[dict]:
+def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
+    """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats)."""
     out = []
     for point in curve:
         by = {}
         for q in point["questions"]:
-            by.setdefault(q["scenario"], []).append(q)
-        chosen = [q for scenario in scenarios for q in by.get(scenario, [])]
+            by.setdefault((q["seed"], q["scenario"]), []).append(q)
+        chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
+        if not chosen:  # random: a drawn seed may not be admissible at this dose
+            continue
         out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen)})
     return out
 
 
-def bootstrap(side_curves: dict[str, list[dict]], scenarios: list[str], rng: random.Random) -> tuple[float, float]:
+def bootstrap(side_curves: dict[str, list[dict]], scenarios: list[str], rng: random.Random) -> tuple[float, float, float]:
+    """Hierarchical bootstrap: resample seeds, then questions; dose selection redone in each draw.
+
+    Returns the 90% interval and the share of draws where a side had no admissible dose (score -inf,
+    counted as the worst outcome rather than dropped)."""
+    seeds = sorted({q["seed"] for curve in side_curves.values() for point in curve for q in point["questions"]})
     scores = []
     for _ in range(N_BOOT):
+        drawn_seeds = [rng.choice(seeds) for _ in seeds]
         drawn = [rng.choice(scenarios) for _ in scenarios]
-        score, _ = pareto_score({side: resample(curve, drawn) for side, curve in side_curves.items()})
-        scores.append(score)
-    scores = sorted(score for score in scores if not math.isnan(score))
-    return scores[int(0.05 * len(scores))], scores[int(0.95 * len(scores)) - 1]
+        score, _ = pareto_score({side: resample(curve, drawn, drawn_seeds) for side, curve in side_curves.items()})
+        scores.append(-math.inf if math.isnan(score) else score)
+    empty = sum(score == -math.inf for score in scores) / len(scores)
+    scores.sort()
+    return scores[int(0.05 * len(scores))], scores[int(0.95 * len(scores)) - 1], empty
 
 
 def random_curves(points: list[dict]) -> dict[str, list[dict]]:
@@ -203,7 +213,7 @@ def random_curves(points: list[dict]) -> dict[str, list[dict]]:
                 out[side].append({
                     "C": C, "side": side, "admissible": True,
                     "effect": mean(point["effect"] for point in live), "off_axis": mean(point["off_axis"] for point in live),
-                    "questions": [q for point in live for q in point["questions"]],
+                    "questions": [q | {"seed": point["seed"]} for point in live for q in point["questions"]],
                 })
     return out
 
@@ -217,12 +227,12 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
         else:
             curves = {side: method_curve(points, method, side) for side in ("+C", "-C")}
         score, best = pareto_score(curves)
-        low, high = bootstrap(curves, scenarios, rng) if not math.isnan(score) else (float("nan"), float("nan"))
+        low, high, empty = bootstrap(curves, scenarios, rng) if not math.isnan(score) else (float("nan"), float("nan"), float("nan"))
         strongest = {side: side_best(curve, directed) for side, curve in curves.items()}
         reference = min(directed(p) - p["off_axis"] for p in strongest.values()) if all(strongest.values()) else float("nan")
         group = [point for point in points if point["method"] == method]
         rows.append({
-            "method": method, "score": score, "ci": (low, high), "best": best, "strongest": strongest,
+            "method": method, "score": score, "ci": (low, high), "ci_empty": empty, "best": best, "strongest": strongest,
             "reference_score": reference, "seeds": len({point["seed"] for point in group}),
             "N": sum(len(curve) for curve in curves.values()), "rejected": sum(not point["admissible"] for point in group),
         })
@@ -455,13 +465,15 @@ def _fmt_side(point: dict | None) -> list[str]:
 
 
 def tables(rows: list[dict]) -> str:
-    head = "| method | score↑ | 90% CI | −C on↑ | −C off↓ | −C C | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
-    lines = [head, "|" + "---|" * 12]
+    head = "| method | score↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
+    lines = [head, "|" + "---|" * 13]
+    bound = lambda v: "−∞" if v == -math.inf else f"{v:+.2f}"
     for row in rows:
         name = f"*{row['method']}*" if row["method"] in ("random", *PROMPTS) else row["method"]
         score = "—" if math.isnan(row["score"]) else f"{row['score']:+.2f}"
-        ci = "—" if math.isnan(row["ci"][0]) else f"[{row['ci'][0]:+.2f}, {row['ci'][1]:+.2f}]"
-        lines.append("| " + " | ".join([name, score, ci, *_fmt_side(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
+        ci = "—" if math.isnan(row["ci"][0]) else f"[{bound(row['ci'][0])}, {bound(row['ci'][1])}]"
+        empty = "—" if math.isnan(row["ci_empty"]) else f"{row['ci_empty']:.0%}"
+        lines.append("| " + " | ".join([name, score, ci, empty, *_fmt_side(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
                                          str(row["seeds"]), str(row["N"]), str(row["rejected"])]) + " |")
     ref = ["", "Reference-style table (vjp-steering README): strongest admissible dose per side, score = min(on − off).", "",
            "| method | ref score↑ | −C on↑ | −C off↓ | +C on↑ | +C off↓ |", "|---|---|---|---|---|---|"]
@@ -477,7 +489,7 @@ def tables(rows: list[dict]) -> str:
 def _no_nan(value):
     """JSON has no NaN; an unscored method (no admissible dose on a side) is null."""
     if isinstance(value, float):
-        return None if math.isnan(value) else value
+        return None if math.isnan(value) or math.isinf(value) else value
     if isinstance(value, dict):
         return {k: _no_nan(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
@@ -561,7 +573,8 @@ def main() -> None:
     ) + blind_table(rows, points)
     intro = (
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
-        f"CI: {N_BOOT} bootstrap resamples of questions, dose selection redone in each. "
+        f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
+        "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
         "Admissible = healthy answers, not past the walk boundary, mean steered off-axis ≤ 1.5 (reference rule)."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     (out / "index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
