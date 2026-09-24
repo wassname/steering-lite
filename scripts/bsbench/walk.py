@@ -276,7 +276,10 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
     Held-out persona pairs (seed 10000+seed, not used for extraction) share a suffix and differ only
     in the persona line. For the suffix tokens, compare KL(p_pos || p_neg steered at +C) with the same
     at -C: if +C brings the negative prompt's predictions closer to the positive prompt's, the sign is
-    right. score = KL(-C) - KL(+C) > 0 means correct; < 0 means the vector's +C steers the other way.
+    right. The KL form is confounded (both signs raise KL, so it tracks which sign damages more:
+    vjp_delta "flipped" there while the judge and blind judge agree it is correct), so the decision uses
+    the directional form: mass moved toward the tokens the positive persona prefers,
+    score = move(+C) - move(-C), > 0 correct.
     """
     if path.exists():
         return json.loads(path.read_text())
@@ -284,6 +287,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
         tokenizer, n_pairs=16, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
     )
     kls = {"base": [], "+C": [], "-C": []}
+    moves = {"+C": [], "-C": []}  # sum_v (p_steered - p_neg) (log p_pos - log p_neg): mass moved toward tokens the positive persona prefers
     for pos_text, neg_text in zip(positive, negative):
         pos_ids = tokenizer(pos_text, return_tensors="pt", add_special_tokens=False).input_ids.to(args.device)
         neg_ids = tokenizer(neg_text, return_tensors="pt", add_special_tokens=False).input_ids.to(args.device)
@@ -292,6 +296,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
             shared += 1
         assert shared >= 8, f"persona pair shares only {shared} suffix tokens"
         logp_pos = model(pos_ids).logits[0, -shared - 1 : -1].float().log_softmax(-1)
+        logp_base = None
         for key, sign in (("base", 0.0), ("+C", 1.0), ("-C", -1.0)):
             if sign == 0.0:
                 logits = model(neg_ids).logits
@@ -300,11 +305,17 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
                     logits = model(neg_ids).logits
             logp_neg = logits[0, -shared - 1 : -1].float().log_softmax(-1)
             kls[key].append(float((logp_pos.exp() * (logp_pos - logp_neg)).sum(-1).mean()))
+            if sign == 0.0:
+                logp_base = logp_neg
+            else:
+                moves[key].append(float(((logp_neg.exp() - logp_base.exp()) * (logp_pos - logp_base)).sum(-1).mean()))
     result = {key: sum(v) / len(v) for key, v in kls.items()} | {"C": coefficient, "n_pairs": len(positive)}
-    result["score"] = result["-C"] - result["+C"]
+    result["score_kl"] = result["-C"] - result["+C"]  # confounded: both signs raise KL, so this tracks which sign damages more
+    result["move+C"], result["move-C"] = (sum(v) / len(v) for v in (moves["+C"], moves["-C"]))
+    result["score"] = result["move+C"] - result["move-C"]
     result["flip"] = result["score"] < 0
-    logger.info("SIGN_PROBE method={} seed={} C={:.4g} KL base={:.4f} +C={:.4f} -C={:.4f} score={:+.4f} flip={}",
-                args.method, args.seed, coefficient, result["base"], result["+C"], result["-C"], result["score"], result["flip"])
+    logger.info("SIGN_PROBE method={} seed={} C={:.4g} move+C={:+.5f} move-C={:+.5f} score={:+.5f} flip={} | KL base={:.4f} +C={:.4f} -C={:.4f}",
+                args.method, args.seed, coefficient, result["move+C"], result["move-C"], result["score"], result["flip"], result["base"], result["+C"], result["-C"])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2) + "\n")
     return result
@@ -361,7 +372,7 @@ def walk(args) -> None:
     vector = extract_vector(args, model, tokenizer, layers)
     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.method}_s{args.seed}.json")
     if args.probe:
-        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign" / f"{args.method}_s{args.seed}.json")
+        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.method}_s{args.seed}.json")
         return
     # start on the stride lattice of the reference grid, so every seed and method shares C values
     start = min(range(len(GRID)), key=lambda index: abs(math.log(GRID[index]) - math.log(c0 / args.start_below)))
