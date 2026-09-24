@@ -39,7 +39,7 @@ with sync_playwright() as p:
     page.screenshot(path=str(site / "uat_plot.png"), full_page=False)
 
     question = data["questions"][1]["scenario"]
-    page.select_option("select", question)
+    page.locator("select").last.select_option(question)  # the question picker (a judge switch may come first)
     blocks = page.locator(".answer").count()
     print(f"question={question} answer blocks={blocks}")
     assert blocks > 1
@@ -49,6 +49,16 @@ with sync_playwright() as p:
     assert page.locator(".answer.selected").count() == 1
     page.locator(".answer.selected").screenshot(path=str(site / "uat_selected.png"))
     page.screenshot(path=str(site / "uat_full.png"), full_page=True)
+    if (site / "points_jev.json").exists():  # judge switch: the Jev view must draw exactly its own points and the Jev PNG's
+        jev = json.loads((site / "points_jev.json").read_text())
+        jev_marks = json.loads((site / "plot_marks_jev.json").read_text())
+        page.select_option("label.picker select", "jev")
+        page.wait_for_timeout(1500)
+        jev_drawn = page.locator("circle.mark, path.mark.end").count()
+        jev_expect = sum(len(c["points"]) for c in jev["curves"] if c["method"] in jev["shown"])
+        print(f"JEV view: page drawn={jev_drawn} points_jev.json={jev_expect} PNG plot_marks_jev={jev_marks['frontier_marks']}")
+        assert jev_drawn == jev_expect == jev_marks["frontier_marks"], "Jev view differs from points_jev.json or its PNG"
+        page.screenshot(path=str(site / "uat_plot_jev.png"))
     assert not errors, errors
     print(f"UAT_PASS {url} screenshots: uat_plot.png uat_selected.png uat_full.png")
     browser.close()
