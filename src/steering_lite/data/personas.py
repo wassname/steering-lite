@@ -1,6 +1,7 @@
 """Persona-branching contrastive pair construction."""
 from __future__ import annotations
 
+import hashlib
 import json
 import random
 from pathlib import Path
@@ -19,6 +20,16 @@ PROMPT_TEMPLATE = "You think and act like {persona}."
 
 def _data_path() -> Path:
     return Path(__file__).with_name("branching_suffixes_filt.json")
+
+
+def persona_corpus_identity(*, thinking: bool) -> dict:
+    raw = _data_path().read_bytes()
+    actual_pairs = len(load_suffixes(thinking=thinking))
+    return {
+        "corpus_sha256": hashlib.sha256(raw).hexdigest(),
+        "actual_pairs": actual_pairs,
+        "thinking": thinking,
+    }
 
 
 def load_suffixes(thinking: bool = True) -> list[dict]:

@@ -121,13 +121,22 @@ def attach(
         _install_state(mod, sh, st, cfg)
         mod._steering_cfg = cfg
         mod._steering_method = method
-        if requires_linear:
+        if getattr(method, "cache_intervention", False):
+            mod._steering_layer_idx = li
+        elif requires_linear:
             mod._steering_module_name = full_name
             handles.append(mod.register_forward_hook(_linear_hook))
         else:
             mod._steering_layer_idx = li
             handles.append(mod.register_forward_hook(_hook))
         attached_names.append(full_name)
+
+    if getattr(method, "cache_intervention", False):
+        runtime_stacked = {
+            li: _gather_split_state(mod)[1]
+            for _, mod, li in targets
+        }
+        handles.extend(method.install(model, cfg, runtime_stacked))
 
     setattr(model, _ATTACHED_ATTR, {
         "cfg": cfg, "targets": attached_names, "handles": handles,
@@ -180,6 +189,17 @@ def _split_extracted(extracted: dict) -> tuple[dict, dict]:
     return shared, stacked
 
 
+def _require_untruncated_prompts(tok, pos_prompts: list[str], neg_prompts: list[str], max_length: int) -> None:
+    encoded = tok(pos_prompts + neg_prompts, return_tensors="pt", padding=True, truncation=False)
+    lengths = encoded.attention_mask.sum(dim=-1)
+    clipped = lengths > max_length
+    if clipped.any():
+        raise ValueError(
+            f"extraction prompt truncation: {int(clipped.sum())}/{len(lengths)} exceed "
+            f"max_length={max_length} (longest={int(lengths.max())})"
+        )
+
+
 def train(
     model: nn.Module,
     tok,
@@ -191,6 +211,8 @@ def train(
     max_length: int = 256,
 ):
     from .vector import Vector
+    if cfg.method != "random":
+        _require_untruncated_prompts(tok, pos_prompts, neg_prompts, max_length)
     _log_extract_demo(tok, pos_prompts, neg_prompts)
     method = REGISTRY[cfg.method]
     if cfg.target_submodule is None and getattr(method, "default_target_submodule", None):
