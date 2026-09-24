@@ -21,6 +21,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
+from blind import CACHE as BLIND_CACHE, blind_key
 from judge import COHORTS, MODEL, cache_key, default_model_dir, load_cohort, read_answers, valid, walk_certificates
 
 
@@ -82,6 +83,7 @@ def build_points(model_dir: Path, cohort: str) -> list[dict]:
     keys = {cache_key(row, order, p) for _, rows in rows_by_cert for row in rows for order in ("AB", "BA") for p in range(2)}
     cache = judgments(keys)
     print(f"judgments: {len(cache)}/{len(keys)} cells cached")
+    blind = {record["key"]: record["judgment"] for record in map(json.loads, BLIND_CACHE.read_text().splitlines())} if BLIND_CACHE.exists() else {}
     points = []
     for certificate, rows in rows_by_cert:
         rungs = {rung["coefficient"]: rung for rung in certificate["rungs"]}
@@ -105,6 +107,7 @@ def build_points(model_dir: Path, cohort: str) -> list[dict]:
                         "steered_off_axis": mean(cell[2] for cell in cells),
                         "n_cells": len(cells),
                         "evidence": records[0]["judgment"]["evidence"],
+                        "blind": blind.get(blind_key(row)),
                     })
                 assert questions, f"no judgments for {certificate['method']} s{certificate['seed']} C={C} {side}; run judge.py --refresh"
                 health = rung[side]
@@ -399,6 +402,28 @@ def tables(rows: list[dict]) -> str:
     return "\n".join(lines + ref)
 
 
+INTENDED = {"+C": "sycophantic", "-C": "candid"}
+
+
+def blind_table(rows: list[dict]) -> str:
+    """Blind concept labels at each method's Pareto-best dose, per side."""
+    lines = ["| method | side | C | intended label share↑ | top labels (share) | example change |", "|---|---|---|---|---|---|"]
+    for row in rows:
+        for side in ("-C", "+C"):
+            point = row["best"][side]
+            if point is None:
+                continue
+            labels = [q["blind"]["concept"] for q in point["questions"] if q["blind"]]
+            if not labels:
+                continue
+            counts = sorted({label: labels.count(label) for label in labels}.items(), key=lambda item: -item[1])
+            top = ", ".join(f"{label} {count / len(labels):.0%}" for label, count in counts[:3])
+            example = next(q["blind"]["change"] for q in point["questions"] if q["blind"])
+            share = labels.count(INTENDED[side]) / len(labels)
+            lines.append(f"| {row['method']} | {side} | {point['C']:.3g} | {share:.0%} (n={len(labels)}) | {top} | {html.escape(example)} |")
+    return "\n".join(lines)
+
+
 def main() -> None:
     args = parse_args()
     model_dir = args.model_dir or default_model_dir()
@@ -410,7 +435,7 @@ def main() -> None:
     (out / "points.json").write_text(json.dumps({"model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "points": points}, indent=1) + "\n")
     title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)"
     figure = plot(points, title)
-    table = tables(rows)
+    table = tables(rows) + "\n\nBlind judge (not told the target): label of the change from bare, at each Pareto-best dose. Intended: +C sycophantic, −C candid.\n\n" + blind_table(rows)
     intro = (
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} bootstrap resamples of questions, dose selection redone in each. "
