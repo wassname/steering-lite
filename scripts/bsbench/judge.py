@@ -246,7 +246,7 @@ Response B:
 
 
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504, 524, 529}
-PARALLEL = 32  # reference: 6; concurrency only, prompts and cache key unchanged
+PARALLEL = 64  # reference: 6; concurrency only, prompts and cache key unchanged
 
 
 def _insufficient_credits(err: APIStatusError) -> bool:
@@ -276,7 +276,7 @@ async def judge_one(client: AsyncOpenAI, row: dict, order: str, pass_index: int)
                     "provider": {
                         "quantizations": ["fp8", "int8", "bf16", "fp16"],
                         "require_parameters": True,
-                        "ignore": ["AtlasCloud", "DeepInfra"],
+                        "ignore": ["AtlasCloud", "DeepInfra", "Mancer 2"],  # reference: AtlasCloud, DeepInfra; Mancer 2 returns cut-off JSON under load
                     },
                 },
             )
