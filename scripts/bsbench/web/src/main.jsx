@@ -13,6 +13,7 @@ const COLORS = {
 };
 const W = 1000, H = 560, M = { l: 70, r: 20, t: 30, b: 50 };
 const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
+const anchor = px => (px > W - 140 ? 'end' : px < M.l + 90 ? 'start' : 'middle');  // keep edge labels inside the plot
 const pointId = p => `${p.method}_s${p.seed}_${p.side}_C${p.C}`;
 const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 
@@ -54,13 +55,13 @@ function Plot({ data, visible, selected, onSelect }) {
           })}
           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
             return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" className="best" />; })()}
-          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor="middle" className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
+          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
         </g>;
       })}
       {data.points.filter(p => p.method.startsWith('prompting')).map(p => <g key={pointId(p)} className="mark" onClick={() => onSelect(p)}
         onPointerEnter={() => setHover(p)} onPointerLeave={() => setHover(null)}>
         <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={COLORS[p.method]} />
-        <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor="middle" className="label" fill={COLORS[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
+        <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor={anchor(x(p.effect))} className="label" fill={COLORS[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
       </g>)}
       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
     </svg>
