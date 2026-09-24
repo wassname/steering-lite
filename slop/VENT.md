@@ -1,0 +1,8 @@
+
+## 2026-09-24 exit interview: pi-goals harness on bsbench-v3 -- PI/Claude
+
+- helped: the goals file survived two compactions. Each goal's discriminator ("same sign as the README table", "walk passes the predicted dose") told me what to check next without re-reading the chat. The loop line "a finished run or a negative result is not done, check the port against the reference first" stopped me from reporting the first dev table as a result; the random-seed overlap with the reference and the stop-rule difference both came out of that check.
+- helped: "record your assumption in the goals file and continue" made me pick a budget assumption instead of stalling on a question.
+- friction: the loop prompt re-sends the whole goals file (~3k tokens) on every wake, and it fires while long jobs run, so I produced several near-duplicate status messages. My own scheduled checks then fired after the work they asked for was already done. A "nothing changed since last wake, keep waiting" path would cut this.
+- friction: I have not called CompleteGoal yet. Writing quoted evidence per goal is fine, but I was unsure whether a goal with one open sub-question (random -C sign) should go to the judge or wait, so I waited. A "partial / blocked on X" state would help.
+- misfire: the long-comment hook flagged a judge prompt string in blind.py as a comment wall.

@@ -37,16 +37,20 @@ function Plot({ data, selected, onSelect }) {
       {zonePath && <path d={zonePath} className="zone" />}
       {random.map(p => <circle key={pointId(p)} cx={x(p.effect)} cy={y(p.off_axis)} r={p.admissible ? 3 : 2} className={p.admissible ? 'random' : 'random rejected'} />)}
       {data.curves.filter(c => c.points.length).map(c => {
-        const pts = [[0, 0], ...c.points.map(p => [p.effect, p.off_axis])];
+        const end = c.points.at(-1);
         return <g key={c.method + c.side}>
-          <polyline points={pts.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
+          <polyline points={c.path.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
           {c.points.map(p => {
             const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C);
             const isSel = selected && full && pointId(full) === pointId(selected);
-            return <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4.5} fill={COLORS[c.method]} stroke={isSel ? '#000' : 'white'}
-              className="mark" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />;
+            const isEnd = p === end;
+            return isEnd
+              ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={COLORS[c.method]} strokeWidth="3.5"
+                  className="mark end" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />
+              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={COLORS[c.method]} fillOpacity={isSel ? 1 : 0.5} stroke={isSel ? '#000' : 'none'}
+                  className="mark" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />;
           })}
-          <text x={x(c.points.at(-1).effect)} y={y(c.points.at(-1).off_axis) - 9} textAnchor="middle" className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
+          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor="middle" className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
         </g>;
       })}
       {data.points.filter(p => p.method.startsWith('prompting')).map(p => <g key={pointId(p)} className="mark" onClick={() => onSelect(p)}
@@ -111,12 +115,22 @@ function App() {
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
     <h1>steering-lite on Bullshit Bench v2</h1>
-    <p className="lede">{data.model_dir}, cohort <strong>{data.cohort}</strong> ({data.questions.length} questions), judge {data.judge}.
-      Each line is one method's dose walk from bare (◆) to its last coherent dose; solid = +C (toward sycophancy), dashed = −C (toward candour).
-      ★ = prompt baselines (one point each, no dose). Grey dots = random directions at each dose (hollow = rejected: incoherent or off-axis &gt; 1.5); the grey band is their 10–90% range where most seeds are still coherent.
-      Up is less damage. Score = min over ±C of on-axis − {data.off_weight}×off-axis at each side's best admissible dose; CI from a bootstrap over questions.</p>
+    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? Explanation below the plot.</p>
     <Plot data={data} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
-    <h2>Pareto-best dose per method</h2>
+    {/* intro text: PI/Claude, rewrite freely */}
+    <section className="intro">
+      <p>We add a steering vector to a small language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
+        Each question rests on a made-up premise, such as the thermal conductivity of a CI pipeline. A good answer points out the made-up part.
+        Steering one way (+C) should make the model go along with the premise (sycophantic). Steering the other way (−C) should make it point out the problem (candid).</p>
+      <p>Each colour is one method. We raise the steering strength step by step until the answers stop making sense.
+        Left to right is how far a judge model says the answers moved: right is more sycophantic, left is more candid.
+        Up and down is other damage the judge saw, such as rambling or going off topic; higher on the page is better.
+        The line joins each method's best trade-offs and ends at its last sensible strength (×). Faint dots are the other strengths we tried.
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
+        Grey dots are random directions with the same effect on the model's outputs; the grey band is where most of them land.</p>
+    </section>
+    <h2>Best strength per method</h2>
+    <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling the questions.</p>
     <Summary data={data} />
     <h2 id="explorer">Answers</h2>
     <p className="lede">Pick a question. Each block is one method and side at its Pareto-best dose (random: seed 0). Click a point on the plot to add that dose.</p>

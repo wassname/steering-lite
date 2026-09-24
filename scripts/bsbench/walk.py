@@ -33,7 +33,8 @@ from pathlib import Path
 
 import torch
 from loguru import logger
-from steering_lite import KVCacheGramC, MeanDiffC, PCAC, RandomC, Vector, VjpCacheC, VjpDeltaC
+from steering_lite import Vector
+from steering_lite.config import _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -56,10 +57,7 @@ ENGINEERED = {
 }
 ROLE_LEAK = re.compile(r"<\s*/?\s*think\s*>|^\s*(user|assistant|system)\s*$", re.I | re.M)
 GRID = tuple(2.0 ** (n / 6) for n in range(-30, 85))
-CONFIGS = {
-    "mean_diff": MeanDiffC, "pca": PCAC, "random": RandomC,
-    "kv_cache_gram": KVCacheGramC, "vjp_cache": VjpCacheC, "vjp_delta": VjpDeltaC,
-}
+CONFIGS = dict(_CONFIG_REGISTRY)  # every registered steering-lite method
 PROMPT_METHODS = {
     "prompting": {side: PERSONA_TEMPLATE.format(persona=persona) for side, persona in zip(("+C", "-C"), PERSONAS[0])},
     "prompting_engineered": ENGINEERED,

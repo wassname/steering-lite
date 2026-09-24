@@ -323,6 +323,47 @@ def random_zone(points: list[dict]) -> list[tuple[float, float, float, float]]:
 PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
 
 
+def frontier(curve: list[dict]) -> list[dict]:
+    """Pareto points of one walk in on-axis order, ending at the last coherent dose (always kept).
+
+    A point stays if no other point has at least its on-axis gain with less damage. Points past the
+    end's on-axis gain are dropped so the line never turns back."""
+    if not curve:
+        return []
+    end = curve[-1]
+    kept = [
+        p for p in curve
+        if p is not end and directed(p) < directed(end)
+        and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
+    ]
+    return sorted(kept, key=directed) + [end]
+
+
+def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]]:
+    """Monotone cubic (Fritsch-Carlson PCHIP) of damage over on-axis gain, pinned at bare and at the end.
+
+    Monotone interpolation cannot overshoot, so the drawn line stays between its support points."""
+    sign = 1.0 if side == "+C" else -1.0
+    ts, ys = [0.0], [0.0]
+    for p in support:
+        if directed(p) > ts[-1]:
+            ts.append(directed(p)); ys.append(p["off_axis"])
+    if len(ts) < 2:
+        return [[0.0, 0.0]] + [[p["effect"], p["off_axis"]] for p in support]
+    h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+    d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
+    m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
+    path = []
+    for i in range(len(h)):
+        for k in range(n):
+            u = k / n
+            h00, h10, h01, h11 = 2 * u**3 - 3 * u**2 + 1, u**3 - 2 * u**2 + u, -2 * u**3 + 3 * u**2, u**3 - u**2
+            y = h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
+            path.append([sign * (ts[i] + u * h[i]), y])
+    path.append([sign * ts[-1], ys[-1]])
+    return path
+
+
 def plot(points: list[dict], title: str) -> go.Figure:
     figure = go.Figure()
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
@@ -344,16 +385,20 @@ def plot(points: list[dict], title: str) -> go.Figure:
     for (method, side), curve in curves.items():
         if not curve:
             continue
+        path = smooth_path(frontier(curve), side)
+        dash = "solid" if side == "+C" else "dash"
         figure.add_trace(go.Scatter(
-            x=[0, *(p["effect"] for p in curve)], y=[0, *(p["off_axis"] for p in curve)], mode="lines+markers",
-            line={"color": COLORS[method], "width": 3, "dash": "solid" if side == "+C" else "dash"},
-            marker={"color": COLORS[method], "size": [0, *([8] * (len(curve) - 1)), 12], "symbol": ["circle"] * len(curve) + ["x"]},
-            line_shape="spline", line_smoothing=0.6, text=["bare", *(f"{side} C={p['C']:.3g}" for p in curve)],
+            x=[q[0] for q in path], y=[q[1] for q in path], mode="lines",
+            line={"color": COLORS[method], "width": 3, "dash": dash}, hoverinfo="skip", showlegend=False,
+        ))
+        figure.add_trace(go.Scatter(
+            x=[p["effect"] for p in curve], y=[p["off_axis"] for p in curve], mode="markers",
+            marker={"color": COLORS[method], "size": [7] * (len(curve) - 1) + [12], "symbol": ["circle"] * (len(curve) - 1) + ["x"], "opacity": [0.55] * (len(curve) - 1) + [1.0]},
+            text=[f"{side} C={p['C']:.3g}" for p in curve],
             hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
         ))
-        series = [(0.0, 0.0), *((p["effect"], p["off_axis"]) for p in curve)]
-        for start, end in zip(series, series[1:]):
-            obstacles.extend((start[0] + f * (end[0] - start[0]), start[1] + f * (end[1] - start[1])) for f in (0.25, 0.5, 0.75, 1.0))
+        obstacles.extend((q[0], q[1]) for q in path[::4])
+        obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
         labels.append({"x": curve[-1]["effect"], "y": curve[-1]["off_axis"], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
     for point in prompting:
         figure.add_trace(go.Scatter(
@@ -469,7 +514,11 @@ def main() -> None:
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "off_weight": OFF_WEIGHT,
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zone": random_zone(points),
-        "curves": [{"method": m, "side": side, "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)]} for m in methods for side in ("+C", "-C")],
+        "curves": [{
+            "method": m, "side": side,
+            "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)],
+            "path": smooth_path(frontier(method_curve(points, m, side)), side) if method_curve(points, m, side) else [],
+        } for m in methods for side in ("+C", "-C")],
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
             "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis")} for side, p in row["best"].items()},

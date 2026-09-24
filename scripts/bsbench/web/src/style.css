@@ -31,3 +31,4 @@ td.control{font-style:italic}
 .answer.selected{box-shadow:0 0 0 2px #2563eb}
 .answer h3{font-size:.9rem;margin:.2rem 0}
 .judge{color:#5b554b;font-size:.82rem}
+.intro{max-width:80ch;color:#4a463f;font-size:.95rem;margin-top:1rem}

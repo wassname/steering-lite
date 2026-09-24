@@ -28,7 +28,7 @@ with sync_playwright() as p:
     page.goto(url)
     page.wait_for_selector("svg")
     curve_points = sum(len(c["points"]) for c in data["curves"])
-    drawn = page.locator("circle.mark").count()
+    drawn = page.locator("circle.mark, path.mark.end").count()
     print(f"curve points in points.json={curve_points} drawn={drawn}")
     assert drawn == curve_points, "SVG curve points differ from points.json"
     rows = page.locator("table tbody tr").count()
