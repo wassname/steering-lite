@@ -109,28 +109,28 @@ def requests_for(rows: list[dict]) -> dict[str, tuple[str, dict]]:
 async def refresh(todo: dict[str, tuple[str, dict]]) -> None:
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     headers = {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"}
-    semaphore = asyncio.Semaphore(8)
+    semaphore = asyncio.Semaphore(4)
     lock = asyncio.Lock()
     cost = 0.0
 
     async def run(client, cell_key, kind, request):
         nonlocal cost
         async with semaphore:
-            for attempt in range(3):
+            for attempt in range(6):
                 try:
                     response = await client.post(URL, json=request, headers=headers, timeout=60)
                 except httpx.TimeoutException:
-                    logger.warning("jev timeout attempt={}/3", attempt + 1)
+                    logger.warning("jev timeout attempt={}/6", attempt + 1)
                     continue
-                if response.status_code in (408, 429, 500, 502, 503, 504):
-                    logger.warning("jev {} attempt={}/3", response.status_code, attempt + 1)
-                    await asyncio.sleep(2 * (attempt + 1))
+                if response.status_code in (408, 429, 500, 502, 503, 504, 529):  # 529 = Jev overloaded
+                    logger.warning("jev {} attempt={}/6", response.status_code, attempt + 1)
+                    await asyncio.sleep(5 * 2**attempt)
                     continue
                 response.raise_for_status()
                 body = response.json()
                 break
             else:
-                logger.error("skipping jev cell {} after 3 tries", cell_key)
+                logger.error("skipping jev cell {} after 6 tries", cell_key)
                 return
         async with lock:
             cost += body["usage"]["cost"]
