@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cohort", choices=tuple(COHORTS), default="dev")
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
+    parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
     return parser.parse_args()
 
 
@@ -83,11 +84,11 @@ def judgments(keys: set[str]) -> dict[str, dict]:
     return records
 
 
-def build_points(model_dir: Path, cohort: str) -> list[dict]:
+def build_points(model_dir: Path, cohort: str, exclude: set[str]) -> list[dict]:
     """One point per (method, seed, C, side) with per-question scores kept for bootstrap and the explorer."""
     from judge import demo_rows
 
-    certificates = walk_certificates(model_dir, cohort)
+    certificates = [c for c in walk_certificates(model_dir, cohort) if c["method"] not in exclude]
     rows_by_cert = [(certificate, demo_rows(model_dir, certificate)) for certificate in certificates]
     keys = {cache_key(row, order, p) for _, rows in rows_by_cert for row in rows for order in ("AB", "BA") for p in range(2)}
     cache = judgments(keys)
@@ -514,7 +515,8 @@ def main() -> None:
     model_dir = args.model_dir or default_model_dir()
     out = args.out or ROOT / "outputs/bsbench/results" / args.cohort
     out.mkdir(parents=True, exist_ok=True)
-    points = build_points(model_dir, args.cohort)
+    exclude = {m for m in args.exclude.split(",") if m}
+    points = build_points(model_dir, args.cohort, exclude)
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
     rows = summary(points, scenarios)
     cohort_rows = load_cohort()
@@ -549,7 +551,7 @@ def main() -> None:
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} bootstrap resamples of questions, dose selection redone in each. "
         "Admissible = healthy answers, not past the walk boundary, mean steered off-axis ≤ 1.5 (reference rule)."
-    )
+    ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     (out / "index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / "plot.html").write_text(
