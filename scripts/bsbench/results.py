@@ -411,7 +411,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             b = best[method, side]
             figure.add_trace(go.Scatter(
                 x=[b["effect"]], y=[b["off_axis"]], mode="markers", hoverinfo="skip", showlegend=False,
-                marker={"color": "rgba(0,0,0,0)", "size": 20, "symbol": "circle-open", "line": {"color": COLORS[method], "width": 3}},
+                marker={"color": COLORS[method], "size": 22, "symbol": "circle-open", "line": {"width": 3}},  # open symbols draw in marker.color
             ))
         obstacles.extend((q[0], q[1]) for q in path[::4])
         obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
