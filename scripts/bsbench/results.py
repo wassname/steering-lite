@@ -309,6 +309,8 @@ def random_zone(points: list[dict]) -> list[tuple[float, float, float, float]]:
     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
     cone = [(0.0, 0.0, 0.0, 0.0)]
     for C in sorted({point["C"] for point in random_points}):
+        if len({seed for seed in seeds if (seed, C, "+C") in at}) < max(1, len(seeds) // 2):
+            continue  # seeds start at their own C0/8, so the lowest doses are sampled by only some seeds
         coherent = [seed for seed in seeds if all((seed, C, side) in at and at[seed, C, side]["admissible"] for side in ("+C", "-C"))]
         if len(coherent) < max(1, len(seeds) // 2):
             break
