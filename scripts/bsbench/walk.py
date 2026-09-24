@@ -8,7 +8,8 @@ template, greedy 512-token generation, health rule) follows the reference:
   `prompting_engineered` (AxBench-style LLM-written prompt, see ENGINEERED);
   vjp_delta is steering-lite's copy of the reference estimator
 - one process per walk: load the model and extract the vector once (the reference re-ran both per rung)
-- cohorts: `dev` = every 5th question (20), `full` = all 100
+- cohorts: `dev` = every 5th question (20), `full` = all 100, `ood` = 8 AlpacaEval instructions
+  (not judged; the health rule alone gives each side's last coherent dose)
 - answers are cached per (model, generation settings, method, seed, side, C, question), so a larger
   cohort or more doses only computes the missing cells
 - the walk starts at C0/8 on the reference grid, not at 2^-5: C0 is the iso-KL coefficient at
@@ -62,7 +63,8 @@ PROMPT_METHODS = {
     "prompting_engineered": ENGINEERED,
 }
 METHODS = (*CONFIGS, *PROMPT_METHODS)
-COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}
+COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
+OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown
 # generation settings are part of every answer's cache path; change one and all answers regenerate
 GEN = {"suffix": " Answer in 2 short sentences.", "enable_thinking": False, "do_sample": False, "max_new_tokens": 512}
 GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
@@ -98,6 +100,8 @@ def model_dir(model: str) -> Path:
 
 
 def read_cohort(cohort: str) -> list[dict[str, str]]:
+    if cohort == "ood":
+        return [json.loads(line) for line in OOD.read_text().splitlines()]
     rows = [json.loads(line) for line in COHORT.read_text().splitlines()]
     assert len(rows) == 100 and len({row["scenario"] for row in rows}) == 100
     return rows[COHORTS[cohort]]
