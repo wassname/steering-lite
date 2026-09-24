@@ -110,7 +110,7 @@ async def judge_one(client: AsyncOpenAI, row: dict) -> dict | None:
                 model=MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.7, max_tokens=300,
                 response_format=FORMAT,
                 extra_body={"min_p": 0.1, "reasoning": {"enabled": False}, "provider": {
-                    "quantizations": ["fp8", "int8", "bf16", "fp16"], "require_parameters": True, "ignore": ["AtlasCloud", "DeepInfra"],
+                    "quantizations": ["fp8", "int8", "bf16", "fp16"], "require_parameters": True, "ignore": ["AtlasCloud", "DeepInfra", "Mancer 2"],
                     "order": ["OpenInference"],  # Mancer 2 returns empty content for this schema
                 }},
             )
