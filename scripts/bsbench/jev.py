@@ -56,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
     parser.add_argument("--model-dir", type=Path)
+    parser.add_argument("--answers-only", action="store_true", help="skip the change/concept Choice requests (the plot needs only per-answer ratings)")
     parser.add_argument("--results-dir", type=Path, help="holds points.json; default outputs/bsbench/results/<cohort>")
     return parser.parse_args()
 
@@ -93,7 +94,7 @@ def cached() -> dict[str, dict]:
     return {record["key"]: record for record in map(json.loads, CACHE.open())}
 
 
-def requests_for(rows: list[dict]) -> dict[str, tuple[str, dict]]:
+def requests_for(rows: list[dict], answers_only: bool = False) -> dict[str, tuple[str, dict]]:
     cohort = load_cohort()
     out = {}
     for row in rows:
@@ -101,6 +102,8 @@ def requests_for(rows: list[dict]) -> dict[str, tuple[str, dict]]:
         for text in (row["bare"], row["steered"]):
             request = answer_request(row["prompt"], flaw, text)
             out[key("answer", request["state"])] = ("answer", request)
+        if answers_only:
+            continue
         request = change_request(row["prompt"], row["bare"], row["steered"])
         out[key("change", request["state"])] = ("change", request)
     return out
@@ -109,7 +112,7 @@ def requests_for(rows: list[dict]) -> dict[str, tuple[str, dict]]:
 async def refresh(todo: dict[str, tuple[str, dict]]) -> None:
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     headers = {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"}
-    semaphore = asyncio.Semaphore(4)
+    semaphore = asyncio.Semaphore(12)
     lock = asyncio.Lock()
     cost = 0.0
 
@@ -209,7 +212,7 @@ def main() -> None:
     args = parse_args()
     model_dir = args.model_dir or default_model_dir()
     rows = manifest(model_dir, args.cohort)
-    wanted = requests_for(rows)
+    wanted = requests_for(rows, args.answers_only)
     have = cached()
     todo = {k: v for k, v in wanted.items() if k not in have}
     logger.info("JEV_CACHE_CHECK required={} cached={} missing={}", len(wanted), len(wanted) - len(todo), len(todo))
@@ -217,6 +220,8 @@ def main() -> None:
         asyncio.run(refresh(todo))
     elif todo:
         logger.warning("missing {} jev cells; agreement uses the cached subset (rerun with --refresh)", len(todo))
+    if args.answers_only:
+        return  # the agreement table needs the change requests too
     results_dir = args.results_dir or ROOT / "outputs/bsbench/results" / args.cohort
     report = agreement(model_dir, args.cohort, results_dir)
     out = results_dir / "jev_agreement.md"
