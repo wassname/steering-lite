@@ -406,7 +406,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         ))
         support = frontier(curve)  # the points the line is fitted to; last = last coherent dose (x)
         figure.add_trace(go.Scatter(
-            x=[p["effect"] for p in support], y=[p["off_axis"] for p in support], mode="markers",
+            x=[p["effect"] for p in support], y=[p["off_axis"] for p in support], mode="markers", name="frontier",
             marker={"color": COLORS[method], "size": [8] * (len(support) - 1) + [13], "symbol": ["circle"] * (len(support) - 1) + ["x"]},
             text=[f"{side} C={p['C']:.3g}" for p in support],
             hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
@@ -572,6 +572,9 @@ def main() -> None:
         f"<h1>Results ({html.escape(args.cohort)})</h1><p>{html.escape(intro)}</p>{figure_html}<pre>{html.escape(table)}</pre>"
     )
     figure.write_image(out / "plot.png", width=1064, height=590, scale=2)
+    # marker count drawn in the PNG, compared with the React page by web/uat.py
+    frontier_marks = sum(len(trace.x) for trace in figure.data if trace.name == "frontier")
+    (out / "plot_marks.json").write_text(json.dumps({"frontier_marks": frontier_marks, "methods": shown}) + "\n")
     print(table)
     print(f"wrote {out}/points.json ({len(points)} points), index.md, plot.html, plot.png")
 

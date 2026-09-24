@@ -31,6 +31,9 @@ with sync_playwright() as p:
     drawn = page.locator("circle.mark, path.mark.end").count()
     print(f"curve points in points.json={curve_points} drawn={drawn}")
     assert drawn == curve_points, "SVG curve points differ from points.json"
+    png_marks = json.loads((site / "plot_marks.json").read_text())
+    print(f"PNG frontier marks (plot_marks.json from results.py)={png_marks['frontier_marks']} page drawn={drawn} methods png={png_marks['methods']} page={data['shown']}")
+    assert png_marks["frontier_marks"] == drawn and png_marks["methods"] == data["shown"], "page and PNG draw different points"
     rows = page.locator("table tbody tr").count()
     assert rows == len(data["summary"]), (rows, len(data["summary"]))
     page.screenshot(path=str(site / "uat_plot.png"), full_page=False)

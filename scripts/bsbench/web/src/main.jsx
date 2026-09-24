@@ -26,8 +26,11 @@ function Plot({ data, visible, selected, onSelect }) {
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
   const zone = data.zone;
-  const zonePath = zone.length > 1
-    ? 'M' + [...zone.map(z => `${x(z[2])},${y(z[1])}`), ...[...zone].reverse().map(z => `${x(z[3])},${y(z[1])}`)].join('L') + 'Z' : null;
+  // Chaikin corner cutting (3 passes) so the band is smooth like the PNG's spline
+  const chaikin = (pts, n) => n === 0 ? pts : chaikin(pts.flatMap((p, i) => { const q = pts[(i + 1) % pts.length];
+    return [[0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]], [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]]; }), n - 1);
+  const ring = [...zone.map(z => [x(z[2]), y(z[1])]), ...[...zone].reverse().map(z => [x(z[3]), y(z[1])])];
+  const zonePath = zone.length > 1 ? 'M' + chaikin(ring, 3).map(([a, b]) => `${a},${b}`).join('L') + 'Z' : null;
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
