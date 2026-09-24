@@ -38,7 +38,7 @@ COLORS = {
 for _method, _color in zip(
     ("angular_steering", "chars", "corda_pca", "cosine_gated", "directional_ablation", "linear_act", "spherical",
      "sspace", "sspace_ablate", "sspace_damp_amp", "sspace_pca", "super_sspace", "topk_clusters"),
-    ("#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94", "#e377c2", "#17becf"),
+    ("#1f77b4", "#17becf", "#ff7f0e", "#2ca02c", "#98df8a", "#ff9896", "#d62728", "#c5b0d5", "#9467bd", "#8c564b", "#c49c94", "#e377c2", "#aec7e8"),
 ):
     COLORS[_method] = _color
 TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring learned methods; the table lists all

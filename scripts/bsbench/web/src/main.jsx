@@ -7,9 +7,9 @@ import './style.css';
 const COLORS = {
   vjp_delta: '#0072b2', mean_diff: '#d55e00', pca: '#cc79a7', vjp_cache: '#009e73',
   kv_cache_gram: '#e69f00', prompting: '#6a3d9a', prompting_engineered: '#b15928', random: '#999999',
-  angular_steering: '#1f77b4', chars: '#aec7e8', corda_pca: '#ff7f0e', cosine_gated: '#2ca02c', directional_ablation: '#98df8a',
-  linear_act: '#d62728', spherical: '#ff9896', sspace: '#9467bd', sspace_ablate: '#c5b0d5', sspace_damp_amp: '#8c564b',
-  sspace_pca: '#c49c94', super_sspace: '#e377c2', topk_clusters: '#17becf',
+  angular_steering: '#1f77b4', chars: '#17becf', corda_pca: '#ff7f0e', cosine_gated: '#2ca02c', directional_ablation: '#98df8a',
+  linear_act: '#ff9896', spherical: '#d62728', sspace: '#c5b0d5', sspace_ablate: '#9467bd', sspace_damp_amp: '#8c564b',
+  sspace_pca: '#c49c94', super_sspace: '#e377c2', topk_clusters: '#aec7e8',
 };
 const W = 1000, H = 560, M = { l: 70, r: 20, t: 30, b: 50 };
 const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
