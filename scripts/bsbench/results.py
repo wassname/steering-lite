@@ -32,11 +32,11 @@ MAX_STEERED_OFF_AXIS = 1.5  # reference export.py admissible rule
 N_BOOT = 1000
 COLORS = {
     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
-    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a",
+    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928",
 }
 LABELS = {
     "vjp_delta": "VJP-delta", "mean_diff": "mean difference", "pca": "PCA", "vjp_cache": "VJP-cache",
-    "kv_cache_gram": "KV-cache Gram", "prompting": "persona prompt", "random": "random",
+    "kv_cache_gram": "KV-cache Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
 }
 
 
@@ -317,11 +317,14 @@ def random_zone(points: list[dict]) -> list[tuple[float, float, float, float]]:
     return cone
 
 
+PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
+
+
 def plot(points: list[dict], title: str) -> go.Figure:
     figure = go.Figure()
-    methods = sorted({point["method"] for point in points} - {"random", "prompting"})
+    methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
-    prompting = [point for point in points if point["method"] == "prompting"]
+    prompting = [point for point in points if point["method"] in PROMPTS]
     random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
     shown = [point for curve in curves.values() for point in curve] + random_live + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
@@ -352,10 +355,10 @@ def plot(points: list[dict], title: str) -> go.Figure:
     for point in prompting:
         figure.add_trace(go.Scatter(
             x=[point["effect"]], y=[point["off_axis"]], mode="markers",
-            marker={"color": COLORS["prompting"], "size": 13, "symbol": "star"}, hoverinfo="skip", showlegend=False,
+            marker={"color": COLORS[point["method"]], "size": 13, "symbol": "star"}, hoverinfo="skip", showlegend=False,
         ))
         obstacles.append((point["effect"], point["off_axis"]))
-        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"prompt {point['side']}", "color": COLORS["prompting"]})
+        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}", "color": COLORS[point["method"]]})
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333333", "size": 11, "symbol": "diamond"}, hoverinfo="skip", showlegend=False))
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
@@ -387,7 +390,7 @@ def tables(rows: list[dict]) -> str:
     head = "| method | score↑ | 90% CI | −C on↑ | −C off↓ | −C C | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
     lines = [head, "|" + "---|" * 12]
     for row in rows:
-        name = f"*{row['method']}*" if row["method"] in ("random", "prompting") else row["method"]
+        name = f"*{row['method']}*" if row["method"] in ("random", *PROMPTS) else row["method"]
         score = "—" if math.isnan(row["score"]) else f"{row['score']:+.2f}"
         ci = "—" if math.isnan(row["ci"][0]) else f"[{row['ci'][0]:+.2f}, {row['ci'][1]:+.2f}]"
         lines.append("| " + " | ".join([name, score, ci, *_fmt_side(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
@@ -446,7 +449,7 @@ def main() -> None:
     rows = summary(points, scenarios)
     cohort_rows = load_cohort()
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
-    methods = sorted({point["method"] for point in points} - {"random", "prompting"})
+    methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     site = {
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "off_weight": OFF_WEIGHT,
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],

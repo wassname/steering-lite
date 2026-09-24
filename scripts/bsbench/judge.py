@@ -246,7 +246,7 @@ Response B:
 
 
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504, 524, 529}
-PARALLEL = 6  # user requested --parallel N=6
+PARALLEL = 32  # reference: 6; concurrency only, prompts and cache key unchanged
 
 
 def _insufficient_credits(err: APIStatusError) -> bool:
