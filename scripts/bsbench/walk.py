@@ -17,7 +17,9 @@ template, greedy 512-token generation, health rule) follows the reference:
 - stop rule: a side's boundary is 2 unhealthy rungs in a row, as in the reference, but the walk
   stops only when BOTH sides are one rung past their boundary (reference: either side), so each
   side's last coherent dose is measured
-- each rung also logs RMS KL at +/-C on the calibration prompts, for the calibration table
+- each rung also logs RMS KL at +/-C on the calibration prompts, for the calibration table; it is
+  reused from any earlier walk of the same vector, and a COMPLETE walk with the same stride and
+  kl_target exits before loading the model
 """
 
 import argparse
@@ -255,7 +257,12 @@ def calibration_c0(args, model, tokenizer, vector: Vector, calib_path: Path) -> 
     return c0
 
 
-def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float) -> dict[str, float]:
+def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
+    """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
+    for path in (root / "walks").glob(f"{args.method}_s{args.seed}_*.json"):
+        for rung in json.loads(path.read_text())["rungs"]:
+            if rung.get("coefficient") is not None and math.isclose(rung["coefficient"], coefficient, rel_tol=1e-9) and "kl_rms" in rung:
+                return rung["kl_rms"]
     out = {}
     for side, sign in (("+C", 1.0), ("-C", -1.0)):
         vector.cfg.coeff = sign * coefficient
@@ -267,6 +274,11 @@ def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
+    if certificate_path.exists() and not args.smoke:
+        done = json.loads(certificate_path.read_text())
+        if done["status"] == "COMPLETE" and done.get("stride", args.stride) == args.stride and done.get("kl_target", args.kl_target) == args.kl_target:
+            logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
+            return
     dtype = getattr(torch, args.dtype)
     logger.info("stage=load model={} device={} dtype={} gen_key={} gen={}", args.model, args.device, args.dtype, GEN_KEY, GEN)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
@@ -322,7 +334,7 @@ def walk(args) -> None:
         if step >= args.max_rungs:
             raise RuntimeError(f"{args.method} s{args.seed}: no confirmed breakdown within {args.max_rungs} rungs from C={GRID[start]:.4g}")
         coefficient = GRID[grid_index]
-        rung = {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": rung_kl(args, model, tokenizer, vector, coefficient)}
+        rung = {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": rung_kl(args, model, tokenizer, vector, coefficient, root)}
         for side, sign in (("+C", 1.0), ("-C", -1.0)):
             path = answer_path(args.model, args.method, args.seed, side, coefficient)
             answers = cached_answers(
