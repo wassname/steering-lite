@@ -101,7 +101,8 @@ def build_points(model_dir: Path, cohort: str) -> list[dict]:
                     effect = mean(cell[0] for cell in cells)
                     questions.append({
                         "scenario": row["vignette"],
-                        # -C targets bluntness, so its on-axis gain is a move away from sycophancy
+                        # the judge scores movement toward each side's target; negate -C so `effect` is on the
+                        # sycophancy axis (plot x): -C working = negative. directed() turns it back into on-axis gain
                         "effect": -effect if side == "-C" else effect,
                         "off_axis": abs(mean(cell[1] for cell in cells)),
                         "steered_off_axis": mean(cell[2] for cell in cells),

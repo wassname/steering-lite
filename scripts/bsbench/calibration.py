@@ -2,7 +2,8 @@
 
 Per walk and side: the last healthy dose before the confirmed boundary (2 unhealthy rungs in a row),
 its ratio to C0, and the RMS KL there. Rows for BS-bench (dev) and the held-out AlpacaEval set (ood),
-plus the judged Pareto-best dose from points.json when it exists.
+plus, from points.json when it exists, the last judge-admissible dose (the health rule misses short
+gibberish, e.g. vjp_delta +C C=1.26 "Heat shit fast like damn shit yeah.") and the Pareto-best dose.
 
     python calibration.py            # writes outputs/bsbench/results/calibration.md
 """
@@ -43,19 +44,24 @@ def rows_for(model_dir: Path, cohort: str) -> list[dict]:
 def main() -> None:
     model_dir = default_model_dir()
     rows = rows_for(model_dir, "dev") + rows_for(model_dir, "ood")
-    best = {}
+    best, admissible = {}, {}
     points_path = ROOT / "outputs/bsbench/results/dev/points.json"
     if points_path.exists():
-        for summary in json.loads(points_path.read_text())["summary"]:
+        site = json.loads(points_path.read_text())
+        for summary in site["summary"]:
             for side, point in summary["best"].items():
                 if point:
                     best[summary["method"], side] = point["C"]
+        for point in site["points"]:
+            if point["admissible"]:
+                key = (point["method"], point["side"])
+                admissible.setdefault(key, []).append(point)
     lines = [
         "C0 = dose where RMS KL reaches 1 nat on the calibration prompts (walk starts at C0/8). "
         "last healthy = last dose before 2 unhealthy rungs in a row (health rule only, no judge). "
         "Random: median over seeds.", "",
-        "| method | side | C0 | dev last healthy (×C0) | dev KL there | ood last healthy (×C0) | ood KL there | dev Pareto-best C (×C0) |",
-        "|---|---|---|---|---|---|---|---|",
+        "| method | side | C0 | dev last healthy (×C0) | dev KL there | dev last admissible, judged (×C0) | ood last healthy (×C0) | ood KL there | dev Pareto-best C (×C0) |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     groups = {}
     for row in rows:
@@ -74,7 +80,12 @@ def main() -> None:
         ood, ood_kl = cell(group, "ood")
         pareto = best.get((method, side))
         pareto_cell = "—" if pareto is None else f"{pareto:.3g} ({pareto / c0:.2f})"
-        lines.append(f"| {method} | {side} | {c0:.3g} | {dev} | {dev_kl} | {ood} | {ood_kl} | {pareto_cell} |")
+        # random: max admissible C per seed, then median; others have one seed
+        per_seed = {}
+        for point in admissible.get((method, side), []):
+            per_seed[point["seed"]] = max(per_seed.get(point["seed"], 0.0), point["C"])
+        judged = "—" if not per_seed else f"{median(per_seed.values()):.3g} ({median(per_seed.values()) / c0:.2f})"
+        lines.append(f"| {method} | {side} | {c0:.3g} | {dev} | {dev_kl} | {judged} | {ood} | {ood_kl} | {pareto_cell} |")
     out = ROOT / "outputs/bsbench/results/calibration.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("# RMS-KL calibration vs walk breakdown\n\n" + "\n".join(lines) + "\n")
