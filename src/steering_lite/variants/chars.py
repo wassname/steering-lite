@@ -69,18 +69,20 @@ def _kmeans_counts(X: Tensor, k: int, n_iters: int, seed: int) -> tuple[Tensor, 
 def _sinkhorn(C: Tensor, p: Tensor, q: Tensor, lam: float, n_iters: int) -> Tensor:
     """Entropic OT: P* = argmin <P,C> + lam*H(P), s.t. P 1 = p, P^T 1 = q.
 
-    `K = exp(-C/lam)` underflows to 0 in fp32 for C/lam > ~80, which is easy to
-    hit in residual-stream space (squared centroid distances easily 100s, lam=0.1).
-    Without `.clamp_min(ε)` the Sinkhorn iterates produce 0 → div-by-0 → inf → NaN
-    that propagate silently into v_hat at apply time. Symptom: every eval cell
-    saturates at the _logit clamp (+4.6 nats) regardless of vignette content.
+    Log-domain iterations on the potentials f, g, with log P = (f_i + g_j - C_ij) / lam.
+    The plain form `K = exp(-C/lam)` underflows to 0 once C/lam > ~80 (residual-stream
+    squared distances are ~1e4 with lam=0.1), which left P all zeros and chars inert.
     """
-    K = torch.exp(-C / lam)
-    u = torch.ones_like(p)
+    C, p, q = C.double(), p.double(), q.double()  # exponents reach ~1e5/lam: fp32 loses the plan mass
+    f = torch.zeros_like(p)
+    g = torch.zeros_like(q)
+    log_p, log_q = p.log(), q.log()
     for _ in range(n_iters):
-        v = q / (K.t() @ u).clamp_min(ε)
-        u = p / (K @ v).clamp_min(ε)
-    return u[:, None] * K * v[None, :]
+        f = lam * (log_p - torch.logsumexp((g[None, :] - C) / lam, dim=1))
+        g = lam * (log_q - torch.logsumexp((f[:, None] - C) / lam, dim=0))
+    P = torch.exp((f[:, None] + g[None, :] - C) / lam)
+    assert torch.isclose(P.sum(), torch.tensor(1.0, dtype=P.dtype), atol=1e-6), f"Sinkhorn plan mass {P.sum():.6f} != 1"
+    return P.float()
 
 
 @register
