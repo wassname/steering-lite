@@ -348,8 +348,8 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
     for p in support:
         if directed(p) > ts[-1]:
             ts.append(directed(p)); ys.append(p["off_axis"])
-    if len(ts) < 2:
-        return [[0.0, 0.0]] + [[p["effect"], p["off_axis"]] for p in support]
+    if len(ts) < 2:  # no forward progress on this side: straight line to the end
+        return [[0.0, 0.0], [support[-1]["effect"], support[-1]["off_axis"]]]
     h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
     d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
     m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
@@ -476,6 +476,8 @@ def blind_cell(point: dict | None, side: str) -> str:
     if point is None:
         return "— | — | —"
     judged = [q["blind"] for q in point["questions"] if q["blind"]]
+    if not judged:
+        return f"{point['C']:.3g}: not judged (run blind.py) | — | —"
     shifts = [STANCE[j["b_premise"]] - STANCE[j["a_premise"]] for j in judged if j["a_premise"] in STANCE and j["b_premise"] in STANCE]
     sign = 1 if side == "+C" else -1
     labels = [j["concept"] for j in judged]
