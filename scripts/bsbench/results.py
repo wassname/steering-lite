@@ -108,6 +108,7 @@ def build_points(model_dir: Path, cohort: str) -> list[dict]:
                         "n_cells": len(cells),
                         "evidence": records[0]["judgment"]["evidence"],
                         "blind": blind.get(blind_key(row)),
+                        "text": row["steered"],
                     })
                 assert questions, f"no judgments for {certificate['method']} s{certificate['seed']} C={C} {side}; run judge.py --refresh"
                 health = rung[side]
@@ -402,6 +403,17 @@ def tables(rows: list[dict]) -> str:
     return "\n".join(lines + ref)
 
 
+def _no_nan(value):
+    """JSON has no NaN; an unscored method (no admissible dose on a side) is null."""
+    if isinstance(value, float):
+        return None if math.isnan(value) else value
+    if isinstance(value, dict):
+        return {k: _no_nan(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_no_nan(v) for v in value]
+    return value
+
+
 INTENDED = {"+C": "sycophantic", "-C": "candid"}
 
 
@@ -432,7 +444,21 @@ def main() -> None:
     points = build_points(model_dir, args.cohort)
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
     rows = summary(points, scenarios)
-    (out / "points.json").write_text(json.dumps({"model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "points": points}, indent=1) + "\n")
+    cohort_rows = load_cohort()
+    bare = read_answers(model_dir / "answers/bare/bare.jsonl")
+    methods = sorted({point["method"] for point in points} - {"random", "prompting"})
+    site = {
+        "model_dir": model_dir.name, "cohort": args.cohort, "judge": MODEL, "off_weight": OFF_WEIGHT,
+        "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
+        "zone": random_zone(points),
+        "curves": [{"method": m, "side": side, "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)]} for m in methods for side in ("+C", "-C")],
+        "summary": [{
+            "method": row["method"], "score": row["score"], "ci": row["ci"], "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
+            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis")} for side, p in row["best"].items()},
+        } for row in rows],
+        "points": points,
+    }
+    (out / "points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)"
     figure = plot(points, title)
     table = tables(rows) + "\n\nBlind judge (not told the target): label of the change from bare, at each Pareto-best dose. Intended: +C sycophantic, −C candid.\n\n" + blind_table(rows)
@@ -443,14 +469,14 @@ def main() -> None:
     )
     (out / "index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
-    (out / "index.html").write_text(
+    (out / "plot.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>steering-lite bsbench</title>"
         "<style>body{font:16px system-ui;max-width:1064px;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap}</style>"
         f"<h1>Results ({html.escape(args.cohort)})</h1><p>{html.escape(intro)}</p>{figure_html}<pre>{html.escape(table)}</pre>"
     )
     figure.write_image(out / "plot.png", width=1064, height=590, scale=2)
     print(table)
-    print(f"wrote {out}/points.json ({len(points)} points), index.md, index.html, plot.png")
+    print(f"wrote {out}/points.json ({len(points)} points), index.md, plot.html, plot.png")
 
 
 if __name__ == "__main__":

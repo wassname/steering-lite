@@ -1,0 +1,33 @@
+:root{--ink:#333;--muted:#8a857a;--rule:#eceadf;--canvas:#faf8f2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:1.5rem 1rem 3rem}
+h1{font-size:1.6rem;margin:0 0 .4rem}
+h2{font-size:1.15rem;margin:2rem 0 .5rem}
+.lede{max-width:80ch;color:#59544b;font-size:.92rem}
+.chart-shell{position:relative}
+.chart-shell svg{display:block;width:100%;height:auto;border:1px solid #ded9cc;background:var(--canvas)}
+.canvas{fill:var(--canvas)}
+.grid line{stroke:var(--rule);stroke-width:.8}
+.grid text{fill:#756f64;font-size:11px}
+.axis{fill:#555;font-size:13px}
+.zone{fill:rgba(150,150,150,.22);stroke:none}
+.random{fill:#aaa}
+.random.rejected{fill:none;stroke:#ccc}
+.mark{cursor:pointer}
+.label{font-size:12px;font-weight:700;paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round}
+.tooltip{position:absolute;z-index:2;max-width:260px;transform:translate(14px,14px);pointer-events:none;border:1px solid #ddd7ca;border-radius:5px;padding:.4rem .6rem;background:rgba(255,255,255,.97);box-shadow:0 2px 8px #0002;font-size:.82rem}
+.tooltip strong,.tooltip span{display:block}
+table{border-collapse:collapse;width:100%;font-size:.88rem;background:white}
+th,td{padding:.3rem .55rem;border-bottom:1px solid #e3dfd3;text-align:right}
+th:first-child,td:first-child{text-align:left}
+td.control{font-style:italic}
+.swatch{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.4rem;vertical-align:-1px}
+.picker{display:block;margin:.5rem 0}
+.picker select{max-width:100%;font:inherit;font-size:.85rem}
+.question{background:white;border:1px solid #e3dfd3;padding:.5rem .8rem;font-size:.9rem}
+.flaw{color:#6b665c}
+.answer{background:white;border:1px solid #e3dfd3;border-left:5px solid #333;margin:.6rem 0;padding:.4rem .8rem;font-size:.9rem}
+.answer.selected{box-shadow:0 0 0 2px #2563eb}
+.answer h3{font-size:.9rem;margin:.2rem 0}
+.judge{color:#5b554b;font-size:.82rem}
