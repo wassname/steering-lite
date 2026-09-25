@@ -16,6 +16,7 @@ from pathlib import Path
 from statistics import mean, median
 
 from data import ROOT, default_model_dir
+from judge import MODEL
 
 JUDGMENTS = ROOT / "outputs/bsbench/judgments"
 
@@ -56,7 +57,9 @@ def main() -> None:
     (key, t), = list(timing.items())[:1] or [((None, None), None)]
     assert t is not None, "no walk certificate with timing yet: run a full walk after walk.py records timing"
     gpu_min = t["total_s"] / 60
-    summary = json.loads((ROOT / "outputs/bsbench/results/full/points.json").read_text())["summary"]
+    site = json.loads((ROOT / "outputs/bsbench/results/full/points.json").read_text())
+    assert site["judge"].startswith(MODEL), f"points.json is from judge {site['judge']!r}; rerun results.py --cohort full"
+    summary = site["summary"]
     top = [row["method"] for row in summary if row["method"] not in ("random", "prompting", "prompting_engineered") and row["score"] is not None][:4]
 
     lines = [

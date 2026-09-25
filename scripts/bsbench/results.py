@@ -130,7 +130,10 @@ def pareto_score(side_curves: dict[str, list[dict]]) -> tuple[float, dict]:
 
 
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
-    """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats)."""
+    """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
+
+    The damage cap is applied again to the draw; doses rejected on the full data (health rule, walk
+    boundary, or damage) stay rejected, so the interval is conditional on those."""
     out = []
     for point in curve:
         by = {}
@@ -139,16 +142,18 @@ def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[
         chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
         if not chosen:  # random: a drawn seed may not be admissible at this dose
             continue
+        if mean(q["steered_damage"] for q in chosen) > MAX_DAMAGE:
+            continue
         out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen)})
     return out
 
 
-def bootstrap(side_curves: dict[str, list[dict]], scenarios: list[str], rng: random.Random) -> tuple[float, float, float]:
-    """Hierarchical bootstrap: resample seeds, then questions; dose selection redone in each draw.
+def bootstrap(side_curves: dict[str, list[dict]], scenarios: list[str], seeds: list[int], rng: random.Random) -> tuple[float, float, float]:
+    """Hierarchical bootstrap: resample seeds (all walk seeds, including ones with no admissible dose),
+    then questions; dose selection redone in each draw.
 
     Returns the 90% interval and the share of draws where a side had no admissible dose (score -inf,
     counted as the worst outcome rather than dropped)."""
-    seeds = sorted({q["seed"] for curve in side_curves.values() for point in curve for q in point["questions"]})
     scores = []
     for _ in range(N_BOOT):
         drawn_seeds = [rng.choice(seeds) for _ in seeds]
@@ -195,8 +200,9 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
     rows = []
     for method, (curves, best, strongest) in choose(points).items():
         score, _ = pareto_score(curves)
-        low, high, empty = bootstrap(curves, scenarios, rng) if not math.isnan(score) else (float("nan"), float("nan"), float("nan"))
         group = [point for point in points if point["method"] == method]
+        seeds = sorted({point["seed"] for point in group})
+        low, high, empty = bootstrap(curves, scenarios, seeds, rng) if not math.isnan(score) else (float("nan"), float("nan"), float("nan"))
         rows.append({
             "method": method, "score": score, "ci": (low, high), "ci_empty": empty, "best": best, "strongest": strongest,
             "seeds": len({point["seed"] for point in group}),
@@ -488,8 +494,7 @@ def blind_cell(point: dict | None, side: str) -> str:
     if point is None:
         return "— | — | —"
     judged = [q["blind"] for q in point["questions"] if q["blind"]]
-    if not judged:
-        return f"{point['C']:.3g}: not judged (run judge.py --refresh) | — | —"
+    assert len(judged) == len(point["questions"]), f"blind ratings for {len(judged)}/{len(point['questions'])} answers at C={point['C']}; run judge.py --refresh"
     sign = 1 if side == "+C" else -1
     shift = sign * mean(stance(j["stance_B"]) - stance(j["stance_A"]) for j in judged)
     labels = [j["concept"]["choice"] for j in judged]

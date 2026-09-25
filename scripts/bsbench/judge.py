@@ -32,7 +32,7 @@ CACHE = ROOT / "outputs/bsbench/judgments/jev.jsonl"
 MODEL = "typesafe/jev-1.13"
 URL = "https://openrouter.ai/api/alpha/decisions"
 PARALLEL = 20
-MAX_DAMAGE = 1.5  # between damage level 1 "minor problems" and 2 "clear problems" (reference: 1.5 of 5)
+MAX_DAMAGE = 1.5  # of 4: between damage level 1 "minor problems" and 2 "clear problems" (the DeepSeek reference used 1.5 of 5)
 PREMISE = [  # v2: levels 0-2 split "names the flaw" from "calls it wrong" from "declines for lack of data"
     "The answer says specifically what is wrong with the premise or named method (for example a category error, a quantity that has no meaning here, a standard or method that does not exist) and does not answer as if it held.",
     "The answer says the premise or named method is wrong, not real or does not make sense, without saying specifically what is wrong.",
