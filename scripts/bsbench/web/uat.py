@@ -11,7 +11,7 @@ import sys
 import threading
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeout, sync_playwright
 
 site = Path(sys.argv[1]).resolve()
 data = json.loads((site / "points.json").read_text())
@@ -52,10 +52,13 @@ with sync_playwright() as p:
     if (site / "points_jev.json").exists():  # judge switch: the Jev view must draw exactly its own points and the Jev PNG's
         jev = json.loads((site / "points_jev.json").read_text())
         jev_marks = json.loads((site / "plot_marks_jev.json").read_text())
-        page.select_option("label.picker select", "jev")
-        page.wait_for_timeout(1500)
-        jev_drawn = page.locator("circle.mark, path.mark.end").count()
         jev_expect = sum(len(c["points"]) for c in jev["curves"] if c["method"] in jev["shown"])
+        page.select_option("label.picker select", "jev")
+        try:  # wait for points_jev.json to load and redraw; on timeout the assert below reports the counts
+            page.wait_for_function(f"document.querySelectorAll('circle.mark, path.mark.end').length === {jev_expect}", timeout=15000)
+        except PlaywrightTimeout:
+            pass
+        jev_drawn = page.locator("circle.mark, path.mark.end").count()
         print(f"JEV view: page drawn={jev_drawn} points_jev.json={jev_expect} PNG plot_marks_jev={jev_marks['frontier_marks']}")
         assert jev_drawn == jev_expect == jev_marks["frontier_marks"], "Jev view differs from points_jev.json or its PNG"
         page.screenshot(path=str(site / "uat_plot_jev.png"))

@@ -2,7 +2,7 @@
 
 90% CI width of the score (min over ±C of on - off, dose selection redone per draw) when resampling
 seeds only (all questions), questions only (all seeds), or both (the results.py hierarchical bootstrap).
-Rule (goal 4): add seeds where the seeds-only width is more than 25% of the both width.
+Diagnostic only: extra seeds are added for all methods alike, and only after the user approves.
 
     python ci_decomposition.py --cohort full > ../../outputs/logs/ci-decomposition-full.txt
 """
@@ -15,7 +15,6 @@ from judge import COHORTS, default_model_dir, load_cohort
 from results import PROMPTS, build_points, method_curve, pareto_score, random_curves, resample
 
 N_DRAWS = 400
-SEED_SHARE_LIMIT = 0.25
 
 
 def width(curves: dict, seeds: list[int], scenarios: list[str], vary_seeds: bool, vary_questions: bool, rng: random.Random) -> float:
@@ -35,15 +34,15 @@ def main() -> None:
     args = parser.parse_args()
     points = build_points(default_model_dir(), args.cohort, set())
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
-    print(f"| method | seeds | 90% CI width: seeds only | questions only | both | seeds-only / both | add seeds (> {SEED_SHARE_LIMIT:.0%}) |")
-    print("|---|--:|--:|--:|--:|--:|---|")
+    print("| method | seeds | 90% CI width: seeds only | questions only | both | seeds-only / both |")
+    print("|---|--:|--:|--:|--:|--:|")
     for method in sorted({p["method"] for p in points} - set(PROMPTS), key=lambda m: (m == "random", m)):
         curves = random_curves(points) if method == "random" else {side: method_curve(points, method, side) for side in ("+C", "-C")}
         seeds = sorted({p["seed"] for p in points if p["method"] == method})
         rng = random.Random(method)
         w_seed, w_q, w_both = (width(curves, seeds, scenarios, s, q, rng) for s, q in ((True, False), (False, True), (True, True)))
         share = w_seed / w_both
-        print(f"| {method} | {len(seeds)} | {w_seed:.2f} | {w_q:.2f} | {w_both:.2f} | {share:.0%} | {'YES' if share > SEED_SHARE_LIMIT else 'no'} |")
+        print(f"| {method} | {len(seeds)} | {w_seed:.2f} | {w_q:.2f} | {w_both:.2f} | {share:.0%} |")
 
 
 if __name__ == "__main__":
