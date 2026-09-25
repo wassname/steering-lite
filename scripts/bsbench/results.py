@@ -31,6 +31,7 @@ N_BOOT = 1000
 COLORS = {
     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
     "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928",
+    "mean_vjp": "#56b4e9", "wiki_mean_vjp": "#000000", "suppressed_mean_diff": "#7f7f7f",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
@@ -43,6 +44,7 @@ TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring le
 LABELS = {
     "vjp_delta": "VJP-delta", "mean_diff": "mean difference", "pca": "PCA", "vjp_cache": "VJP-cache",
     "kv_cache_gram": "KV-cache Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
+    "mean_vjp": "mean VJP", "wiki_mean_vjp": "WikiText mean VJP", "suppressed_mean_diff": "suppressed mean diff",
 }
 LABELS |= {method: method for method in COLORS if method not in LABELS}
 
