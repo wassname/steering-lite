@@ -18,9 +18,9 @@ def load_cohort() -> dict[str, dict]:
     return {row["scenario"]: row for row in rows}
 
 
-def default_model_dir() -> Path:
-    dirs = [path for path in (ROOT / "outputs/bsbench").iterdir() if (path / "walks").is_dir()]
-    assert len(dirs) == 1, f"pass --model-dir, found {dirs}"
+def default_model_dir(model: str = "Qwen/Qwen3.5-4B") -> Path:
+    dirs = [path for path in (ROOT / "outputs/bsbench").glob(f"{model.replace('/', '--')}-g*") if (path / "walks").is_dir()]
+    assert len(dirs) == 1, f"expected one output dir for {model}, found {dirs}"
     return dirs[0]
 
 
