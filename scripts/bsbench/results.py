@@ -5,7 +5,7 @@ file writes the one data artifact (`points.json`) that the plot, the tables and 
 Kept from the reference: per-cell scoring (AB/BA x 2 passes), the -C sign flip, the admissible rule
 (healthy, not past the walk boundary, mean steered off-axis <= 1.5), the random zone, the plot style.
 Changed: all steering-lite methods plus prompting points; the headline table picks, for each side,
-the admissible dose with the best on-axis - 4 x off-axis, scores the method by the weaker side, and
+the admissible dose with the best on-axis - OFF_WEIGHT (1) x off-axis, scores the method by the weaker side, and
 bootstraps questions (selection is redone inside each resample). The reference table (strongest
 admissible dose, 1:1 penalty) is kept below it for parity with the vjp-steering README.
 """
@@ -165,7 +165,7 @@ def method_curve(points: list[dict], method: str, side: str) -> list[dict]:
 
 
 def pareto_score(side_curves: dict[str, list[dict]]) -> tuple[float, dict]:
-    """min over sides of the best admissible on-axis - 4 x off-axis."""
+    """min over sides of the best admissible on-axis - OFF_WEIGHT x off-axis."""
     best = {side: side_best(curve, lambda point: directed(point) - OFF_WEIGHT * point["off_axis"]) for side, curve in side_curves.items()}
     if any(point is None for point in best.values()):
         return float("nan"), best
