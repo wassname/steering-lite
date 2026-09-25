@@ -88,17 +88,21 @@ function Summary({ data }) {
 }
 
 function Explorer({ data, selected, onSelect }) {
-  const [scenario, setScenario] = useState(data.questions[0].scenario);
-  const question = data.questions.find(q => q.scenario === scenario);
   // default rows: each method-side at its Pareto-best dose; the selected point is added on top
-  const rows = useMemo(() => {
-    const best = data.summary.flatMap(r => ['-C', '+C'].map(side => r.best[side] && data.points.find(p => p.method === r.method && p.side === side && p.C === r.best[side].C && (r.method !== 'random' || p.seed === 0))))
-      .filter(Boolean);
-    return selected && !best.some(p => pointId(p) === pointId(selected)) ? [selected, ...best] : best;
-  }, [data, selected]);
+  const best = useMemo(() => data.summary.flatMap(r => ['-C', '+C'].map(side => r.best[side] && data.points.find(p => p.method === r.method && p.side === side && p.C === r.best[side].C && (r.method !== 'random' || p.seed === 0))))
+    .filter(Boolean), [data]);
+  const rows = selected && !best.some(p => pointId(p) === pointId(selected)) ? [selected, ...best] : best;
+  // questions sorted by the spread (std) of the on-axis score over those default rows: most variation first
+  const questions = useMemo(() => data.questions.map(q => {
+    const xs = best.map(p => p.questions.find(a => a.scenario === q.scenario)).filter(Boolean).map(a => a.effect);
+    const m = xs.reduce((s, x) => s + x, 0) / xs.length;
+    return { ...q, std: Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length) };
+  }).sort((a, b) => b.std - a.std), [data, best]);
+  const [scenario, setScenario] = useState(questions[0].scenario);
+  const question = questions.find(q => q.scenario === scenario);
   return <section>
     <label className="picker">question <select value={scenario} onChange={e => setScenario(e.target.value)}>
-      {data.questions.map(q => <option key={q.scenario} value={q.scenario}>{q.scenario.replace('syco_bullshit_v2_', '')}: {q.prompt.slice(0, 90)}…</option>)}
+      {questions.map(q => <option key={q.scenario} value={q.scenario}>σ={q.std.toFixed(2)} {q.scenario.replace('syco_bullshit_v2_', '')}: {q.prompt.slice(0, 80)}…</option>)}
     </select></label>
     <div className="question"><p><strong>Question.</strong> {question.prompt}</p><p className="flaw"><strong>Known flaw (given to the aware judge, not the blind one).</strong> {question.flaw}</p></div>
     <div className="answer bare"><h3>bare</h3><p>{question.bare}</p></div>
@@ -160,7 +164,7 @@ function App() {
     <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling the questions.</p>
     <Summary data={data} />
     <h2 id="explorer">Answers</h2>
-    <p className="lede">Pick a question. Each block is one method and side at its Pareto-best dose (random: seed 0). Click a point on the plot to add that dose.</p>
+    <p className="lede">Pick a question; the list starts with the questions where the answers below differ most (σ = spread of the on-axis score over these blocks). Each block is one method and side at its Pareto-best dose (random: seed 0). Click a point on the plot to add that dose.</p>
     <Explorer data={data} selected={selected} onSelect={setSelected} />
   </main>;
 }

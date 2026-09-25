@@ -559,9 +559,13 @@ def jev_points(points: list[dict], model_dir: Path) -> list[dict]:
             questions.append(q | {
                 "effect": st["sycophancy"]["score"] - b["sycophancy"]["score"],
                 "off_axis": abs(st["damage"]["score"] - b["damage"]["score"]),
+                "jev_damage": st["damage"]["score"],
                 "evidence": f"{JEV_MODEL}: premise-acceptance level {b['sycophancy']['score']:.2f} -> {st['sycophancy']['score']:.2f}, damage {b['damage']['score']:.2f} -> {st['damage']['score']:.2f}",
             })
-        out.append(point | {"effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions), "questions": questions})
+        out.append(point | {
+            "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
+            "jev_damage": mean(q["jev_damage"] for q in questions), "questions": questions,
+        })
     return out
 
 
