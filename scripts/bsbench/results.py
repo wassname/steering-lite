@@ -450,6 +450,9 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         figure.add_annotation(x=cone[-1][0], y=cone[-1][1] / 2, text="null zone of<br>random directions", showarrow=False, font={"color": "#666666", "size": 13})
     figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer -> abrasive", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0.005, y=1, xref="paper", yref="paper", xanchor="left", yanchor="top", yshift=-34, align="left", showarrow=False,
+                          font={"color": "#555555", "size": 12},
+                          text="dot = Pareto point · ring = dose that sets the score<br>× = last coherent dose · ★ = prompt baseline")
     figure.add_annotation(x=0.5, y=0, xref="paper", yref="paper", text="mostly side effects", showarrow=False, yshift=18, font={"color": "#c44e52", "size": 14})
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
@@ -602,7 +605,7 @@ def main() -> None:
         "points": points,
     }
     (out / f"points{tag}.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
-    title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)" + (" — judge: Jev" if tag else "")
+    title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions)" + (" — judge: Jev" if tag else " — judge: DeepSeek")
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
     table = tables(rows) + (
