@@ -7,12 +7,14 @@ early to the peak layer, then falls by the output layer, are "thought but not sa
 per prompt, last token:  z_e, z_p, z_o = unembed(rmsnorm(h[early, peak, output]))
                          rise = center(z_p - z_e);  fall = center(z_p - z_o)
                          score = min(relu(rise), relu(fall))                      # [V]
-pooled over all persona prompts:  score = mean(score) * frac(score > 0)          # "persistent" rule
-S = qr(center(W_U)[topk(score, rank)] * gain)                                    # [d, rank]
+persona contrast:  diff = mean(score | sycophantic prompt) - mean(score | abrasive prompt)
+S = qr(center(W_U)[topk(diff, rank/2) + topk(-diff, rank/2)] * gain)            # [d, rank]
 v_l = S S^T (mean(h+_l) - mean(h-_l)), unit norm per layer
 
-Deviations from the source repo: the basis is pooled over the persona prompts (one fixed steering
-vector), not per sample; the output layer is the last block's output before the final norm.
+Deviations from the source repo: one fixed basis from the persona contrast, not per sample (pooling
+all prompts with the source's "persistent" rule picked rare multilingual fragments, and mean_diff kept
+only chance-level energy in it: dev log 2026-09-25 13:36); the output layer is the last block's output
+before the final norm.
 Hypothesis for sycophancy: the model may represent "this premise is wrong" mid-network and suppress it.
 Adapted by PI/OpenAI.
 """
@@ -52,12 +54,12 @@ def _last_token_states(model, tok, prompts, layers, batch_size, max_length) -> d
     return {layer: torch.cat(values) for layer, values in out.items()}
 
 
-def _suppressed_basis(model, tok, states: dict[int, Tensor], early: int, peak: int, output: int, rank: int) -> Tensor:
+def _mean_scores(model, states: dict[int, Tensor], early: int, peak: int, output: int) -> Float[Tensor, " V"]:
+    """Mean suppressed score per vocabulary token over prompts (source: suppressed_activation_scores)."""
     W_U = model.get_output_embeddings().weight.float()  # [V, d]
     final_norm = model.model.norm
     gain = final_norm(torch.ones(W_U.shape[1], device=W_U.device, dtype=final_norm.weight.dtype)).float()  # rms(1)=1, so this is the gain for any RMSNorm form
     total = torch.zeros(W_U.shape[0], device=W_U.device)
-    positive = torch.zeros_like(total)
     n = states[early].shape[0]
     for start in range(0, n, 16):
         h = torch.stack([states[layer][start : start + 16] for layer in (early, peak, output)], dim=1)  # [b 3 d]
@@ -65,18 +67,24 @@ def _suppressed_basis(model, tok, states: dict[int, Tensor], early: int, peak: i
         z = h @ W_U.T  # [b 3 V]
         rise = z[:, 1] - z[:, 0]
         fall = z[:, 1] - z[:, 2]
-        score = torch.minimum((rise - rise.mean(-1, keepdim=True)).clamp_min(0), (fall - fall.mean(-1, keepdim=True)).clamp_min(0))
-        total += score.sum(0)
-        positive += (score > 0).float().sum(0)
-    persistent = total / n * positive / n
-    token_ids = persistent.topk(rank).indices
+        total += torch.minimum((rise - rise.mean(-1, keepdim=True)).clamp_min(0), (fall - fall.mean(-1, keepdim=True)).clamp_min(0)).sum(0)
+    return total / n
+
+
+def _contrast_basis(model, tok, diff: Float[Tensor, " V"], rank: int, layers: tuple[int, int, int]) -> Float[Tensor, "d r"]:
+    W_U = model.get_output_embeddings().weight.float()
+    final_norm = model.model.norm
+    gain = final_norm(torch.ones(W_U.shape[1], device=W_U.device, dtype=final_norm.weight.dtype)).float()
+    pos_ids, neg_ids = diff.topk(rank // 2).indices, (-diff).topk(rank - rank // 2).indices
     logger.info(
-        "SHOULD: suppressed tokens look like content the answer withholds (e.g. doubt, correction words), "
-        "ELSE the subspace is formatting/noise. layers early={} peak={} output={} top tokens: {}",
-        early, peak, output, [tok.decode([i]) for i in token_ids.tolist()],
+        "SHOULD: tokens read as content one persona thinks but does not say (sycophant: criticism/doubt; "
+        "abrasive: praise/agreement), ELSE the subspace is noise. layers early/peak/output={}\n"
+        "suppressed more when sycophantic: {}\nsuppressed more when abrasive: {}",
+        layers, [tok.decode([i]) for i in pos_ids.tolist()], [tok.decode([i]) for i in neg_ids.tolist()],
     )
-    directions = (W_U - W_U.mean(0))[token_ids] * gain  # [rank d]
-    return torch.linalg.qr(directions.T, mode="reduced").Q  # [d rank]
+    token_ids = torch.cat([pos_ids, neg_ids])
+    directions = (W_U - W_U.mean(0))[token_ids] * gain  # [r d]
+    return torch.linalg.qr(directions.T, mode="reduced").Q
 
 
 @register
@@ -91,8 +99,8 @@ class SuppressedMeanDiff:
         needed = tuple(sorted({*cfg.layers, early, peak, output}))
         pos = _last_token_states(model, tok, pos_prompts, needed, batch_size, max_length)
         neg = _last_token_states(model, tok, neg_prompts, needed, batch_size, max_length)
-        both = {layer: torch.cat([pos[layer], neg[layer]]) for layer in (early, peak, output)}
-        S = _suppressed_basis(model, tok, both, early, peak, output, cfg.rank)
+        diff = _mean_scores(model, pos, early, peak, output) - _mean_scores(model, neg, early, peak, output)
+        S = _contrast_basis(model, tok, diff, cfg.rank, (early, peak, output))
         out = {}
         for layer in cfg.layers:
             v = pos[layer].mean(0) - neg[layer].mean(0)
