@@ -133,7 +133,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
         "SHOULD: POS and NEG share the suffix and differ only in persona. ELSE extraction is invalid.\n"
         "=== extraction pair 0 ===\nPOS:\n{}\nNEG:\n{}\n=== end pair ===", positive[0], negative[0],
     )
-    extra = {"target_layer": args.target_layer} if args.method in ("vjp_delta", "vjp_cache") else {}
+    extra = {"target_layer": args.target_layer} if args.method in ("vjp_delta", "vjp_cache", "mean_vjp", "wiki_mean_vjp") else {}
     config = CONFIGS[args.method](layers=layers, dtype=getattr(torch, args.dtype), seed=args.seed, **extra)
     started = time.monotonic()
     vector = Vector.train(

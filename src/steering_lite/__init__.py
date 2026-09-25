@@ -30,6 +30,7 @@ from .variants.random import RandomC
 from .variants.kv_cache_gram import KVCacheGramC
 from .variants.vjp_delta import VjpDeltaC
 from .variants.vjp_cache import VjpCacheC
+from .variants.mean_vjp import MeanVjpC, WikiMeanVjpC
 
 __all__ = [
     "SteeringConfig",
