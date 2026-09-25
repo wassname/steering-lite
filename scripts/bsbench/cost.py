@@ -54,20 +54,20 @@ def walk_costs(model_dir: Path) -> tuple[float, float, dict]:
 def main() -> None:
     model_dir = default_model_dir()
     judge_per_walk, blind_per_walk, timing = walk_costs(model_dir)
-    (key, t), = list(timing.items())[:1] or [((None, None), None)]
-    assert t is not None, "no walk certificate with timing yet: run a full walk after walk.py records timing"
-    gpu_min = t["total_s"] / 60
     site = json.loads((ROOT / "outputs/bsbench/results/full/points.json").read_text())
     assert site["judge"].startswith(MODEL), f"points.json is from judge {site['judge']!r}; rerun results.py --cohort full"
-    summary = site["summary"]
-    top = [row["method"] for row in summary if row["method"] not in ("random", "prompting", "prompting_engineered") and row["score"] is not None][:4]
-
+    top = [row["method"] for row in site["summary"] if row["method"] not in ("random", "prompting", "prompting_engineered") and row["score"] is not None][:4]
+    # walk time depends on the method (S-space setup up to 44 min): time the plan's methods, fresh walks only
+    # (learned seed 0 reuses the 20 dev answers per dose)
+    timed = {k: t for k, t in timing.items() if (k[0] in top and k[1] > 0) or k[0] == "random"}
+    assert timed, f"no timed fresh walk for {top} or random"
+    gpu_min = median(t["total_s"] for t in timed.values()) / 60
     lines = [
         "# Cost per walk and larger-model estimate", "",
         "## Measured on Qwen3.5-4B (L40S)", "",
-        f"- GPU time, one new 100-question walk with fresh extraction ({key[0]} seed {key[1]}, {t['rungs']} rungs, GPU {t['gpu']}): "
-        f"{gpu_min:.1f} min total = load {t['load_s'] / 60:.1f} + setup (bare answers, extraction, C0) {t['setup_s'] / 60:.1f} + rungs {(t['total_s'] - t['load_s'] - t['setup_s']) / 60:.1f}. "
-        f"At ${PRICE['L40S']:.2f}/h: ${gpu_min / 60 * PRICE['L40S']:.2f}. Earlier measured billing (~$1.0 per fresh 100-q walk for 10 walks with 12-19 rungs) is consistent once CPU/memory and container start are included.",
+        f"- GPU time per fresh 100-question walk: median {gpu_min:.1f} min over {len(timed)} timed walks of the plan's methods and random "
+        f"({', '.join(f'{m} s{s} {t['total_s'] / 60:.0f} min' for (m, s), t in sorted(timed.items()))}). At ${PRICE['L40S']:.2f}/h: ${gpu_min / 60 * PRICE['L40S']:.2f}. "
+        "Other methods differ: S-space methods took 48-83 min per fresh walk (super_sspace setup up to 44 min).",
         f"- Judge cost per 100-question walk (Jev, mean OpenRouter usage cost per request x requests per walk): aware ${judge_per_walk:.2f}, blind ${blind_per_walk:.2f}. "
         "(The earlier DeepSeek pairwise judge cost a median $0.80 + $0.13 blind per walk.)",
         "", "## Estimate for larger models (inference, about 2x uncertain)", "",
