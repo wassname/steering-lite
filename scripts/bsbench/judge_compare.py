@@ -56,6 +56,15 @@ def spearman(x, y) -> float:
     return pearson(_ranks(x), _ranks(y))
 
 
+def jev_scale(ds: list[dict], jev: list[dict]) -> tuple[float, float]:
+    """(on, off) factors taking Jev to DeepSeek units: ratio of standard deviations over the same
+    steered answers at DeepSeek-admissible doses (ds and jev are index-aligned, from jev_points)."""
+    idx = [(i, j) for i, p in enumerate(ds) if p["method"] not in PROMPTS and p["admissible"] for j in range(len(p["questions"]))]
+    s_on = np.std([ds[i]["questions"][j]["effect"] for i, j in idx]) / np.std([jev[i]["questions"][j]["effect"] for i, j in idx])
+    s_off = np.std([ds[i]["questions"][j]["off_axis"] for i, j in idx]) / np.std([jev[i]["questions"][j]["off_axis"] for i, j in idx])
+    return float(s_on), float(s_off)
+
+
 def curves_for(points: list[dict], method: str) -> dict[str, list[dict]]:
     return random_curves(points) if method == "random" else {side: method_curve(points, method, side) for side in ("+C", "-C")}
 
@@ -172,8 +181,7 @@ def main() -> None:
     # --- 3: ranking, paired bootstrap
     methods = sorted({p["method"] for p in ds if p["method"] not in PROMPTS})
     # Jev's scales are not DeepSeek's: match each axis's spread over the same answers so on - 1 x off weighs damage the same
-    s_on = np.std([d["questions"][j]["effect"] for d, _, j in pairs]) / np.std([jp["questions"][j]["effect"] for _, jp, j in pairs])
-    s_off = np.std([d["questions"][j]["off_axis"] for d, _, j in pairs]) / np.std([jp["questions"][j]["off_axis"] for _, jp, j in pairs])
+    s_on, s_off = jev_scale(ds, jev_ds_doses)
     jev_scaled = [p | {"effect": p["effect"] * s_on, "off_axis": p["off_axis"] * s_off,
                        "questions": [q | {"effect": q["effect"] * s_on, "off_axis": q["off_axis"] * s_off} for q in p["questions"]]} for p in jev_own]
     views = {"DeepSeek": ds, "Jev, DeepSeek doses": jev_ds_doses, "Jev, own doses": jev_own, "Jev, own doses, DeepSeek units": jev_scaled}
