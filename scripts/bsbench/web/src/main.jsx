@@ -145,7 +145,7 @@ function App() {
     {hasJev && <label className="picker">judge <select value={judge} onChange={e => setJudge(e.target.value)}>
       <option value="deepseek">DeepSeek V4 Flash (pairwise, reference judge)</option>
       <option value="jev">Jev (rates each answer alone; premise level 0-6, damage 0-4)</option>
-    </select> <span className="lede">Same answers and same admissible doses; only the judge differs, so the gap between the two plots is judge noise.</span></label>}
+    </select> <span className="lede">Same answers and same admissible doses; only the judge differs. The gap between the two plots is mostly a rubric difference: Jev scores only the premise, DeepSeek also scores blunt wording (see judge_compare.md).</span></label>}
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {/* intro text: PI/Claude, rewrite freely */}
