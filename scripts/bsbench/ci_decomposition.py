@@ -11,7 +11,7 @@ import argparse
 import math
 import random
 
-from judge import COHORTS, default_model_dir, load_cohort
+from data import COHORTS, default_model_dir, load_cohort
 from results import PROMPTS, build_points, method_curve, pareto_score, random_curves, resample
 
 N_DRAWS = 400

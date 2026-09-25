@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from statistics import median
 
-from judge import default_model_dir
+from data import default_model_dir
 
 ROOT = Path(__file__).resolve().parents[2]
 

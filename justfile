@@ -26,7 +26,7 @@ sweep cohort="dev" methods="mean_diff,pca,vjp_delta,vjp_cache,kv_cache_gram,prom
 pull:
 	uv run --extra benchmark modal volume get --force steering-lite-bsbench-v3 bsbench outputs/
 
-# judge every COMPLETE walk (OpenRouter), then render points.json, tables and plot
+# judge every COMPLETE walk with Jev (OpenRouter), then render points.json, tables and plot
 results cohort="dev":
 	cd scripts/bsbench && uv run --extra benchmark python judge.py --cohort {{cohort}} --refresh
 	cd scripts/bsbench && uv run --extra benchmark python results.py --cohort {{cohort}}
