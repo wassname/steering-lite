@@ -497,15 +497,17 @@ def blind_cell(point: dict | None, side: str) -> str:
     assert len(judged) == len(point["questions"]), f"blind ratings for {len(judged)}/{len(point['questions'])} answers at C={point['C']}; run judge.py --refresh"
     sign = 1 if side == "+C" else -1
     shift = sign * mean(stance(j["stance_B"]) - stance(j["stance_A"]) for j in judged)
-    labels = [j["concept"]["choice"] for j in judged]
-    counts = sorted({label: labels.count(label) for label in labels}.items(), key=lambda item: -item[1])
-    return f"{point['C']:.3g}: {shift:+.2f} (n={len(judged)}) | {labels.count(INTENDED[side]) / len(labels):.0%} | " + ", ".join(f"{label} {count / len(labels):.0%}" for label, count in counts[:3])
+    # mean probability per concept label, not the share of top labels: a 0.51 verbose / 0.25 sycophantic answer counts for both
+    labels = judged[0]["concept"]["probabilities"].keys()
+    prob = {label: mean(j["concept"]["probabilities"][label] for j in judged) for label in labels}
+    top = sorted(prob.items(), key=lambda item: -item[1])[:3]
+    return f"{point['C']:.3g}: {shift:+.2f} (n={len(judged)}) | {prob[INTENDED[side]]:.0%} | " + ", ".join(f"{label} {p:.0%}" for label, p in top)
 
 
 def blind_table(rows: list[dict]) -> str:
     """Blind judge at each method's Pareto-best dose and at its strongest admissible dose."""
     lines = [
-        "| method | side | Pareto-best C: blind stance shift↑ | intended label | top labels | strongest C: blind stance shift↑ | intended label | top labels |",
+        "| method | side | Pareto-best C: blind stance shift↑ | P(intended label) | top labels (mean P) | strongest C: blind stance shift↑ | P(intended label) | top labels (mean P) |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:

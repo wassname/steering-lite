@@ -76,6 +76,14 @@ def main() -> None:
         f"Plan = top 4 methods from full/index.md ({', '.join(top)}) x 3 seeds + 10 random + 2 prompts = 24 walks on 100 questions.", "",
         "| model | GPU | time x | GPU min/walk | GPU $/walk | judge $/walk | total $/walk | plan (24 walks) | reason |", "|---|---|---|---|---|---|---|---|---|",
     ]
+    big = [json.loads(p.read_text()) for p in (ROOT / "outputs/bsbench").glob("Qwen--Qwen3.5-27B-*/walks/*_full.json")]
+    big = [c for c in big if "timing" in c]
+    if big:
+        minutes = median(c["timing"]["total_s"] for c in big) / 60
+        gpu_cost = minutes / 60 * PRICE["A100-80GB"]
+        per_walk = gpu_cost + judge_per_walk + blind_per_walk
+        lines.append(f"| Qwen3.5-27B | A100-80GB | measured | {minutes:.0f} | {gpu_cost:.2f} | {judge_per_walk + blind_per_walk:.2f} | {per_walk:.2f} | {24 * per_walk:.0f} | "
+                     f"measured: {', '.join(c['method'] + ' s' + str(c['seed']) for c in big)} (H100 is blocked: fla refuses its backward kernel on Hopper with Triton < 3.7.1) |")
     for model, gpu, mult, reason in SCALE:
         minutes = gpu_min * mult
         gpu_cost = minutes / 60 * PRICE[gpu]
