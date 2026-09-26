@@ -47,3 +47,20 @@ Last-token logit-lens scores at block outputs 22/24/31 on the persona prompts.
    '/mac', '发送邮件', ...`; energy 0.008-0.019. Stopped both Modal runs before generation; vectors deleted.
 Hypotheses: rare-token noise dominates centred rise/fall (~45%); the last persona-prompt token is mid-story, so
 the persona has little to suppress there (~35%); layers tuned for translation, not persona (~20%).
+
+## Review and bug check (2026-09-26)
+
+Fresh-eyes reviews: [Fable](2026-09-26_review_fable.md), [Kimi](2026-09-26_review_kimi.md). Neither found a code
+bug in mean_vjp / wiki_mean_vjp delivery (same layers 6-24, target 29, cotangent, masks, apply, sign). Tiny-model
+check: mean_vjp = unit(P+N) and vjp_delta = unit(P-N) exactly; WikiText lengths match.
+
+Misconception confirmed (Fable #1): h_29 = h_l + later block writes, so J_l.T c = c + block pullback. vjp_delta
+cancels c; mean_vjp keeps it. Measured on 4B (logs/2026-09-26_diag_identity_path.txt, cosine in one residual basis):
+cos(wiki_mean_vjp_l, c) = 0.26 at layer 6 rising to 0.85 at layer 24 (mean_vjp same; vjp_delta -0.15..+0.03;
+random ~0). So at later layers wiki_mean_vjp is mostly the layer-29 persona contrast c, i.e. a mean_diff-like
+direction, not a new transport direction. Its tie with mean_diff fits this.
+
+Paired per-question (on - off) vs vjp_delta at each method's best dose (in-sample dose choice, 1 seed):
+-C: wiki +0.01 [-0.71, +0.69], mean_diff +0.00 [-0.65, +0.55], mean_vjp -0.96 [-2.07, +0.14].
++C: wiki -1.22 [-2.22, -0.25], mean_vjp -1.74 [-2.78, -0.77].
+The idea as intended (the block pullback without the identity copy) is untested: v = mean(J.T c) - c.
