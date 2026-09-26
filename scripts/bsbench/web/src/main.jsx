@@ -87,6 +87,18 @@ function Summary({ data }) {
   </table>;
 }
 
+function Blind({ data }) {
+  // blind judge (not told the target): mean probability of each change label over the answers at that dose
+  return <table className="blind">
+    <thead><tr><th>method</th><th>side</th><th>dose</th><th>C</th><th>stance shift↑</th><th>P(intended)</th><th>change labels, mean probability (≥2%)</th></tr></thead>
+    <tbody>{data.blind.map(b => <tr key={b.method + b.side + b.dose}>
+      <td><span className="swatch" style={{ background: COLORS[b.method] }} />{b.method}</td><td>{b.side}</td><td>{b.dose === 'best' ? 'Pareto-best' : 'strongest'}</td><td>{b.C.toPrecision(3)}</td>
+      <td>{fmt(b.shift)}</td><td>{Math.round(100 * b.intended)}%</td>
+      <td>{Object.entries(b.labels).filter(([, v]) => v >= 0.02).map(([k, v]) => `${k} ${Math.round(100 * v)}%`).join(' · ')}</td>
+    </tr>)}</tbody>
+  </table>;
+}
+
 function Explorer({ data, selected, onSelect }) {
   // default rows: each method-side at its Pareto-best dose; the selected point is added on top
   const best = useMemo(() => data.summary.flatMap(r => ['-C', '+C'].map(side => r.best[side] && data.points.find(p => p.method === r.method && p.side === side && p.C === r.best[side].C && (r.method !== 'random' || p.seed === 0))))
@@ -113,7 +125,7 @@ function Explorer({ data, selected, onSelect }) {
         {q ? <>
           <p>{q.text}</p>
           <p className="judge">aware judge (Jev): on-axis {fmt(q.effect)} (toward {p.side === '+C' ? 'sycophancy' : 'candour'}: {fmt(p.side === '+C' ? q.effect : -q.effect)}), off-axis {q.off_axis.toFixed(2)}. “{q.evidence}”</p>
-          {q.blind && <p className="judge">blind judge (not told the flaw or target): change = <strong>{q.blind.concept.choice}</strong>; premise stance bare {q.blind.stance_A.choice} → steered {q.blind.stance_B.choice}</p>}
+          {q.blind && <p className="judge">blind judge (not told the flaw or target): change = {Object.entries(q.blind.concept.probabilities).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.05).map(([k, v], i) => <span key={k}>{i ? ' · ' : ''}{i ? k : <strong>{k}</strong>} {Math.round(100 * v)}%</span>)}; premise stance bare {q.blind.stance_A.choice} → steered {q.blind.stance_B.choice}</p>}
         </> : <p>no judged answer for this question</p>}
       </div>;
     })}
@@ -155,6 +167,9 @@ function App() {
     <h2>Best strength per method</h2>
     <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling seeds and questions.</p>
     <Summary data={data} />
+    <h2 id="blind">What changed, blind judge</h2>
+    <p className="lede">A second Jev question sees the bare answer and the steered answer, but is not told the target or the flaw. It gives a probability for each change label; the table shows the mean over the answers at that dose. The labels are named from free-text descriptions the judge wrote without a list. P(intended) is the mean probability of "accepts_premise" for +C and "rejects_premise" for −C. Stance shift is the change in the answer's stance on the premise (−1 rejects … +1 accepts), toward the side's target.</p>
+    <Blind data={data} />
     <h2 id="explorer">Answers</h2>
     <p className="lede">Pick a question; the list starts with the questions where the answers below differ most (σ = spread of the on-axis score over these blocks). Each block is one method and side at its Pareto-best dose (random: seed 0). Click a point on the plot to add that dose.</p>
     <Explorer data={data} selected={selected} onSelect={setSelected} />

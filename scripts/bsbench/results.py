@@ -479,7 +479,7 @@ def _no_nan(value):
     return value
 
 
-INTENDED = {"+C": "sycophantic", "-C": "candid"}
+INTENDED = {"+C": "accepts_premise", "-C": "rejects_premise"}
 
 
 
@@ -489,19 +489,24 @@ def stance(choice: dict) -> float:
     return choice["probabilities"]["accepts"] - choice["probabilities"]["rejects"]
 
 
-def blind_cell(point: dict | None, side: str) -> str:
-    """Blind stance shift toward the side's target (+ = intended), intended-label share and top labels."""
-    if point is None:
-        return "— | — | —"
+def blind_summary(point: dict, side: str) -> dict:
+    """Blind stance shift toward the side's target (+ = intended) and the mean probability of every change label.
+
+    Mean probability, not the share of top labels: a 0.51 verbose / 0.25 sycophantic answer counts for both."""
     judged = [q["blind"] for q in point["questions"] if q["blind"]]
     assert len(judged) == len(point["questions"]), f"blind ratings for {len(judged)}/{len(point['questions'])} answers at C={point['C']}; run judge.py --refresh"
     sign = 1 if side == "+C" else -1
-    shift = sign * mean(stance(j["stance_B"]) - stance(j["stance_A"]) for j in judged)
-    # mean probability per concept label, not the share of top labels: a 0.51 verbose / 0.25 sycophantic answer counts for both
     labels = judged[0]["concept"]["probabilities"].keys()
     prob = {label: mean(j["concept"]["probabilities"][label] for j in judged) for label in labels}
-    top = sorted(prob.items(), key=lambda item: -item[1])[:3]
-    return f"{point['C']:.3g}: {shift:+.2f} (n={len(judged)}) | {prob[INTENDED[side]]:.0%} | " + ", ".join(f"{label} {p:.0%}" for label, p in top)
+    return {"C": point["C"], "n": len(judged), "shift": sign * mean(stance(j["stance_B"]) - stance(j["stance_A"]) for j in judged),
+            "intended": prob[INTENDED[side]], "labels": dict(sorted(prob.items(), key=lambda item: -item[1]))}
+
+
+def blind_cell(point: dict | None, side: str) -> str:
+    if point is None:
+        return "— | — | —"
+    b = blind_summary(point, side)
+    return f"{b['C']:.3g}: {b['shift']:+.2f} (n={b['n']}) | {b['intended']:.0%} | " + ", ".join(f"{label} {p:.0%}" for label, p in list(b["labels"].items())[:3])
 
 
 def blind_table(rows: list[dict]) -> str:
@@ -543,6 +548,8 @@ def main() -> None:
             "method": row["method"], "score": row["score"], "ci": row["ci"], "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
             "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis")} for side, p in row["best"].items()},
         } for row in rows],
+        "blind": [{"method": row["method"], "side": side, "dose": dose, **blind_summary(row[dose][side], side)}
+                  for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],
         "points": points,
     }
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")

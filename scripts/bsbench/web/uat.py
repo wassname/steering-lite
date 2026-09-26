@@ -34,8 +34,12 @@ with sync_playwright() as p:
     png_marks = json.loads((site / "plot_marks.json").read_text())
     print(f"PNG frontier marks (plot_marks.json from results.py)={png_marks['frontier_marks']} page drawn={drawn} methods png={png_marks['methods']} page={data['shown']}")
     assert png_marks["frontier_marks"] == drawn and png_marks["methods"] == data["shown"], "page and PNG draw different points"
-    rows = page.locator("table tbody tr").count()
+    rows = page.locator("table:not(.blind) tbody tr").count()
     assert rows == len(data["summary"]), (rows, len(data["summary"]))
+    blind_rows = page.locator("table.blind tbody tr").count()
+    assert blind_rows == len(data["blind"]), (blind_rows, len(data["blind"]))
+    # the page shows each blind row's full label distribution, not only the top label
+    assert page.locator("table.blind tbody tr").first.inner_text().count("%") >= 3
     page.screenshot(path=str(site / "uat_plot.png"), full_page=False)
 
     question = data["questions"][1]["scenario"]
