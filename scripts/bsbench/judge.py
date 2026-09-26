@@ -181,8 +181,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
     parser.add_argument("--refresh", action="store_true", help="call the API for missing cells (else only report them)")
+    parser.add_argument("--model", default="Qwen/Qwen3.5-4B", help="steered model whose walks to judge")
     args = parser.parse_args()
-    model_dir = default_model_dir()
+    model_dir = default_model_dir(args.model)
     missing = refresh(aware_requests(manifest(model_dir, args.cohort)), "aware", args.refresh)
     if missing and not args.refresh:
         return

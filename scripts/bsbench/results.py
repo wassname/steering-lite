@@ -553,7 +553,8 @@ def main() -> None:
         "points": points,
     }
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
-    title = f"steering-lite on Bullshit Bench v2 ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
+    model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
+    title = f"steering-lite on Bullshit Bench v2: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
     table = tables(rows) + (
