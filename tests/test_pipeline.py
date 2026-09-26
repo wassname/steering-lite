@@ -26,11 +26,12 @@ from steering_lite.variants.vjp_delta import _activations, _encode, _target_mean
 import steering_lite.variants.vjp_delta as vjp_delta_module
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
+TINY_QWEN = "wassname/qwen3-5lyr-tiny-random"  # query_steer needs self_attn.q_norm, which Llama lacks
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache",
+    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache", "query_steer",
 ]
 
 POS = [
@@ -71,6 +72,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "kv_cache_gram":         sl.KVCacheGramC(**common, r=2),
         "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
         "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+        "query_steer":           sl.QuerySteerC(**common),
     }
     return table[method]
 
@@ -84,10 +86,16 @@ def tiny_model():
     return model, tok
 
 
+@pytest.fixture(scope="module")
+def tiny_qwen():
+    tok = AutoTokenizer.from_pretrained(TINY_QWEN)
+    return AutoModelForCausalLM.from_pretrained(TINY_QWEN, torch_dtype=torch.float32).eval(), tok
+
+
 @pytest.mark.parametrize("method", METHODS)
-def test_pipeline(method, tiny_model, tmp_path):
+def test_pipeline(method, request, tmp_path):
     """extract + calibrate + steer + save/load. One test per method."""
-    model, tok = tiny_model
+    model, tok = request.getfixturevalue("tiny_qwen" if method == "query_steer" else "tiny_model")
     sl.detach(model)
 
     cfg = _make_cfg(method)
