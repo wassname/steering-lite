@@ -34,3 +34,27 @@ Next: small single runs only, wassname's instruction. First candidate: measure, 
 The main lesson is that the large-model failure is a property of how the VJP methods pick their target, not of the dose sweep or the extraction code.
 
 -- PI/Claude
+
+## 2026-09-28 -- Where the persona contrast forms: not a fixed fraction of depth
+
+This entry answers wassname's question whether the right VJP target layer is a fixed percentage of depth, using a forward-only measurement on the three models.
+
+`walk.py --profile` records, per layer and at the last token of the 200 persona contrast pairs, ratio = |mean(h_pos) - mean(h_neg)| / mean |h|, i.e. how large the persona contrast is relative to the residual at that depth. No steering is applied.
+
+| model | layers | peak layer (depth) | depth at 50% of peak | depth at 90% of peak | layers from end at 90% | steered band (depth) |
+|---|---|---|---|---|---|---|
+| Qwen3.5-4B | 32 | L30 (0.97) | 0.52 (L16) | 0.61 (L19) | 12 | L6-L24 (0.19-0.77) |
+| Qwen3.5-27B | 64 | L62 (0.98) | 0.78 (L49) | 0.98 (L62) | 1 | L12-L50 (0.19-0.79) |
+| OLMo-2-32B | 64 | L47 (0.75) | 0.65 (L41) | 0.71 (L45) | 18 | L12-L50 (0.19-0.79) |
+
+Table 1. Source: `slop/reviews/2026-09-28_depth_profile/profile_compare.md:6-8`, computed from `outputs/logs/profile-{4b,27b,olmo}.log`; plot `slop/reviews/2026-09-28_depth_profile/profile_compare.png`.
+
+The contrast forms at depth 0.52 to 0.61 on 4B, 0.65 to 0.71 on OLMo and 0.78 to 0.98 on Qwen 27B, so neither a fixed fraction of depth nor a fixed number of layers from the end lines up across the three models. On OLMo the contrast falls after its peak (to about 0.87 of peak at the default VJP target, L61); on the two Qwen models it stays near its peak to the end.
+
+Interpretation (mine, PI/Claude): layer settings probably need to come from a per-model measurement rather than from one rule (probable, maybe 0.7). On Qwen 27B the concept forms at the edge of the steered band, so most source layers lie before it exists, which is a plausible reason the VJP linearisation works poorly there. On OLMo the default target sits where the contrast is already falling, which fits wassname's suppression idea, but the default target is at 0.87 of peak or more on all three models, so the target position alone does not separate them. The measure is a norm ratio, not the rise-and-fall logit-lens rule from wassname's suppressed-activations repo, and it uses one seed of pairs.
+
+Next: one single run, OLMo vjp_delta with the target at its contrast peak L47 (sources L12 to L46). If a target in the falling zone is what breaks VJP on OLMo, this run should recover a clear effect there.
+
+The practical lesson is to measure where a concept forms in each model before choosing where to steer and where to aim.
+
+-- PI/Claude
