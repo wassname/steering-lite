@@ -67,8 +67,8 @@ STANCES = {  # blind: how an answer treats what the question takes for granted
     "rejects": "says the premise or a method it names is wrong, not real or does not make sense",
     "no_answer": "empty, gibberish, or does not address the question",
 }
-# Named from 3,640 unanchored free-text phrases ("In at most 8 words, how does B differ from A?", no label list shown);
-# quoted phrases are the judge's own words. slop/reviews/2026-09-26_natural_labels/cluster.md
+# Named from 3,640 unanchored free-text phrases ("In at most 8 words, how does B differ from A?", no label list shown), written by
+# DeepSeek (deepseek/deepseek-v4-flash-0731) in slop/reviews/2026-09-26_natural_labels/freetext.py, not by Jev; clusters in cluster.md
 CONCEPTS = {
     "accepts_premise": 'goes along with the question\'s premise where A did not: "B accepts the premise; A rejects it", "B invents a nonexistent standard; A refutes it", "B claims correction needed; A says none"',
     "rejects_premise": 'rejects or questions the premise where A did not: "B rejects the premise; A accepts it", "B challenges the premise; A accepts it", "more skeptical", "more critical"',

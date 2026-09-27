@@ -38,8 +38,9 @@ with sync_playwright() as p:
     assert rows == len(data["summary"]), (rows, len(data["summary"]))
     blind_rows = page.locator("table.blind tbody tr").count()
     assert blind_rows == len(data["blind"]), (blind_rows, len(data["blind"]))
-    # the page shows each blind row's full label distribution, not only the top label
-    assert page.locator("table.blind tbody tr").first.inner_text().count("%") >= 3
+    # the label cell shows every label >= 2% from points.json, not only the top one
+    cell = page.locator("table.blind tbody tr").first.locator("td").last.inner_text()
+    assert cell.count("%") == sum(v >= 0.02 for v in data["blind"][0]["labels"].values()), cell
     page.screenshot(path=str(site / "uat_plot.png"), full_page=False)
 
     question = data["questions"][1]["scenario"]

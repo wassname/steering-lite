@@ -1,0 +1,190 @@
+diff --git a/scripts/bsbench/walk.py b/scripts/bsbench/walk.py
+index 38632cf..41dd2d8 100644
+--- a/scripts/bsbench/walk.py
++++ b/scripts/bsbench/walk.py
+@@ -113,8 +113,8 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
+         return tuple(int(layer) for layer in value.split(","))
+     n_layers = len(model.model.layers)
+     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
+-    if method in ("kv_cache_gram", "vjp_cache"):
+-        # cache methods edit DynamicLayer values; hybrid models only have them on full-attention layers
++    if method in ("kv_cache_gram", "vjp_cache", "query_steer"):
++        # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
+         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
+         layers = tuple(layer for layer in layers if types[layer] == "full_attention")
+     return layers
+diff --git a/src/steering_lite/__init__.py b/src/steering_lite/__init__.py
+index 6532222..114c0ee 100644
+--- a/src/steering_lite/__init__.py
++++ b/src/steering_lite/__init__.py
+@@ -30,6 +30,7 @@ from .variants.random import RandomC
+ from .variants.kv_cache_gram import KVCacheGramC
+ from .variants.vjp_delta import VjpDeltaC
+ from .variants.vjp_cache import VjpCacheC
++from .variants.query_steer import QuerySteerC
+ 
+ __all__ = [
+     "SteeringConfig",
+@@ -52,6 +53,7 @@ __all__ = [
+     "KVCacheGramC",
+     "VjpDeltaC",
+     "VjpCacheC",
++    "QuerySteerC",
+     "record_activations",
+     "train",
+     "attach",
+diff --git a/src/steering_lite/variants/__init__.py b/src/steering_lite/variants/__init__.py
+index c24a9ca..151236c 100644
+--- a/src/steering_lite/variants/__init__.py
++++ b/src/steering_lite/variants/__init__.py
+@@ -2,5 +2,5 @@ from . import (
+     mean_diff, pca, topk_clusters, cosine_gated,
+     sspace, sspace_pca, corda_pca, sspace_ablate, sspace_damp_amp, super_sspace,
+     spherical, directional_ablation, chars, linear_act, angular_steering,
+-    random, kv_cache_gram, vjp_delta, vjp_cache,
++    random, kv_cache_gram, vjp_delta, vjp_cache, query_steer,
+ )  # noqa: F401
+diff --git a/src/steering_lite/variants/query_steer.py b/src/steering_lite/variants/query_steer.py
+new file mode 100644
+index 0000000..fe5bf09
+--- /dev/null
++++ b/src/steering_lite/variants/query_steer.py
+@@ -0,0 +1,93 @@
++"""Query steering: mean difference of attention queries (wassname/superkv, renamed query-steering).
++
++For each selected attention layer L, capture every head's query after `q_norm` and before RoPE at the last
++real token of each prompt, and take the class difference:
++
++$$q^*_L = \\text{mean}(q^+_L) - \\text{mean}(q^-_L) \\in \\mathbb{R}^{H \\times d_{head}}, \\quad \\hat q^*_L = q^*_L / \\|q^*_L\\|_F$$
++
++At runtime add it to every position's query:
++
++$$q \\leftarrow q + \\alpha \\cdot \\hat q^*_L$$
++
++Keys and values are unchanged, so a head can only change which tokens of the current context it reads
++(and how sharply); it cannot write new content the way residual steering does.
++
++Differs from the superkv repo, which adds q* at the last token only: here every position is steered
++(steering-lite convention; the teacher-forced KL calibration needs every position steered).
++Requires `self_attn.q_norm` (Qwen3 / Qwen3.5); on hybrid models select only full-attention layers.
++
++Ref: https://github.com/wassname/superkv (README "Query steering")
++"""
++from dataclasses import dataclass
++
++import torch
++from jaxtyping import Float
++from torch import Tensor
++
++from ..config import SteeringConfig, register, register_config
++from ..target import _get_blocks
++from .vjp_delta import _encode
++
++
++ε = 1e-8
++
++
++@register_config
++@dataclass
++class QuerySteerC(SteeringConfig):
++    method: str = "query_steer"
++
++
++def _q_norms(model, layers) -> dict[int, torch.nn.Module]:
++    blocks = _get_blocks(model)
++    return {layer: blocks[layer].self_attn.q_norm for layer in layers}
++
++
++@torch.no_grad()
++def _last_token_queries(model, tok, prompts, layers, batch_size, max_length) -> dict[int, Float[Tensor, "h d"]]:
++    """Mean over prompts of the post-q_norm query at the last real token, per layer: [heads, head_dim]."""
++    sums = {layer: 0.0 for layer in layers}
++    grabbed = {}
++    hooks = [m.register_forward_hook(lambda _m, _i, out, layer=layer: grabbed.__setitem__(layer, out))
++             for layer, m in _q_norms(model, layers).items()]
++    try:
++        for start in range(0, len(prompts), batch_size):
++            batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
++            model(**batch)
++            last = batch["attention_mask"].sum(1) - 1                              # right padding
++            rows = torch.arange(last.shape[0], device=last.device)
++            for layer in layers:
++                sums[layer] = sums[layer] + grabbed[layer][rows, last].float().sum(0)  # [b s h d] -> [h d]
++    finally:
++        for h in hooks:
++            h.remove()
++    return {layer: s / len(prompts) for layer, s in sums.items()}
++
++
++@register
++class QuerySteer:
++    name = "query_steer"
++    extract_from_prompts = True
++    cache_intervention = True  # own hooks via install(), no block-output hook
++
++    @staticmethod
++    def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
++        layers = tuple(cfg.layers)
++        pos = _last_token_queries(model, tok, pos_prompts, layers, batch_size, max_length)
++        neg = _last_token_queries(model, tok, neg_prompts, layers, batch_size, max_length)
++        out = {}
++        for layer in layers:
++            q = pos[layer] - neg[layer]
++            out[layer] = {"shared": {}, "stacked": {"q": (q / (q.norm() + ε)).unsqueeze(0)}}  # [1, h, d]
++        return out
++
++    @staticmethod
++    def install(model, cfg, stacked):
++        def hook(_m, _i, out, q):
++            return out + cfg.coeff * q.to(out)  # [b s h d] + [h d]
++        return [m.register_forward_hook(lambda _m, _i, out, q=stacked[layer]["q"].sum(0): hook(_m, _i, out, q))
++                for layer, m in _q_norms(model, stacked).items()]
++
++    @staticmethod
++    def apply(_mod, _x, y, _shared, _stacked, _cfg):
++        return y
+diff --git a/tests/test_pipeline.py b/tests/test_pipeline.py
+index 23bab78..c64db77 100644
+--- a/tests/test_pipeline.py
++++ b/tests/test_pipeline.py
+@@ -26,11 +26,12 @@ from steering_lite.variants.vjp_delta import _activations, _encode, _target_mean
+ import steering_lite.variants.vjp_delta as vjp_delta_module
+ 
+ TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
++TINY_QWEN = "wassname/qwen3-5lyr-tiny-random"  # query_steer needs self_attn.q_norm, which Llama lacks
+ METHODS = [
+     "mean_diff", "pca", "topk_clusters", "cosine_gated",
+     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+     "spherical", "directional_ablation", "chars", "linear_act",
+-    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache",
++    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache", "query_steer",
+ ]
+ 
+ POS = [
+@@ -71,6 +72,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
+         "kv_cache_gram":         sl.KVCacheGramC(**common, r=2),
+         "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+         "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
++        "query_steer":           sl.QuerySteerC(**common),
+     }
+     return table[method]
+ 
+@@ -84,10 +86,16 @@ def tiny_model():
+     return model, tok
+ 
+ 
++@pytest.fixture(scope="module")
++def tiny_qwen():
++    tok = AutoTokenizer.from_pretrained(TINY_QWEN)
++    return AutoModelForCausalLM.from_pretrained(TINY_QWEN, torch_dtype=torch.float32).eval(), tok
++
++
+ @pytest.mark.parametrize("method", METHODS)
+-def test_pipeline(method, tiny_model, tmp_path):
++def test_pipeline(method, request, tmp_path):
+     """extract + calibrate + steer + save/load. One test per method."""
+-    model, tok = tiny_model
++    model, tok = request.getfixturevalue("tiny_qwen" if method == "query_steer" else "tiny_model")
+     sl.detach(model)
+ 
+     cfg = _make_cfg(method)

@@ -72,7 +72,7 @@ class QuerySteer:
 
     @staticmethod
     def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
-        layers = tuple(cfg.layers)
+        layers = tuple(range(len(_get_blocks(model)))) if cfg.layers is None else tuple(cfg.layers)  # None = all layers
         pos = _last_token_queries(model, tok, pos_prompts, layers, batch_size, max_length)
         neg = _last_token_queries(model, tok, neg_prompts, layers, batch_size, max_length)
         out = {}

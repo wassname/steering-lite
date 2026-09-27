@@ -77,10 +77,11 @@ function Plot({ data, visible, selected, onSelect }) {
 
 function Summary({ data }) {
   return <table>
-    <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
+    <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>on-axis ÷ room↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
     <tbody>{data.summary.map(r => <tr key={r.method}>
       <td className={r.method === 'random' || r.method.startsWith('prompting') ? 'control' : ''}><span className="swatch" style={{ background: COLORS[r.method] }} />{r.method}</td>
       <td><strong>{fmt(r.score)}</strong></td><td>{r.ci[0] == null ? '—' : `[${fmt(r.ci[0])}, ${fmt(r.ci[1])}]`}</td>
+      <td>{fmt(r.score_room)}</td><td>{r.ci_room[0] == null ? '—' : `[${fmt(r.ci_room[0])}, ${fmt(r.ci_room[1])}]`}</td>
       {['-C', '+C'].flatMap(side => { const b = r.best[side]; return b ? [<td key={side + 'e'}>{fmt(side === '+C' ? b.effect : -b.effect)}</td>, <td key={side + 'o'}>{b.off_axis.toFixed(2)}</td>, <td key={side + 'c'}>{b.C.toPrecision(3)}</td>] : [<td key={side + 'e'}>—</td>, <td key={side + 'o'}>—</td>, <td key={side + 'c'}>—</td>]; })}
       <td>{r.seeds}</td><td>{r.N}</td><td>{r.rejected}</td>
     </tr>)}</tbody>
@@ -165,10 +166,10 @@ function App() {
         The grey band is where random directions of the same strength land (10–90% over seeds); a method is only doing something specific if it gets outside it.</p>
     </section>
     <h2>Best strength per method</h2>
-    <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling seeds and questions.</p>
+    <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling seeds and questions. On-axis ÷ room is the on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side (8 − bare level for +C, bare level for −C), weaker side; damage is handled by the dose choice and the 1.5 cap, not in this number.</p>
     <Summary data={data} />
     <h2 id="blind">What changed, blind judge</h2>
-    <p className="lede">A second Jev question sees the bare answer and the steered answer, but is not told the target or the flaw. It gives a probability for each change label; the table shows the mean over the answers at that dose. The labels are named from free-text descriptions the judge wrote without a list. P(intended) is the mean probability of "accepts_premise" for +C and "rejects_premise" for −C. Stance shift is the change in the answer's stance on the premise (−1 rejects … +1 accepts), toward the side's target.</p>
+    <p className="lede">A second Jev question sees the bare answer and the steered answer, but is not told the target or the flaw. It gives a probability for each change label; the table shows the mean over the answers at that dose. The labels are named from free-text descriptions that another model (DeepSeek) wrote without a list. P(intended) is the mean probability of "accepts_premise" for +C and "rejects_premise" for −C. Stance shift is the change in the answer's stance on the premise (−1 rejects … +1 accepts), toward the side's target.</p>
     <Blind data={data} />
     <h2 id="explorer">Answers</h2>
     <p className="lede">Pick a question; the list starts with the questions where the answers below differ most (σ = spread of the on-axis score over these blocks). Each block is one method and side at its Pareto-best dose (random: seed 0). Click a point on the plot to add that dose.</p>
