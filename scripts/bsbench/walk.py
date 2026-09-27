@@ -37,6 +37,7 @@ from steering_lite import Vector
 from steering_lite.config import _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
+from steering_lite.extract import record_activations
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.import_utils import is_flash_linear_attention_available
 
@@ -93,6 +94,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-rungs", type=int, default=24)
     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
+    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
     args.name = args.method + (f"-{args.tag}" if args.tag else "")
@@ -259,6 +261,31 @@ def calibration_c0(args, model, tokenizer, vector: Vector, calib_path: Path) -> 
     return c0
 
 
+def profile(args, model, tokenizer, path: Path) -> None:
+    """Where the persona contrast lives, per layer, on the extraction pairs (no steering).
+
+    contrast = mean(h_pos) - mean(h_neg) at the last token. ratio = |contrast| / mean |h|: how large the
+    contrast is relative to the residual at that depth. cos_final = cos(contrast_l, contrast at the last layer).
+    A ratio that peaks and then falls toward the output marks where the model suppresses the persona contrast."""
+    positive, negative = make_persona_pairs(
+        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+    )
+    layers = tuple(range(len(model.model.layers)))
+    pos = record_activations(model, tokenizer, positive, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
+    neg = record_activations(model, tokenizer, negative, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
+    contrast = {l: pos[l].float().mean(0) - neg[l].float().mean(0) for l in layers}
+    rows = []
+    for l in layers:
+        h = torch.cat([pos[l], neg[l]]).float().norm(dim=-1).mean()
+        rows.append({"layer": l, "depth": l / (len(layers) - 1), "ratio": float(contrast[l].norm() / h),
+                     "cos_final": float(torch.nn.functional.cosine_similarity(contrast[l], contrast[layers[-1]], dim=0))})
+    peak = max(rows, key=lambda row: row["ratio"])
+    logger.info("PROFILE model={} layers={} n_pairs={} peak ratio {:.3f} at layer {} (depth {:.2f})\n{}", args.model, len(layers), len(positive),
+                peak["ratio"], peak["layer"], peak["depth"], "\n".join(f"L{r['layer']:>2} d={r['depth']:.2f} ratio={r['ratio']:.3f} cos_final={r['cos_final']:+.2f}" for r in rows))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"model": args.model, "n_pairs": len(positive), "rows": rows}, indent=1) + "\n")
+
+
 def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
     """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
     for path in (root / "walks").glob(f"{args.name}_s{args.seed}_*.json"):
@@ -334,7 +361,7 @@ def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
-    if certificate_path.exists() and not args.smoke and not args.probe:
+    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile:
         done = json.loads(certificate_path.read_text())
         if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
@@ -348,6 +375,9 @@ def walk(args) -> None:
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype, attn_implementation="sdpa").to(args.device).eval()
     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
     timing["load_s"] = time.monotonic() - timing["start"]
+    if args.profile:
+        profile(args, model, tokenizer, root / "profile" / f"persona_s{args.seed}.json")
+        return
     prompts = generation_inputs(tokenizer, rows)
     logger.info(
         "SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. "
