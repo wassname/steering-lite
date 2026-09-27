@@ -31,7 +31,8 @@ N_BOOT = 1000
 PMAX = len(PREMISE) - 1  # top premise level (8)
 COLORS = {
     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
-    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928",
+    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
+    "query_steer": "#f0e442", "vjp_delta-t48": "#56b4e9",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
@@ -560,6 +561,7 @@ def main() -> None:
     shown = [row["method"] for row in rows if row["method"] in methods and not math.isnan(row["score"])][:TOP_N_PLOT]
     site = {
         "shown": shown,
+        "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zone": random_zone(points),

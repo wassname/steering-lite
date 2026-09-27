@@ -121,7 +121,8 @@ def cached() -> dict[str, dict]:
     if not CACHE.exists():
         return {}
     with CACHE.open() as file:  # iterate lines: str.splitlines also splits on U+2028 inside answers
-        return {record["key"]: record["answers"] for record in map(json.loads, file)}
+        # drop Jev's per-answer "legend" (the rubric text echoed back, ~60% of the file): never read, and it doubles RAM
+        return {record["key"]: {q: {k: v for k, v in a.items() if k != "legend"} for q, a in record["answers"].items()} for record in map(json.loads, file)}
 
 
 def aware_requests(rows: list[dict]) -> dict[str, dict]:
