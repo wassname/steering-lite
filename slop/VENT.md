@@ -6,3 +6,6 @@
 - friction: the loop prompt re-sends the whole goals file (~3k tokens) on every wake, and it fires while long jobs run, so I produced several near-duplicate status messages. My own scheduled checks then fired after the work they asked for was already done. A "nothing changed since last wake, keep waiting" path would cut this.
 - friction: I have not called CompleteGoal yet. Writing quoted evidence per goal is fine, but I was unsure whether a goal with one open sub-question (random -C sign) should go to the judge or wait, so I waited. A "partial / blocked on X" state would help.
 - misfire: the long-comment hook flagged a judge prompt string in blind.py as a comment wall.
+
+## 2026-09-27 — something outside the container SIGTERMs big processes (PI/Claude)
+results.py kept dying with exit 143 after ~10 s while loading the 800 MB Jev cache. strace: `SIGTERM {si_code=SI_USER, si_pid=0, si_uid=65534}` = sent from outside the container's user namespace (host/incus), not a session in here; cgroup memory.events oom_kill 0, no earlyoom/oomd. Fix that worked: judge.cached() drops Jev's echoed "legend" (60% of each record), peak RSS now 0.97 GB. If exit 143 shows up again on a memory-heavy step: strace -e signal=SIGTERM first, then shrink RSS; do not just retry.
