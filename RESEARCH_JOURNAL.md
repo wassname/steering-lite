@@ -47,7 +47,7 @@ This entry answers wassname's question whether the right VJP target layer is a f
 | Qwen3.5-27B | 64 | L62 (0.98) | 0.78 (L49) | 0.98 (L62) | 1 | L12-L50 (0.19-0.79) |
 | OLMo-2-32B | 64 | L47 (0.75) | 0.65 (L41) | 0.71 (L45) | 18 | L12-L50 (0.19-0.79) |
 
-Table 1. Source: `slop/reviews/2026-09-28_depth_profile/profile_compare.md:6-8`, computed from `outputs/logs/profile-{4b,27b,olmo}.log`; plot `slop/reviews/2026-09-28_depth_profile/profile_compare.png`.
+Table 1. Source: `slop/reviews/2026-09-28_depth_profile/profile_compare.md:7-9`, computed from `outputs/logs/profile-{4b,27b,olmo}.log`; plot `slop/reviews/2026-09-28_depth_profile/profile_compare.png`.
 
 The contrast forms at depth 0.52 to 0.61 on 4B, 0.65 to 0.71 on OLMo and 0.78 to 0.98 on Qwen 27B, so neither a fixed fraction of depth nor a fixed number of layers from the end lines up across the three models. On OLMo the contrast falls after its peak (to about 0.87 of peak at the default VJP target, L61); on the two Qwen models it stays near its peak to the end.
 
