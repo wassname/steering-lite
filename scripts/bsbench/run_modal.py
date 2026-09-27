@@ -64,7 +64,7 @@ def cached_on_volume(argv: list[str]) -> bool:
     args = walk.parse_args(argv)
     if args.smoke or args.probe:
         return False
-    path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
+    path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
     try:
         certificate = json.loads(b"".join(cache.read_file(str(path))))
     except FileNotFoundError:

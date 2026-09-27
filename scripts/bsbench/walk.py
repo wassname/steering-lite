@@ -93,7 +93,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-rungs", type=int, default=24)
     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
-    return parser.parse_args(argv)
+    parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+    args = parser.parse_args(argv)
+    args.name = args.method + (f"-{args.tag}" if args.tag else "")
+    return args
 
 
 def model_dir(model: str) -> Path:
@@ -121,7 +124,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
 
 
 def extract_vector(args, model, tokenizer, layers) -> Vector:
-    path = model_dir(args.model) / "vectors" / f"{args.method}_s{args.seed}.safetensors"
+    path = model_dir(args.model) / "vectors" / f"{args.name}_s{args.seed}.safetensors"
     if path.exists():
         logger.info("cache hit vector {}", path)
         return Vector.load(str(path))
@@ -144,7 +147,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
     path.parent.mkdir(parents=True, exist_ok=True)
     vector.save(str(path))
     path.with_suffix(".json").write_text(json.dumps({
-        "method": args.method, "seed": args.seed, "layers": layers, "n_pairs": len(positive),
+        "method": args.name, "seed": args.seed, "layers": layers, "n_pairs": len(positive),
         "max_length": args.max_length, "extraction_seconds": time.monotonic() - started,
         "config": vector.cfg.to_dict(),
     }, indent=2) + "\n")
@@ -258,7 +261,7 @@ def calibration_c0(args, model, tokenizer, vector: Vector, calib_path: Path) -> 
 
 def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
     """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
-    for path in (root / "walks").glob(f"{args.method}_s{args.seed}_*.json"):
+    for path in (root / "walks").glob(f"{args.name}_s{args.seed}_*.json"):
         for rung in json.loads(path.read_text())["rungs"]:
             if rung.get("coefficient") is not None and math.isclose(rung["coefficient"], coefficient, rel_tol=1e-9) and "kl_rms" in rung:
                 return rung["kl_rms"]
@@ -330,7 +333,7 @@ def walk_done(certificate: dict, args) -> bool:
 def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
-    certificate_path = root / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
+    certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
     if certificate_path.exists() and not args.smoke and not args.probe:
         done = json.loads(certificate_path.read_text())
         if walk_done(done, args):
@@ -357,13 +360,13 @@ def walk(args) -> None:
     if args.method in PROMPT_METHODS:
         rung = {"grid_index": None, "coefficient": 1.0}
         for side, instruction in PROMPT_METHODS[args.method].items():
-            path = answer_path(args.model, args.method, args.seed, side, 1.0)
+            path = answer_path(args.model, args.name, args.seed, side, 1.0)
             answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null)
             side_stats, side_reasons = health(tokenizer, answers)
             rung[side] = {"breakdown_reasons": side_reasons, "post_boundary": False, "stats": side_stats, "answers": str(path.relative_to(root))}
         certificate_path.parent.mkdir(parents=True, exist_ok=True)
         certificate_path.write_text(json.dumps({
-            "schema": "bsbench_walk_v3", "status": "COMPLETE", "method": args.method, "seed": args.seed,
+            "schema": "bsbench_walk_v3", "status": "COMPLETE", "method": args.name, "seed": args.seed,
             "cohort": args.cohort, "model": args.model, "gen": GEN, "rungs": [rung],
         }, indent=2) + "\n")
         logger.info("WALK_COMPLETE {} certificate={}", args.method, certificate_path)
@@ -372,9 +375,9 @@ def walk(args) -> None:
     layers = resolve_layers(model, args.method, args.layers)
     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
     vector = extract_vector(args, model, tokenizer, layers)
-    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.method}_s{args.seed}.json")
+    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
     if args.probe:
-        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.method}_s{args.seed}.json")
+        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.name}_s{args.seed}.json")
         return
     # start on the stride lattice of the reference grid, so every seed and method shares C values
     start = min(range(len(GRID)), key=lambda index: abs(math.log(GRID[index]) - math.log(c0 / args.start_below)))
@@ -400,7 +403,7 @@ def walk(args) -> None:
         coefficient = GRID[grid_index]
         rung = {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": rung_kl(args, model, tokenizer, vector, coefficient, root)}
         for side, sign in (("+C", 1.0), ("-C", -1.0)):
-            path = answer_path(args.model, args.method, args.seed, side, coefficient)
+            path = answer_path(args.model, args.name, args.seed, side, coefficient)
             answers = cached_answers(
                 model, tokenizer, rows, path, prompts, args.batch_size,
                 lambda sign=sign: vector(model, C=sign * coefficient),
@@ -426,7 +429,7 @@ def walk(args) -> None:
         certificate_path.parent.mkdir(parents=True, exist_ok=True)
         certificate_path.write_text(json.dumps({
             "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
-            "method": args.method, "seed": args.seed, "cohort": args.cohort, "model": args.model,
+            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
             "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
             "state": state, "rungs": rungs,
             "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
