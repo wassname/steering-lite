@@ -178,3 +178,22 @@
 | vjp_delta | 1 | +C | 14 | 3 |  | 1.59 | +4.79 | 4: unfinished dmg 3.87 unf 94% | 0 |
 | vjp_delta | 2 | -C | 9 | 10 |  | 0.5 | +0.27 | 0.794: unfinished dmg 2.30 unf 62% | 0 |
 | vjp_delta | 2 | +C | 14 | 3 |  | 1.59 | +4.74 | 4: unfinished dmg 3.88 unf 93% | 0 |
+
+## OLMo-32B: 14 walk sides; best at edge 3; no post-boundary rung 0; sides with a false flag 0
+
+| method | seed | side | n_pre | n_post | edge | best C | best on | first unhealthy rung | false flags |
+|---|---|---|---|---|---|---|---|---|---|
+| chars | 0 | -C | 12 | 3 | EDGE | 0.397 | +1.46 | 0.63: unfinished,repetition dmg 3.63 unf 61% | 0 |
+| chars | 0 | +C | 11 | 4 |  | 0.25 | +0.58 | 0.5: unfinished,repetition dmg 3.47 unf 95% | 0 |
+| mean_diff | 0 | -C | 12 | 3 | EDGE | 2 | +1.70 | 4: unfinished,repetition dmg 3.74 unf 64% | 0 |
+| mean_diff | 0 | +C | 12 | 3 |  | 1.26 | +0.69 | 4: unfinished,repetition dmg 3.44 unf 99% | 0 |
+| random | 0 | -C | 14 | 4 |  | 0.63 | +0.16 | 8: unfinished,repetition dmg 3.13 unf 82% | 0 |
+| random | 0 | +C | 15 | 3 |  | 0.315 | +0.04 | 10.1: unfinished,repetition dmg 3.72 unf 80% | 0 |
+| random | 1 | -C | 13 | 3 | EDGE | 6.35 | +0.77 | 10.1: unfinished,repetition dmg 3.71 unf 83% | 0 |
+| random | 1 | +C | 13 | 3 |  | 0.5 | +0.08 | 10.1: unfinished,repetition dmg 3.67 unf 96% | 0 |
+| random | 2 | -C | 15 | 3 |  | 1.59 | +0.26 | 10.1: unfinished,repetition dmg 3.52 unf 78% | 0 |
+| random | 2 | +C | 14 | 3 |  | 0.25 | +0.06 | 10.1: unfinished,repetition dmg 3.72 unf 97% | 0 |
+| vjp_cache | 0 | -C | 12 | 11 |  | 0.315 | +0.02 | 4: unfinished,repetition dmg 2.63 unf 83% | 0 |
+| vjp_cache | 0 | +C | 13 | 5 |  | 1 | +0.13 | 16: repetition dmg 3.69 unf 12% | 0 |
+| vjp_delta | 0 | -C | 12 | 8 |  | 0.0787 | +0.16 | 0.5: unfinished,repetition dmg 2.82 unf 67% | 0 |
+| vjp_delta | 0 | +C | 14 | 3 |  | 0.198 | +0.31 | 1.59: unfinished,repetition dmg 3.96 unf 100% | 0 |

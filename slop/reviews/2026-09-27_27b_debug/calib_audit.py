@@ -11,8 +11,8 @@ Run: python slop/reviews/2026-09-27_27b_debug/calib_audit.py > slop/reviews/2026
 """
 import collections, glob, json
 
-for model, res in (("4B", "full"), ("27B", "27b-full")):
-    md = glob.glob(f"outputs/bsbench/Qwen--Qwen3.5-{model}-g*")[0]
+for model, res, pat in (("4B", "full", "Qwen--Qwen3.5-4B"), ("27B", "27b-full", "Qwen--Qwen3.5-27B"), ("OLMo-32B", "olmo-full", "allenai--OLMo-2-0325-32B-Instruct")):
+    md = glob.glob(f"outputs/bsbench/{pat}-g*")[0]
     pts = {(p["method"], p["seed"], p["C"], p["side"]): p for p in json.load(open(f"outputs/bsbench/results/{res}/points.json"))["points"]}
     tot = collections.Counter()
     false_rows, lines = [], []
