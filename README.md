@@ -99,6 +99,8 @@ Each implementation includes its own math and references in [the variants direct
 
 The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 
+Branch `bsbench-meanvjp` adds [mean VJP and WikiText mean VJP](src/steering_lite/variants/mean_vjp.py) and [suppressed-subspace mean difference](src/steering_lite/variants/suppressed_mean_diff.py). On the BS-bench dev set none beat `vjp_delta`; see [RESEARCH_JOURNAL.md](RESEARCH_JOURNAL.md).
+
 See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
 
 ## Citation
