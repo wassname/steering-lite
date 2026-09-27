@@ -47,9 +47,9 @@ for j, (m, _) in enumerate(MODELS):
             ax.plot([lo, hi], [y, y], color=color[m], lw=1.5)
         ax.plot(r["score_room"], y, marker[m], color=color[m], ms=7, label=m if i == 0 or method == methods[0] else None)
 ax.axvline(0, color="#bbbbbb", lw=1)
-ax.set_yticks(range(len(methods)), methods)
+ax.set_yticks(range(len(methods)), [m.replace("vjp_delta-t48", "vjp_delta, target 48\n(27B only)") for m in methods])
 ax.invert_yaxis()
-ax.set_xlabel("on-axis ÷ room (share of the bare answers' premise room used, weaker side); bars: 90% CI")
+ax.set_xlabel("on-axis ÷ room, higher is better (share of the premise room the bare answers leave, weaker side); bars: 90% CI")
 handles = [plt.Line2D([], [], marker=marker[m], color=color[m], ls="", ms=7) for m, _ in MODELS]
 ax.legend(handles, [m for m, _ in MODELS], loc="lower right", frameon=False)
 ax.set_title("Same steering methods on three models (BS-bench v2, 100 questions, judge: Jev)", fontsize=10)

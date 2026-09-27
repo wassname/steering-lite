@@ -8,7 +8,7 @@ for model, res, pat in (("4B", "full", "Qwen--Qwen3.5-4B"), ("27B", "27b-full", 
     md = glob.glob(f"outputs/bsbench/{pat}-g*")[0]
     pts = {(p["method"], p["seed"], p["C"], p["side"]): p for p in json.load(open(f"outputs/bsbench/results/{res}/points.json"))["points"]}
     best = {r["method"]: r["best"] for r in json.load(open(f"outputs/bsbench/results/{res}/points.json"))["summary"]}
-    for m in methods:
+    for m in [m for m in methods if glob.glob(f"{md}/walks/{m}_s0_full.json")]:  # variants such as vjp_delta-t48 exist on one model only
         c = json.load(open(f"{md}/walks/{m}_s0_full.json"))
         print(f"\n### {model} {m} s0: c0={c['c0']:.3g} stride={c['stride']} rungs={len(c['rungs'])} state={c['state']}")
         bC = {s: (best[m][s] or {}).get("C") for s in ("+C", "-C")}
