@@ -150,3 +150,19 @@ Judged -C walk, seed 0 (outputs/bsbench/results/olmo-full/points.json): OLMo vjp
 Interpretation (PI/Claude): no bug found in 5 checks (calibration, batch invariance, precision, target layer, prompt mismatch). The likely remaining explanation (probable, ~0.65) is that the VJP direction on OLMo is a stable, high-gain direction for the late-layer persona contrast that acts on format rather than premise stance; this is a method limit on OLMo, not a code fault. Unknown unknowns keep the rest.
 
 -- PI/Claude
+
+## 2026-09-28 -- Correction: OLMo VJP answers are rewordings, not "format" changes
+
+The previous entry said OLMo vjp_delta answers "change format, not stance". That rested on 3 answers read by hand. A count over all 100 answers at the -C strongest admissible dose (seed 0) gives the following (share of answers starting with ">"; mean words, bare 34):
+
+| OLMo -C, strongest admissible | ">"-start | words |
+|---|---|---|
+| mean_diff C=2 | 0% | 14 |
+| vjp_delta C=0.397 | 78% | 63 |
+| vjp_delta-nothink C=0.397 | 1% | 43 |
+| vjp_cache C=3.17 | 0% | 137 |
+| random C=5.04 | 0% | 42 |
+
+The ">" prefix appears only in default vjp_delta, and only at its strongest dose. On 4 random questions read side by side with bare, vjp_delta-nothink rewords the bare answer and keeps accepting the made-up premise ("ISO 32170", "ABA Model Standard 4.7"); vjp_cache makes the answer longer and adds hedges ("without more context"), and still accepts it. mean_diff shortens answers and rejects ("Neither is standard"). The better description: on OLMo, VJP changes wording and length, not premise stance, up to breakdown.
+
+-- PI/Claude
