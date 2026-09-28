@@ -51,30 +51,55 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 
 ## Results
 
-<!-- Results section drafted by PI/claude-opus 2026-09-28 from RESEARCH_JOURNAL.md; needs wassname's review. -->
+<!-- Results section drafted by PI/claude-opus 2026-09-28. Numbers copied by script from `just results` output:
+outputs/bsbench/results/{full,27b-full,olmo-full}/index.md (2026-09-28). Needs wassname's review. -->
 
-Can we make a model more or less sycophantic without breaking its answers? We test this on petergpt's [Bullshit Benchmark v2](https://github.com/petergpt/bullshit-benchmark): 100 questions built on a false premise. A sycophantic answer goes along with the premise; a candid answer says what is wrong with it.
+We test sycophancy with petergpt's [Bullshit Benchmark v2](https://github.com/petergpt/bullshit-benchmark): 100 questions with a false premise. A sycophantic answer accepts the premise. A candid answer says what is wrong with it.
 
-Each method extracts a vector from 256 persona pairs ("sycophantic" against "abrasive"). We then increase the dose from well below C0, the coefficient that gives 1 nat RMS KL, until both +C and -C break down: unfinished, repeated or role-leaking answers on two doses in a row. The Jev judge rates every answer on two scales: how far it accepts the premise (0 names the flaw, 8 accepts it and praises the user) and how damaged it is (0 clean, 4 broken). For each side we take the healthy dose, with mean damage at most 1.5, that has the best on-axis change minus off-axis change. The method's score is its weaker side. `random` is a null: a random direction, walked the same way.
+We steer in both directions: +C toward sycophantic, -C toward abrasive. For each method we increase the steering strength until the answers break (unfinished, looping or repeated). A judge model, Jev, rates each answer on two things: how much it accepts the premise, and how damaged it is.
+
+The score is the change we want minus the damage, at the best strength, in the weaker of the two directions. Higher is better. `random` (a random direction) shows what noise scores.
+
+![Pareto plot, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_full.png)
+
+The plot shows the 5 best methods on Qwen3.5-4B. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers.
+
+The table shows every method we tested. Brackets are 90% bootstrap intervals. Most methods were tested only on the small model.
 
 | method | Qwen3.5-4B score↑ | Qwen3.5-27B score↑ | OLMo-2-32B score↑ |
 | --- | ---: | ---: | ---: |
 | vjp_cache | **+1.14** [+0.75, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
 | chars | +0.88 [+0.49, +1.23] | +0.43 [+0.01, +1.11] | +0.13 [-0.04, +0.34] |
+| linear_act | +0.71 [+0.39, +1.01] |  |  |
 | vjp_delta | +0.66 [+0.39, +1.14] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
+| spherical | +0.54 [+0.10, +1.01] |  |  |
+| directional_ablation | +0.47 [+0.20, +0.84] |  |  |
 | mean_diff | +0.37 [+0.15, +0.78] | **+0.91** [+0.60, +1.33] | **+0.21** [+0.04, +0.50] |
-| *random* | -0.07 [-0.22, +0.13] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.02] |
+| topk_clusters | +0.33 [+0.09, +0.63] |  |  |
+| corda_pca | +0.26 [-0.02, +0.72] |  |  |
+| cosine_gated | +0.14 [-0.03, +0.49] |  |  |
+| query_steer | +0.10 [-0.15, +0.41] |  |  |
+| sspace_ablate | +0.07 [-0.09, +0.36] |  |  |
+| super_sspace | +0.06 [-0.13, +0.33] |  |  |
+| sspace | +0.01 [-0.08, +0.27] |  |  |
+| sspace_pca | -0.07 [-0.28, +0.16] |  |  |
+| *random* | -0.07 [-0.22, +0.13] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.01] |
+| pca | -0.12 [-0.30, +0.21] |  |  |
+| sspace_damp_amp | -0.14 [-0.32, +0.14] |  |  |
+| kv_cache_gram | -0.25 [-0.50, -0.12] |  |  |
+| *prompting* | — | — | — |
+| *prompting_engineered* | — | — | — |
 
-Brackets are 90% bootstrap intervals (seeds, then questions). Seeds: 3 per learned method on the Qwen models, 1 on OLMo. Source: [research journal](RESEARCH_JOURNAL.md), 2026-09-27, commit `a75d69f`, which also has on-axis change as a fraction of the room left by the unsteered answers. These results are exploratory. The VJP methods work on the 4B model but not on the two 64-layer models; the journal lists the checks. Only methods in the journal table are shown here; `just results` scores every walked method.
+Seeds: 3 per method on the Qwen models, 1 on OLMo. `—`: the prompting baselines have no score, because one of their directions failed the coherence or damage check. The [research journal](RESEARCH_JOURNAL.md) explains why the VJP methods fail on the two larger models, and has extra `vjp_delta` runs with other settings. These results are exploratory.
 
 To reproduce:
 
 ```bash
-just sweep dev    # dose walks on Modal, dev cohort (every 5th question); `just sweep full` for all 100
-just results dev  # judge with Jev (needs OPENROUTER_API_KEY in .env), then tables and plot
+just sweep full    # steering runs on Modal, all 100 questions (`dev` = 20 questions)
+just results full  # judge with Jev (needs OPENROUTER_API_KEY in .env), then the table and plot
 ```
 
-`just results` writes `index.md`, `plot.png`, `plot.html` and `points.json` to `outputs/bsbench/results/<cohort>/`. [`scripts/bsbench/web/`](scripts/bsbench/web) is an explorer page over `points.json`. [`calibration.py`](scripts/bsbench/calibration.py) checks whether C0 predicts where each walk breaks down, and [`cost.py`](scripts/bsbench/cost.py) estimates the GPU and judge cost per walk.
+The outputs go to `outputs/bsbench/results/<cohort>/`. [`calibration.py`](scripts/bsbench/calibration.py) and [`cost.py`](scripts/bsbench/cost.py) are extra checks: where each run breaks down, and what a run costs.
 
 ## Methods and debugging
 
