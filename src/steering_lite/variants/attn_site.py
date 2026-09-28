@@ -684,14 +684,16 @@ for _name in ("q_prefix_k", "q_prefix_k0"):
 # At C = 0 the two halves get the sink's weight between them and their values average to v_sink (unchanged up to an
 # ε·(q·u) term). As C moves, the sink's attention shifts to one half: the head writes ≈ w_sink·ν·tanh(ε·C·scale)·v̂*.
 @torch.no_grad()
-def _key_samples(model, tok, prompts, layers, max_length):
-    """post-RoPE keys of every real token (first token dropped) -> {layer: [KVH, n, d]} on CPU"""
+def _key_samples(model, tok, prompts, layers, max_length, site="k"):
+    """post-RoPE keys (site "k") or queries (site "q", grouped per KV head) of every real token, first token dropped
+    -> {layer: [KVH, n, d]} on CPU"""
     from transformers.models.qwen3.modeling_qwen3 import apply_rotary_pos_emb
     blocks, out = _get_blocks(model), {L: [] for L in layers}
+    norm = {"k": "k_norm", "q": "q_norm"}[site]
     for text in prompts:
         ids = tok(text, return_tensors="pt", add_special_tokens=False, truncation=True, max_length=max_length).input_ids.to(next(model.parameters()).device)
         grabbed = {}
-        hooks = [blocks[L].self_attn.k_norm.register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(L, o)) for L in layers]
+        hooks = [getattr(blocks[L].self_attn, norm).register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(L, o)) for L in layers]
         try:
             model(ids)
         finally:
@@ -699,11 +701,13 @@ def _key_samples(model, tok, prompts, layers, max_length):
                 h.remove()
         pos = torch.arange(ids.shape[1], device=ids.device)[None]
         for L in layers:
-            k = grabbed[L].transpose(1, 2)
-            cos, sin = model.model.rotary_emb(k, pos)
-            k, _ = apply_rotary_pos_emb(k, k, cos, sin)
-            out[L].append(k[0, :, 1:].float().cpu())
-    return {L: torch.cat(ks, 1) for L, ks in out.items()}
+            x = grabbed[L].transpose(1, 2)  # [1, heads, T, d]
+            cos, sin = model.model.rotary_emb(x, pos)
+            x, _ = apply_rotary_pos_emb(x, x, cos, sin)
+            x = x[0, :, 1:].float().cpu()
+            kvh = blocks[L].self_attn.config.num_key_value_heads
+            out[L].append(x.reshape(kvh, -1, x.shape[-1]))  # query heads of one KV group stacked as samples
+    return {L: torch.cat(xs, 1) for L, xs in out.items()}
 
 
 def _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
@@ -722,6 +726,7 @@ def _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, ma
         for h in hooks:
             h.remove()
     keys = _key_samples(model, tok, pos_prompts[:16] + neg_prompts[:16], tuple(v), max_length)
+    queries = _key_samples(model, tok, pos_prompts[:16] + neg_prompts[:16], tuple(v), max_length, site="q")
     out = {}
     for L in v:
         attn = blocks[L].self_attn
@@ -731,14 +736,21 @@ def _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, ma
         k, _ = apply_rotary_pos_emb(k, k, cos, sin)
         k = k[0, :, 0].float().cpu()  # [KVH, d]
         vs = grabbed[("v", L)].view(-1, d).float().cpu()  # [KVH, d]
-        # u_g: the direction real keys vary least along (smallest eigenvector of E[k kᵀ]), made orthogonal to k_sink,
-        # so C·u in the query barely changes logits to real tokens and mostly moves weight between the two halves
-        M = torch.einsum("gnd,gne->gde", keys[L], keys[L]) / keys[L].shape[1]  # [KVH, d, d]
+        # u_g: the direction real keys and queries vary least along (smallest eigenvector of E[kkᵀ]/tr + E[qqᵀ]/tr),
+        # made orthogonal to k_sink: C·u in the query barely changes logits to real tokens (small u·k), and the model's
+        # own query barely prefers either half at C = 0 (small q·u)
+        Mk = torch.einsum("gnd,gne->gde", keys[L], keys[L]) / keys[L].shape[1]
+        Mq = torch.einsum("gnd,gne->gde", queries[L], queries[L]) / queries[L].shape[1]
+        tr = lambda M: M.diagonal(dim1=-2, dim2=-1).sum(-1)[:, None, None]
+        M = Mk / tr(Mk) + Mq / tr(Mq)  # [KVH, d, d]
         u = torch.linalg.eigh(M).eigenvectors[..., 0]  # [KVH, d]
         u = u - (u * k).sum(-1, keepdim=True) / (k * k).sum(-1, keepdim=True) * k
         u = u / u.norm(dim=-1, keepdim=True)
         vstar = v[L]["stacked"]["x"][0].view(-1, d).float().cpu()
-        vstar = vstar / vstar.norm(dim=-1, keepdim=True) * vs.norm(dim=-1, keepdim=True)  # per KV head, ν = ‖v_sink‖
+        if cfg.nu_scale is None:  # per KV head, ν = ‖v_sink‖
+            vstar = vstar / vstar.norm(dim=-1, keepdim=True) * vs.norm(dim=-1, keepdim=True)
+        else:  # ν_g = nu_scale·‖v̂*_g‖: fully choosing one half writes what sink_value writes at C = nu_scale
+            vstar = vstar * cfg.nu_scale
         out[L] = {"shared": {"ksink": k, "vsink": vs, "u": u, "vstar": vstar}, "stacked": {"x": u.flatten().unsqueeze(0)}}
     return out
 
@@ -804,10 +816,19 @@ def _q_slot_install(model, cfg, stacked):
 class QSlotC(SteeringConfig):
     method: str = "q_slot"
     eps: float = 1.0  # key offset along u; logit gap between the halves = 2·eps·(q·u + C)·scale (0.6B: 0.05 too weak, 5 changes C=0)
+    nu_scale: float | None = None
 
 
-register(type("q_slot", (), {
-    "name": "q_slot", "extract_from_prompts": True, "cache_intervention": True,
-    "extract": staticmethod(_q_slot_extract), "install": staticmethod(_q_slot_install),
-    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
-}))
+@register_config
+@dataclass
+class QSlotBigC(QSlotC):
+    method: str = "q_slot_big"
+    nu_scale: float | None = 12.7  # sink_value's best -C dose on Qwen3-4B dev; ‖v_sink‖ was 1.3-12x smaller than this write
+
+
+for _name in ("q_slot", "q_slot_big"):
+    register(type(_name, (), {
+        "name": _name, "extract_from_prompts": True, "cache_intervention": True,
+        "extract": staticmethod(_q_slot_extract), "install": staticmethod(_q_slot_install),
+        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+    }))
