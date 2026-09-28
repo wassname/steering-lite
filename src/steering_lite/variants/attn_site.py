@@ -570,3 +570,26 @@ register(type("q_prefix", (), {
     "extract": staticmethod(_q_prefix_extract), "install": staticmethod(_q_prefix_install),
     "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
 }))
+
+
+# sinkr_rand: control for sinkr_sum. Same residual part; the sink value gets a random unit vector per layer (seeded).
+def _sinkr_rand_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    out = _sinkr_extract(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    g = torch.Generator().manual_seed(cfg.seed)
+    for s in out.values():
+        if "x" in s["stacked"]:
+            s["stacked"]["x"] = _unit_direction(torch.randn(s["stacked"]["x"].shape, generator=g))
+    return out
+
+
+@register_config
+@dataclass
+class SinkRRandC(SinkRSumC):
+    method: str = "sinkr_rand"
+
+
+register(type("sinkr_rand", (), {
+    "name": "sinkr_rand", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_sinkr_rand_extract), "install": staticmethod(_sinkr_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
