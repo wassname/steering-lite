@@ -20,3 +20,7 @@ Reviews: round1-code-kimi.md (BLOCK), round1-claims-kimi.md (OK with notes), rou
 - Odd n_pairs drops one pair in --vjp-split: n is 200. Ignore.
 - Oracle: the VJP estimator is a difference of gradients over interior positions, not a behavioural gradient; suggests a finite-difference audit. This is a next experiment, not a fix to this diff; offered to the user.
 - Oracle: the hand reading used vjp_delta-nothink, not default vjp_delta: already stated in olmo_read_25q.md; the vectors have cos 0.995.
+
+## Round 2 (targeted follow-up on the fix diff round2-fix.diff)
+
+round2-code-kimi.md: both P1 resolved, no invocation used so far is rejected, untagged cache names kept; "Fix verdict: RESOLVED", "Merge verdict: OK with notes". round2-claims-gpt.md: items 4-6 resolved, numbers match sources; "Fix verdict: RESOLVED", "Merge verdict: OK with notes". Loop stopped: no P0, no P1. Remaining notes: the extra bare generation before --vjp-split/--vjp-check (cached after the first run); the oracle's finite-difference audit (a next experiment); the interpretation in the journal stays inference.

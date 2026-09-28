@@ -1,0 +1,253 @@
+diff --git a/RESEARCH_JOURNAL.md b/RESEARCH_JOURNAL.md
+index 71b8d43..cd1bd0b 100644
+--- a/RESEARCH_JOURNAL.md
++++ b/RESEARCH_JOURNAL.md
+@@ -131,6 +131,10 @@ Table 1. Source: `slop/reviews/2026-09-28_judged_by_stance/by_stance.md` (script
+ 
+ On Qwen 27B, on the questions where the bare model still accepts the premise, vjp_cache moves the premise by +2.86 levels (4B +2.64) and vjp_delta by +1.41 (4B +1.87). Only 21 of 100 bare 27B answers accept the premise, against 51 on 4B, so the averaged score is dominated by questions with no room. On OLMo, 85 of 100 bare answers accept the premise, mean_diff and chars move them by +1.91 and +1.63, and both VJP methods stay near random (+0.11, +0.15; random +0.03).
+ 
++The +C side agrees on Qwen 27B, where most bare answers leave room toward accepting: vjp_delta +C on-axis +4.78 (off-axis 0.61), vjp_cache +4.94 (0.57); blind stance shift +1.37 and +1.47, P(accepts_premise) 60% and 68% (outputs/bsbench/results/27b-full/index.md, method table and blind table).
++
++Caveats (review round 1, slop/reviews/2026-09-28_review/). n counts question-seed pairs, not independent questions: the 27B accepts bucket is 21 unique questions over 3 correlated seeds (4B 51 x 3, OLMo 85 x 1). The table has no CI. The dose was chosen on the same 100 questions it is evaluated on. The bare-accept subsets differ across models (21 vs 51 vs 85 questions), so the split checks headroom within each model; it is not a controlled cross-model comparison. Selecting questions on one bare rating can also regress to the mean.
++
+ Interpretation (mine, PI/Claude): on Qwen 27B the VJP methods probably still work where there is something to steer (probable, maybe 0.75), and most of their score drop is the candour floor; mean_diff's lead there is real though (+4.28 on the same questions). OLMo is the case where VJP genuinely fails with plenty of room. OLMo differs from Qwen in family and architecture (plain attention, norm after each sublayer), so a VJP-specific interaction with the OLMo architecture, or a bug that only shows there, is now the leading question; the earlier "fails on 64-layer models" framing was too broad.
+ 
+ The takeaway is that the Qwen 27B drop is mostly a property of the benchmark on a more candid model, and the open failure is VJP on OLMo.
+@@ -143,9 +147,9 @@ This entry records two checks of why vjp_delta steers Qwen but not OLMo-2-32B, w
+ 
+ Split-half stability (`walk.py --vjp-split`, outputs/bsbench/<model>/vjp_split/vjp_delta_s0.json): vjp_delta extracted from pairs 0-99 and from pairs 100-199 agree, median cos over source layers 4B +0.993, Qwen 27B +0.986, OLMo +0.985. The class difference is not a small remainder: |pos - neg| / |pos| median 1.67 / 1.37 / 1.29. So bf16 cancellation noise is ruled out on all three models.
+ 
+-Judged -C walk, seed 0 (outputs/bsbench/results/olmo-full/points.json): OLMo vjp_delta on-axis stays between -0.01 and -0.22 up to KL 1.9, then breaks; mean_diff reaches -1.70 while admissible; 4B vjp_delta reaches -1.16 at KL 0.65. Read by hand, OLMo vjp_delta answers change format (a leading ">" quote, restating the question), not stance. The OLMo persona contrast peaks at L47 (slop/reviews/2026-09-28_depth_profile/profile_compare.md), the target of the failed t47 run, so the target layer is ruled out as well.
++Judged -C walk, seed 0 (outputs/bsbench/results/olmo-full/points.json): OLMo vjp_delta on-axis stays between -0.01 and -0.22 up to KL 1.9, then breaks; mean_diff reaches -1.70 while admissible. For comparison, 4B vjp_delta reaches -1.16 at KL 0.65 (outputs/bsbench/results/full/points.json). Read by hand, OLMo vjp_delta answers change format (a leading ">" quote, restating the question), not stance. The OLMo persona contrast peaks at L47 (slop/reviews/2026-09-28_depth_profile/profile_compare.md), the target of the failed t47 run, so the target layer is ruled out as well.
+ 
+-`<think>` mismatch (flagged independently by the j-steer session): extraction pairs put a literal "<think>" before the suffix, eval runs thinking off, and OLMo has no thinking mode. vjp_delta averages gradients over all prompt positions, mean_diff reads only the last token. Walk with `--no-think --tag nothink` (outputs/logs/modal-olmo-vjp_delta-nothink.log, judge-olmo-nothink.log, results-olmo-nothink.log): score -0.12 [-0.22, -0.00], on-axis / room +0.00 [-0.02, +0.05], same as default vjp_delta (-0.05, +0.03). Vector cos to the default vector per layer: min 0.979, median 0.995. The "<think>" text barely changes the vector.
++`<think>` mismatch (flagged independently by the j-steer session): extraction pairs put a literal "<think>" before the suffix, eval runs thinking off, and OLMo has no thinking mode. vjp_delta averages gradients over all prompt positions, mean_diff reads only the last token. Walk with `--no-think --tag nothink` (outputs/logs/modal-olmo-vjp_delta-nothink.log, judge-olmo-nothink.log, results-olmo-nothink.log): score -0.12 [-0.22, -0.00], on-axis / room +0.00 [-0.02, +0.05], same as default vjp_delta (-0.05, +0.03). Vector cos to the default vector per layer: min 0.979, median 0.995 over 39 source layers (slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.md, script vector_cos_nothink.py in the same folder). The "<think>" text barely changes the vector.
+ 
+ Interpretation (PI/Claude): no bug found in 5 checks (calibration, batch invariance, precision, target layer, prompt mismatch). The likely remaining explanation (probable, ~0.65) is that the VJP direction on OLMo is a stable, high-gain direction for the late-layer persona contrast that acts on format rather than premise stance; this is a method limit on OLMo, not a code fault. Unknown unknowns keep the rest.
+ 
+diff --git a/scripts/bsbench/results.py b/scripts/bsbench/results.py
+index 08be041..0df0158 100644
+--- a/scripts/bsbench/results.py
++++ b/scripts/bsbench/results.py
+@@ -555,7 +555,10 @@ def main() -> None:
+     points = build_points(model_dir, args.cohort, exclude)
+     # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
+     spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
+-    for method in sorted({point["method"] for point in points} - set(COLORS)):
++    uncoloured = sorted({point["method"] for point in points} - set(COLORS))
++    if len(uncoloured) > len(spare):
++        raise ValueError(f"{len(uncoloured)} methods have no fixed colour but only {len(spare)} spare colours: {uncoloured}; add colours to COLORS or --exclude some")
++    for method in uncoloured:
+         COLORS[method] = spare.pop(0)
+         LABELS[method] = method
+     scenarios = list(load_cohort())[COHORTS[args.cohort]]
+diff --git a/scripts/bsbench/run_modal.py b/scripts/bsbench/run_modal.py
+index d3a7168..d4bafa2 100644
+--- a/scripts/bsbench/run_modal.py
++++ b/scripts/bsbench/run_modal.py
+@@ -65,9 +65,8 @@ def cached_on_volume(argv: list[str]) -> bool:
+     if args.smoke or args.probe:
+         return False
+     if args.profile or args.vjp_check or args.vjp_split:
+-        name = f"profile/persona_s{args.seed}.json" if args.profile else f"{'vjp_split' if args.vjp_split else 'vjp_check'}/{args.name}_s{args.seed}.json"
+         try:
+-            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / name)))
++            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / walk.mode_output(args))))
+             return True
+         except FileNotFoundError:
+             return False
+diff --git a/scripts/bsbench/walk.py b/scripts/bsbench/walk.py
+index 1e5267e..d08261c 100644
+--- a/scripts/bsbench/walk.py
++++ b/scripts/bsbench/walk.py
+@@ -94,16 +94,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+     parser.add_argument("--max-rungs", type=int, default=24)
+     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
+     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
+-    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
++    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json (persona-<tag>_s<seed>.json with --tag)")
+     parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
+     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
+     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
+     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+     args = parser.parse_args(argv)
++    extraction = (("--layers", "layers"), ("--target-layer", "target_layer"), ("--n-pairs", "n_pairs"), ("--max-length", "max_length"), ("--no-think", "no_think"))
++    changed = [flag for flag, dest in extraction if getattr(args, dest) != parser.get_default(dest)]
++    # --smoke writes to its own throw-away tree (outputs/bsbench-smoke), where extract_vector still fails on a mismatched cached vector
++    if changed and not args.tag and not args.smoke:
++        parser.error(f"extraction settings differ from the defaults ({', '.join(changed)}); add --tag so this run's vector, answers and diagnostics do not share the default run's cache")
+     args.name = args.method + (f"-{args.tag}" if args.tag else "")
+     return args
+ 
+ 
++def mode_output(args) -> Path:
++    """Output file of a diagnostic mode (--profile, --vjp-check, --vjp-split), relative to model_dir. Walk.py writes it; run_modal reads it to skip finished runs."""
++    if args.profile:
++        return Path("profile") / (f"persona-{args.tag}_s{args.seed}.json" if args.tag else f"persona_s{args.seed}.json")
++    assert args.vjp_check or args.vjp_split, "mode_output needs --profile, --vjp-check or --vjp-split"
++    return Path("vjp_split" if args.vjp_split else "vjp_check") / f"{args.name}_s{args.seed}.json"
++
++
+ def model_dir(model: str) -> Path:
+     return OUT / f"{model.replace('/', '--')}-g{GEN_KEY}"
+ 
+@@ -139,7 +152,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
+     if path.exists():
+         saved = json.loads(path.with_suffix(".json").read_text())
+         saved = {"layers": saved["layers"], "n_pairs": saved["n_pairs"], "max_length": saved["max_length"],
+-                 "target_layer": saved["config"].get("target_layer"), "thinking": saved.get("thinking", settings["thinking"])}  # vectors saved before 2026-09-28 lack "thinking"
++                 "target_layer": saved["config"].get("target_layer"), "thinking": saved["thinking"]}
+         if saved != settings:
+             raise ValueError(f"cached vector {path} was extracted with {saved}, this run asks for {settings}; use --tag for a variant")
+         logger.info("cache hit vector {} settings={}", path, settings)
+@@ -467,7 +480,7 @@ def walk(args) -> None:
+     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
+     timing["load_s"] = time.monotonic() - timing["start"]
+     if args.profile:
+-        profile(args, model, tokenizer, root / "profile" / f"persona_s{args.seed}.json")
++        profile(args, model, tokenizer, root / mode_output(args))
+         return
+     prompts = generation_inputs(tokenizer, rows)
+     logger.info(
+@@ -496,12 +509,12 @@ def walk(args) -> None:
+     layers = resolve_layers(model, args.method, args.layers)
+     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
+     if args.vjp_split:
+-        vjp_split(args, model, tokenizer, layers, root / "vjp_split" / f"{args.name}_s{args.seed}.json")
++        vjp_split(args, model, tokenizer, layers, root / mode_output(args))
+         return
+     vector = extract_vector(args, model, tokenizer, layers)
+     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
+     if args.vjp_check:
+-        vjp_check(args, model, tokenizer, vector, c0, rows, root / "vjp_check" / f"{args.name}_s{args.seed}.json")
++        vjp_check(args, model, tokenizer, vector, c0, rows, root / mode_output(args))
+         return
+     if args.probe:
+         sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.name}_s{args.seed}.json")
+diff --git a/slop/reviews/2026-09-28_judged_by_stance/olmo_read_25q.md b/slop/reviews/2026-09-28_judged_by_stance/olmo_read_25q.md
+index 6af10e5..bf1de44 100644
+--- a/slop/reviews/2026-09-28_judged_by_stance/olmo_read_25q.md
++++ b/slop/reviews/2026-09-28_judged_by_stance/olmo_read_25q.md
+@@ -32,6 +32,6 @@ Reading per question: A = accepts the made-up premise, P = partly rejects or ref
+ | 25 | fin_tce_01 WACC depreciation | A | R | A | P |
+ 
+ Counts over the 22 questions where bare is A: mean_diff R 9, P 1; vjp_delta-nothink R 1, P 4; vjp_cache R 0, P 3.
+-In 2 cases VJP is worse than bare: #7 (bare half-rejects; both VJP give ohm numbers) and #16 for vjp_cache.
++In 1 case VJP moves the stance toward accepting, away from the -C target: #7 (bare half-rejects, "not quantifiable in ohms"; vjp_delta-nothink gives 100 ohms, vjp_cache 1000 ohms). In #16 vjp_cache keeps bare's stance (both A, both invent an interval: bare "3.2 to 4.1", vjp_cache "(0.45, 0.65)"), so it is not worse than bare; vjp_delta-nothink rejects ("I cannot provide").
+ mean_diff -C also reads abrasive ("None of your business", "Test and measure the damn thing"); the -C persona is "abrasive".
+-vjp_delta-nothink mostly rewords the bare answer; vjp_cache often longer, with more invented detail (#1, #7, #16, #24).
++vjp_delta-nothink mostly rewords the bare answer; vjp_cache often longer, with more invented detail (#1, #7, #24).
+diff --git a/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.md b/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.md
+new file mode 100644
+index 0000000..209e5fd
+--- /dev/null
++++ b/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.md
+@@ -0,0 +1,50 @@
++Does dropping the literal "<think>" from the extraction pairs change the OLMo vjp_delta vector? (PI/Claude, 2026-09-28)
++
++cos(v_default, v_nothink) per source layer, seed 0, from the saved vectors:
++outputs/bsbench/allenai--OLMo-2-0325-32B-Instruct-g7c7712c6/vectors/vjp_delta{,-nothink}_s0.safetensors.
++Writes vector_cos_nothink.md next to this file.
++Run: .venv/bin/python slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.py
++
++39 source layers: min +0.9789, median +0.9955, max +0.9989
++
++| layer | cos(default, nothink) |
++|---|---|
++| L12 | +0.9790 |
++| L13 | +0.9789 |
++| L14 | +0.9792 |
++| L15 | +0.9796 |
++| L16 | +0.9806 |
++| L17 | +0.9825 |
++| L18 | +0.9833 |
++| L19 | +0.9856 |
++| L20 | +0.9863 |
++| L21 | +0.9877 |
++| L22 | +0.9884 |
++| L23 | +0.9893 |
++| L24 | +0.9898 |
++| L25 | +0.9893 |
++| L26 | +0.9919 |
++| L27 | +0.9925 |
++| L28 | +0.9930 |
++| L29 | +0.9941 |
++| L30 | +0.9949 |
++| L31 | +0.9955 |
++| L32 | +0.9961 |
++| L33 | +0.9971 |
++| L34 | +0.9973 |
++| L35 | +0.9977 |
++| L36 | +0.9979 |
++| L37 | +0.9983 |
++| L38 | +0.9985 |
++| L39 | +0.9987 |
++| L40 | +0.9988 |
++| L41 | +0.9988 |
++| L42 | +0.9988 |
++| L43 | +0.9989 |
++| L44 | +0.9988 |
++| L45 | +0.9985 |
++| L46 | +0.9985 |
++| L47 | +0.9984 |
++| L48 | +0.9985 |
++| L49 | +0.9983 |
++| L50 | +0.9983 |
+diff --git a/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.py b/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.py
+new file mode 100644
+index 0000000..e58ea7d
+--- /dev/null
++++ b/slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.py
+@@ -0,0 +1,26 @@
++"""Does dropping the literal "<think>" from the extraction pairs change the OLMo vjp_delta vector? (PI/Claude, 2026-09-28)
++
++cos(v_default, v_nothink) per source layer, seed 0, from the saved vectors:
++outputs/bsbench/allenai--OLMo-2-0325-32B-Instruct-g7c7712c6/vectors/vjp_delta{,-nothink}_s0.safetensors.
++Writes vector_cos_nothink.md next to this file.
++Run: .venv/bin/python slop/reviews/2026-09-28_judged_by_stance/vector_cos_nothink.py
++"""
++from pathlib import Path
++from statistics import median
++
++import torch
++from safetensors.torch import load_file
++
++ROOT = Path(__file__).resolve().parents[3]
++VECTORS = ROOT / "outputs/bsbench/allenai--OLMo-2-0325-32B-Instruct-g7c7712c6/vectors"
++default = load_file(str(VECTORS / "vjp_delta_s0.safetensors"))
++nothink = load_file(str(VECTORS / "vjp_delta-nothink_s0.safetensors"))
++assert default.keys() == nothink.keys(), (sorted(default), sorted(nothink))
++layer = lambda key: int(key.split(".")[1].removeprefix("layer"))  # stacked.layer<l>.v
++cos = {layer(key): float(torch.nn.functional.cosine_similarity(default[key].float().flatten(), nothink[key].float().flatten(), dim=0))
++       for key in default}
++lines = ["| layer | cos(default, nothink) |", "|---|---|", *(f"| L{l} | {c:+.4f} |" for l, c in sorted(cos.items()))]
++summary = f"{len(cos)} source layers: min {min(cos.values()):+.4f}, median {median(cos.values()):+.4f}, max {max(cos.values()):+.4f}"
++text = __doc__ + "\n" + summary + "\n\n" + "\n".join(lines) + "\n"
++(Path(__file__).parent / "vector_cos_nothink.md").write_text(text)
++print(summary)
+diff --git a/slop/reviews/2026-09-28_review/backfill_thinking.py b/slop/reviews/2026-09-28_review/backfill_thinking.py
+new file mode 100644
+index 0000000..056f7a3
+--- /dev/null
++++ b/slop/reviews/2026-09-28_review/backfill_thinking.py
+@@ -0,0 +1,20 @@
++"""Add "thinking" to vector sidecar jsons written before walk.py recorded it (review round 1, item 1).
++
++Every extraction before commit ba717fd (walk.py --no-think) used make_persona_pairs(thinking=True);
++the one no-think extraction is vjp_delta-nothink_s0 (OLMo). Key order follows walk.extract_vector.
++Run: python3 backfill_thinking.py <vectors dir> [<vectors dir> ...]   (PI/Claude, 2026-09-28)
++"""
++import json
++import sys
++from pathlib import Path
++
++for directory in sys.argv[1:]:
++    paths = sorted(Path(directory).glob("*.json"))
++    assert paths, f"no vector jsons in {directory}"
++    for path in paths:
++        saved = json.loads(path.read_text())
++        assert "thinking" not in saved, f"{path} already has thinking={saved['thinking']}"
++        thinking = path.name != "vjp_delta-nothink_s0.json"
++        head = {key: saved.pop(key) for key in ("method", "seed", "layers", "n_pairs")}
++        path.write_text(json.dumps({**head, "thinking": thinking, **saved}, indent=2) + "\n")
++        print(f"{path} thinking={thinking}")
