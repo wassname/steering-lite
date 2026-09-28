@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 here = Path(__file__).parent
 MODELS = (("Qwen3.5-4B", "full"), ("Qwen3.5-27B", "27b-full"), ("OLMo-2-32B", "olmo-full"))
 rows = {m: {r["method"]: r for r in json.loads((ROOT / f"outputs/bsbench/results/{d}/points.json").read_text())["summary"]} for m, d in MODELS}
-methods = [m for m in ("mean_diff", "chars", "vjp_cache", "vjp_delta", "vjp_delta-t48", "random") if any(m in rows[k] for k, _ in MODELS)]
+methods = [m for m in ("mean_diff", "chars", "vjp_cache", "vjp_delta", "vjp_delta-t48", "vjp_delta-t47", "random") if any(m in rows[k] for k, _ in MODELS)]
 
 
 def cell(r, key, ci):
@@ -47,7 +47,7 @@ for j, (m, _) in enumerate(MODELS):
             ax.plot([lo, hi], [y, y], color=color[m], lw=1.5)
         ax.plot(r["score_room"], y, marker[m], color=color[m], ms=7, label=m if i == 0 or method == methods[0] else None)
 ax.axvline(0, color="#bbbbbb", lw=1)
-ax.set_yticks(range(len(methods)), [m.replace("vjp_delta-t48", "vjp_delta, target 48\n(27B only)") for m in methods])
+ax.set_yticks(range(len(methods)), [m.replace("vjp_delta-t48", "vjp_delta, target 48\n(27B only)").replace("vjp_delta-t47", "vjp_delta, target 47\n(OLMo only)") for m in methods])
 ax.invert_yaxis()
 ax.set_xlabel("on-axis ÷ room: share of the premise room the bare answers leave, weaker side\nhigher is better; bars: 90% CI")
 handles = [plt.Line2D([], [], marker=marker[m], color=color[m], ls="", ms=7) for m, _ in MODELS]

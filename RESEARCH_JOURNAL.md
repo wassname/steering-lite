@@ -58,3 +58,22 @@ Next: one single run, OLMo vjp_delta with the target at its contrast peak L47 (s
 The practical lesson is to measure where a concept forms in each model before choosing where to steer and where to aim.
 
 -- PI/Claude
+
+## 2026-09-28 -- OLMo vjp_delta with its target at the contrast peak: no recovery
+
+This entry records the single run that tested whether aiming the VJP target at the layer where the persona contrast peaks, instead of three layers from the end, brings vjp_delta back on OLMo-2-32B.
+
+| OLMo-2-32B vjp_delta, 1 seed | score [90% CI] | on-axis / room [90% CI] |
+|---|---|---|
+| target L61 (default), sources L12 to L50 | -0.05 [-0.16, +0.03] | +0.03 [-0.01, +0.05] |
+| target L47 (contrast peak), sources L12 to L46 | -0.08 [-0.12, -0.05] | +0.00 [-0.01, +0.03] |
+
+Table 1. Source: `slop/reviews/2026-09-26_27b/compare.md:14,16` (OLMo columns).
+
+Per dose, the target-47 walk moves the premise by at most +0.14 on -C before damage rises (`slop/reviews/2026-09-27_27b_debug/walk_audit_t47.md`, OLMo vjp_delta-t47 block), the same pattern as the default walk in the same file.
+
+Interpretation (mine, PI/Claude): the prediction failed, so on OLMo the target position is very probably not what breaks vjp_delta (maybe 0.85), and the depth profile from the previous entry does not explain the VJP failure. My next suspect is the linearisation itself: the VJP direction is a first-order prediction of what changes the target-layer contrast, and across 30 to 50 layers of a large model that prediction may not hold at the doses used. A direct check is to steer along the VJP direction and measure whether the target-layer activation actually moves along the target contrast, on 4B (where VJP works) against OLMo and Qwen 27B, with mean_diff as a reference.
+
+The takeaway is that moving the VJP target does not fix VJP on OLMo, so the cause lies elsewhere.
+
+-- PI/Claude
