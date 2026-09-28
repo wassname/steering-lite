@@ -131,6 +131,10 @@ Table 1. Source: `slop/reviews/2026-09-28_judged_by_stance/by_stance.md` (script
 
 On Qwen 27B, on the questions where the bare model still accepts the premise, vjp_cache moves the premise by +2.86 levels (4B +2.64) and vjp_delta by +1.41 (4B +1.87). Only 21 of 100 bare 27B answers accept the premise, against 51 on 4B, so the averaged score is dominated by questions with no room. On OLMo, 85 of 100 bare answers accept the premise, mean_diff and chars move them by +1.91 and +1.63, and both VJP methods stay near random (+0.11, +0.15; random +0.03).
 
+The +C side agrees on Qwen 27B, where most bare answers leave room toward accepting: vjp_delta +C on-axis +4.78 (off-axis 0.61), vjp_cache +4.94 (0.57); blind stance shift +1.37 and +1.47, P(accepts_premise) 60% and 68% (outputs/bsbench/results/27b-full/index.md, method table and blind table).
+
+Caveats (review round 1, slop/reviews/2026-09-28_review/). n counts question-seed pairs, not independent questions: the 27B accepts bucket is 21 unique questions over 3 correlated seeds (4B 51 x 3, OLMo 85 x 1). The table has no CI. The dose was chosen on the same 100 questions it is evaluated on. The bare-accept subsets differ across models (21 vs 51 vs 85 questions), so the split checks headroom within each model; it is not a controlled cross-model comparison. Selecting questions on one bare rating can also regress to the mean.
+
 Interpretation (mine, PI/Claude): on Qwen 27B the VJP methods probably still work where there is something to steer (probable, maybe 0.75), and most of their score drop is the candour floor; mean_diff's lead there is real though (+4.28 on the same questions). OLMo is the case where VJP genuinely fails with plenty of room. OLMo differs from Qwen in family and architecture (plain attention, norm after each sublayer), so a VJP-specific interaction with the OLMo architecture, or a bug that only shows there, is now the leading question; the earlier "fails on 64-layer models" framing was too broad.
 
 The takeaway is that the Qwen 27B drop is mostly a property of the benchmark on a more candid model, and the open failure is VJP on OLMo.
