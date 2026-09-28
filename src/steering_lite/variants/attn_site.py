@@ -456,3 +456,117 @@ register(type("sinkr_sum", (), {
     "extract": staticmethod(_sinkr_extract), "install": staticmethod(_sinkr_install),
     "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
 }))
+
+
+# --- q_prefix: the working q-steer, plus something for it to find --------------------------------------------------
+# Query steering fetched a password because the password was in the context. A persona is not in the test prompt, so
+# put the persona sentences in the cache, hidden by a logit bias, and let the same q* decide how much is read:
+#     q*_L = mean(q⁺_L[last]) − mean(q⁻_L[last])                 (query_steer's extraction, unchanged)
+#     prefix± = K, V of "Answer as someone who is {sycophantic | abrasive}." (post-RoPE at their own positions 1..n)
+#     q_t += C·q̂*_L;   logit(t, s ∈ prefix) = q_t·k_s·scale − b        (b: prefix nearly unread at C = 0)
+PERSONA_SENTENCES = ("Answer as someone who is sycophantic.", "Answer as someone who is abrasive.")
+_ACTIVE_PREFIX: dict[int, dict] = {}  # id(attention module) -> {"k": [KVH, n, d], "v": [KVH, n, d], "b": float}
+
+
+@torch.no_grad()
+def _persona_kv(model, tok, layers):
+    """K (post-RoPE), V of each persona sentence inside a user turn, first (sink) token dropped -> {layer: (k, v)}"""
+    from transformers import AutoTokenizer
+    tok = tok or AutoTokenizer.from_pretrained(model.config._name_or_path)
+    blocks, out = _get_blocks(model), {layer: ([], []) for layer in layers}
+    for sentence in PERSONA_SENTENCES:
+        ids = tok(tok.apply_chat_template([{"role": "user", "content": sentence}], tokenize=False).split(sentence)[0] + sentence,
+                  return_tensors="pt", add_special_tokens=False).input_ids.to(next(model.parameters()).device)
+        grabbed = {}
+        hooks = [blocks[layer].self_attn.k_norm.register_forward_hook(lambda _m, _i, o, layer=layer: grabbed.__setitem__(("k", layer), o)) for layer in layers]
+        hooks += [blocks[layer].self_attn.v_proj.register_forward_hook(lambda _m, _i, o, layer=layer: grabbed.__setitem__(("v", layer), o)) for layer in layers]
+        try:
+            model(ids)
+        finally:
+            for h in hooks:
+                h.remove()
+        pos = torch.arange(ids.shape[1], device=ids.device)[None]
+        cos, sin = model.model.rotary_emb(grabbed[("k", layers[0])].transpose(1, 2), pos)
+        from transformers.models.qwen3.modeling_qwen3 import apply_rotary_pos_emb
+        for layer in layers:
+            attn = blocks[layer].self_attn
+            k = grabbed[("k", layer)].transpose(1, 2)  # [1, KVH, n, d]
+            k, _ = apply_rotary_pos_emb(k, k, cos, sin)
+            v = grabbed[("v", layer)].view(1, ids.shape[1], -1, attn.head_dim).transpose(1, 2)
+            out[layer][0].append(k[0, :, 1:].float())  # drop the first token (the sink)
+            out[layer][1].append(v[0, :, 1:].float())
+    return {layer: (torch.cat(ks, 1), torch.cat(vs, 1)) for layer, (ks, vs) in out.items()}, [int(t.shape[1]) for t in out[layers[0]][0]]
+
+
+def _q_prefix_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    q = _mean_diff_site("q")(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    kv, lengths = _persona_kv(model, tok, tuple(q))
+    for layer in q:
+        q[layer]["shared"] = {"pk": kv[layer][0], "pv": kv[layer][1], "npos": torch.tensor([lengths[0]])}
+    return q
+
+
+def _prefix_attention(original):
+    def attention(module, query, key, value, attention_mask, scaling, dropout=0.0, **kw):
+        P = _ACTIVE_PREFIX.get(id(module))
+        if P is None:
+            return original(module, query, key, value, attention_mask, scaling=scaling, dropout=dropout, **kw)
+        g = module.num_key_value_groups
+        k = torch.cat([key, P["k"].to(key)[None].expand(key.shape[0], -1, -1, -1)], 2).repeat_interleave(g, 1)
+        v = torch.cat([value, P["v"].to(value)[None].expand(value.shape[0], -1, -1, -1)], 2).repeat_interleave(g, 1)
+        T, S, n = query.shape[2], key.shape[2], P["k"].shape[1]
+        logits = (query @ k.transpose(2, 3)).float() * scaling
+        if attention_mask is None:
+            keep = torch.ones(T, S, dtype=torch.bool, device=query.device).tril(S - T)[None, None]
+            real = torch.zeros_like(logits[..., :S]).masked_fill(~keep, -torch.inf)
+        elif attention_mask.dtype == torch.bool:
+            real = torch.zeros(attention_mask.shape, device=query.device).masked_fill(~attention_mask, -torch.inf)
+        else:
+            real = attention_mask.float()
+        logits[..., :S] += real[..., :S]
+        logits[..., S:] -= P["b"]
+        A = logits.softmax(-1)
+        last = A[:, :, -1]  # last query position (real under left padding); diagnostics: mass on all prefix, on the + sentence
+        P["mass"] = last[..., S:].sum(-1).mean().item(), last[..., S:S + P["n_pos"]].sum(-1).mean().item()
+        return (A.to(v.dtype) @ v).transpose(1, 2).contiguous(), None
+    return attention
+
+
+class _Restore:
+    def __init__(self, fn):
+        self.fn = fn
+
+    def remove(self):
+        self.fn()
+
+
+def _q_prefix_install(model, cfg, stacked):
+    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+    impl = model.config._attn_implementation
+    original = ALL_ATTENTION_FUNCTIONS[impl]
+    from ..attach import _gather_split_state
+    blocks = _get_blocks(model)
+    for layer in stacked:
+        shared = _gather_split_state(blocks[layer])[0]
+        _ACTIVE_PREFIX[id(blocks[layer].self_attn)] = {"k": shared["pk"], "v": shared["pv"], "b": cfg.bias, "n_pos": int(shared["npos"][0])}
+    ALL_ATTENTION_FUNCTIONS[impl] = _prefix_attention(original)
+
+    def restore():
+        ALL_ATTENTION_FUNCTIONS[impl] = original
+        for layer in stacked:
+            _ACTIVE_PREFIX.pop(id(blocks[layer].self_attn), None)
+    return [*_install_add(model, cfg, {layer: {"x": s["x"]} for layer, s in stacked.items()}, "q"), _Restore(restore)]
+
+
+@register_config
+@dataclass
+class QPrefixC(SteeringConfig):
+    method: str = "q_prefix"
+    bias: float = 8.0  # logit penalty on the persona prefix; set from the C = 0 attention mass in sink_probe/q_prefix_probe
+
+
+register(type("q_prefix", (), {
+    "name": "q_prefix", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_q_prefix_extract), "install": staticmethod(_q_prefix_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))

@@ -13,8 +13,9 @@ from results import build_points, curves_for, pareto_score, resample
 
 a, b = sys.argv[1:3]
 model_dir = Path(__file__).resolve().parents[2] / "outputs/bsbench/Qwen--Qwen3-4B-g7c7712c6"
-points = build_points(model_dir, "dev", set())
-scenarios = list(load_cohort())[COHORTS["dev"]]
+COHORT = __import__("os").environ.get("COHORT", "dev")
+points = build_points(model_dir, COHORT, set())
+scenarios = list(load_cohort())[COHORTS[COHORT]]
 curves = {m: curves_for(points, m) for m in (a, b)}
 seeds = {m: sorted({p["seed"] for p in points if p["method"] == m}) for m in (a, b)}
 rng, diffs = random.Random(0), []
