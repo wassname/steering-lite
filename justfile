@@ -4,10 +4,7 @@ set dotenv-load
 default:
 	@just --list
 
-check: test smoke
-
-test:
-	uv run --extra test --extra hf-test pytest -q
+check: smoke smoke-bsbench
 
 # library smoke: every method extract -> attach -> generate -> save/load on tiny models
 smoke:

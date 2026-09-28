@@ -49,53 +49,36 @@ We measure how much steering changes the next-token distribution using KL diverg
 v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 ```
 
-The older results below used the 95th percentile of token KL at a target of 0.50 nats instead. See [calibration code](src/steering_lite/calibrate.py) and the [longer explanation](https://gist.github.com/wassname/6c11cf30b43d8c228bc114795f1019c7).
-
 ## Results
 
-Can we make a model treat disobedience to authority as less morally significant, while giving more weight to care? We test this with [moralmaps](https://github.com/wassname/moral-maps): short stories where the model chooses which moral concern is involved. We measure intended changes and changes to the other concerns.
+<!-- Results section drafted by PI/claude-opus 2026-09-28 from RESEARCH_JOURNAL.md; needs wassname's review. -->
 
-We want steering to have a precise, bidirectional effect: pushing one way should increase the target concept, and pushing the other way should decrease it, without changing unrelated answers. We measure this with *steering selectivity*, comparing the logprobs in the two steering directions:
+Can we make a model more or less sycophantic without breaking its answers? We test this on petergpt's [Bullshit Benchmark v2](https://github.com/petergpt/bullshit-benchmark): 100 questions built on a false premise. A sycophantic answer goes along with the premise; a candid answer says what is wrong with it.
 
-$$
-\text{selectivity} = \text{intended movement} - 0.1\,\text{unintended movement}.
-$$
+Each method extracts a vector from 256 persona pairs ("sycophantic" against "abrasive"). We then increase the dose from well below C0, the coefficient that gives 1 nat RMS KL, until both +C and -C break down: unfinished, repeated or role-leaking answers on two doses in a row. The Jev judge rates every answer on two scales: how far it accepts the premise (0 names the flaw, 8 accepts it and praises the user) and how damaged it is (0 clean, 4 broken). For each side we take the healthy dose, with mean damage at most 1.5, that has the best on-axis change minus off-axis change. The method's score is its weaker side. `random` is a null: a random direction, walked the same way.
 
-Moving the target the right way earns credit; moving it the wrong way loses credit. Side effects count at one tenth the weight. Logprobs let us see small changes even when the chosen answer stays the same. [Scoring function](https://github.com/wassname/moral-maps/blob/main/src/moralmaps/metrics.py#L80).
+| method | Qwen3.5-4B score↑ | Qwen3.5-27B score↑ | OLMo-2-32B score↑ |
+| --- | ---: | ---: | ---: |
+| vjp_cache | **+1.14** [+0.75, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
+| chars | +0.88 [+0.49, +1.23] | +0.43 [+0.01, +1.11] | +0.13 [-0.04, +0.34] |
+| vjp_delta | +0.66 [+0.39, +1.14] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
+| mean_diff | +0.37 [+0.15, +0.78] | **+0.91** [+0.60, +1.33] | **+0.21** [+0.04, +0.50] |
+| *random* | -0.07 [-0.22, +0.13] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.02] |
 
-Here are the saved Qwen3-4B results. Higher selectivity is better; `on` and `off` show its intended and unintended movement.
+Brackets are 90% bootstrap intervals (seeds, then questions). Seeds: 3 per learned method on the Qwen models, 1 on OLMo. Source: [research journal](RESEARCH_JOURNAL.md), 2026-09-27, commit `a75d69f`, which also has on-axis change as a fraction of the room left by the unsteered answers. These results are exploratory. The VJP methods work on the 4B model but not on the two 64-layer models; the journal lists the checks. Only methods in the journal table are shown here; `just results` scores every walked method.
 
-| method | selectivity↑ | on↑ | off↓ | 95% interval |
-| --- | ---: | ---: | ---: | :--- |
-| pca[+] | **+2.12** | **+2.17** | 0.54 | [+1.67,+2.60] |
-| sspace_pca[+] | +1.54 | +1.60 | 0.66 | [+1.02,+2.12] |
-| corda_pca[+] | +1.50 | +1.71 | 2.12 | [+1.01,+1.98] |
-| sspace_signed[-] | +1.49 | +1.58 | 0.89 | [+1.00,+1.97] |
-| topk_clusters[-] | +0.31 | +0.35 | 0.45 | [-0.03,+0.63] |
-| super_sspace[-] | +0.24 | +0.28 | 0.38 | [-0.02,+0.50] |
-| sspace_damp_amp[+] | +0.17 | +0.25 | 0.75 | [-0.24,+0.58] |
-| mean_diff[-] | +0.10 | +0.24 | 1.37 | [-0.29,+0.51] |
-| cosine_gated[+] | -0.13 | -0.09 | 0.42 | [-0.40,+0.13] |
-| directional_ablation[-] | -0.14 | -0.14 | **0.09** | [-0.56,+0.27] |
-| spherical[-] | -0.49 | -0.41 | 0.82 | [-0.86,-0.10] |
-| sspace_ablate[-] | -0.56 | -0.41 | 1.52 | [-1.08,-0.08] |
-| sspace[-] | -0.72 | -0.52 | 1.99 | [-1.36,-0.11] |
-| *prompt_only* | -1.80 | -1.66 | 1.40 | [-2.30,-1.30] |
-
-These values are exploratory. The run used 132 classic vignettes, 256 persona-branching pairs, layers 7-27, and a 256-token thinking budget. It ran on 2026-07-16 as `82d4c8319de5` with code `514b97e`, calibrated at `0.5 kl_p95`, and used 2,000 row-bootstrap samples. The table was rescored by `bba61e6`. It predates the matched-pair correction `055bd94`; do not treat its ranking as a corrected comparison. `random` is an equal-KL evaluation null, but has no saved result and is not in this table.
-
-`on` is the mean signed change toward Authority-down and Care-up; `off` is the mean absolute change on the other foundations. Both use centered logprobs: each answer's logprob minus the mean across answers. The maintained scorer calls `moralmaps.gated_selectivity`; `tests/test_results_seam.py` checks that input seam.
-
-To produce a new table with the current code:
+To reproduce:
 
 ```bash
-just sweep Qwen/Qwen3-4B outputs/tinymfv_sweep_4b
-just results outputs/tinymfv_sweep_4b
+just sweep dev    # dose walks on Modal, dev cohort (every 5th question); `just sweep full` for all 100
+just results dev  # judge with Jev (needs OPENROUTER_API_KEY in .env), then tables and plot
 ```
+
+`just results` writes `index.md`, `plot.png`, `plot.html` and `points.json` to `outputs/bsbench/results/<cohort>/`. [`scripts/bsbench/web/`](scripts/bsbench/web) is an explorer page over `points.json`. [`calibration.py`](scripts/bsbench/calibration.py) checks whether C0 predicts where each walk breaks down, and [`cost.py`](scripts/bsbench/cost.py) estimates the GPU and judge cost per walk.
 
 ## Methods and debugging
 
-Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). The new variants are [S-space PCA](src/steering_lite/variants/sspace_pca.py) and [CorDA PCA](src/steering_lite/variants/corda_pca.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
+Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). Newer variants are [VJP delta](src/steering_lite/variants/vjp_delta.py), [VJP cache](src/steering_lite/variants/vjp_cache.py), [KV-cache Gram](src/steering_lite/variants/kv_cache_gram.py) and [query steering](src/steering_lite/variants/query_steer.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
 
 The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 
