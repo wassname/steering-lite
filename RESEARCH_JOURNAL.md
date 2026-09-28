@@ -136,3 +136,17 @@ Interpretation (mine, PI/Claude): on Qwen 27B the VJP methods probably still wor
 The takeaway is that the Qwen 27B drop is mostly a property of the benchmark on a more candid model, and the open failure is VJP on OLMo.
 
 -- PI/Claude
+
+## 2026-09-28 -- VJP on OLMo: not precision noise, not the <think> prompt mismatch
+
+This entry records two checks of why vjp_delta steers Qwen but not OLMo-2-32B, where 85 of 100 bare answers accept the premise.
+
+Split-half stability (`walk.py --vjp-split`, outputs/bsbench/<model>/vjp_split/vjp_delta_s0.json): vjp_delta extracted from pairs 0-99 and from pairs 100-199 agree, median cos over source layers 4B +0.993, Qwen 27B +0.986, OLMo +0.985. The class difference is not a small remainder: |pos - neg| / |pos| median 1.67 / 1.37 / 1.29. So bf16 cancellation noise is ruled out on all three models.
+
+Judged -C walk, seed 0 (outputs/bsbench/results/olmo-full/points.json): OLMo vjp_delta on-axis stays between -0.01 and -0.22 up to KL 1.9, then breaks; mean_diff reaches -1.70 while admissible; 4B vjp_delta reaches -1.16 at KL 0.65. Read by hand, OLMo vjp_delta answers change format (a leading ">" quote, restating the question), not stance. The OLMo persona contrast peaks at L47 (slop/reviews/2026-09-28_depth_profile/profile_compare.md), the target of the failed t47 run, so the target layer is ruled out as well.
+
+`<think>` mismatch (flagged independently by the j-steer session): extraction pairs put a literal "<think>" before the suffix, eval runs thinking off, and OLMo has no thinking mode. vjp_delta averages gradients over all prompt positions, mean_diff reads only the last token. Walk with `--no-think --tag nothink` (outputs/logs/modal-olmo-vjp_delta-nothink.log, judge-olmo-nothink.log, results-olmo-nothink.log): score -0.12 [-0.22, -0.00], on-axis / room +0.00 [-0.02, +0.05], same as default vjp_delta (-0.05, +0.03). Vector cos to the default vector per layer: min 0.979, median 0.995. The "<think>" text barely changes the vector.
+
+Interpretation (PI/Claude): no bug found in 5 checks (calibration, batch invariance, precision, target layer, prompt mismatch). The likely remaining explanation (probable, ~0.65) is that the VJP direction on OLMo is a stable, high-gain direction for the late-layer persona contrast that acts on format rather than premise stance; this is a method limit on OLMo, not a code fault. Unknown unknowns keep the rest.
+
+-- PI/Claude
