@@ -329,3 +329,71 @@ for _name in ("qr_sum", "qretr_sum"):
         "extract": staticmethod(_qr_sum_extract), "install": staticmethod(_qr_sum_install),
         "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
     }))
+
+
+# --- attention-gated write through the attention sink -----------------------------------------------------------
+# Most heads put much of their attention on the first token (the sink). Edit only that token's value:
+#     v_L[first] ← v_L[first] + C·v̂*_L        (prefill only; the edited value stays in the KV cache for every later token)
+# so head h writes W_O^h (A_t,first · C v̂*) into the residual at each position t: a steering write gated by attention.
+#     sink_write:  v*_L,g = Σ_{h∈g} W_O^hᵀ r̂*_L    (the value that makes the group's heads write r*, mean_diff's direction)
+#     sink_value:  v*_L = mean(v⁺[last]) − mean(v⁻[last])   (value_steer's direction, sink only)
+
+
+def _wo_transpose_r(model, layers, r_hat):
+    blocks, out = _get_blocks(model), {}
+    for layer in layers:
+        attn = blocks[layer].self_attn
+        H, KVH, d = attn.config.num_attention_heads, attn.config.num_key_value_heads, attn.head_dim
+        w = (attn.o_proj.weight.float().T @ r_hat[layer].to(attn.o_proj.weight.device)).view(KVH, H // KVH, d).sum(1)  # [KVH, d]
+        out[layer] = _unit_direction(w.flatten())
+    return out
+
+
+def _sink_write_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    layers = _layers(model, cfg)
+    r_hat = _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
+    return _pack(_wo_transpose_r(model, layers, r_hat))
+
+
+def _install_sink(model, cfg, stacked):
+    mask = {}
+
+    def grab_mask(_m, args, kwargs):
+        ids = kwargs.get("input_ids", args[0] if args else None)
+        am = kwargs.get("attention_mask")
+        mask["first"] = None if am is None or ids is None or am.shape[1] != ids.shape[1] else am.long().argmax(1)  # left padding
+        return None
+
+    def hook(_m, _i, out, x):
+        if out.shape[1] == 1:  # decode step: the sink is already in the cache
+            return out
+        rows = torch.arange(out.shape[0], device=out.device)
+        first = mask["first"] if mask["first"] is not None else torch.zeros_like(rows)
+        out = out.clone()
+        out[rows, first] += cfg.coeff * x.to(out)
+        return out
+
+    hooks = [model.register_forward_pre_hook(grab_mask, with_kwargs=True)]
+    hooks += [m.register_forward_hook(lambda _m, _i, out, x=stacked[layer]["x"].sum(0): hook(_m, _i, out, x))
+              for layer, m in _site_modules(model, stacked, "v").items()]
+    return hooks
+
+
+@register_config
+@dataclass
+class SinkWriteC(SteeringConfig):
+    method: str = "sink_write"
+
+
+@register_config
+@dataclass
+class SinkValueC(SteeringConfig):
+    method: str = "sink_value"
+
+
+for _name, _extract in (("sink_write", _sink_write_extract), ("sink_value", _mean_diff_site("v"))):
+    register(type(_name, (), {
+        "name": _name, "extract_from_prompts": True, "cache_intervention": True,
+        "extract": staticmethod(_extract), "install": staticmethod(_install_sink),
+        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+    }))
