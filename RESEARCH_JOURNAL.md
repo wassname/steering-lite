@@ -105,3 +105,34 @@ Interpretation (mine, PI/Claude): the check does not separate 4B, where VJP work
 The takeaway is that the target-layer view of VJP does not explain its success on 4B, so tuning the target is unlikely to fix the large models.
 
 -- PI/Claude
+
+## 2026-09-28 -- Judged candour effect by bare stance: Qwen 27B is mostly the floor, OLMo is a real VJP failure
+
+This entry splits the judged -C effect by whether the bare answer already rejects the premise, after wassname pointed out that the judged steering effect, not a target-layer proxy, is what should decide the question.
+
+At each method's -C Pareto-best dose, the judged candour gain per question is the bare Jev premise level minus the steered level (0 to 8 scale), split by the bare answer: accepts (level 6 or more), middle, rejects (level 1 or less). n counts question-seed pairs.
+
+| model | method | bare accepts: n, gain | middle: n, gain | bare rejects: n, gain |
+|---|---|---|---|---|
+| Qwen3.5-4B | mean_diff | 153, +1.24 | 42, +0.80 | 105, -0.53 |
+| Qwen3.5-4B | vjp_cache | 153, +2.64 | 42, +2.05 | 105, -0.11 |
+| Qwen3.5-4B | vjp_delta | 153, +1.87 | 42, +0.98 | 105, -0.31 |
+| Qwen3.5-27B | mean_diff | 63, +4.28 | 30, +3.07 | 207, +0.04 |
+| Qwen3.5-27B | vjp_cache | 63, +2.86 | 30, +1.38 | 207, -0.14 |
+| Qwen3.5-27B | vjp_delta | 63, +1.41 | 30, +0.37 | 207, -0.11 |
+| Qwen3.5-27B | random | 21, +0.24 | 10, -0.06 | 69, -0.02 |
+| OLMo-2-32B | mean_diff | 85, +1.91 | 11, +0.82 | 4, -0.31 |
+| OLMo-2-32B | chars | 85, +1.63 | 11, +1.03 | 4, -1.06 |
+| OLMo-2-32B | vjp_cache | 85, +0.11 | 11, -0.52 | 4, -0.42 |
+| OLMo-2-32B | vjp_delta | 85, +0.15 | 11, +0.19 | 4, +0.17 |
+| OLMo-2-32B | random | 170, +0.03 | 22, +0.33 | 8, +0.04 |
+
+Table 1. Source: `slop/reviews/2026-09-28_judged_by_stance/by_stance.md` (script `by_stance.py` in the same folder, reads `outputs/bsbench/results/{full,27b-full,olmo-full}/points.json`); chars on Qwen and the t48 and t47 variants are in the same file.
+
+On Qwen 27B, on the questions where the bare model still accepts the premise, vjp_cache moves the premise by +2.86 levels (4B +2.64) and vjp_delta by +1.41 (4B +1.87). Only 21 of 100 bare 27B answers accept the premise, against 51 on 4B, so the averaged score is dominated by questions with no room. On OLMo, 85 of 100 bare answers accept the premise, mean_diff and chars move them by +1.91 and +1.63, and both VJP methods stay near random (+0.11, +0.15; random +0.03).
+
+Interpretation (mine, PI/Claude): on Qwen 27B the VJP methods probably still work where there is something to steer (probable, maybe 0.75), and most of their score drop is the candour floor; mean_diff's lead there is real though (+4.28 on the same questions). OLMo is the case where VJP genuinely fails with plenty of room. OLMo differs from Qwen in family and architecture (plain attention, norm after each sublayer), so a VJP-specific interaction with the OLMo architecture, or a bug that only shows there, is now the leading question; the earlier "fails on 64-layer models" framing was too broad.
+
+The takeaway is that the Qwen 27B drop is mostly a property of the benchmark on a more candid model, and the open failure is VJP on OLMo.
+
+-- PI/Claude
