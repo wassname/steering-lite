@@ -94,14 +94,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-rungs", type=int, default=24)
     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
-    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
+    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json (persona-<tag>_s<seed>.json with --tag)")
     parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
+    extraction = (("--layers", "layers"), ("--target-layer", "target_layer"), ("--n-pairs", "n_pairs"), ("--max-length", "max_length"), ("--no-think", "no_think"))
+    changed = [flag for flag, dest in extraction if getattr(args, dest) != parser.get_default(dest)]
+    # --smoke writes to its own throw-away tree (outputs/bsbench-smoke), where extract_vector still fails on a mismatched cached vector
+    if changed and not args.tag and not args.smoke:
+        parser.error(f"extraction settings differ from the defaults ({', '.join(changed)}); add --tag so this run's vector, answers and diagnostics do not share the default run's cache")
     args.name = args.method + (f"-{args.tag}" if args.tag else "")
     return args
+
+
+def mode_output(args) -> Path:
+    """Output file of a diagnostic mode (--profile, --vjp-check, --vjp-split), relative to model_dir. Walk.py writes it; run_modal reads it to skip finished runs."""
+    if args.profile:
+        return Path("profile") / (f"persona-{args.tag}_s{args.seed}.json" if args.tag else f"persona_s{args.seed}.json")
+    assert args.vjp_check or args.vjp_split, "mode_output needs --profile, --vjp-check or --vjp-split"
+    return Path("vjp_split" if args.vjp_split else "vjp_check") / f"{args.name}_s{args.seed}.json"
 
 
 def model_dir(model: str) -> Path:
@@ -139,7 +152,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
     if path.exists():
         saved = json.loads(path.with_suffix(".json").read_text())
         saved = {"layers": saved["layers"], "n_pairs": saved["n_pairs"], "max_length": saved["max_length"],
-                 "target_layer": saved["config"].get("target_layer"), "thinking": saved.get("thinking", settings["thinking"])}  # vectors saved before 2026-09-28 lack "thinking"
+                 "target_layer": saved["config"].get("target_layer"), "thinking": saved["thinking"]}
         if saved != settings:
             raise ValueError(f"cached vector {path} was extracted with {saved}, this run asks for {settings}; use --tag for a variant")
         logger.info("cache hit vector {} settings={}", path, settings)
@@ -467,7 +480,7 @@ def walk(args) -> None:
     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
     timing["load_s"] = time.monotonic() - timing["start"]
     if args.profile:
-        profile(args, model, tokenizer, root / "profile" / f"persona_s{args.seed}.json")
+        profile(args, model, tokenizer, root / mode_output(args))
         return
     prompts = generation_inputs(tokenizer, rows)
     logger.info(
@@ -496,12 +509,12 @@ def walk(args) -> None:
     layers = resolve_layers(model, args.method, args.layers)
     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
     if args.vjp_split:
-        vjp_split(args, model, tokenizer, layers, root / "vjp_split" / f"{args.name}_s{args.seed}.json")
+        vjp_split(args, model, tokenizer, layers, root / mode_output(args))
         return
     vector = extract_vector(args, model, tokenizer, layers)
     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
     if args.vjp_check:
-        vjp_check(args, model, tokenizer, vector, c0, rows, root / "vjp_check" / f"{args.name}_s{args.seed}.json")
+        vjp_check(args, model, tokenizer, vector, c0, rows, root / mode_output(args))
         return
     if args.probe:
         sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.name}_s{args.seed}.json")

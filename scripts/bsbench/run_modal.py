@@ -65,9 +65,8 @@ def cached_on_volume(argv: list[str]) -> bool:
     if args.smoke or args.probe:
         return False
     if args.profile or args.vjp_check or args.vjp_split:
-        name = f"profile/persona_s{args.seed}.json" if args.profile else f"{'vjp_split' if args.vjp_split else 'vjp_check'}/{args.name}_s{args.seed}.json"
         try:
-            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / name)))
+            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / walk.mode_output(args))))
             return True
         except FileNotFoundError:
             return False
