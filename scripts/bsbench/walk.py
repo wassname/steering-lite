@@ -97,6 +97,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
     parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
+    parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
     args.name = args.method + (f"-{args.tag}" if args.tag else "")
@@ -133,7 +134,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
         logger.info("cache hit vector {}", path)
         return Vector.load(str(path))
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
         template=PERSONA_TEMPLATE, seed=args.seed,
     )
     logger.info(
@@ -270,7 +271,7 @@ def profile(args, model, tokenizer, path: Path) -> None:
     contrast is relative to the residual at that depth. cos_final = cos(contrast_l, contrast at the last layer).
     A ratio that peaks and then falls toward the output marks where the model suppresses the persona contrast."""
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
     )
     layers = tuple(range(len(model.model.layers)))
     pos = record_activations(model, tokenizer, positive, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
@@ -301,7 +302,7 @@ def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict
     from steering_lite.variants.vjp_delta import _activations, _encode
     target = getattr(vector.cfg, "target_layer", None) or args.target_layer or len(model.model.layers) - 3
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=32, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
+        tokenizer, n_pairs=32, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
     )
     base = {"persona_neg": negative, "bench": generation_inputs(tokenizer, rows)[:32]}
 
@@ -345,7 +346,7 @@ def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> No
     from steering_lite.variants.vjp_delta import _class_mean_vjp, _target_mean
 
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
     )
     model.requires_grad_(False)
     target = len(model.model.layers) - 3 if args.target_layer is None else args.target_layer
@@ -397,7 +398,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
     if path.exists():
         return json.loads(path.read_text())
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=16, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
+        tokenizer, n_pairs=16, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
     )
     kls = {"base": [], "+C": [], "-C": []}
     moves = {"+C": [], "-C": []}  # sum_v (p_steered - p_neg) (log p_pos - log p_neg): mass moved toward tokens the positive persona prefers
