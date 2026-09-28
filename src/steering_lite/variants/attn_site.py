@@ -839,3 +839,41 @@ for _name in ("q_slot", "q_slot_big", "q_slot_huge"):
         "extract": staticmethod(_q_slot_extract), "install": staticmethod(_q_slot_install),
         "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
     }))
+
+
+# qslotr_sum: q_slot_big (query picks a ± half of the split sink) + mean_diff on the residual (20-80% depth), one coefficient
+#     q_t += C·u  (attention),   h_L += C·r_scale·r̂*_L  (residual);  r_scale = C0 mean_diff / C0 q_slot_big ≈ 3.0/3.95
+def _qslotr_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    out = _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    r_layers = _default_resid_layers(len(_get_blocks(model)))
+    r = _residual_star(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
+    for L in r_layers:
+        out.setdefault(L, {"shared": {}, "stacked": {}})["stacked"]["r"] = r[L].unsqueeze(0)
+    return out
+
+
+def _qslotr_install(model, cfg, stacked):
+    blocks = _get_blocks(model)
+    hooks = _q_slot_install(model, cfg, {L: s for L, s in stacked.items() if "x" in s})
+    for L, s in stacked.items():
+        if "r" in s:
+            def resid(_m, _i, out, r=s["r"].sum(0)):
+                h = out[0] if isinstance(out, tuple) else out
+                h = h + cfg.coeff * cfg.r_scale * r.to(h)
+                return (h, *out[1:]) if isinstance(out, tuple) else h
+            hooks.append(blocks[L].register_forward_hook(resid))
+    return hooks
+
+
+@register_config
+@dataclass
+class QSlotRSumC(QSlotBigC):
+    method: str = "qslotr_sum"
+    r_scale: float = 0.76
+
+
+register(type("qslotr_sum", (), {
+    "name": "qslotr_sum", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_qslotr_extract), "install": staticmethod(_qslotr_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
