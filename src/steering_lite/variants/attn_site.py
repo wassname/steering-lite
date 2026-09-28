@@ -355,23 +355,34 @@ def _sink_write_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size
     return _pack(_wo_transpose_r(model, layers, r_hat))
 
 
+def _punct_ids(tok_vocab_size, model):
+    """token ids made only of punctuation / whitespace with at least one of . , ; : ! ? newline (full stops etc. are secondary sinks)"""
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(model.config._name_or_path)
+    vocab = tok.convert_ids_to_tokens(list(range(len(tok))))
+    return torch.tensor([i for i, t in enumerate(vocab) if any(c in t for c in ".\n,;:!?Ċ") and len(t.strip("Ġ ĊĉĠ.,;:!?\n")) == 0])
+
+
 def _install_sink(model, cfg, stacked):
+    """add C·x̂ to the value of the first real token (prefill); with cfg.punct also to every punctuation token, including decoded ones"""
     mask = {}
+    punct = _punct_ids(None, model).to(next(model.parameters()).device) if getattr(cfg, "punct", False) else None
 
     def grab_mask(_m, args, kwargs):
         ids = kwargs.get("input_ids", args[0] if args else None)
         am = kwargs.get("attention_mask")
         mask["first"] = None if am is None or ids is None or am.shape[1] != ids.shape[1] else am.long().argmax(1)  # left padding
+        mask["punct"] = None if punct is None or ids is None else torch.isin(ids, punct)
         return None
 
     def hook(_m, _i, out, x):
-        if out.shape[1] == 1:  # decode step: the sink is already in the cache
-            return out
-        rows = torch.arange(out.shape[0], device=out.device)
-        first = mask["first"] if mask["first"] is not None else torch.zeros_like(rows)
-        out = out.clone()
-        out[rows, first] += cfg.coeff * x.to(out)
-        return out
+        sel = torch.zeros(out.shape[:2], dtype=torch.bool, device=out.device)
+        if out.shape[1] > 1:  # prefill: the first real token; decode steps find it already in the cache
+            rows = torch.arange(out.shape[0], device=out.device)
+            sel[rows, mask["first"] if mask["first"] is not None else torch.zeros_like(rows)] = True
+        if mask.get("punct") is not None and mask["punct"].shape == sel.shape:
+            sel |= mask["punct"]
+        return out + cfg.coeff * sel[..., None].to(out) * x.to(out)
 
     hooks = [model.register_forward_pre_hook(grab_mask, with_kwargs=True)]
     hooks += [m.register_forward_hook(lambda _m, _i, out, x=stacked[layer]["x"].sum(0): hook(_m, _i, out, x))
@@ -391,7 +402,14 @@ class SinkValueC(SteeringConfig):
     method: str = "sink_value"
 
 
-for _name, _extract in (("sink_write", _sink_write_extract), ("sink_value", _mean_diff_site("v"))):
+@register_config
+@dataclass
+class SinkPunctC(SteeringConfig):
+    method: str = "sink_punct"
+    punct: bool = True
+
+
+for _name, _extract in (("sink_write", _sink_write_extract), ("sink_value", _mean_diff_site("v")), ("sink_punct", _mean_diff_site("v"))):
     register(type(_name, (), {
         "name": _name, "extract_from_prompts": True, "cache_intervention": True,
         "extract": staticmethod(_extract), "install": staticmethod(_install_sink),
