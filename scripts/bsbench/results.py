@@ -555,7 +555,10 @@ def main() -> None:
     points = build_points(model_dir, args.cohort, exclude)
     # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
     spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
-    for method in sorted({point["method"] for point in points} - set(COLORS)):
+    uncoloured = sorted({point["method"] for point in points} - set(COLORS))
+    if len(uncoloured) > len(spare):
+        raise ValueError(f"{len(uncoloured)} methods have no fixed colour but only {len(spare)} spare colours: {uncoloured}; add colours to COLORS or --exclude some")
+    for method in uncoloured:
         COLORS[method] = spare.pop(0)
         LABELS[method] = method
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
