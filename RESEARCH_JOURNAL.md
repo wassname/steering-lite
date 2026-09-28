@@ -77,3 +77,31 @@ Interpretation (mine, PI/Claude): the prediction failed, so on OLMo the target p
 The takeaway is that moving the VJP target does not fix VJP on OLMo, so the cause lies elsewhere.
 
 -- PI/Claude
+
+## 2026-09-28 -- VJP mechanism check: same signature on all three models, including 4B
+
+This entry records a forward-only check of whether the VJP vectors move the target-layer activation along the persona contrast that defines them, run to separate a size-specific bug from a real limit.
+
+For each model and method (seed-0 vectors), steering at C = +-C0/8 and the target-layer residual at the last token are compared with c = mean(h_pos) - mean(h_neg) of 32 held-out persona pairs at that layer (the VJP cotangent). cos is the cosine between the mean shift and c.
+
+| model | method | cos on benchmark prompts, +C / -C | cos on negative-persona prompts, +C / -C |
+|---|---|---|---|
+| Qwen3.5-4B | mean_diff | +0.443 / -0.449 | +0.759 / -0.751 |
+| Qwen3.5-4B | vjp_delta | -0.067 / +0.077 | -0.499 / +0.474 |
+| Qwen3.5-4B | vjp_cache | +0.011 / +0.016 | -0.445 / +0.385 |
+| Qwen3.5-27B | mean_diff | +0.291 / -0.278 | +0.569 / -0.525 |
+| Qwen3.5-27B | vjp_delta | +0.001 / -0.003 | -0.347 / +0.358 |
+| Qwen3.5-27B | random | +0.023 / +0.005 | -0.012 / +0.046 |
+| OLMo-2-32B | mean_diff | +0.461 / -0.455 | +0.610 / -0.582 |
+| OLMo-2-32B | vjp_delta | +0.090 / -0.077 | -0.458 / +0.458 |
+| OLMo-2-32B | random | +0.047 / -0.041 | +0.065 / -0.066 |
+
+Table 1. Source: `slop/reviews/2026-09-28_vjp_check/vjp_check.md` (full table incl. vjp_cache on 27B and OLMo and the t48 and t47 variants), raw rows in `outputs/logs/vjpcheck-{4b,27b,olmo}.log`. 4B random was killed on Modal (exit -9) and not rerun.
+
+Two things hold on every model, 4B included. On benchmark prompts the VJP vectors barely move the target layer along c (|cos| at most 0.09, about the size of random), while mean_diff does (cos 0.29 to 0.46). On the negative-persona prompts, +C moves the target layer against c (cos -0.35 to -0.50) for both VJP methods, and the t48 and t47 variants show the same sign.
+
+Interpretation (mine, PI/Claude): the check does not separate 4B, where VJP works on the judge, from the two large models, where it does not. So a bug that only shows on deep models is unlikely (maybe 0.15), and so is "the first-order VJP prediction breaks with depth" (the prediction already fails on 4B). The anti-alignment is not a contradiction of the code: vjp_delta is mean_pos(J^T c) - mean_neg(J^T c), a difference of gradients between the two classes, not the gradient of c . h, so nothing requires it to raise c . h. My read is that the VJP vectors do not steer through the target-layer persona contrast at all, which also fits the small effect of moving the target (t48, t47). Why they move the answer on 4B and not on the large models stays open.
+
+The takeaway is that the target-layer view of VJP does not explain its success on 4B, so tuning the target is unlikely to fix the large models.
+
+-- PI/Claude
