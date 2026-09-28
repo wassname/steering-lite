@@ -14,6 +14,7 @@ Apply: x_L[t] += C · x̂*_L at every position; x̂* = x* / ‖x*‖ per layer.
 
 Ref: wassname/vjp-steering (estimator), wassname/query-steering (q site). PI[claude] 2026-09-28.
 """
+import math
 from dataclasses import dataclass
 
 import torch
@@ -673,3 +674,140 @@ for _name in ("q_prefix_k", "q_prefix_k0"):
         "extract": staticmethod(_q_prefix_k_extract), "install": staticmethod(_q_prefix_k_install),
         "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
     }))
+
+
+# --- q_slot: split the attention sink into two halves carrying ±v*, and let the query choose between them --------
+# Per layer, per KV head g (post-RoPE keys):
+#     the real first token (the sink, <|im_start|> at position 0) is hidden from query positions past the first 3
+#     slot±: key = k_sink ± ε·u,  value = v_sink ± ν·v̂*,  logit bias −ln 2     (u ⟂ k_sink random unit, ν = ‖v_sink‖)
+#     q_t (post-RoPE) += C·u
+# At C = 0 the two halves get the sink's weight between them and their values average to v_sink (unchanged up to an
+# ε·(q·u) term). As C moves, the sink's attention shifts to one half: the head writes ≈ w_sink·ν·tanh(ε·C·scale)·v̂*.
+@torch.no_grad()
+def _key_samples(model, tok, prompts, layers, max_length):
+    """post-RoPE keys of every real token (first token dropped) -> {layer: [KVH, n, d]} on CPU"""
+    from transformers.models.qwen3.modeling_qwen3 import apply_rotary_pos_emb
+    blocks, out = _get_blocks(model), {L: [] for L in layers}
+    for text in prompts:
+        ids = tok(text, return_tensors="pt", add_special_tokens=False, truncation=True, max_length=max_length).input_ids.to(next(model.parameters()).device)
+        grabbed = {}
+        hooks = [blocks[L].self_attn.k_norm.register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(L, o)) for L in layers]
+        try:
+            model(ids)
+        finally:
+            for h in hooks:
+                h.remove()
+        pos = torch.arange(ids.shape[1], device=ids.device)[None]
+        for L in layers:
+            k = grabbed[L].transpose(1, 2)
+            cos, sin = model.model.rotary_emb(k, pos)
+            k, _ = apply_rotary_pos_emb(k, k, cos, sin)
+            out[L].append(k[0, :, 1:].float().cpu())
+    return {L: torch.cat(ks, 1) for L, ks in out.items()}
+
+
+def _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    from transformers import AutoTokenizer
+    from transformers.models.qwen3.modeling_qwen3 import apply_rotary_pos_emb
+    tok = tok or AutoTokenizer.from_pretrained(model.config._name_or_path)
+    v = _mean_diff_site("v")(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    blocks, grabbed = _get_blocks(model), {}
+    ids = tok(pos_prompts[0], return_tensors="pt", add_special_tokens=False).input_ids[:, :1].to(next(model.parameters()).device)
+    hooks = [blocks[L].self_attn.k_norm.register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(("k", L), o)) for L in v]
+    hooks += [blocks[L].self_attn.v_proj.register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(("v", L), o)) for L in v]
+    try:
+        with torch.no_grad():
+            model(ids)
+    finally:
+        for h in hooks:
+            h.remove()
+    keys = _key_samples(model, tok, pos_prompts[:16] + neg_prompts[:16], tuple(v), max_length)
+    out = {}
+    for L in v:
+        attn = blocks[L].self_attn
+        d = attn.head_dim
+        k = grabbed[("k", L)].transpose(1, 2)  # [1, KVH, 1, d] pre-RoPE
+        cos, sin = model.model.rotary_emb(k, torch.zeros(1, 1, dtype=torch.long, device=k.device))
+        k, _ = apply_rotary_pos_emb(k, k, cos, sin)
+        k = k[0, :, 0].float().cpu()  # [KVH, d]
+        vs = grabbed[("v", L)].view(-1, d).float().cpu()  # [KVH, d]
+        # u_g: the direction real keys vary least along (smallest eigenvector of E[k kᵀ]), made orthogonal to k_sink,
+        # so C·u in the query barely changes logits to real tokens and mostly moves weight between the two halves
+        M = torch.einsum("gnd,gne->gde", keys[L], keys[L]) / keys[L].shape[1]  # [KVH, d, d]
+        u = torch.linalg.eigh(M).eigenvectors[..., 0]  # [KVH, d]
+        u = u - (u * k).sum(-1, keepdim=True) / (k * k).sum(-1, keepdim=True) * k
+        u = u / u.norm(dim=-1, keepdim=True)
+        vstar = v[L]["stacked"]["x"][0].view(-1, d).float().cpu()
+        vstar = vstar / vstar.norm(dim=-1, keepdim=True) * vs.norm(dim=-1, keepdim=True)  # per KV head, ν = ‖v_sink‖
+        out[L] = {"shared": {"ksink": k, "vsink": vs, "u": u, "vstar": vstar}, "stacked": {"x": u.flatten().unsqueeze(0)}}
+    return out
+
+
+def _slot_attention(original):
+    def attention(module, query, key, value, attention_mask, scaling, dropout=0.0, **kw):
+        P = _ACTIVE_SLOT.get(id(module))
+        if P is None:
+            return original(module, query, key, value, attention_mask, scaling=scaling, dropout=dropout, **kw)
+        g = module.num_key_value_groups
+        ks, vk, u, vs = (P[n].to(query) for n in ("ksink", "vsink", "u", "vstar"))
+        slot_k = torch.stack([ks + P["eps"] * u, ks - P["eps"] * u], 1)  # [KVH, 2, d]
+        slot_v = torch.stack([vk + vs, vk - vs], 1)
+        query = query + P["C"] * u.repeat_interleave(g, 0)[None, :, None, :]
+        B = key.shape[0]
+        k = torch.cat([key, slot_k[None].expand(B, -1, -1, -1)], 2).repeat_interleave(g, 1)
+        v = torch.cat([value, slot_v[None].expand(B, -1, -1, -1)], 2).repeat_interleave(g, 1)
+        T, S = query.shape[2], key.shape[2]
+        logits = (query @ k.transpose(2, 3)).float() * scaling
+        if attention_mask is None:
+            real = torch.zeros(T, S, device=query.device).masked_fill(~torch.ones(T, S, dtype=torch.bool, device=query.device).tril(S - T), -torch.inf)[None, None]
+        elif attention_mask.dtype == torch.bool:
+            real = torch.zeros(attention_mask.shape, device=query.device).masked_fill(~attention_mask, -torch.inf)
+        else:
+            real = attention_mask.float()
+        real = real[..., :S].expand(B, -1, T, S)
+        visible = real > -torch.inf  # [B, 1, T, S]
+        seen = visible.sum(-1, keepdim=True)
+        mature = seen >= MIN_VISIBLE
+        first = visible.float().argmax(-1, keepdim=True)  # the first real key = the sink (left padding)
+        hide_sink = torch.zeros_like(visible).scatter(-1, first, True) & mature
+        logits[..., :S] += real.masked_fill(hide_sink, -torch.inf)
+        logits[..., S:] = (logits[..., S:] - math.log(2)).masked_fill(~mature & (seen > 0), -torch.inf)  # seen == 0: padding rows
+        A = logits.softmax(-1)
+        P["read"] = (A[:, :, -1, S] - A[:, :, -1, S + 1]).mean().item()  # net + half weight at the last query
+        return (A.to(v.dtype) @ v).transpose(1, 2).contiguous(), None
+    return attention
+
+
+_ACTIVE_SLOT: dict[int, dict] = {}
+
+
+def _q_slot_install(model, cfg, stacked):
+    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+    from ..attach import _gather_split_state
+    impl = model.config._attn_implementation
+    original = ALL_ATTENTION_FUNCTIONS[impl]
+    blocks = _get_blocks(model)
+    for L in stacked:
+        sh = _gather_split_state(blocks[L])[0]
+        _ACTIVE_SLOT[id(blocks[L].self_attn)] = {"ksink": sh["ksink"], "vsink": sh["vsink"], "u": sh["u"], "vstar": sh["vstar"], "eps": cfg.eps, "C": cfg.coeff}
+    ALL_ATTENTION_FUNCTIONS[impl] = _slot_attention(original)
+
+    def restore():
+        ALL_ATTENTION_FUNCTIONS[impl] = original
+        for L in stacked:
+            _ACTIVE_SLOT.pop(id(blocks[L].self_attn), None)
+    return [_Restore(restore)]
+
+
+@register_config
+@dataclass
+class QSlotC(SteeringConfig):
+    method: str = "q_slot"
+    eps: float = 1.0  # key offset along u; logit gap between the halves = 2·eps·(q·u + C)·scale (0.6B: 0.05 too weak, 5 changes C=0)
+
+
+register(type("q_slot", (), {
+    "name": "q_slot", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_q_slot_extract), "install": staticmethod(_q_slot_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
