@@ -96,6 +96,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
     parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
     parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
+    parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
     args.name = args.method + (f"-{args.tag}" if args.tag else "")
@@ -333,6 +334,41 @@ def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict
     path.write_text(json.dumps({"model": args.model, "method": args.name, "target": target, "c0": c0, "c_norm": float(c.norm()), "rows": results}, indent=1) + "\n")
 
 
+def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> None:
+    """Is the vjp_delta vector signal, or noise left after a cancellation?
+
+    v = mean_pos(J.T c) - mean_neg(J.T c). Both class means share the direct residual path, so v can be a small
+    difference of two large bf16 numbers.
+      cancel    = |pos - neg| / |pos|: size of the difference relative to what cancels (small -> rounding noise likely)
+      split_cos = cos(v from pairs[:n/2], v from pairs[n/2:]): a stable direction gives high cos, noise gives ~0
+    The cotangent c uses all pairs, as in the real extraction."""
+    from steering_lite.variants.vjp_delta import _class_mean_vjp, _target_mean
+
+    positive, negative = make_persona_pairs(
+        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+    )
+    model.requires_grad_(False)
+    target = len(model.model.layers) - 3 if args.target_layer is None else args.target_layer
+    kw = dict(batch_size=args.extract_batch_size, max_length=args.max_length)
+    c = _target_mean(model, tokenizer, positive, target, **kw) - _target_mean(model, tokenizer, negative, target, **kw)
+    half = len(positive) // 2
+    parts = {}
+    for name, sl in (("a", slice(0, half)), ("b", slice(half, 2 * half))):
+        for cls, prompts in (("pos", positive), ("neg", negative)):
+            parts[name, cls] = _class_mean_vjp(model, tokenizer, prompts[sl], layers, target, c, skip_first=16, **kw)
+    cos = torch.nn.functional.cosine_similarity
+    rows = []
+    for l in layers:
+        va, vb = parts["a", "pos"][l] - parts["a", "neg"][l], parts["b", "pos"][l] - parts["b", "neg"][l]
+        rows.append({"layer": l, "split_cos": float(cos(va, vb, dim=0)), "cancel": float(va.norm() / parts["a", "pos"][l].norm()),
+                     "cos_pos_c": float(cos(parts["a", "pos"][l], c, dim=0))})
+    logger.info("VJP_SPLIT model={} target={} n_pairs={} half={}\nSHOULD: split_cos well above 0 (4B vjp_delta works); ELSE the vector is noise.\n{}",
+                args.model, target, len(positive), half,
+                "\n".join(f"L{r['layer']:>2} split_cos={r['split_cos']:+.3f} cancel={r['cancel']:.4f} cos(pos,c)={r['cos_pos_c']:+.3f}" for r in rows))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"model": args.model, "target": target, "n_pairs": len(positive), "dtype": args.dtype, "rows": rows}, indent=1) + "\n")
+
+
 def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
     """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
     for path in (root / "walks").glob(f"{args.name}_s{args.seed}_*.json"):
@@ -408,7 +444,7 @@ def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
-    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile and not args.vjp_check:
+    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile and not args.vjp_check and not args.vjp_split:
         done = json.loads(certificate_path.read_text())
         if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
@@ -451,6 +487,9 @@ def walk(args) -> None:
 
     layers = resolve_layers(model, args.method, args.layers)
     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
+    if args.vjp_split:
+        vjp_split(args, model, tokenizer, layers, root / "vjp_split" / f"{args.name}_s{args.seed}.json")
+        return
     vector = extract_vector(args, model, tokenizer, layers)
     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
     if args.vjp_check:
