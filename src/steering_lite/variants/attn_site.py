@@ -465,6 +465,7 @@ register(type("sinkr_sum", (), {
 #     prefix± = K, V of "Answer as someone who is {sycophantic | abrasive}." (post-RoPE at their own positions 1..n)
 #     q_t += C·q̂*_L;   logit(t, s ∈ prefix) = q_t·k_s·scale − b        (b: prefix nearly unread at C = 0)
 PERSONA_SENTENCES = ("Answer as someone who is sycophantic.", "Answer as someone who is abrasive.")
+MIN_VISIBLE = 4  # a query position reads the prefix only once it can see this many real tokens
 _ACTIVE_PREFIX: dict[int, dict] = {}  # id(attention module) -> {"k": [KVH, n, d], "v": [KVH, n, d], "b": float}
 
 
@@ -527,6 +528,10 @@ def _prefix_attention(original):
             real = attention_mask.float()
         logits[..., :S] += real[..., :S]
         logits[..., S:] -= P["b"]
+        # the first few real tokens (the sink) only see themselves; letting them read the prefix rewrites the sink and breaks the model
+        seen = (real[..., :S] > -torch.inf).sum(-1, keepdim=True)
+        young = (seen > 0) & (seen < MIN_VISIBLE)  # seen == 0: left-padding rows, unused; masking them too gives NaN
+        logits[..., S:] = logits[..., S:].masked_fill(young, -torch.inf)
         A = logits.softmax(-1)
         last = A[:, :, -1]  # last query position (real under left padding); diagnostics: mass on all prefix, on the + sentence
         P["mass"] = last[..., S:].sum(-1).mean().item(), last[..., S:S + P["n_pos"]].sum(-1).mean().item()
