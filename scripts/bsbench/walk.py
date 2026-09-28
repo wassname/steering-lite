@@ -95,6 +95,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
     parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
+    parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
     args.name = args.method + (f"-{args.tag}" if args.tag else "")
@@ -286,6 +287,52 @@ def profile(args, model, tokenizer, path: Path) -> None:
     path.write_text(json.dumps({"model": args.model, "n_pairs": len(positive), "rows": rows}, indent=1) + "\n")
 
 
+def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict], path: Path) -> None:
+    """Does steering move the target-layer activation along the persona contrast, as VJP assumes?
+
+    c = mean(h_pos) - mean(h_neg) at the target layer, last token, on 32 held-out persona pairs (the VJP cotangent).
+    For C = +-{1/8, 1/4, 1/2, 1} x C0, shift = mean over prompts of h_target(steered) - h_target(bare), on the
+    negative persona prompts and on 32 benchmark prompts.
+      gain = shift . c_hat / |c|: fraction of the pos-neg gap moved along c (sign should follow the sign of C)
+      cos  = cos(shift, c): how much of the movement is along c
+      move = |shift| / |c|: total movement in units of the gap
+    First-order VJP predicts gain linear in C, antisymmetric in sign, and cos well above a random vector's."""
+    from steering_lite.variants.vjp_delta import _activations, _encode
+    target = getattr(vector.cfg, "target_layer", None) or args.target_layer or len(model.model.layers) - 3
+    positive, negative = make_persona_pairs(
+        tokenizer, n_pairs=32, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
+    )
+    base = {"persona_neg": negative, "bench": generation_inputs(tokenizer, rows)[:32]}
+
+    @torch.inference_mode()
+    def last(prompts: list[str]) -> torch.Tensor:  # [n, d] target-layer residual at the last real token
+        out = []
+        for start in range(0, len(prompts), args.extract_batch_size):
+            encoded = _encode(model, tokenizer, prompts[start : start + args.extract_batch_size], args.max_length)
+            with _activations(model, (target,)) as found:
+                model(**encoded)
+            index = encoded["attention_mask"].sum(1) - 1
+            out.append(found[target][torch.arange(len(index), device=index.device), index].float())
+        return torch.cat(out)
+
+    c = last(positive).mean(0) - last(negative).mean(0)
+    c_hat = c / c.norm()
+    bare = {name: last(prompts) for name, prompts in base.items()}
+    results = []
+    for fraction in (0.125, 0.25, 0.5, 1.0):
+        for sign in (1.0, -1.0):
+            with vector(model, C=sign * fraction * c0):
+                for name, prompts in base.items():
+                    shift = (last(prompts) - bare[name]).mean(0)
+                    results.append({"base": name, "C_over_C0": sign * fraction, "C": sign * fraction * c0,
+                                    "gain": float(shift @ c_hat / c.norm()), "cos": float(torch.nn.functional.cosine_similarity(shift, c, dim=0)),
+                                    "move": float(shift.norm() / c.norm())})
+    logger.info("VJP_CHECK model={} method={} target=L{} c0={:.4g} |c|={:.3g}\n{}", args.model, args.name, target, c0, float(c.norm()),
+                "\n".join(f"{r['base']:11s} C/C0={r['C_over_C0']:+.3f} gain={r['gain']:+.3f} cos={r['cos']:+.3f} move={r['move']:.3f}" for r in results))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"model": args.model, "method": args.name, "target": target, "c0": c0, "c_norm": float(c.norm()), "rows": results}, indent=1) + "\n")
+
+
 def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
     """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
     for path in (root / "walks").glob(f"{args.name}_s{args.seed}_*.json"):
@@ -361,7 +408,7 @@ def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
-    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile:
+    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile and not args.vjp_check:
         done = json.loads(certificate_path.read_text())
         if walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
@@ -406,6 +453,9 @@ def walk(args) -> None:
     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
     vector = extract_vector(args, model, tokenizer, layers)
     c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
+    if args.vjp_check:
+        vjp_check(args, model, tokenizer, vector, c0, rows, root / "vjp_check" / f"{args.name}_s{args.seed}.json")
+        return
     if args.probe:
         sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.name}_s{args.seed}.json")
         return

@@ -64,9 +64,10 @@ def cached_on_volume(argv: list[str]) -> bool:
     args = walk.parse_args(argv)
     if args.smoke or args.probe:
         return False
-    if args.profile:
+    if args.profile or args.vjp_check:
+        name = f"profile/persona_s{args.seed}.json" if args.profile else f"vjp_check/{args.name}_s{args.seed}.json"
         try:
-            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / "profile" / f"persona_s{args.seed}.json")))
+            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / name)))
             return True
         except FileNotFoundError:
             return False
