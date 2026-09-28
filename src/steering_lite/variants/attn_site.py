@@ -1,0 +1,301 @@
+"""Attention-site steering: the same contrast as mean_diff / vjp_delta, but read and written at a head's query, key or value.
+
+Sites, per layer L (Qwen3 names, pre-RoPE, after q_norm / k_norm):
+    q = q_norm(q_proj h)   [b s H d]      where a head looks
+    k = k_norm(k_proj h)   [b s KVH d]    what is easy to find
+    v = v_proj h           [b s KVH*d]    what a head reads out (goes into the KV cache)
+
+Extraction (x = site activation):
+    key_steer, value_steer:  x*_L = mean(x⁺_L[last]) − mean(x⁻_L[last])                   (query_steer does this for q)
+    q_vjp, k_vjp:            c = mean h⁺_T[last] − mean h⁻_T[last],  T = n_layers − 3
+                             g_L(x) = mean_{s∈V(x)} ∂(Σ_{t∈V} c·h_T,t)/∂x_L,s                (vjp_delta's estimator, source = site)
+                             x*_L = mean⁺ g_L − mean⁻ g_L
+Apply: x_L[t] += C · x̂*_L at every position; x̂* = x* / ‖x*‖ per layer.
+
+Ref: wassname/vjp-steering (estimator), wassname/query-steering (q site). PI[claude] 2026-09-28.
+"""
+from dataclasses import dataclass
+
+import torch
+from einops import einsum
+
+from ..config import SteeringConfig, register, register_config
+from ..target import _get_blocks
+from .vjp_delta import _encode, _target_mean, _unit_direction, _valid_mask
+
+ε = 1e-8
+MODULE = {"q": "q_norm", "k": "k_norm", "v": "v_proj"}
+
+
+def _site_modules(model, layers, site: str) -> dict[int, torch.nn.Module]:
+    blocks = _get_blocks(model)
+    return {layer: getattr(blocks[layer].self_attn, MODULE[site]) for layer in layers}
+
+
+@torch.no_grad()
+def _last_token_mean(model, tok, prompts, layers, site, batch_size, max_length) -> dict[int, torch.Tensor]:
+    sums, grabbed = {layer: 0.0 for layer in layers}, {}
+    hooks = [m.register_forward_hook(lambda _m, _i, out, layer=layer: grabbed.__setitem__(layer, out))
+             for layer, m in _site_modules(model, layers, site).items()]
+    try:
+        for start in range(0, len(prompts), batch_size):
+            batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
+            model(**batch)
+            last = batch["attention_mask"].sum(1) - 1  # right padding
+            rows = torch.arange(last.shape[0], device=last.device)
+            for layer in layers:
+                sums[layer] = sums[layer] + grabbed[layer][rows, last].float().sum(0)
+    finally:
+        for h in hooks:
+            h.remove()
+    return {layer: s / len(prompts) for layer, s in sums.items()}
+
+
+def _site_gradients(model, tok, prompts, layers, site, target_layer, cotangent, skip_first, max_length):
+    """per-prompt mean over valid positions of ∂(Σ_t∈V c·h_T,t)/∂x_L,s -> {layer: [b, F]}"""
+    encoded = _encode(model, tok, prompts, max_length)
+    valid = _valid_mask(encoded["attention_mask"], skip_first)
+    assert valid.sum(1).min() > 0, f"a prompt has no valid positions after skip_first={skip_first}"
+    found, root = {}, min(layers)
+
+    def grab(layer):
+        def hook(_m, _i, out):
+            if layer == root:  # frozen model: seed the graph at the earliest site
+                out = out.detach().requires_grad_(True)
+            found[layer] = out
+            return out
+        return hook
+
+    blocks = _get_blocks(model)
+    hooks = [m.register_forward_hook(grab(layer)) for layer, m in _site_modules(model, layers, site).items()]
+    hooks.append(blocks[target_layer].register_forward_hook(lambda _m, _i, out: found.__setitem__("T", out[0] if isinstance(out, tuple) else out)))
+    try:
+        with torch.enable_grad():
+            model(**encoded)
+            target = found["T"]
+            grads = torch.autograd.grad(target, [found[layer] for layer in layers],
+                                        grad_outputs=cotangent.to(target)[None, None, :] * valid[..., None])
+    finally:
+        for h in hooks:
+            h.remove()
+    counts = valid.sum(1).float()
+    out = {}
+    for layer, g in zip(layers, grads, strict=True):
+        g = g.float().flatten(2)  # [b s F]
+        out[layer] = einsum(g, valid.float(), "b s f, b s -> b f") / counts[:, None]
+    return out
+
+
+def _class_mean_site_vjp(model, tok, prompts, layers, site, target, cotangent, batch_size, max_length, skip_first):
+    totals = {}
+    for start in range(0, len(prompts), batch_size):
+        grads = _site_gradients(model, tok, prompts[start:start + batch_size], layers, site, target, cotangent, skip_first, max_length)
+        for layer, g in grads.items():
+            totals[layer] = totals.get(layer, 0.0) + g.sum(0)
+    return {layer: t / len(prompts) for layer, t in totals.items()}
+
+
+def _install_add(model, cfg, stacked, site):
+    """x ← x + C·x̂ at every position; x̂ is stored flat [1, F] and reshaped to the module output's trailing dims."""
+    def hook(_m, _i, out, x):
+        return out + cfg.coeff * x.to(out).view(out.shape[2:])
+    return [m.register_forward_hook(lambda _m, _i, out, x=stacked[layer]["x"].sum(0): hook(_m, _i, out, x))
+            for layer, m in _site_modules(model, stacked, site).items()]
+
+
+def _pack(directions):
+    return {layer: {"shared": {}, "stacked": {"x": d.flatten().unsqueeze(0)}} for layer, d in directions.items()}
+
+
+def _layers(model, cfg):
+    return tuple(range(len(_get_blocks(model)))) if cfg.layers is None else tuple(cfg.layers)
+
+
+def _mean_diff_site(site):
+    def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+        layers = _layers(model, cfg)
+        pos = _last_token_mean(model, tok, pos_prompts, layers, site, batch_size, max_length)
+        neg = _last_token_mean(model, tok, neg_prompts, layers, site, batch_size, max_length)
+        return _pack({layer: _unit_direction(pos[layer] - neg[layer]) for layer in layers})
+    return extract
+
+
+def _vjp_site(site):
+    def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+        model.requires_grad_(False)
+        count = len(_get_blocks(model))
+        target = count - 3 if cfg.target_layer is None else cfg.target_layer
+        layers = tuple(layer for layer in _layers(model, cfg) if layer < target)
+        c = _target_mean(model, tok, pos_prompts, target, batch_size, max_length) - _target_mean(model, tok, neg_prompts, target, batch_size, max_length)
+        pos = _class_mean_site_vjp(model, tok, pos_prompts, layers, site, target, c, batch_size, max_length, cfg.skip_first)
+        neg = _class_mean_site_vjp(model, tok, neg_prompts, layers, site, target, c, batch_size, max_length, cfg.skip_first)
+        return _pack({layer: _unit_direction(pos[layer] - neg[layer]) for layer in layers})
+    return extract
+
+
+def _method(name, site, extract):
+    cls = type(name, (), {
+        "name": name, "extract_from_prompts": True, "cache_intervention": True,  # own hooks via install()
+        "extract": staticmethod(extract),
+        "install": staticmethod(lambda model, cfg, stacked: _install_add(model, cfg, stacked, site)),
+        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+    })
+    return register(cls)
+
+
+@register_config
+@dataclass
+class KeySteerC(SteeringConfig):
+    method: str = "key_steer"
+
+
+@register_config
+@dataclass
+class ValueSteerC(SteeringConfig):
+    method: str = "value_steer"
+
+
+@register_config
+@dataclass
+class QVjpC(SteeringConfig):
+    method: str = "q_vjp"
+    target_layer: int | None = None
+    skip_first: int = 16
+
+
+@register_config
+@dataclass
+class KVjpC(SteeringConfig):
+    method: str = "k_vjp"
+    target_layer: int | None = None
+    skip_first: int = 16
+
+
+KeySteer = _method("key_steer", "k", _mean_diff_site("k"))
+ValueSteer = _method("value_steer", "v", _mean_diff_site("v"))
+QVjp = _method("q_vjp", "q", _vjp_site("q"))
+KVjp = _method("k_vjp", "k", _vjp_site("k"))
+
+
+# --- the two pathways together -------------------------------------------------------------------------------------
+# r*_L = mean(h⁺_L[last]) − mean(h⁻_L[last]) at block L's output (what mean_diff adds).
+#
+# q_retrieve ("the Q that retrieves r*"): per layer, the query shift whose attention output writes most along r*_L,
+#     q*_L = mean_{x∈pos∪neg} ∇_δ Σ_{t∈V(x)} ⟨r̂*_L, o_proj_L(attn(q + δ, k, v))_t⟩
+#     local to the layer: each block's input is detached, so δ_L reaches only its own o_proj.
+# qr_sum: mean_diff on the residual (20-80% depth) and query_steer on the attention layers, one coefficient:
+#     h_L ← h_L + C·r_scale·r̂*_L,   q_L ← q_L + C·q̂*_L        (r_scale ≈ C0_mean_diff / C0_query_steer on Qwen3-4B)
+
+
+@torch.no_grad()
+def _last_token_residual(model, tok, prompts, layers, batch_size, max_length) -> dict[int, torch.Tensor]:
+    blocks, sums, grabbed = _get_blocks(model), {layer: 0.0 for layer in layers}, {}
+    hooks = [blocks[layer].register_forward_hook(lambda _m, _i, out, layer=layer: grabbed.__setitem__(layer, out[0] if isinstance(out, tuple) else out))
+             for layer in layers]
+    try:
+        for start in range(0, len(prompts), batch_size):
+            batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
+            model(**batch)
+            last = batch["attention_mask"].sum(1) - 1
+            rows = torch.arange(last.shape[0], device=last.device)
+            for layer in layers:
+                sums[layer] = sums[layer] + grabbed[layer][rows, last].float().sum(0)
+    finally:
+        for h in hooks:
+            h.remove()
+    return {layer: s / len(prompts) for layer, s in sums.items()}
+
+
+def _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length):
+    pos = _last_token_residual(model, tok, pos_prompts, layers, batch_size, max_length)
+    neg = _last_token_residual(model, tok, neg_prompts, layers, batch_size, max_length)
+    return {layer: _unit_direction(pos[layer] - neg[layer]) for layer in layers}
+
+
+def _retrieve_gradients(model, tok, prompts, layers, r_hat, skip_first, max_length):
+    encoded = _encode(model, tok, prompts, max_length)
+    valid = _valid_mask(encoded["attention_mask"], skip_first)
+    assert valid.sum(1).min() > 0
+    blocks, found, hooks = _get_blocks(model), {}, []
+    B, H, d = len(prompts), blocks[layers[0]].self_attn.config.num_attention_heads, blocks[layers[0]].self_attn.head_dim
+    δ = {layer: torch.zeros(B, 1, H, d, device=valid.device, requires_grad=True) for layer in layers}
+    for i, block in enumerate(blocks):  # cut the residual path between layers, so each δ_L reaches only o_proj_L
+        hooks.append(block.register_forward_pre_hook(lambda _m, args, kwargs: ((args[0].detach(), *args[1:]), kwargs), with_kwargs=True))
+    for layer in layers:
+        attn = blocks[layer].self_attn
+        hooks.append(attn.q_norm.register_forward_hook(lambda _m, _i, out, layer=layer: out + δ[layer].to(out)))
+        hooks.append(attn.o_proj.register_forward_hook(lambda _m, _i, out, layer=layer: found.__setitem__(layer, out)))
+    try:
+        with torch.enable_grad():
+            model(**encoded)
+            objective = sum(einsum(found[layer].float(), r_hat[layer].to(found[layer].device), valid.float(), "b s D, D, b s -> ")
+                            for layer in layers)
+            grads = torch.autograd.grad(objective, [δ[layer] for layer in layers])
+    finally:
+        for h in hooks:
+            h.remove()
+    return {layer: g[:, 0].sum(0) / valid.sum(1).float().mean() for layer, g in zip(layers, grads, strict=True)}  # [H, d]
+
+
+def _q_retrieve_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    model.requires_grad_(False)
+    layers = _layers(model, cfg)
+    r_hat = _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
+    prompts, totals = pos_prompts + neg_prompts, {}
+    for start in range(0, len(prompts), batch_size):
+        for layer, g in _retrieve_gradients(model, tok, prompts[start:start + batch_size], layers, r_hat, cfg.skip_first, max_length).items():
+            totals[layer] = totals.get(layer, 0.0) + g
+    return _pack({layer: _unit_direction(t) for layer, t in totals.items()})
+
+
+def _default_resid_layers(n):  # walk.py resolve_layers default: 20-80% depth
+    return tuple(range(max(2, int(n * 0.2)), min(n - 2, int(n * 0.8))))
+
+
+def _qr_sum_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    layers = _layers(model, cfg)
+    r_layers = _default_resid_layers(len(_get_blocks(model)))
+    q = _mean_diff_site("q")(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    r = _residual_star(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
+    out = {layer: {"shared": {}, "stacked": {}} for layer in sorted(set(layers) | set(r_layers))}
+    for layer in layers:
+        out[layer]["stacked"]["x"] = q[layer]["stacked"]["x"]
+    for layer in r_layers:
+        out[layer]["stacked"]["r"] = r[layer].unsqueeze(0)
+    return out
+
+
+def _qr_sum_install(model, cfg, stacked):
+    blocks, hooks = _get_blocks(model), []
+    for layer, s in stacked.items():
+        if "x" in s:
+            hooks += _install_add(model, cfg, {layer: {"x": s["x"]}}, "q")
+        if "r" in s:
+            def resid(_m, _i, out, r=s["r"].sum(0)):
+                h = out[0] if isinstance(out, tuple) else out
+                h = h + cfg.coeff * cfg.r_scale * r.to(h)
+                return (h, *out[1:]) if isinstance(out, tuple) else h
+            hooks.append(blocks[layer].register_forward_hook(resid))
+    return hooks
+
+
+@register_config
+@dataclass
+class QRetrieveC(SteeringConfig):
+    method: str = "q_retrieve"
+    skip_first: int = 16
+
+
+@register_config
+@dataclass
+class QRSumC(SteeringConfig):
+    method: str = "qr_sum"
+    r_scale: float = 0.1
+
+
+QRetrieve = _method("q_retrieve", "q", _q_retrieve_extract)
+QRSum = register(type("qr_sum", (), {
+    "name": "qr_sum", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_qr_sum_extract), "install": staticmethod(_qr_sum_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))

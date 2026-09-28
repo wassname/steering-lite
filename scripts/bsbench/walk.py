@@ -120,7 +120,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
         return tuple(int(layer) for layer in value.split(","))
     n_layers = len(model.model.layers)
     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
-    if method in ("kv_cache_gram", "vjp_cache", "query_steer"):
+    if method in ("kv_cache_gram", "vjp_cache", "query_steer", "key_steer", "value_steer", "q_vjp", "k_vjp", "q_retrieve", "qr_sum"):
         # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
         layers = tuple(layer for layer in layers if types[layer] == "full_attention")
@@ -140,7 +140,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
         "SHOULD: POS and NEG share the suffix and differ only in persona. ELSE extraction is invalid.\n"
         "=== extraction pair 0 ===\nPOS:\n{}\nNEG:\n{}\n=== end pair ===", positive[0], negative[0],
     )
-    extra = {"target_layer": args.target_layer} if args.method in ("vjp_delta", "vjp_cache") else {}
+    extra = {"target_layer": args.target_layer} if args.method in ("vjp_delta", "vjp_cache", "q_vjp", "k_vjp") else {}
     config = CONFIGS[args.method](layers=layers, dtype=getattr(torch, args.dtype), seed=args.seed, **extra)
     started = time.monotonic()
     vector = Vector.train(
