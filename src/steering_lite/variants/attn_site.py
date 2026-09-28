@@ -237,15 +237,23 @@ def _retrieve_gradients(model, tok, prompts, layers, r_hat, skip_first, max_leng
     return {layer: g[:, 0].sum(0) / valid.sum(1).float().mean() for layer, g in zip(layers, grads, strict=True)}  # [H, d]
 
 
-def _q_retrieve_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
-    model.requires_grad_(False)
-    layers = _layers(model, cfg)
-    r_hat = _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
-    prompts, totals = pos_prompts + neg_prompts, {}
+def _retrieve_sum(model, tok, prompts, layers, r_hat, cfg, batch_size, max_length):
+    totals = {}
     for start in range(0, len(prompts), batch_size):
         for layer, g in _retrieve_gradients(model, tok, prompts[start:start + batch_size], layers, r_hat, cfg.skip_first, max_length).items():
             totals[layer] = totals.get(layer, 0.0) + g
-    return _pack({layer: _unit_direction(t) for layer, t in totals.items()})
+    return totals
+
+
+def _q_retrieve_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    """estimator "mean": sum of g over pos ∪ neg;  "delta": Σ_pos g − Σ_neg g (vjp_delta style)"""
+    model.requires_grad_(False)
+    layers = _layers(model, cfg)
+    r_hat = _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
+    gp = _retrieve_sum(model, tok, pos_prompts, layers, r_hat, cfg, batch_size, max_length)
+    gn = _retrieve_sum(model, tok, neg_prompts, layers, r_hat, cfg, batch_size, max_length)
+    sign = {"mean": 1.0, "delta": -1.0}[cfg.estimator]
+    return _pack({layer: _unit_direction(gp[layer] + sign * gn[layer]) for layer in layers})
 
 
 def _default_resid_layers(n):  # walk.py resolve_layers default: 20-80% depth
@@ -255,7 +263,8 @@ def _default_resid_layers(n):  # walk.py resolve_layers default: 20-80% depth
 def _qr_sum_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
     layers = _layers(model, cfg)
     r_layers = _default_resid_layers(len(_get_blocks(model)))
-    q = _mean_diff_site("q")(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    q_extract = {"dom": _mean_diff_site("q"), "retrieve": _q_retrieve_extract}[cfg.q_source]
+    q = q_extract(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
     r = _residual_star(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
     out = {layer: {"shared": {}, "stacked": {}} for layer in sorted(set(layers) | set(r_layers))}
     for layer in layers:
@@ -284,6 +293,14 @@ def _qr_sum_install(model, cfg, stacked):
 class QRetrieveC(SteeringConfig):
     method: str = "q_retrieve"
     skip_first: int = 16
+    estimator: str = "mean"
+
+
+@register_config
+@dataclass
+class QRetrieveDeltaC(QRetrieveC):
+    method: str = "q_retrieve_delta"
+    estimator: str = "delta"
 
 
 @register_config
@@ -291,11 +308,24 @@ class QRetrieveC(SteeringConfig):
 class QRSumC(SteeringConfig):
     method: str = "qr_sum"
     r_scale: float = 0.1
+    q_source: str = "dom"
+    skip_first: int = 16
+    estimator: str = "mean"
+
+
+@register_config
+@dataclass
+class QRetrSumC(QRSumC):
+    method: str = "qretr_sum"
+    r_scale: float = 1.5  # C0 mean_diff 3.01 / C0 q_retrieve 1.96 on Qwen3-4B dev
+    q_source: str = "retrieve"
 
 
 QRetrieve = _method("q_retrieve", "q", _q_retrieve_extract)
-QRSum = register(type("qr_sum", (), {
-    "name": "qr_sum", "extract_from_prompts": True, "cache_intervention": True,
-    "extract": staticmethod(_qr_sum_extract), "install": staticmethod(_qr_sum_install),
-    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
-}))
+QRetrieveDelta = _method("q_retrieve_delta", "q", _q_retrieve_extract)
+for _name in ("qr_sum", "qretr_sum"):
+    register(type(_name, (), {
+        "name": _name, "extract_from_prompts": True, "cache_intervention": True,
+        "extract": staticmethod(_qr_sum_extract), "install": staticmethod(_qr_sum_install),
+        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+    }))

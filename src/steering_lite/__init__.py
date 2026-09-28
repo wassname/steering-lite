@@ -31,7 +31,7 @@ from .variants.kv_cache_gram import KVCacheGramC
 from .variants.vjp_delta import VjpDeltaC
 from .variants.vjp_cache import VjpCacheC
 from .variants.query_steer import QuerySteerC
-from .variants.attn_site import KeySteerC, ValueSteerC, QVjpC, KVjpC, QRetrieveC, QRSumC
+from .variants.attn_site import KeySteerC, ValueSteerC, QVjpC, KVjpC, QRetrieveC, QRSumC, QRetrieveDeltaC, QRetrSumC
 
 __all__ = [
     "SteeringConfig",
@@ -61,6 +61,8 @@ __all__ = [
     "KVjpC",
     "QRetrieveC",
     "QRSumC",
+    "QRetrieveDeltaC",
+    "QRetrSumC",
     "record_activations",
     "train",
     "attach",
