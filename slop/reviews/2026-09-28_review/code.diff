@@ -1,0 +1,408 @@
+diff --git a/scripts/bsbench/judge.py b/scripts/bsbench/judge.py
+index 5dd1129..53d6f0c 100644
+--- a/scripts/bsbench/judge.py
++++ b/scripts/bsbench/judge.py
+@@ -121,7 +121,8 @@ def cached() -> dict[str, dict]:
+     if not CACHE.exists():
+         return {}
+     with CACHE.open() as file:  # iterate lines: str.splitlines also splits on U+2028 inside answers
+-        return {record["key"]: record["answers"] for record in map(json.loads, file)}
++        # drop Jev's per-answer "legend" (the rubric text echoed back, ~60% of the file): never read, and it doubles RAM
++        return {record["key"]: {q: {k: v for k, v in a.items() if k != "legend"} for q, a in record["answers"].items()} for record in map(json.loads, file)}
+ 
+ 
+ def aware_requests(rows: list[dict]) -> dict[str, dict]:
+diff --git a/scripts/bsbench/results.py b/scripts/bsbench/results.py
+index 1b61400..08be041 100644
+--- a/scripts/bsbench/results.py
++++ b/scripts/bsbench/results.py
+@@ -31,7 +31,8 @@ N_BOOT = 1000
+ PMAX = len(PREMISE) - 1  # top premise level (8)
+ COLORS = {
+     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
+-    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928",
++    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
++    "query_steer": "#f0e442",
+ }
+ # the other steering-lite methods: Tableau-20 colours not used above
+ for _method, _color in zip(
+@@ -552,6 +553,11 @@ def main() -> None:
+     out.mkdir(parents=True, exist_ok=True)
+     exclude = {m for m in args.exclude.split(",") if m}
+     points = build_points(model_dir, args.cohort, exclude)
++    # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
++    spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
++    for method in sorted({point["method"] for point in points} - set(COLORS)):
++        COLORS[method] = spare.pop(0)
++        LABELS[method] = method
+     scenarios = list(load_cohort())[COHORTS[args.cohort]]
+     rows = summary(points, scenarios)
+     cohort_rows = load_cohort()
+@@ -560,6 +566,7 @@ def main() -> None:
+     shown = [row["method"] for row in rows if row["method"] in methods and not math.isnan(row["score"])][:TOP_N_PLOT]
+     site = {
+         "shown": shown,
++        "colors": COLORS,  # the page's only colour source
+         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
+         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
+         "zone": random_zone(points),
+diff --git a/scripts/bsbench/run_modal.py b/scripts/bsbench/run_modal.py
+index 10e67e7..d3a7168 100644
+--- a/scripts/bsbench/run_modal.py
++++ b/scripts/bsbench/run_modal.py
+@@ -64,7 +64,14 @@ def cached_on_volume(argv: list[str]) -> bool:
+     args = walk.parse_args(argv)
+     if args.smoke or args.probe:
+         return False
+-    path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
++    if args.profile or args.vjp_check or args.vjp_split:
++        name = f"profile/persona_s{args.seed}.json" if args.profile else f"{'vjp_split' if args.vjp_split else 'vjp_check'}/{args.name}_s{args.seed}.json"
++        try:
++            b"".join(cache.read_file(str(walk.model_dir(args.model).relative_to(walk.OUT.parent) / name)))
++            return True
++        except FileNotFoundError:
++            return False
++    path = walk.model_dir(args.model).relative_to(walk.OUT.parent) / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
+     try:
+         certificate = json.loads(b"".join(cache.read_file(str(path))))
+     except FileNotFoundError:
+diff --git a/scripts/bsbench/walk.py b/scripts/bsbench/walk.py
+index 41dd2d8..a252f61 100644
+--- a/scripts/bsbench/walk.py
++++ b/scripts/bsbench/walk.py
+@@ -37,6 +37,7 @@ from steering_lite import Vector
+ from steering_lite.config import _CONFIG_REGISTRY
+ from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
+ from steering_lite.data import make_persona_pairs
++from steering_lite.extract import record_activations
+ from transformers import AutoModelForCausalLM, AutoTokenizer
+ from transformers.utils.import_utils import is_flash_linear_attention_available
+ 
+@@ -93,7 +94,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+     parser.add_argument("--max-rungs", type=int, default=24)
+     parser.add_argument("--probe", action="store_true", help="only run the persona sign probe on the cached vector (see sign_probe)")
+     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
+-    return parser.parse_args(argv)
++    parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json")
++    parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
++    parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
++    parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
++    parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
++    args = parser.parse_args(argv)
++    args.name = args.method + (f"-{args.tag}" if args.tag else "")
++    return args
+ 
+ 
+ def model_dir(model: str) -> Path:
+@@ -121,12 +129,12 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
+ 
+ 
+ def extract_vector(args, model, tokenizer, layers) -> Vector:
+-    path = model_dir(args.model) / "vectors" / f"{args.method}_s{args.seed}.safetensors"
++    path = model_dir(args.model) / "vectors" / f"{args.name}_s{args.seed}.safetensors"
+     if path.exists():
+         logger.info("cache hit vector {}", path)
+         return Vector.load(str(path))
+     positive, negative = make_persona_pairs(
+-        tokenizer, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS,
++        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
+         template=PERSONA_TEMPLATE, seed=args.seed,
+     )
+     logger.info(
+@@ -144,7 +152,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
+     path.parent.mkdir(parents=True, exist_ok=True)
+     vector.save(str(path))
+     path.with_suffix(".json").write_text(json.dumps({
+-        "method": args.method, "seed": args.seed, "layers": layers, "n_pairs": len(positive),
++        "method": args.name, "seed": args.seed, "layers": layers, "n_pairs": len(positive),
+         "max_length": args.max_length, "extraction_seconds": time.monotonic() - started,
+         "config": vector.cfg.to_dict(),
+     }, indent=2) + "\n")
+@@ -256,9 +264,115 @@ def calibration_c0(args, model, tokenizer, vector: Vector, calib_path: Path) ->
+     return c0
+ 
+ 
++def profile(args, model, tokenizer, path: Path) -> None:
++    """Where the persona contrast lives, per layer, on the extraction pairs (no steering).
++
++    contrast = mean(h_pos) - mean(h_neg) at the last token. ratio = |contrast| / mean |h|: how large the
++    contrast is relative to the residual at that depth. cos_final = cos(contrast_l, contrast at the last layer).
++    A ratio that peaks and then falls toward the output marks where the model suppresses the persona contrast."""
++    positive, negative = make_persona_pairs(
++        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
++    )
++    layers = tuple(range(len(model.model.layers)))
++    pos = record_activations(model, tokenizer, positive, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
++    neg = record_activations(model, tokenizer, negative, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
++    contrast = {l: pos[l].float().mean(0) - neg[l].float().mean(0) for l in layers}
++    rows = []
++    for l in layers:
++        h = torch.cat([pos[l], neg[l]]).float().norm(dim=-1).mean()
++        rows.append({"layer": l, "depth": l / (len(layers) - 1), "ratio": float(contrast[l].norm() / h),
++                     "cos_final": float(torch.nn.functional.cosine_similarity(contrast[l], contrast[layers[-1]], dim=0))})
++    peak = max(rows, key=lambda row: row["ratio"])
++    logger.info("PROFILE model={} layers={} n_pairs={} peak ratio {:.3f} at layer {} (depth {:.2f})\n{}", args.model, len(layers), len(positive),
++                peak["ratio"], peak["layer"], peak["depth"], "\n".join(f"L{r['layer']:>2} d={r['depth']:.2f} ratio={r['ratio']:.3f} cos_final={r['cos_final']:+.2f}" for r in rows))
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps({"model": args.model, "n_pairs": len(positive), "rows": rows}, indent=1) + "\n")
++
++
++def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict], path: Path) -> None:
++    """Does steering move the target-layer activation along the persona contrast, as VJP assumes?
++
++    c = mean(h_pos) - mean(h_neg) at the target layer, last token, on 32 held-out persona pairs (the VJP cotangent).
++    For C = +-{1/8, 1/4, 1/2, 1} x C0, shift = mean over prompts of h_target(steered) - h_target(bare), on the
++    negative persona prompts and on 32 benchmark prompts.
++      gain = shift . c_hat / |c|: fraction of the pos-neg gap moved along c (sign should follow the sign of C)
++      cos  = cos(shift, c): how much of the movement is along c
++      move = |shift| / |c|: total movement in units of the gap
++    First-order VJP predicts gain linear in C, antisymmetric in sign, and cos well above a random vector's."""
++    from steering_lite.variants.vjp_delta import _activations, _encode
++    target = getattr(vector.cfg, "target_layer", None) or args.target_layer or len(model.model.layers) - 3
++    positive, negative = make_persona_pairs(
++        tokenizer, n_pairs=32, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
++    )
++    base = {"persona_neg": negative, "bench": generation_inputs(tokenizer, rows)[:32]}
++
++    @torch.inference_mode()
++    def last(prompts: list[str]) -> torch.Tensor:  # [n, d] target-layer residual at the last real token
++        out = []
++        for start in range(0, len(prompts), args.extract_batch_size):
++            encoded = _encode(model, tokenizer, prompts[start : start + args.extract_batch_size], args.max_length)
++            with _activations(model, (target,)) as found:
++                model(**encoded)
++            index = encoded["attention_mask"].sum(1) - 1
++            out.append(found[target][torch.arange(len(index), device=index.device), index].float())
++        return torch.cat(out)
++
++    c = last(positive).mean(0) - last(negative).mean(0)
++    c_hat = c / c.norm()
++    bare = {name: last(prompts) for name, prompts in base.items()}
++    results = []
++    for fraction in (0.125, 0.25, 0.5, 1.0):
++        for sign in (1.0, -1.0):
++            with vector(model, C=sign * fraction * c0):
++                for name, prompts in base.items():
++                    shift = (last(prompts) - bare[name]).mean(0)
++                    results.append({"base": name, "C_over_C0": sign * fraction, "C": sign * fraction * c0,
++                                    "gain": float(shift @ c_hat / c.norm()), "cos": float(torch.nn.functional.cosine_similarity(shift, c, dim=0)),
++                                    "move": float(shift.norm() / c.norm())})
++    logger.info("VJP_CHECK model={} method={} target=L{} c0={:.4g} |c|={:.3g}\n{}", args.model, args.name, target, c0, float(c.norm()),
++                "\n".join(f"{r['base']:11s} C/C0={r['C_over_C0']:+.3f} gain={r['gain']:+.3f} cos={r['cos']:+.3f} move={r['move']:.3f}" for r in results))
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps({"model": args.model, "method": args.name, "target": target, "c0": c0, "c_norm": float(c.norm()), "rows": results}, indent=1) + "\n")
++
++
++def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> None:
++    """Is the vjp_delta vector signal, or noise left after a cancellation?
++
++    v = mean_pos(J.T c) - mean_neg(J.T c). Both class means share the direct residual path, so v can be a small
++    difference of two large bf16 numbers.
++      cancel    = |pos - neg| / |pos|: size of the difference relative to what cancels (small -> rounding noise likely)
++      split_cos = cos(v from pairs[:n/2], v from pairs[n/2:]): a stable direction gives high cos, noise gives ~0
++    The cotangent c uses all pairs, as in the real extraction."""
++    from steering_lite.variants.vjp_delta import _class_mean_vjp, _target_mean
++
++    positive, negative = make_persona_pairs(
++        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
++    )
++    model.requires_grad_(False)
++    target = len(model.model.layers) - 3 if args.target_layer is None else args.target_layer
++    kw = dict(batch_size=args.extract_batch_size, max_length=args.max_length)
++    c = _target_mean(model, tokenizer, positive, target, **kw) - _target_mean(model, tokenizer, negative, target, **kw)
++    half = len(positive) // 2
++    parts = {}
++    for name, sl in (("a", slice(0, half)), ("b", slice(half, 2 * half))):
++        for cls, prompts in (("pos", positive), ("neg", negative)):
++            parts[name, cls] = _class_mean_vjp(model, tokenizer, prompts[sl], layers, target, c, skip_first=16, **kw)
++    cos = torch.nn.functional.cosine_similarity
++    rows = []
++    for l in layers:
++        va, vb = parts["a", "pos"][l] - parts["a", "neg"][l], parts["b", "pos"][l] - parts["b", "neg"][l]
++        rows.append({"layer": l, "split_cos": float(cos(va, vb, dim=0)), "cancel": float(va.norm() / parts["a", "pos"][l].norm()),
++                     "cos_pos_c": float(cos(parts["a", "pos"][l], c, dim=0))})
++    logger.info("VJP_SPLIT model={} target={} n_pairs={} half={}\nSHOULD: split_cos well above 0 (4B vjp_delta works); ELSE the vector is noise.\n{}",
++                args.model, target, len(positive), half,
++                "\n".join(f"L{r['layer']:>2} split_cos={r['split_cos']:+.3f} cancel={r['cancel']:.4f} cos(pos,c)={r['cos_pos_c']:+.3f}" for r in rows))
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps({"model": args.model, "target": target, "n_pairs": len(positive), "dtype": args.dtype, "rows": rows}, indent=1) + "\n")
++
++
+ def rung_kl(args, model, tokenizer, vector: Vector, coefficient: float, root: Path) -> dict[str, float]:
+     """RMS KL at +/-C on the calibration prompts: cohort-independent, so reuse any walk of this vector."""
+-    for path in (root / "walks").glob(f"{args.method}_s{args.seed}_*.json"):
++    for path in (root / "walks").glob(f"{args.name}_s{args.seed}_*.json"):
+         for rung in json.loads(path.read_text())["rungs"]:
+             if rung.get("coefficient") is not None and math.isclose(rung["coefficient"], coefficient, rel_tol=1e-9) and "kl_rms" in rung:
+                 return rung["kl_rms"]
+@@ -284,7 +398,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
+     if path.exists():
+         return json.loads(path.read_text())
+     positive, negative = make_persona_pairs(
+-        tokenizer, n_pairs=16, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
++        tokenizer, n_pairs=16, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
+     )
+     kls = {"base": [], "+C": [], "-C": []}
+     moves = {"+C": [], "-C": []}  # sum_v (p_steered - p_neg) (log p_pos - log p_neg): mass moved toward tokens the positive persona prefers
+@@ -330,8 +444,8 @@ def walk_done(certificate: dict, args) -> bool:
+ def walk(args) -> None:
+     rows = read_cohort(args.cohort)
+     root = model_dir(args.model)
+-    certificate_path = root / "walks" / f"{args.method}_s{args.seed}_{args.cohort}.json"
+-    if certificate_path.exists() and not args.smoke and not args.probe:
++    certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
++    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile and not args.vjp_check and not args.vjp_split:
+         done = json.loads(certificate_path.read_text())
+         if walk_done(done, args):
+             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
+@@ -345,6 +459,9 @@ def walk(args) -> None:
+     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype, attn_implementation="sdpa").to(args.device).eval()
+     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
+     timing["load_s"] = time.monotonic() - timing["start"]
++    if args.profile:
++        profile(args, model, tokenizer, root / "profile" / f"persona_s{args.seed}.json")
++        return
+     prompts = generation_inputs(tokenizer, rows)
+     logger.info(
+         "SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. "
+@@ -357,13 +474,13 @@ def walk(args) -> None:
+     if args.method in PROMPT_METHODS:
+         rung = {"grid_index": None, "coefficient": 1.0}
+         for side, instruction in PROMPT_METHODS[args.method].items():
+-            path = answer_path(args.model, args.method, args.seed, side, 1.0)
++            path = answer_path(args.model, args.name, args.seed, side, 1.0)
+             answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null)
+             side_stats, side_reasons = health(tokenizer, answers)
+             rung[side] = {"breakdown_reasons": side_reasons, "post_boundary": False, "stats": side_stats, "answers": str(path.relative_to(root))}
+         certificate_path.parent.mkdir(parents=True, exist_ok=True)
+         certificate_path.write_text(json.dumps({
+-            "schema": "bsbench_walk_v3", "status": "COMPLETE", "method": args.method, "seed": args.seed,
++            "schema": "bsbench_walk_v3", "status": "COMPLETE", "method": args.name, "seed": args.seed,
+             "cohort": args.cohort, "model": args.model, "gen": GEN, "rungs": [rung],
+         }, indent=2) + "\n")
+         logger.info("WALK_COMPLETE {} certificate={}", args.method, certificate_path)
+@@ -371,10 +488,16 @@ def walk(args) -> None:
+ 
+     layers = resolve_layers(model, args.method, args.layers)
+     logger.info("resolved method={} seed={} cohort={} n={} layers={} target={}", args.method, args.seed, args.cohort, len(rows), layers, args.target_layer)
++    if args.vjp_split:
++        vjp_split(args, model, tokenizer, layers, root / "vjp_split" / f"{args.name}_s{args.seed}.json")
++        return
+     vector = extract_vector(args, model, tokenizer, layers)
+-    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.method}_s{args.seed}.json")
++    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
++    if args.vjp_check:
++        vjp_check(args, model, tokenizer, vector, c0, rows, root / "vjp_check" / f"{args.name}_s{args.seed}.json")
++        return
+     if args.probe:
+-        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.method}_s{args.seed}.json")
++        sign_probe(args, model, tokenizer, vector, c0 / 2, root / "sign_v2" / f"{args.name}_s{args.seed}.json")
+         return
+     # start on the stride lattice of the reference grid, so every seed and method shares C values
+     start = min(range(len(GRID)), key=lambda index: abs(math.log(GRID[index]) - math.log(c0 / args.start_below)))
+@@ -400,7 +523,7 @@ def walk(args) -> None:
+         coefficient = GRID[grid_index]
+         rung = {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": rung_kl(args, model, tokenizer, vector, coefficient, root)}
+         for side, sign in (("+C", 1.0), ("-C", -1.0)):
+-            path = answer_path(args.model, args.method, args.seed, side, coefficient)
++            path = answer_path(args.model, args.name, args.seed, side, coefficient)
+             answers = cached_answers(
+                 model, tokenizer, rows, path, prompts, args.batch_size,
+                 lambda sign=sign: vector(model, C=sign * coefficient),
+@@ -426,7 +549,7 @@ def walk(args) -> None:
+         certificate_path.parent.mkdir(parents=True, exist_ok=True)
+         certificate_path.write_text(json.dumps({
+             "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
+-            "method": args.method, "seed": args.seed, "cohort": args.cohort, "model": args.model,
++            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
+             "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
+             "state": state, "rungs": rungs,
+             "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
+diff --git a/scripts/bsbench/web/src/main.jsx b/scripts/bsbench/web/src/main.jsx
+index f465653..4319528 100644
+--- a/scripts/bsbench/web/src/main.jsx
++++ b/scripts/bsbench/web/src/main.jsx
+@@ -4,13 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
+ import { createRoot } from 'react-dom/client';
+ import './style.css';
+ 
+-const COLORS = {
+-  vjp_delta: '#0072b2', mean_diff: '#d55e00', pca: '#cc79a7', vjp_cache: '#009e73',
+-  kv_cache_gram: '#e69f00', prompting: '#6a3d9a', prompting_engineered: '#b15928', random: '#999999',
+-  angular_steering: '#1f77b4', chars: '#17becf', corda_pca: '#ff7f0e', cosine_gated: '#2ca02c', directional_ablation: '#98df8a',
+-  linear_act: '#ff9896', spherical: '#d62728', sspace: '#c5b0d5', sspace_ablate: '#9467bd', sspace_damp_amp: '#8c564b',
+-  sspace_pca: '#c49c94', super_sspace: '#e377c2', topk_clusters: '#aec7e8',
+-};
+ const W = 1000, H = 560, M = { l: 70, r: 20, t: 30, b: 50 };
+ const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
+ const anchor = px => (px > W - 140 ? 'end' : px < M.l + 90 ? 'start' : 'middle');  // keep edge labels inside the plot
+@@ -45,26 +38,26 @@ function Plot({ data, visible, selected, onSelect }) {
+       {curves.filter(c => c.points.length).map(c => {
+         const end = c.points.at(-1);
+         return <g key={c.method + c.side}>
+-          <polyline points={c.path.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
++          <polyline points={c.path.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
+           {c.points.map(p => {
+             const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C);
+             const isSel = selected && full && pointId(full) === pointId(selected);
+             const isEnd = p === end;
+             return isEnd
+-              ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={COLORS[c.method]} strokeWidth="3.5"
++              ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={data.colors[c.method]} strokeWidth="3.5"
+                   className="mark end" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />
+-              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={COLORS[c.method]} fillOpacity={1} stroke={isSel ? '#000' : 'none'}
++              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={data.colors[c.method]} fillOpacity={1} stroke={isSel ? '#000' : 'none'}
+                   className="mark" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />;
+           })}
+           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
+-            return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={COLORS[c.method]} strokeWidth="2.5" className="best" />; })()}
+-          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={COLORS[c.method]}>{c.method} {c.side}</text>
++            return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
++          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>
+         </g>;
+       })}
+       {data.points.filter(p => p.method.startsWith('prompting')).map(p => <g key={pointId(p)} className="mark" onClick={() => onSelect(p)}
+         onPointerEnter={() => setHover(p)} onPointerLeave={() => setHover(null)}>
+-        <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={COLORS[p.method]} />
+-        <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor={anchor(x(p.effect))} className="label" fill={COLORS[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
++        <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={data.colors[p.method]} />
++        <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor={anchor(x(p.effect))} className="label" fill={data.colors[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
+       </g>)}
+       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
+     </svg>
+@@ -79,7 +72,7 @@ function Summary({ data }) {
+   return <table>
+     <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>on-axis ÷ room↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
+     <tbody>{data.summary.map(r => <tr key={r.method}>
+-      <td className={r.method === 'random' || r.method.startsWith('prompting') ? 'control' : ''}><span className="swatch" style={{ background: COLORS[r.method] }} />{r.method}</td>
++      <td className={r.method === 'random' || r.method.startsWith('prompting') ? 'control' : ''}><span className="swatch" style={{ background: data.colors[r.method] }} />{r.method}</td>
+       <td><strong>{fmt(r.score)}</strong></td><td>{r.ci[0] == null ? '—' : `[${fmt(r.ci[0])}, ${fmt(r.ci[1])}]`}</td>
+       <td>{fmt(r.score_room)}</td><td>{r.ci_room[0] == null ? '—' : `[${fmt(r.ci_room[0])}, ${fmt(r.ci_room[1])}]`}</td>
+       {['-C', '+C'].flatMap(side => { const b = r.best[side]; return b ? [<td key={side + 'e'}>{fmt(side === '+C' ? b.effect : -b.effect)}</td>, <td key={side + 'o'}>{b.off_axis.toFixed(2)}</td>, <td key={side + 'c'}>{b.C.toPrecision(3)}</td>] : [<td key={side + 'e'}>—</td>, <td key={side + 'o'}>—</td>, <td key={side + 'c'}>—</td>]; })}
+@@ -93,7 +86,7 @@ function Blind({ data }) {
+   return <table className="blind">
+     <thead><tr><th>method</th><th>side</th><th>dose</th><th>C</th><th>stance shift↑</th><th>P(intended)</th><th>change labels, mean probability (≥2%)</th></tr></thead>
+     <tbody>{data.blind.map(b => <tr key={b.method + b.side + b.dose}>
+-      <td><span className="swatch" style={{ background: COLORS[b.method] }} />{b.method}</td><td>{b.side}</td><td>{b.dose === 'best' ? 'Pareto-best' : 'strongest'}</td><td>{b.C.toPrecision(3)}</td>
++      <td><span className="swatch" style={{ background: data.colors[b.method] }} />{b.method}</td><td>{b.side}</td><td>{b.dose === 'best' ? 'Pareto-best' : 'strongest'}</td><td>{b.C.toPrecision(3)}</td>
+       <td>{fmt(b.shift)}</td><td>{Math.round(100 * b.intended)}%</td>
+       <td>{Object.entries(b.labels).filter(([, v]) => v >= 0.02).map(([k, v]) => `${k} ${Math.round(100 * v)}%`).join(' · ')}</td>
+     </tr>)}</tbody>
+@@ -121,7 +114,7 @@ function Explorer({ data, selected, onSelect }) {
+     <div className="answer bare"><h3>bare</h3><p>{question.bare}</p></div>
+     {rows.map(p => {
+       const q = p.questions.find(q => q.scenario === scenario);
+-      return <div key={pointId(p)} className={`answer ${selected && pointId(p) === pointId(selected) ? 'selected' : ''}`} style={{ borderLeftColor: COLORS[p.method] }}>
++      return <div key={pointId(p)} className={`answer ${selected && pointId(p) === pointId(selected) ? 'selected' : ''}`} style={{ borderLeftColor: data.colors[p.method] }}>
+         <h3>{p.method} s{p.seed} {p.side} C={p.C.toPrecision(3)} {p.admissible ? '' : <em>(not admissible)</em>}</h3>
+         {q ? <>
+           <p>{q.text}</p>
+@@ -137,7 +130,7 @@ function Chips({ data, visible, setVisible }) {
+   const methods = [...new Set(data.curves.map(c => c.method))];
+   const toggle = m => { const next = new Set(visible); next.has(m) ? next.delete(m) : next.add(m); setVisible(next); };
+   return <div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
+-    <span className="swatch" style={{ background: COLORS[m] }} />{m}</button>)}</div>;
++    <span className="swatch" style={{ background: data.colors[m] }} />{m}</button>)}</div>;
+ }
+ 
+ function App() {

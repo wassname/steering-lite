@@ -130,13 +130,20 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
 
 def extract_vector(args, model, tokenizer, layers) -> Vector:
     path = model_dir(args.model) / "vectors" / f"{args.name}_s{args.seed}.safetensors"
-    if path.exists():
-        logger.info("cache hit vector {}", path)
-        return Vector.load(str(path))
     positive, negative = make_persona_pairs(
         tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
         template=PERSONA_TEMPLATE, seed=args.seed,
     )
+    target_layer = args.target_layer if args.method in ("vjp_delta", "vjp_cache") else None
+    settings = {"layers": list(layers), "n_pairs": len(positive), "max_length": args.max_length, "target_layer": target_layer, "thinking": not args.no_think}
+    if path.exists():
+        saved = json.loads(path.with_suffix(".json").read_text())
+        saved = {"layers": saved["layers"], "n_pairs": saved["n_pairs"], "max_length": saved["max_length"],
+                 "target_layer": saved["config"].get("target_layer"), "thinking": saved.get("thinking", settings["thinking"])}  # vectors saved before 2026-09-28 lack "thinking"
+        if saved != settings:
+            raise ValueError(f"cached vector {path} was extracted with {saved}, this run asks for {settings}; use --tag for a variant")
+        logger.info("cache hit vector {} settings={}", path, settings)
+        return Vector.load(str(path))
     logger.info(
         "SHOULD: POS and NEG share the suffix and differ only in persona. ELSE extraction is invalid.\n"
         "=== extraction pair 0 ===\nPOS:\n{}\nNEG:\n{}\n=== end pair ===", positive[0], negative[0],
@@ -152,7 +159,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
     path.parent.mkdir(parents=True, exist_ok=True)
     vector.save(str(path))
     path.with_suffix(".json").write_text(json.dumps({
-        "method": args.name, "seed": args.seed, "layers": layers, "n_pairs": len(positive),
+        "method": args.name, "seed": args.seed, "layers": layers, "n_pairs": len(positive), "thinking": not args.no_think,
         "max_length": args.max_length, "extraction_seconds": time.monotonic() - started,
         "config": vector.cfg.to_dict(),
     }, indent=2) + "\n")
