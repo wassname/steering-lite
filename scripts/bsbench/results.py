@@ -556,8 +556,8 @@ def main() -> None:
     # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
     spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f",
                          "#1f77b4", "#d62728", "#9467bd", "#8c564b", "#17becf", "#bcbd22", "#7f7f7f") if c not in COLORS.values()]
-    for method in sorted({point["method"] for point in points} - set(COLORS)):
-        COLORS[method] = spare.pop(0)
+    for i, method in enumerate(sorted({point["method"] for point in points} - set(COLORS))):
+        COLORS[method] = spare[i % len(spare)]
         LABELS[method] = method
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
     rows = summary(points, scenarios)
