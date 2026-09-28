@@ -397,3 +397,44 @@ for _name, _extract in (("sink_write", _sink_write_extract), ("sink_value", _mea
         "extract": staticmethod(_extract), "install": staticmethod(_install_sink),
         "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
     }))
+
+
+# sinkr_sum: sink_value (attention sink's value) + mean_diff (residual, 20-80% depth), one coefficient:
+#     v_L[first] += C·v̂*_L,   h_L += C·r_scale·r̂*_L      (r_scale = C0 mean_diff / C0 sink_value ≈ 3.0/4.0 on Qwen3-4B dev)
+def _sinkr_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    v = _mean_diff_site("v")(model, tok, pos_prompts, neg_prompts, cfg, batch_size=batch_size, max_length=max_length)
+    r_layers = _default_resid_layers(len(_get_blocks(model)))
+    r = _residual_star(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
+    out = {layer: {"shared": {}, "stacked": {}} for layer in sorted(set(v) | set(r_layers))}
+    for layer in v:
+        out[layer]["stacked"]["x"] = v[layer]["stacked"]["x"]
+    for layer in r_layers:
+        out[layer]["stacked"]["r"] = r[layer].unsqueeze(0)
+    return out
+
+
+def _sinkr_install(model, cfg, stacked):
+    blocks = _get_blocks(model)
+    hooks = _install_sink(model, cfg, {layer: {"x": s["x"]} for layer, s in stacked.items() if "x" in s})
+    for layer, s in stacked.items():
+        if "r" in s:
+            def resid(_m, _i, out, r=s["r"].sum(0)):
+                h = out[0] if isinstance(out, tuple) else out
+                h = h + cfg.coeff * cfg.r_scale * r.to(h)
+                return (h, *out[1:]) if isinstance(out, tuple) else h
+            hooks.append(blocks[layer].register_forward_hook(resid))
+    return hooks
+
+
+@register_config
+@dataclass
+class SinkRSumC(SteeringConfig):
+    method: str = "sinkr_sum"
+    r_scale: float = 0.75
+
+
+register(type("sinkr_sum", (), {
+    "name": "sinkr_sum", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_sinkr_extract), "install": staticmethod(_sinkr_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
