@@ -33,8 +33,8 @@ rows = [json.loads(line) for line in COHORT.open()][COHORTS["dev"]]
 prompts = generation_inputs(tok, rows)
 table = []
 with torch.no_grad():
-    for b in (0.0, 4.0, 8.0):
-        for C in (-4.0, -1.0, 0.0, 1.0, 4.0):
+    for b in (0.0, 4.0):
+        for C in (-64.0, -32.0, -16.0, 0.0, 16.0, 32.0, 64.0):
             vec.cfg.bias = b
             mass, plus = [], []
             with vec(model, C=C):
