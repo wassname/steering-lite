@@ -652,10 +652,19 @@ def _q_prefix_k_install(model, cfg, stacked):
 @dataclass
 class QPrefixKC(QPrefixC):
     method: str = "q_prefix_k"
+    bias: float = 4.0  # Qwen3-4B probe: prefix gets ~0.4% of last-token attention at C = 0
 
 
-register(type("q_prefix_k", (), {
-    "name": "q_prefix_k", "extract_from_prompts": True, "cache_intervention": True,
-    "extract": staticmethod(_q_prefix_k_extract), "install": staticmethod(_q_prefix_k_install),
-    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
-}))
+@register_config
+@dataclass
+class QPrefixK0C(QPrefixC):
+    method: str = "q_prefix_k0"
+    bias: float = 0.0  # prefix visible: ~15% of last-token attention at C = 0
+
+
+for _name in ("q_prefix_k", "q_prefix_k0"):
+    register(type(_name, (), {
+        "name": _name, "extract_from_prompts": True, "cache_intervention": True,
+        "extract": staticmethod(_q_prefix_k_extract), "install": staticmethod(_q_prefix_k_install),
+        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+    }))
