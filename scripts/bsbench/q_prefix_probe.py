@@ -11,7 +11,7 @@ import json
 
 import torch
 from loguru import logger
-from steering_lite import QPrefixC, Vector
+from steering_lite import QPrefixC, QPrefixKC, Vector
 from steering_lite.data import make_persona_pairs
 from steering_lite.variants.attn_site import _ACTIVE_PREFIX
 from tabulate import tabulate
@@ -23,18 +23,20 @@ p = argparse.ArgumentParser()
 p.add_argument("--model", default="Qwen/Qwen3-4B")
 p.add_argument("--device", default="cuda")
 p.add_argument("--n-pairs", type=int, default=64)
+p.add_argument("--method", default="q_prefix", choices=("q_prefix", "q_prefix_k"))
 args = p.parse_args()
 tok = AutoTokenizer.from_pretrained(args.model)
 model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16 if args.device == "cuda" else torch.float32, device_map=args.device).eval()
 L = len(model.model.layers)
 pos, neg = make_persona_pairs(tok, n_pairs=args.n_pairs, thinking=True, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=0)
-vec = Vector.train(model, tok, pos, neg, QPrefixC(layers=tuple(range(1, L)), dtype=model.dtype), batch_size=4, max_length=384)
+cfg_cls = {"q_prefix": QPrefixC, "q_prefix_k": QPrefixKC}[args.method]
+vec = Vector.train(model, tok, pos, neg, cfg_cls(layers=tuple(range(1, L)), dtype=model.dtype), batch_size=4, max_length=384)
 rows = [json.loads(line) for line in COHORT.open()][COHORTS["dev"]]
 prompts = generation_inputs(tok, rows)
 table = []
 with torch.no_grad():
     for b in (0.0, 4.0):
-        for C in (-64.0, -32.0, -16.0, 0.0, 16.0, 32.0, 64.0):
+        for C in (-16.0, -4.0, -1.0, 0.0, 1.0, 4.0, 16.0):
             vec.cfg.bias = b
             mass, plus = [], []
             with vec(model, C=C):

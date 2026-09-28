@@ -512,6 +512,8 @@ def _prefix_attention(original):
         if P is None:
             return original(module, query, key, value, attention_mask, scaling=scaling, dropout=dropout, **kw)
         g = module.num_key_value_groups
+        if "dq" in P:  # q_prefix_k: q_t (post-RoPE) += C·(k⁺ − k⁻)/‖·‖, per KV head broadcast to its query heads
+            query = query + P["C"] * P["dq"].to(query).repeat_interleave(g, 0)[None, :, None, :]
         k = torch.cat([key, P["k"].to(key)[None].expand(key.shape[0], -1, -1, -1)], 2).repeat_interleave(g, 1)
         v = torch.cat([value, P["v"].to(value)[None].expand(value.shape[0], -1, -1, -1)], 2).repeat_interleave(g, 1)
         T, S, n = query.shape[2], key.shape[2], P["k"].shape[1]
@@ -591,5 +593,69 @@ class SinkRRandC(SinkRSumC):
 register(type("sinkr_rand", (), {
     "name": "sinkr_rand", "extract_from_prompts": True, "cache_intervention": True,
     "extract": staticmethod(_sinkr_rand_extract), "install": staticmethod(_sinkr_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
+
+
+# q_prefix_k: same cache prefix; q* now points at the + persona word's keys instead of being the query mean diff:
+#     q*_L,g = mean_{s ∈ " sycophantic"} k_s − mean_{s ∈ " abrasive"} k_s   (post-RoPE, at the tokens where the two sentences differ)
+#     q_t (post-RoPE) += C·q̂*_L          so logit(t, s) changes by C·q̂*·k_s, fixed for each prefix key s
+def _word_slices(tok):
+    a, b = (tok(x, add_special_tokens=False).input_ids for x in PERSONA_SENTENCES)
+    i = 0
+    while a[i] == b[i]:
+        i += 1
+    j = 0
+    while a[-1 - j] == b[-1 - j]:
+        j += 1
+    return (i, len(a) - j), (i, len(b) - j)
+
+
+def _q_prefix_k_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    from transformers import AutoTokenizer
+    tok = tok or AutoTokenizer.from_pretrained(model.config._name_or_path)
+    layers = tuple(range(1, len(_get_blocks(model)))) if cfg.layers is None else tuple(l for l in cfg.layers if l > 0)
+    kv, lengths = _persona_kv(model, tok, layers)
+    head = tok.apply_chat_template([{"role": "user", "content": PERSONA_SENTENCES[0]}], tokenize=False).split(PERSONA_SENTENCES[0])[0]
+    offset = len(tok(head, add_special_tokens=False).input_ids) - 1  # sentence start inside the stored prefix (sink dropped)
+    (a0, a1), (b0, b1) = _word_slices(tok)
+    out = {}
+    for layer in layers:
+        k = kv[layer][0]  # [KVH, n⁺ + n⁻, d]
+        dq = k[:, offset + a0:offset + a1].mean(1) - k[:, lengths[0] + offset + b0:lengths[0] + offset + b1].mean(1)
+        out[layer] = {"shared": {"pk": kv[layer][0], "pv": kv[layer][1], "npos": torch.tensor([lengths[0]])},
+                      "stacked": {"x": _unit_direction(dq.flatten()).unsqueeze(0)}}
+    return out
+
+
+def _q_prefix_k_install(model, cfg, stacked):
+    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+    from ..attach import _gather_split_state
+    impl = model.config._attn_implementation
+    original = ALL_ATTENTION_FUNCTIONS[impl]
+    blocks = _get_blocks(model)
+    for layer, s in stacked.items():
+        shared = _gather_split_state(blocks[layer])[0]
+        attn = blocks[layer].self_attn
+        _ACTIVE_PREFIX[id(attn)] = {"k": shared["pk"], "v": shared["pv"], "b": cfg.bias, "n_pos": int(shared["npos"][0]),
+                                    "dq": s["x"].sum(0).view(-1, attn.head_dim), "C": cfg.coeff}
+    ALL_ATTENTION_FUNCTIONS[impl] = _prefix_attention(original)
+
+    def restore():
+        ALL_ATTENTION_FUNCTIONS[impl] = original
+        for layer in stacked:
+            _ACTIVE_PREFIX.pop(id(blocks[layer].self_attn), None)
+    return [_Restore(restore)]
+
+
+@register_config
+@dataclass
+class QPrefixKC(QPrefixC):
+    method: str = "q_prefix_k"
+
+
+register(type("q_prefix_k", (), {
+    "name": "q_prefix_k", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_q_prefix_k_extract), "install": staticmethod(_q_prefix_k_install),
     "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
 }))
