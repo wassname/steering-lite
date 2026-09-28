@@ -32,7 +32,7 @@ PMAX = len(PREMISE) - 1  # top premise level (8)
 COLORS = {
     "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
     "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
-    "query_steer": "#f0e442", "vjp_delta-t48": "#56b4e9", "vjp_delta-t47": "#56b4e9",
+    "query_steer": "#f0e442",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
@@ -553,6 +553,11 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     exclude = {m for m in args.exclude.split(",") if m}
     points = build_points(model_dir, args.cohort, exclude)
+    # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
+    spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
+    for method in sorted({point["method"] for point in points} - set(COLORS)):
+        COLORS[method] = spare.pop(0)
+        LABELS[method] = method
     scenarios = list(load_cohort())[COHORTS[args.cohort]]
     rows = summary(points, scenarios)
     cohort_rows = load_cohort()
