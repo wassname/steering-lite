@@ -826,7 +826,14 @@ class QSlotBigC(QSlotC):
     nu_scale: float | None = 12.7  # sink_value's best -C dose on Qwen3-4B dev; ‖v_sink‖ was 1.3-12x smaller than this write
 
 
-for _name in ("q_slot", "q_slot_big"):
+@register_config
+@dataclass
+class QSlotHugeC(QSlotC):
+    method: str = "q_slot_huge"
+    nu_scale: float | None = 25.4  # 2x q_slot_big: at the walk's doses only part of the sink weight moves, so the cap binds
+
+
+for _name in ("q_slot", "q_slot_big", "q_slot_huge"):
     register(type(_name, (), {
         "name": _name, "extract_from_prompts": True, "cache_intervention": True,
         "extract": staticmethod(_q_slot_extract), "install": staticmethod(_q_slot_install),
