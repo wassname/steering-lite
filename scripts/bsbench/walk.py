@@ -120,7 +120,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
         return tuple(int(layer) for layer in value.split(","))
     n_layers = len(model.model.layers)
     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
-    if method in ("kv_cache_gram", "vjp_cache", "query_steer", "key_steer", "value_steer", "q_vjp", "k_vjp", "q_retrieve", "qr_sum", "q_retrieve_delta", "qretr_sum", "sink_write", "sink_value", "sinkr_sum", "sink_punct", "q_prefix", "sinkr_rand", "q_prefix_k", "q_prefix_k0", "q_slot", "q_slot_big", "q_slot_huge", "qslotr_sum"):
+    if method in ("kv_cache_gram", "vjp_cache", "query_steer", "key_steer", "value_steer", "q_vjp", "k_vjp", "q_retrieve", "qr_sum", "q_retrieve_delta", "qretr_sum", "sink_write", "sink_value", "sinkr_sum", "sink_punct", "q_prefix", "sinkr_rand", "q_prefix_k", "q_prefix_k0", "q_slot", "q_slot_big", "q_slot_huge", "qslotr_sum", "svdkv", "svdkv_resid"):
         # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
         layers = tuple(layer for layer in layers if types[layer] == "full_attention")

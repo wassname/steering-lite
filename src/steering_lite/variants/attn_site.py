@@ -877,3 +877,74 @@ register(type("qslotr_sum", (), {
     "extract": staticmethod(_qslotr_extract), "install": staticmethod(_qslotr_install),
     "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
 }))
+
+
+# --- dose-relative constants: calibrate each part inside extraction ---------------------------------------------------
+# Hand-set numbers (ν = 12.7·‖v̂*_g‖, r_scale 0.75/0.76) came from Qwen3-4B dev doses. Expressed in units of each part's own
+# iso-KL dose C0 (steering-lite calibrate_iso_kl, 1 nat RMS KL, same probe as walk.py), they carry to other models:
+#     ν_g     = nu_mult · C0(sink_value) · ‖v̂*_g‖      nu_mult = 3.2 (Qwen3-4B: 12.7 / 4.0)
+#     r_scale = C0(mean_diff) / C0(attention part)     (Qwen3-4B: 3.01/3.95 = 0.76 for q_slot_big, 3.01/4.0 = 0.75 for sink_value)
+def _iso_kl_c0(model, tok, method: str, parts: dict, layers) -> float:
+    from ..calibrate import calibrate_iso_kl
+    from ..config import _CONFIG_REGISTRY
+    from ..vector import Vector
+    cfg = _CONFIG_REGISTRY[method](layers=tuple(layers), dtype=next(model.parameters()).dtype)
+    vec = Vector(cfg, {L: p["shared"] for L, p in parts.items()}, {L: p["stacked"] for L, p in parts.items()})
+    c0, _ = calibrate_iso_kl(vec, model, tok, None, target_kl=1.0, target_stat="kl_rms", device=next(model.parameters()).device,
+                             T=50, do_sample=True, seed=0)
+    return abs(c0)
+
+
+def _mean_diff_parts(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length):
+    r = _residual_star(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
+    return r, {L: {"shared": {}, "stacked": {"v": r[L].unsqueeze(0)}} for L in layers}
+
+
+def _svdkv_extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
+    """q_slot (+ residual if cfg.with_residual) with ν and r_scale set from iso-KL doses measured here; values stored on cfg."""
+    kw = dict(batch_size=batch_size, max_length=max_length)
+    sv = _mean_diff_site("v")(model, tok, pos_prompts, neg_prompts, cfg, **kw)
+    c0_sv = _iso_kl_c0(model, tok, "sink_value", sv, tuple(sv))
+    cfg.nu_scale = cfg.nu_mult * c0_sv
+    out = _q_slot_extract(model, tok, pos_prompts, neg_prompts, cfg, **kw)
+    if cfg.with_residual:
+        r_layers = _default_resid_layers(len(_get_blocks(model)))
+        c0_qs = _iso_kl_c0(model, tok, "q_slot_big", out, tuple(out))
+        r, md = _mean_diff_parts(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
+        c0_md = _iso_kl_c0(model, tok, "mean_diff", md, r_layers)
+        cfg.r_scale = c0_md / c0_qs
+        for L in r_layers:
+            out.setdefault(L, {"shared": {}, "stacked": {}})["stacked"]["r"] = r[L].unsqueeze(0)
+    from loguru import logger
+    logger.info("svdkv C0 sink_value={:.3g} -> nu_scale={:.3g}; r_scale={}", c0_sv, cfg.nu_scale, getattr(cfg, "r_scale", None))
+    return out
+
+
+@register_config
+@dataclass
+class SvdkvC(QSlotC):
+    """attention part only: query shift picks a ± half of the split sink"""
+    method: str = "svdkv"
+    nu_mult: float = 3.2
+    with_residual: bool = False
+
+
+@register_config
+@dataclass
+class SvdkvResidC(SvdkvC):
+    """svdkv + mean_diff residual, one coefficient"""
+    method: str = "svdkv_resid"
+    with_residual: bool = True
+    r_scale: float | None = None
+
+
+register(type("svdkv", (), {
+    "name": "svdkv", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_svdkv_extract), "install": staticmethod(_q_slot_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
+register(type("svdkv_resid", (), {
+    "name": "svdkv_resid", "extract_from_prompts": True, "cache_intervention": True,
+    "extract": staticmethod(_svdkv_extract), "install": staticmethod(_qslotr_install),
+    "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
+}))
