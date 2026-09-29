@@ -12,8 +12,8 @@ Per attention layer L (full-attention layers ≥ 1), per KV head g, all after Ro
     q_t += C·u                                   u: least-variance direction of real keys and queries, ⟂ mean sink key
     head write ≈ w_sink · ν · tanh(ε·(q_t·u + C)·scale) · v̂*
 C = 0 is near, not exactly, bare: the halves split on q_t·u + C, and u is only approximately ⟂ the model's queries.
-Measured on Qwen3.5-0.8B (8 chat prompts, last token, attention part at the calibrated ν): see the svdkv_c0_check note in
-the commit adding this line.
+Measured on Qwen3.5-0.8B, ν = 320, 8 dev-cohort chat prompts: KL(bare || C=0) 0.005 nats averaged over positions, 0.014 at
+the last token (a calibrated dose C0 is 1 nat); max |Δ log-prob| 3.85 (a rare token).
 svdkv_resid also:  h_L += C · r_scale · r̂*_L on mean_diff's default layers (20-80% depth)
 
 Constants are set at extraction from iso-KL doses (1 nat RMS KL, steering-lite calibrate_iso_kl):
