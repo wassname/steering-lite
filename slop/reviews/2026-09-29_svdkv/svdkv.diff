@@ -1,0 +1,354 @@
+diff --git a/scripts/bsbench/walk.py b/scripts/bsbench/walk.py
+index d08261c..9a0c404 100644
+--- a/scripts/bsbench/walk.py
++++ b/scripts/bsbench/walk.py
+@@ -134,6 +134,11 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
+         return tuple(int(layer) for layer in value.split(","))
+     n_layers = len(model.model.layers)
+     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
++    if method in ("svdkv", "svdkv_resid"):
++        # every full-attention layer except 0 (there pos and neg end in the same token, so v* = 0); the residual part of
++        # svdkv_resid picks its own layers (mean_diff's 20-80% default)
++        types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
++        return tuple(layer for layer in range(1, n_layers) if types[layer] == "full_attention")
+     if method in ("kv_cache_gram", "vjp_cache", "query_steer"):
+         # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
+         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
+diff --git a/src/steering_lite/__init__.py b/src/steering_lite/__init__.py
+index 114c0ee..f1159a3 100644
+--- a/src/steering_lite/__init__.py
++++ b/src/steering_lite/__init__.py
+@@ -31,6 +31,7 @@ from .variants.kv_cache_gram import KVCacheGramC
+ from .variants.vjp_delta import VjpDeltaC
+ from .variants.vjp_cache import VjpCacheC
+ from .variants.query_steer import QuerySteerC
++from .variants.svdkv import SvdkvC, SvdkvResidC
+ 
+ __all__ = [
+     "SteeringConfig",
+@@ -54,6 +55,8 @@ __all__ = [
+     "VjpDeltaC",
+     "VjpCacheC",
+     "QuerySteerC",
++    "SvdkvC",
++    "SvdkvResidC",
+     "record_activations",
+     "train",
+     "attach",
+diff --git a/src/steering_lite/variants/__init__.py b/src/steering_lite/variants/__init__.py
+index 151236c..26ef166 100644
+--- a/src/steering_lite/variants/__init__.py
++++ b/src/steering_lite/variants/__init__.py
+@@ -2,5 +2,5 @@ from . import (
+     mean_diff, pca, topk_clusters, cosine_gated,
+     sspace, sspace_pca, corda_pca, sspace_ablate, sspace_damp_amp, super_sspace,
+     spherical, directional_ablation, chars, linear_act, angular_steering,
+-    random, kv_cache_gram, vjp_delta, vjp_cache, query_steer,
++    random, kv_cache_gram, vjp_delta, vjp_cache, query_steer, svdkv,
+ )  # noqa: F401
+diff --git a/src/steering_lite/variants/svdkv.py b/src/steering_lite/variants/svdkv.py
+new file mode 100644
+index 0000000..ab26f9c
+--- /dev/null
++++ b/src/steering_lite/variants/svdkv.py
+@@ -0,0 +1,269 @@
++"""svdkv: steer by letting the query choose between two halves of the attention sink (+ optional mean-diff residual).
++
++Most heads put much of their attention on the first token (the attention sink). svdkv hides the real sink and puts two
++copies in the KV cache, one carrying +v* and one −v*, with keys a small step apart along u. A query shift C·u moves
++attention between the halves, so C sets how much of ±v* the heads read. v* is the value mean diff (sycophantic − abrasive)
++at the last token. svdkv_resid adds mean_diff's residual vector at the same C.
++
++Per attention layer L (full-attention layers ≥ 1), per KV head g, all after RoPE:
++    sink±   key k_sink ± ε·u,   value v_sink ± ν·v̂*,   logit bias −ln 2 each
++    real first token hidden from query positions that see ≥ 4 real tokens (earlier ones keep it, so the sink itself is not rewritten)
++    q_t += C·u                                   u: least-variance direction of real keys and queries, ⟂ k_sink
++    head write ≈ w_sink · ν · tanh(ε·C·scale) · v̂*        (C = 0: halves get equal weight, the ±v̂* parts cancel)
++svdkv_resid also:  h_L += C · r_scale · r̂*_L on mean_diff's default layers (20-80% depth)
++
++Constants are set at extraction from iso-KL doses (1 nat RMS KL, steering-lite calibrate_iso_kl):
++    ν_g = nu_mult · C0(sink value alone) · ‖v̂*_g‖        nu_mult 3.2 (Qwen3-4B: best −C dose 12.7 / C0 4.0)
++    r_scale = C0(mean_diff) / C0(svdkv)                    so each part contributes at its own calibrated strength
++
++Evidence (Qwen3-4B, BS-bench v2, Jev; as qslotr_sum / q_slot_big in wassname/query-steering branch concept-steer):
++full 100 questions, −C side score svdkv_resid +3.94 vs mean_diff +1.71, paired 90% CI of the difference [+1.79, +2.67];
++3 dev seeds agree; +C ties (Qwen3-4B already accepts most premises). A random vector in the sink (same residual) falls
++back to mean_diff's level. svdkv alone ≈ mean_diff.
++Requires attention that goes through transformers' ALL_ATTENTION_FUNCTIONS (Qwen3, Qwen3.5 full-attention layers).
++PI[claude] 2026-09-29.
++"""
++import math
++from contextlib import contextmanager
++from dataclasses import dataclass
++
++import torch
++from einops import einsum
++from loguru import logger
++
++from ..config import SteeringConfig, register, register_config
++from ..target import _get_blocks
++from .vjp_delta import _encode, _unit_direction
++
++MIN_VISIBLE = 4  # a query position reads the sink halves only once it can see this many real tokens
++_ACTIVE: dict[int, dict] = {}  # id(attention module) -> slot state while attached
++
++
++@contextmanager
++def _record_qkv(model, layers):
++    """record post-RoPE query/key/value per layer by wrapping the attention function -> {layer: (q, k, v)}"""
++    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
++    impl = _get_blocks(model)[layers[0]].self_attn.config._attn_implementation
++    original = ALL_ATTENTION_FUNCTIONS[impl]
++    wanted = {id(_get_blocks(model)[L].self_attn): L for L in layers}
++    found = {}
++
++    def record(module, query, key, value, attention_mask, **kw):
++        if id(module) in wanted:
++            found[wanted[id(module)]] = (query, key, value)
++        return original(module, query, key, value, attention_mask, **kw)
++
++    ALL_ATTENTION_FUNCTIONS[impl] = record
++    try:
++        yield found
++    finally:
++        ALL_ATTENTION_FUNCTIONS[impl] = original
++
++
++@torch.no_grad()
++def _value_mean_diff(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length):
++    """v*_L = mean v⁺[last] − mean v⁻[last] -> {layer: [KVH, d]}"""
++    sums = {}
++    for sign, prompts in ((1.0, pos_prompts), (-1.0, neg_prompts)):
++        for start in range(0, len(prompts), batch_size):
++            batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
++            with _record_qkv(model, layers) as found:
++                model(**batch)
++            last = batch["attention_mask"].sum(1) - 1  # right padding
++            rows = torch.arange(last.shape[0], device=last.device)
++            for L in layers:
++                v = found[L][2][rows, :, last].float()  # [b, KVH, d]
++                sums[L] = sums.get(L, 0.0) + sign * v.sum(0) / len(prompts)
++    return sums
++
++
++@torch.no_grad()
++def _sink_and_directions(model, tok, prompts, layers, max_length):
++    """k_sink, v_sink at position 0, and u_g = least-variance direction of real keys + queries (⟂ k_sink) per layer"""
++    stats = {L: {"kk": 0.0, "qq": 0.0, "nk": 0, "nq": 0} for L in layers}
++    sink = {}
++    for text in prompts:
++        ids = tok(text, return_tensors="pt", add_special_tokens=False, truncation=True, max_length=max_length).input_ids
++        with _record_qkv(model, layers) as found:
++            model(ids.to(next(model.parameters()).device))
++        for L in layers:
++            q, k, v = (x[0].float() for x in found[L])  # [heads, T, d]
++            sink.setdefault(L, (k[:, 0].cpu(), v[:, 0].cpu()))
++            kvh = k.shape[0]
++            qg = q[:, 1:].reshape(kvh, -1, q.shape[-1])  # query heads of one KV group stacked as samples
++            stats[L]["kk"] = stats[L]["kk"] + einsum(k[:, 1:], k[:, 1:], "g n d, g n e -> g d e").cpu()
++            stats[L]["qq"] = stats[L]["qq"] + einsum(qg, qg, "g n d, g n e -> g d e").cpu()
++    out = {}
++    for L in layers:
++        tr = lambda M: M.diagonal(dim1=-2, dim2=-1).sum(-1)[:, None, None]
++        M = stats[L]["kk"] / tr(stats[L]["kk"]) + stats[L]["qq"] / tr(stats[L]["qq"])
++        k_sink, v_sink = sink[L]
++        u = torch.linalg.eigh(M).eigenvectors[..., 0]  # [KVH, d]
++        u = u - (u * k_sink).sum(-1, keepdim=True) / (k_sink * k_sink).sum(-1, keepdim=True) * k_sink
++        out[L] = (k_sink, v_sink, u / u.norm(dim=-1, keepdim=True))
++    return out
++
++
++@torch.no_grad()
++def _residual_mean_diff(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length):
++    """r̂*_L = unit(mean h⁺[last] − mean h⁻[last]) at block L's output"""
++    blocks, sums = _get_blocks(model), {}
++    for sign, prompts in ((1.0, pos_prompts), (-1.0, neg_prompts)):
++        for start in range(0, len(prompts), batch_size):
++            batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
++            grabbed = {}
++            hooks = [blocks[L].register_forward_hook(lambda _m, _i, o, L=L: grabbed.__setitem__(L, o[0] if isinstance(o, tuple) else o))
++                     for L in layers]
++            try:
++                model(**batch)
++            finally:
++                for h in hooks:
++                    h.remove()
++            last = batch["attention_mask"].sum(1) - 1
++            rows = torch.arange(last.shape[0], device=last.device)
++            for L in layers:
++                sums[L] = sums.get(L, 0.0) + sign * grabbed[L][rows, last].float().sum(0) / len(prompts)
++    return {L: _unit_direction(s) for L, s in sums.items()}
++
++
++def _default_resid_layers(n):  # walk.py resolve_layers default: 20-80% depth
++    return tuple(range(max(2, int(n * 0.2)), min(n - 2, int(n * 0.8))))
++
++
++def _iso_kl_c0(model, tok, cfg, shared, stacked) -> float:
++    from ..calibrate import calibrate_iso_kl
++    from ..vector import Vector
++    c0, _ = calibrate_iso_kl(Vector(cfg, shared, stacked), model, tok, None, target_kl=1.0, target_stat="kl_rms",
++                             device=next(model.parameters()).device, T=50, do_sample=True, seed=0)
++    return abs(c0)
++
++
++def _extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
++    from dataclasses import replace
++    layers = tuple(cfg.layers)
++    assert min(layers) >= 1, "layer 0: pos and neg end in the same token, so v* = 0 there"
++    vstar = _value_mean_diff(model, tok, pos_prompts, neg_prompts, layers, batch_size, max_length)
++    kv = _sink_and_directions(model, tok, pos_prompts[:16] + neg_prompts[:16], layers, max_length)
++    shared = {L: {"ksink": kv[L][0], "vsink": kv[L][1], "u": kv[L][2]} for L in layers}
++    unit = {L: _unit_direction(vstar[L].flatten()).view_as(vstar[L]).cpu() for L in layers}  # ‖v̂*‖ = 1 over the layer
++    # C0 of the sink write alone: both halves carry +v̂* write via ν = C: equivalent to sink_value (v_first += C·v̂*)
++    c0_sink = None
++    if cfg.nu_scale is None:  # given explicitly: use it (tests); else calibrate
++        probe = replace(cfg, method="svdkv", layers=layers, nu_scale=1.0, sink_only=True, r_scale=0.0)
++        c0_sink = _iso_kl_c0(model, tok, probe, {L: {**shared[L], "vstar": unit[L]} for L in layers}, {L: {"u": shared[L]["u"].flatten()[None]} for L in layers})
++        cfg.nu_scale = cfg.nu_mult * c0_sink
++    for L in layers:
++        shared[L]["vstar"] = unit[L] * cfg.nu_scale
++    stacked = {L: {"u": shared[L]["u"].flatten()[None]} for L in layers}
++    if cfg.with_residual:
++        r_layers = _default_resid_layers(len(_get_blocks(model)))
++        r = _residual_mean_diff(model, tok, pos_prompts, neg_prompts, r_layers, batch_size, max_length)
++        if cfg.r_scale is None:
++            c0_attn = _iso_kl_c0(model, tok, replace(cfg, layers=layers, r_scale=0.0), shared, stacked)
++            both = {**stacked, **{L: {**stacked.get(L, {}), "r": r[L][None].cpu()} for L in r_layers}}
++            c0_resid = _iso_kl_c0(model, tok, replace(cfg, layers=tuple(sorted(both)), r_scale=1.0, attn_off=True), shared, both)
++            cfg.r_scale = c0_resid / c0_attn
++        for L in r_layers:
++            stacked.setdefault(L, {})["r"] = r[L][None].cpu()
++    cfg.layers = tuple(sorted(set(shared) | set(stacked)))  # attention layers ∪ residual layers: attach targets exactly these
++    logger.info("svdkv C0 sink={} -> nu_scale={:.3g}; r_scale={}", c0_sink, cfg.nu_scale, cfg.r_scale if cfg.with_residual else None)
++    return {L: {"shared": shared.get(L, {}), "stacked": stacked[L]} for L in sorted(set(shared) | set(stacked))}
++
++
++def _slot_attention(original):
++    def attention(module, query, key, value, attention_mask, scaling, dropout=0.0, **kw):
++        P = _ACTIVE.get(id(module))
++        if P is None:
++            return original(module, query, key, value, attention_mask, scaling=scaling, dropout=dropout, **kw)
++        g = module.num_key_value_groups
++        ks, vk, u, vs = (P[n].to(query) for n in ("ksink", "vsink", "u", "vstar"))
++        if P["sink_only"]:  # calibration probe: every head reads its sink with +C·v̂* (= sink_value)
++            slot_k, slot_v = torch.stack([ks, ks], 1), torch.stack([vk + P["C"] * vs, vk + P["C"] * vs], 1)
++        else:
++            slot_k, slot_v = torch.stack([ks + P["eps"] * u, ks - P["eps"] * u], 1), torch.stack([vk + vs, vk - vs], 1)
++            query = query + P["C"] * u.repeat_interleave(g, 0)[None, :, None, :]
++        B, T, S = query.shape[0], query.shape[2], key.shape[2]
++        k = torch.cat([key, slot_k[None].expand(B, -1, -1, -1)], 2).repeat_interleave(g, 1)
++        v = torch.cat([value, slot_v[None].expand(B, -1, -1, -1)], 2).repeat_interleave(g, 1)
++        logits = (query @ k.transpose(2, 3)).float() * scaling
++        if attention_mask is None:
++            keep = torch.ones(T, S, dtype=torch.bool, device=query.device).tril(S - T)
++            real = torch.zeros(T, S, device=query.device).masked_fill(~keep, -torch.inf)[None, None]
++        elif attention_mask.dtype == torch.bool:
++            real = torch.zeros(attention_mask.shape, device=query.device).masked_fill(~attention_mask, -torch.inf)
++        else:
++            real = attention_mask.float()
++        real = real[..., :S].expand(B, -1, T, S)
++        visible = real > -torch.inf
++        seen = visible.sum(-1, keepdim=True)
++        mature = seen >= MIN_VISIBLE
++        first = visible.float().argmax(-1, keepdim=True)  # first real key = the sink (left padding)
++        logits[..., :S] += real.masked_fill(torch.zeros_like(visible).scatter(-1, first, True) & mature, -torch.inf)
++        logits[..., S:] = (logits[..., S:] - math.log(2)).masked_fill(~mature & (seen > 0), -torch.inf)  # seen == 0: padding rows
++        A = logits.softmax(-1)
++        return (A.to(v.dtype) @ v).transpose(1, 2).contiguous(), None
++    return attention
++
++
++class _Restore:
++    def __init__(self, fn):
++        self.remove = fn
++
++
++def _install(model, cfg, stacked):
++    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
++    from ..attach import _gather_split_state
++    blocks, hooks = _get_blocks(model), []
++    attn_layers = [] if cfg.attn_off else [L for L, s in stacked.items() if "u" in s]
++    if attn_layers:
++        impl = blocks[attn_layers[0]].self_attn.config._attn_implementation
++        original = ALL_ATTENTION_FUNCTIONS[impl]
++        for L in attn_layers:
++            sh = _gather_split_state(blocks[L])[0]
++            attn = blocks[L].self_attn
++            _ACTIVE[id(attn)] = {"ksink": sh["ksink"], "vsink": sh["vsink"], "vstar": sh["vstar"], "u": sh["u"], "eps": cfg.eps,
++                                 "C": cfg.coeff, "sink_only": cfg.sink_only}
++        ALL_ATTENTION_FUNCTIONS[impl] = _slot_attention(original)
++
++        def restore():
++            ALL_ATTENTION_FUNCTIONS[impl] = original
++            for L in attn_layers:
++                _ACTIVE.pop(id(blocks[L].self_attn), None)
++        hooks.append(_Restore(restore))
++    scale = cfg.r_scale or 0.0
++    for L, s in stacked.items():
++        if "r" in s and scale:
++            def resid(_m, _i, out, r=s["r"].sum(0)):
++                h = out[0] if isinstance(out, tuple) else out
++                h = h + cfg.coeff * scale * r.to(h)
++                return (h, *out[1:]) if isinstance(out, tuple) else h
++            hooks.append(blocks[L].register_forward_hook(resid))
++    return hooks
++
++
++@register_config
++@dataclass
++class SvdkvC(SteeringConfig):
++    method: str = "svdkv"
++    eps: float = 1.0  # key offset along u; logit gap between the halves = 2·eps·(q·u + C)·scale
++    nu_mult: float = 3.2
++    nu_scale: float | None = None  # set at extraction
++    with_residual: bool = False
++    r_scale: float | None = None  # set at extraction (svdkv_resid)
++    sink_only: bool = False  # calibration probe only
++    attn_off: bool = False  # calibration probe only
++
++
++@register_config
++@dataclass
++class SvdkvResidC(SvdkvC):
++    method: str = "svdkv_resid"
++    with_residual: bool = True
++
++
++for _name in ("svdkv", "svdkv_resid"):
++    register(type(_name, (), {
++        "name": _name, "extract_from_prompts": True, "cache_intervention": True,
++        "extract": staticmethod(_extract), "install": staticmethod(_install),
++        "apply": staticmethod(lambda _mod, _x, y, _shared, _stacked, _cfg: y),
++    }))
+diff --git a/tests/test_pipeline.py b/tests/test_pipeline.py
+index af01b02..c5a7571 100644
+--- a/tests/test_pipeline.py
++++ b/tests/test_pipeline.py
+@@ -32,6 +32,7 @@ METHODS = [
+     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+     "spherical", "directional_ablation", "chars", "linear_act",
+     "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache", "query_steer",
++    "svdkv", "svdkv_resid",
+ ]
+ 
+ POS = [
+@@ -73,6 +74,9 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
+         "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+         "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+         "query_steer":           sl.QuerySteerC(**common),
++        # nu_scale / r_scale given: skip the in-extraction iso-KL calibration (slow on CPU; exercised by just smoke-bsbench)
++        "svdkv":                 sl.SvdkvC(**{**common, "layers": (1, 2)}, nu_scale=2.0),
++        "svdkv_resid":           sl.SvdkvResidC(**{**common, "layers": (1, 2)}, nu_scale=2.0, r_scale=0.5),
+     }
+     return table[method]
+ 
+@@ -100,7 +104,7 @@ def test_methods_list_covers_registry():
+ @pytest.mark.parametrize("method", METHODS)
+ def test_pipeline(method, request, tmp_path):
+     """extract + calibrate + steer + save/load. One test per method."""
+-    model, tok = request.getfixturevalue("tiny_qwen" if method == "query_steer" else "tiny_model")
++    model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "svdkv", "svdkv_resid") else "tiny_model")
+     sl.detach(model)
+ 
+     cfg = _make_cfg(method)
