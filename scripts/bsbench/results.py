@@ -566,7 +566,8 @@ def main() -> None:
     cohort_rows = load_cohort()
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
-    shown = [row["method"] for row in rows if row["method"] in methods and not math.isnan(row["score"])][:TOP_N_PLOT]
+    # tagged variants (<method>-<tag>, e.g. vjp_delta-t47) are diagnostics: in the table, not in the default plot view
+    shown = [row["method"] for row in rows if row["method"] in methods and "-" not in row["method"] and not math.isnan(row["score"])][:TOP_N_PLOT]
     site = {
         "shown": shown,
         "colors": COLORS,  # the page's only colour source
