@@ -64,7 +64,7 @@ The score is the change we want minus the damage, at the best strength, in the w
 
 The plot shows the 5 best methods on Qwen3.5-4B. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers.
 
-The stars are prompt baselines, not steering methods. They do not change the model's internals; they ask the model to act a certain way. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results.
+The stars are prompt baselines: they ask the model to act a certain way, and leave its internals alone. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results.
 
 The table shows every method we tested. Brackets are 90% bootstrap intervals. Most methods were tested only on the small model.
 
