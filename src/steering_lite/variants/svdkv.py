@@ -15,6 +15,7 @@ C = 0 is near, not exactly, bare: the halves split on q_t·u + C, and u is only 
 Measured on Qwen3.5-0.8B, ν = 320, 8 dev-cohort chat prompts: KL(bare || C=0) 0.005 nats averaged over positions, 0.014 at
 the last token (a calibrated dose C0 is 1 nat); max |Δ log-prob| 3.85 (a rare token). Qwen3-4B, ν = 12.7: 0.015 nats over
 positions, last token mean 0.18, max 1.43 (one of 8 prompts is a full dose off bare at its last token).
+Qwen3.5-4B, ν = 550 (calibrated): 0.007 nats over positions, last token mean 0.015, max 0.043; max |Δ log-prob| 9.2.
 TODO(PI[claude]): centre the split, e.g. subtract each head's mean q·u; untested.
 svdkv_resid also:  h_L += C · r_scale · r̂*_L on mean_diff's default layers (20-80% depth)
 
