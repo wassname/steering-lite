@@ -96,7 +96,7 @@ Seeds: 3 per method on the Qwen models, 1 on OLMo. `—`: the prompting baseline
 
 <!-- PI/Claude 2026-09-29, numbers from outputs/bsbench/results/{full,27b-full,olmo-full}/index.md. Needs wassname's review. -->
 
-Four methods also ran on Qwen3.5-27B and OLMo-2-0325-32B-Instruct. The score can be low for two reasons: the method does not steer, or the model already gives the target answer. Bare Qwen3.5-27B already rejects 69 of the 100 false premises, so there is little left to steer toward candour. The second number for each model divides the on-axis change by the room left (how far the bare answers could still move toward that side), in the weaker direction.
+Four methods also ran on Qwen3.5-27B and OLMo-2-0325-32B-Instruct. The score can be low for two reasons: the method does not steer, or the model already gives the target answer. Bare Qwen3.5-27B already rejects 69 of the 100 false premises, against 35 for the 4B model ([by_stance.md](slop/reviews/2026-09-28_judged_by_stance/by_stance.md)), so there is little left to steer toward candour. The second number for each model divides the on-axis change by the room left (how far the bare answers could still move toward that side), in the weaker direction.
 
 | method | 4B score↑ | 4B on ÷ room↑ | 27B score↑ | 27B on ÷ room↑ | OLMo score↑ | OLMo on ÷ room↑ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -106,7 +106,9 @@ Four methods also ran on Qwen3.5-27B and OLMo-2-0325-32B-Instruct. The score can
 | mean_diff | +0.37 [+0.15, +0.78] | +0.14 | **+0.91** [+0.60, +1.33] | **+0.64** | **+0.21** [+0.04, +0.50] | **+0.27** |
 | *random* | -0.07 [-0.22, +0.13] | +0.01 | -0.05 [-0.12, +0.14] | +0.02 | -0.10 [-0.15, -0.01] | +0.01 |
 
-Within each model, the two columns rank these four methods in the same order, so the room correction does not change which of them looks best there. Between models the order changes: mean_diff is 4th of 4 on the 4B model and 1st on both larger models. On Qwen3.5-27B the VJP methods keep much of their effect per unit of room (vjp_cache +0.40 → +0.33). On OLMo they do not steer at all, while mean_diff and chars still do. The [research journal](RESEARCH_JOURNAL.md) has the checks for a bug (none found) and extra `vjp_delta` runs with other settings.
+Within each model, the two columns rank these four methods in the same order, so the room correction does not change which of them looks best there. Between models the order changes: mean_diff is 4th of 4 on the 4B model and 1st on both larger models. On Qwen3.5-27B the VJP methods keep much of their effect per unit of room (vjp_cache +0.40 → +0.33). On OLMo they barely steer (on ÷ room +0.00 and +0.03, random +0.01), while mean_diff and chars still do. The [research journal](RESEARCH_JOURNAL.md) has the checks for a bug (none found) and extra `vjp_delta` runs with other settings.
+
+Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (7th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
 
 ![Pareto plot, Qwen3.5-27B](assets/bsbench_qwen3.5-27b_full.png)
 
