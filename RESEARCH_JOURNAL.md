@@ -170,3 +170,21 @@ The previous entry said OLMo vjp_delta answers "change format, not stance". That
 The ">" prefix appears only in default vjp_delta, and only at its strongest dose. On 4 random questions read side by side with bare, vjp_delta-nothink rewords the bare answer and keeps accepting the made-up premise ("ISO 32170", "ABA Model Standard 4.7"); vjp_cache makes the answer longer and adds hedges ("without more context"), and still accepts it. mean_diff shortens answers and rejects ("Neither is standard"). The better description: on OLMo, VJP changes wording and length, not premise stance, up to breakdown.
 
 -- PI/Claude
+
+## 2026-09-29 -- Cheap dev metric, simulated offline on the cached 4B full walks
+
+Question (wassname): can a cheaper dev run rank methods like the full run? Simulated on cached answers and Jev ratings, Qwen3.5-4B, 19 methods incl. random, seed 0; reference = full headline score (100 q, 3 seeds). Source: `slop/reviews/2026-09-29_dev_metric/sim.md` (script `sim.py`, same folder).
+
+| rule | all 100 q | every 5th q | 20 random q, median [5%, 95%] |
+|---|---|---|---|
+| one dose at 0.67 x breakdown | +0.51 | +0.44 | +0.51 [+0.36, +0.64] |
+| one dose at 0.4 x breakdown | +0.86 | +0.78 | +0.72 [+0.49, +0.88] |
+| current: walk + best judged dose | +0.99 | +0.81 | +0.82 [+0.69, +0.91] |
+
+(Spearman vs full score; breakdown = first rung the health check flags; one dose per side, score = min over sides of on - off.)
+
+Observations: cutting answers at 128 tokens moves the health-check breakdown rung on 3 of 38 method-sides. At 0.67 x breakdown many methods are already damaged (e.g. directional_ablation dev score -2.46): the judge sees damage well before the health check flags breakdown. 0.4 x is the best of the 5 factors tried (0.67, 0.5, 0.4, 0.3, 0.2). Choosing 20 "informative" questions (largest spread across methods on one half of the methods) ranks the other half worse than every 5th (-0.07, +0.35 vs +0.32, +0.61).
+
+Interpretation (PI/Claude): with 20 questions the ranking ceiling is about 0.8 whatever the dose rule, so question count, not the dose rule, limits dev. The 128-token cap is safe and cuts most generation cost. A one-dose rule saves judge calls (cheap) but not GPU unless breakdown is found with fewer rungs (bisection); 0.4 was picked on the same data, so expect a little optimism. One model, one seed.
+
+-- PI/Claude
