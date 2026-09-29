@@ -116,12 +116,17 @@ Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger 
 
 ![Pareto plot, OLMo-2-0325-32B-Instruct](assets/bsbench_olmo-2-32b_full.png)
 
-To reproduce:
+To run the benchmark you need [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), pnpm, a Modal account (`uv run --extra benchmark modal setup`) and `OPENROUTER_API_KEY` in `.env`.
 
 ```bash
-just sweep full    # steering runs on Modal, all 100 questions (`dev` = 20 questions)
-just results full  # judge with Jev (needs OPENROUTER_API_KEY in .env), then the table and plot
+just check                                   # tiny CPU smoke tests of every method and of the walk
+just sweep dev my_method 0 0                 # one method, seed 0, 20 questions (+ random seed 0), on Modal
+just results dev                             # judge with Jev, then table, plot and page
+just sweep full mean_diff,chars 0,1,2 0,1,2  # 100 questions, 3 seeds, as in the table above
+just results full
 ```
+
+To add a method, copy [mean_diff.py](src/steering_lite/variants/mean_diff.py), register it (see [AGENTS.md](AGENTS.md)), then run `just smoke-bsbench my_method` before the dev sweep.
 
 The outputs go to `outputs/bsbench/results/<cohort>/`. [`calibration.py`](scripts/bsbench/calibration.py) and [`cost.py`](scripts/bsbench/cost.py) are extra checks: where each run breaks down, and what a run costs.
 

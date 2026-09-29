@@ -92,6 +92,11 @@ def tiny_qwen():
     return AutoModelForCausalLM.from_pretrained(TINY_QWEN, torch_dtype=torch.float32).eval(), tok
 
 
+def test_methods_list_covers_registry():
+    """A newly registered method must be added to METHODS (and its config below), or this fails."""
+    assert set(METHODS) == set(REGISTRY), f"not in METHODS: {set(REGISTRY) - set(METHODS)}; stale: {set(METHODS) - set(REGISTRY)}"
+
+
 @pytest.mark.parametrize("method", METHODS)
 def test_pipeline(method, request, tmp_path):
     """extract + calibrate + steer + save/load. One test per method."""

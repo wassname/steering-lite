@@ -86,11 +86,15 @@ def main(methods: str = "mean_diff,pca,vjp_delta", seeds: str = "0", cohort: str
     for method, seed in sorted(set(jobs) - set(todo)):
         print(f"WALK_CACHED_LOCAL\t{method}\ts{seed}\tcohort={cohort} (certificate COMPLETE on the Volume; no container started)")
     handles = {job: run.spawn(argvs[job]) for job in todo}
+    failed = []
     for (method, seed), handle in handles.items():
         try:
             print(f"DONE\t{method}\ts{seed}\t{handle.get()}")
-        except Exception as error:  # one dead walk must not hide the others
+        except Exception as error:  # collect, so one dead walk does not hide the others; raise at the end
             print(f"FAILED\t{method}\ts{seed}\t{error!r}")
+            failed.append(f"{method} s{seed}")
+    if failed:
+        raise SystemExit(f"{len(failed)} of {len(handles)} walks FAILED: {', '.join(failed)}")
 
 
 @app.local_entrypoint()

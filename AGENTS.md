@@ -8,8 +8,8 @@ Inherits conventions from sibling project `lora-lite`. Read [../lora-lite/AGENTS
 - One file per method under `src/steering_lite/variants/`. Docstring -> paper link, math, intuition.
 - Use `einops.einsum` and `jaxtyping` shape annotations. Tensor dim letters: `b s d` (batch, seq, d_model), `n` (prompts), `r` (rank/components), `k` (clusters), `l` (layer).
 - No backward compat. Break things to gain simplicity.
-- Single functional test = the real benchmark at tiny scale. Don't add a separate "unit test" suite.
-- New methods register via `@register_config` and `@register` decorators; export `Config` class from `__init__.py`.
+- Keep tests to smoke tests of the real pipeline at tiny scale (`just check`). Don't add a separate unit-test suite.
+- New methods register via `@register_config` and `@register` decorators; export `Config` class from `__init__.py`; add the name to `METHODS` in `tests/test_pipeline.py` (a test fails until you do).
 
 ## Verify
 

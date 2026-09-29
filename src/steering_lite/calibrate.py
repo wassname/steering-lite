@@ -57,7 +57,7 @@ def _log_kl_history(method: str, history: list[dict]) -> None:
     logger.info(
         f"SHOULD: choose the highest C with a coherent tail; a repetition tail "
         f"('but but but') or gibberish marks where the dose is too hot -- read that "
-        f"row's r4ms4e as the target_kl for future runs.\n"
+        f"row's target_stat column (default kl_rms) as the target_kl for future runs.\n"
         f"--- iso-KL bracket trace ({method}, {len(history)} iters) ---\n{table}")
 
 
@@ -306,8 +306,8 @@ def measure_kl(
         # kl_r4ms4e = (mean(KL^4))^(1/4) in nats: like kl_rms but quartically tail-weighted,
         # so a localized front/tail spike that rms dilutes across all tokens still shows. The
         # 4th root keeps the nats scale (no shrink near 0), and it equals max(mean, rms, l4) by
-        # the power-mean inequality. New default target: catches the derail spike rms averages
-        # away, without a noisy p95 quantile. (wassname + Claude 2026-07-18)
+        # the power-mean inequality. Catches the derail spike rms averages away, without a noisy
+        # p95 quantile; the default target_stat is still kl_rms. (wassname + Claude 2026-07-18)
         "kl_r4ms4e": float(cat.pow(4).mean().pow(0.25)),
         "steer_tail": steer_tail,
         "kl_p50": float(cat.quantile(0.50)),
