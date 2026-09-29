@@ -32,6 +32,7 @@ METHODS = [
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache", "query_steer",
+    "svdkv", "svdkv_resid",
 ]
 
 POS = [
@@ -73,6 +74,9 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
         "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
         "query_steer":           sl.QuerySteerC(**common),
+        # nu_scale / r_scale given: skip the in-extraction iso-KL calibration (slow on CPU; exercised by just smoke-bsbench)
+        "svdkv":                 sl.SvdkvC(**{**common, "layers": (1, 2)}, nu_scale=2.0),
+        "svdkv_resid":           sl.SvdkvResidC(**{**common, "layers": (1, 2)}, nu_scale=2.0, r_scale=0.5),
     }
     return table[method]
 
@@ -100,7 +104,7 @@ def test_methods_list_covers_registry():
 @pytest.mark.parametrize("method", METHODS)
 def test_pipeline(method, request, tmp_path):
     """extract + calibrate + steer + save/load. One test per method."""
-    model, tok = request.getfixturevalue("tiny_qwen" if method == "query_steer" else "tiny_model")
+    model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "svdkv", "svdkv_resid") else "tiny_model")
     sl.detach(model)
 
     cfg = _make_cfg(method)

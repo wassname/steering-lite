@@ -134,6 +134,11 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
         return tuple(int(layer) for layer in value.split(","))
     n_layers = len(model.model.layers)
     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
+    if method in ("svdkv", "svdkv_resid"):
+        # every full-attention layer except 0 (there pos and neg end in the same token, so v* = 0); the residual part of
+        # svdkv_resid picks its own layers (mean_diff's 20-80% default)
+        types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
+        return tuple(layer for layer in range(1, n_layers) if types[layer] == "full_attention")
     if method in ("kv_cache_gram", "vjp_cache", "query_steer"):
         # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
