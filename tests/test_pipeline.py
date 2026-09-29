@@ -583,3 +583,27 @@ def test_kv_cache_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_p
     finally:
         sl.detach(model)
     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+
+
+def test_svdkv_float_mask_matches_bool_mask():
+    """svdkv's attention must treat an additive float mask (finfo.min for masked keys) like the bool mask, with left padding."""
+    from types import SimpleNamespace
+    from steering_lite.variants import svdkv as S
+    torch.manual_seed(0)
+    B, H, KVH, T, d = 2, 4, 2, 7, 8
+    q, k, v = torch.randn(B, H, T, d), torch.randn(B, KVH, T, d), torch.randn(B, KVH, T, d)
+    pad = torch.tensor([2, 0])  # row 0 is left-padded by 2
+    real = torch.arange(T)[None] >= pad[:, None]  # [B, S]
+    bool_mask = (torch.ones(T, T, dtype=torch.bool).tril()[None] & real[:, None, :])[:, None]  # [B, 1, T, S]
+    float_mask = torch.zeros(bool_mask.shape).masked_fill(~bool_mask, torch.finfo(torch.float32).min)
+    module = SimpleNamespace(num_key_value_groups=H // KVH)
+    S._ACTIVE[id(module)] = {"u": torch.nn.functional.normalize(torch.randn(KVH, d), dim=-1), "vstar": torch.randn(KVH, d),
+                             "eps": 1.0, "C": 2.0, "sink_only": False}
+    try:
+        attn = S._slot_attention(lambda *a, **k: None)
+        out_b, _ = attn(module, q, k, v, bool_mask, scaling=d ** -0.5)
+        out_f, _ = attn(module, q, k, v, float_mask, scaling=d ** -0.5)
+    finally:
+        S._ACTIVE.pop(id(module))
+    keep = real[:, :, None, None].expand_as(out_b)  # compare real query rows only (pad rows are unused)
+    assert torch.allclose(out_b[keep], out_f[keep], atol=1e-5), (out_b - out_f)[keep].abs().max()
