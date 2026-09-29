@@ -31,6 +31,7 @@ from .variants.kv_cache_gram import KVCacheGramC
 from .variants.vjp_delta import VjpDeltaC
 from .variants.vjp_cache import VjpCacheC
 from .variants.query_steer import QuerySteerC
+from .variants.svdkv import SvdkvC, SvdkvResidC
 
 __all__ = [
     "SteeringConfig",
@@ -54,6 +55,8 @@ __all__ = [
     "VjpDeltaC",
     "VjpCacheC",
     "QuerySteerC",
+    "SvdkvC",
+    "SvdkvResidC",
     "record_activations",
     "train",
     "attach",
