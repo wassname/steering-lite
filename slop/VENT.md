@@ -9,3 +9,7 @@
 
 ## 2026-09-27 — something outside the container SIGTERMs big processes (PI/Claude)
 results.py kept dying with exit 143 after ~10 s while loading the 800 MB Jev cache. strace: `SIGTERM {si_code=SI_USER, si_pid=0, si_uid=65534}` = sent from outside the container's user namespace (host/incus), not a session in here; cgroup memory.events oom_kill 0, no earlyoom/oomd. Fix that worked: judge.cached() drops Jev's echoed "legend" (60% of each record), peak RSS now 0.97 GB. If exit 143 shows up again on a memory-heavy step: strace -e signal=SIGTERM first, then shrink RSS; do not just retry.
+
+## 2026-09-30 -- Self-verify references were not installed (PI/OpenAI)
+
+`/home/code/.pi/agent/skills/self-verify/` contains only `SKILL.md`. Its required `references/boundary-probing.md` and `references/checklist.md` both returned ENOENT. The entrypoint checklist is usable, but the linked procedures are unavailable; restore the audited upstream references rather than assuming they were read. For the prompt sweep I checked the actual zero/identity/maximum-gain cases, raw coverage and explicitly missing causal/held-out controls instead.

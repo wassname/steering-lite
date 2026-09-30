@@ -13,7 +13,8 @@ const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
-  const shown = [...curves.flatMap(c => c.points), ...data.points.filter(p => p.admissible && p.method.startsWith('prompting'))];
+  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method));
+  const shown = [...curves.flatMap(c => c.points), ...prompts];
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), 0.5);
   const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), 0.3);
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
@@ -51,10 +52,10 @@ function Plot({ data, visible, selected, onSelect }) {
           })}
           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
             return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
-          <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>
+          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
         </g>;
       })}
-      {data.points.filter(p => p.method.startsWith('prompting')).map(p => <g key={pointId(p)} className="mark" onClick={() => onSelect(p)}
+      {prompts.map(p => <g key={pointId(p)} className="mark prompt-baseline" onClick={() => onSelect(p)}
         onPointerEnter={() => setHover(p)} onPointerLeave={() => setHover(null)}>
         <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={data.colors[p.method]} />
         <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor={anchor(x(p.effect))} className="label" fill={data.colors[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
@@ -157,7 +158,10 @@ function App() {
         The line joins each method's best trade-offs (dots) and ends at its last tested strength that passes the checks (×). The ring marks the strength used for the score. Other strengths are in the answer explorer below.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
         The grey band is where random directions of the same strength land (10–90% over seeds); a method is only doing something specific if it gets outside it.</p>
-      {data.points.some(p => p.fixed_grid) && <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions.</p>}
+      {data.points.some(p => p.fixed_grid) && <>
+        <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
+        <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at every tested prompt embedding gain" style={{ width: '100%' }} /></a>
+      </>}
     </section>
     <h2>Best strength per method</h2>
     <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling seeds and questions. On-axis ÷ room is the on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side (8 − bare level for +C, bare level for −C), weaker side; damage is handled by the dose choice and the 1.5 cap, not in this number.</p>

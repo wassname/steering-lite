@@ -228,3 +228,30 @@ The independent audit read the complete generation log and found no scoring or s
 Interpretation (PI/OpenAI): the paired result supports a combined-method advantage on this benchmark. Attention-only moves beyond the random reference but does not show an advantage over mean difference. I would retain both measured results without attributing the combined gain to a specific component.
 
 -- PI/OpenAI
+
+## 2026-09-30 -- Instruction embedding gain is not monotonic prompt strength
+
+I tested instruction embedding scaling as a prompting control.
+
+Qwen3.5-4B, 20 fixed dev questions, greedy decoding, two existing instruction styles, nine gains from 0 to 16. A context manager scales instruction-token embeddings during prefill, not later generated-token embeddings. Gain 1 is ordinary prompting; gain 0 retains zero-valued embeddings and positions, not a bare prompt. The same dev questions select doses and estimate scores.
+
+| Method | Score | 90% bootstrap interval | Selected gains, negative / positive persona |
+|---|---:|---:|---:|
+| mean difference reference | 0.70 | [0.20, 1.40] | vector coefficients, not gains |
+| short prompt embedding sweep | 0.48 | [-0.42, 1.10] | 8 / 1 |
+| random reference | 0.05 | [-0.19, 0.63] | vector coefficients, not gains |
+| engineered prompt embedding sweep | -0.47 | [-0.92, -0.004] | 4 / 0 |
+
+Score is the weaker direction's best admissible premise change minus absolute damage change. Source: `slop/reviews/2026-09-30_prompt_embedding/results.md` and production `outputs/bsbench/results/prompt-dev/points.json`. These intervals include dose reselection, not cross-process variation. All 720 answers pass basic health checks, but the damage cap excludes 8/18 short and 7/18 engineered sign/gain points. No breakdown boundary was established.
+
+The selected short negative-persona gain has premise change -0.6135 from historical bare, versus -0.6110 for the opposite persona at the same gain and -0.4170 at gain zero (`selected-controls.json` in the review directory). The blind judge's corresponding rejection-directed stance change is +0.1745; mean probability of the change label `rejects_premise` is 0.11, not an answer rejection rate. In contrast, short positive-persona gain 1 changes premise score +3.5705 versus -0.2565 for its opposite persona. Thus some settings distinguish the instructions, but the short sweep's selected negative effect does not establish an abrasive-instruction benefit.
+
+Fresh ordinary and gain-one generations match exactly on all 40 engineered prompt/direction pairs. Historical ordinary answers differ on 9/20 positive and 3/20 negative prompts; regenerated mean premise scores shift -0.219 and +0.054. The old answers are preserved. The within-process identity test passes, but the cause of cross-process drift remains unknown. `verify_coverage.py` reruns raw-file uniqueness, cohort, grid, provenance and identity checks; `coverage.log` reports `COVERAGE_PASS: 720 unique rows; complete 20-question x 9-gain x 2-sign x 2-method grid; fresh engineered identity 40/40; one engineered process`.
+
+I read complete answers for the first three fixed questions (`examples.md`). Short positive-persona gain 4 sometimes refuses the role or medical advice rather than identifying a false premise. Selected short negative-persona gain 8 identifies the sedation category error, but still endorses invented indemnity and ledger procedures. Logged Jev charges total $0.0295 including the drift checks; GPU list-price wall-time proxy is about $0.46, not an invoice.
+
+Interpretation (PI/OpenAI): I would not use embedding magnitude as a monotonic instruction-strength control on this grid. The result does not demonstrate an advantage over the references or identify a normalization mechanism. Prefix perturbation, regeneration drift and judge sensitivity remain competing explanations for small negative shifts; a matched neutral-prefix control is absent, and gains between zero and the smallest nonzero setting remain untested.
+
+The measured score is not proof of more accurate reasoning.
+
+-- PI/OpenAI

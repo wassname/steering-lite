@@ -1,0 +1,42 @@
+{
+  "selected_controls": [
+    {
+      "method": "prompting_scale",
+      "side": "-C",
+      "gain": 8.0,
+      "selected_effect": -0.6135,
+      "gain0_effect": -0.41700000000000004,
+      "opposite_same_gain_effect": -0.611
+    },
+    {
+      "method": "prompting_scale",
+      "side": "+C",
+      "gain": 1.0,
+      "selected_effect": 3.5705,
+      "gain0_effect": -0.47250000000000003,
+      "opposite_same_gain_effect": -0.25649999999999995
+    },
+    {
+      "method": "prompting_engineered_scale",
+      "side": "-C",
+      "gain": 4.0,
+      "selected_effect": -1.742,
+      "gain0_effect": -0.33799999999999997,
+      "opposite_same_gain_effect": 3.713
+    },
+    {
+      "method": "prompting_engineered_scale",
+      "side": "+C",
+      "gain": 0.0,
+      "selected_effect": -0.35950000000000004,
+      "gain0_effect": -0.35950000000000004,
+      "opposite_same_gain_effect": -0.33799999999999997
+    }
+  ],
+  "short_negative_gain4": {
+    "effect": -0.8589999999999999,
+    "steered_damage": 1.4115,
+    "admissible": true
+  },
+  "marker_check": "both panels circle at short -C gain4; apparent x in review is not the encoded marker"
+}

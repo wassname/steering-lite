@@ -126,7 +126,7 @@ def method_curve(points: list[dict], method: str, side: str) -> list[dict]:
             continue
         questions = [q | {"seed": point["seed"]} for point in at for q in point["questions"]]
         curve.append({
-            "method": method, "side": side, "C": C, "admissible": True,
+            "method": method, "side": side, "C": C, "admissible": True, "fixed_grid": at[0]["fixed_grid"],
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
             "room": room(questions, side), "questions": questions,
         })
@@ -372,7 +372,10 @@ def frontier(curve: list[dict]) -> list[dict]:
 def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]]:
     """Monotone cubic (Fritsch-Carlson PCHIP) of damage over on-axis gain, pinned at bare and at the end.
 
+    Fixed grids join measured support only, without a synthetic bare anchor. -- PI/OpenAI
     Monotone interpolation cannot overshoot, so the drawn line stays between its support points."""
+    if support[0]["fixed_grid"]:
+        return [[p["effect"], p["off_axis"]] for p in support]
     sign = 1.0 if side == "+C" else -1.0
     end = support[-1]
     ts, ys = [0.0], [0.0]
@@ -569,8 +572,8 @@ def prompt_gain_plot(points: list[dict], title: str) -> go.Figure:
     figure.update_xaxes(type="category", title_text="Tested gain (categorical spacing)")
     figure.update_yaxes(range=[0, 4], row=1, col=2)
     figure.update_layout(template="plotly_white", title=dict(text=title, font_size=16),
-                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=110, b=100, l=55, r=25))
-    figure.add_annotation(text="× fails admissibility; dotted line: damage cap. Gain 0 keeps token positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. Finite grid, not a confirmed breakdown boundary.",
+                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=150, b=120, l=55, r=25))
+    figure.add_annotation(text="× fails admissibility; dotted line: damage cap. Gain 0 keeps token positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. ±C selects persona, not a negative gain. Endpoints do not confirm breakdown.",
                           x=0, y=-0.24, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
     return figure
 

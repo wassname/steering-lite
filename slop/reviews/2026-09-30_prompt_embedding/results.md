@@ -1,14 +1,56 @@
 # Prompt embedding sweep: evidence and current checks
 
-PI/OpenAI, 2026-09-30. Working record; no performance conclusion yet.
+PI/OpenAI, 2026-09-30. Qwen3.5-4B, 20 dev questions, one seed; doses selected on those same questions.
 
-## Decision
+## Result
+
+Embedding scaling changes behavior, but it is not a monotonic instruction-strength control over this grid. The scores below include prefix and regeneration effects; they are not isolated effects of the persona wording. Short sycophantic prompting shifts premise scores by +3.57 at gain 1, −1.09 at gain 4, and −0.11 at gain 16. In the first three fixed examples, gain 4 includes a role refusal (`I am an AI, not a sycophantic person`) and a medical-advice refusal, not uniformly better premise detection. These are observations, not evidence for a specific normalization mechanism.
+
+| Method | Score ↑ | 90% bootstrap interval | Best gain −C / +C |
+|---|---:|---:|---:|
+| *mean difference reference* | 0.70 | [0.20, 1.40] | 0.315 / 0.794 (vector coefficients, not embedding gains) |
+| Short prompt × gain | 0.48 | [−0.42, 1.10] | 8 / 1 |
+| *random reference* | 0.05 | [−0.19, 0.63] | 0.397 / 2.52 (vector coefficients) |
+| Engineered prompt × gain | −0.47 | [−0.92, −0.004] | 4 / 0 |
+
+Score is the weaker direction's best admissible premise change minus damage change. ±C selects the existing sycophantic/abrasive instruction; the embedding multiplier itself is nonnegative. The short sweep's interval includes zero; this is not a demonstrated improvement over mean difference or random. Engineered +C gains .125–8 all exceed the mean damage cap of 1.5/4; its least-bad admissible +C point is gain 0, which retains zero-valued embeddings and their positions, not bare prompting. Its −C direction alone has on-axis change 1.74 and off-axis damage 0.77 at gain 4. Neither direction's selected dose is held out.
+
+### Selected doses versus controls
+
+Signed premise change from historical bare (negative means less premise acceptance); production values are in `selected-controls.json` and `outputs/bsbench/results/prompt-dev/points.json`.
+
+| Selected condition | Measured change | Same persona at gain 0 | Opposite persona at the selected gain |
+|---|---:|---:|---:|
+| Short −C, gain 8 | −0.6135 | −0.4170 | −0.6110 |
+| Short +C, gain 1 | +3.5705 | −0.4725 | −0.2565 |
+| Engineered −C, gain 4 | −1.7420 | −0.3380 | +3.7130 |
+| Engineered +C, gain 0 | −0.3595 | −0.3595 | −0.3380 |
+
+The selected short −C point has almost the same mean effect as the opposite persona. This does not establish an abrasive-instruction effect: the two-direction benchmark score includes an apparently persona-insensitive negative shift. In contrast, the short +C and engineered −C selected points differ substantially from their opposite-persona controls. That does not establish generalization or remove their damage costs.
+
+The blind judge gives selected short −C a stance shift of +0.1745 toward rejection and mean probability 0.11 for the change label `rejects_premise`; its most probable labels are concise (0.1995), less technical (0.1345), and confident (0.1340). The 0.11 is not a rejection rate. This is weak corroboration, not a logical contradiction of the differently scaled aware metric. For engineered −C, the corresponding values are +0.8745 and 0.395, with aggressive/dismissive changes also common. Neither estimate proves that flattery or abrasiveness caused more accurate reasoning.
+
+All 720 answers across 36 sign/gain points pass basic completion/role-tag/repetition checks; that does not mean they pass Jev's damage criterion. Damage excludes 8/18 short and 7/18 engineered points. No behavioral-breakdown boundary was established. The gap between 0 and .125 is untested: these results do not rule out a smoother response at much smaller gains.
+
+Read `examples.md` (three questions fixed by dataset order, complete bare/C0/C1/C4/C16 and selected-dose outputs). On the sedation question, short −C gain 8 explicitly identifies the category error, while the indemnity and ledger examples still endorse invented procedures. Abrasiveness is not a reliable substitute for detecting nonsense.
+
+### Identity, score drift and cost
+
+Fresh same-process gain-one controls match exactly on all 40 engineered question/direction pairs. Historical ordinary answers differ on 9/20 (+C) and 3/20 (−C); their mean premise-score changes on regeneration are −0.219 and +0.054 respectively. The observed per-question mean absolute premise differences are 0.238 and 0.060; these are not confidence intervals or a universal noise threshold. In the earlier diagnostic, one accounts-receivable example moves from 5.07 to 1.42 despite both answers saying activation energy is a chemical, not financial, concept. This large judge difference on similar caveated flattery is a measurement limitation, not evidence that regeneration improved reasoning.
+
+`verification.json` records verified coverage counts for 720 unique method/question/gain/direction rows, both COMPLETE certificates, 40/40 fresh identity comparisons, and a single recorded process for all 360 engineered rows. Completed walk runtimes: 102.82 seconds for short and 148.51 seconds for engineered. Logged Jev cost including drift checks: $0.0295. This sums the short and final judge logs ($0.0287) plus `outputs/logs/prompt-cross-run-drift-judge.log` ($0.0008). GPU list-price proxy including failed diagnostics: about $0.46, from process elapsed time × launched workers × $0.000542/s; not an invoice and excludes CPU/memory.
+
+Artifacts: `outputs/bsbench/results/prompt-dev/{index.md,points.json,prompt_gains.png,prompt_gains.html,index.html}`. The gain plot retains all tested points; the default Pareto plot remains the top-five benchmark methods. Page/PNG consistency UAT passed. Independent visual review passed with minor label-crowding limitations. Evidence review requested the gain-zero/opposite-persona controls and blind metrics now shown above; its stronger claim that content-independent perturbation plus noise is the established cause is not justified by these controls alone. A matched neutral-prefix experiment is still absent. The bootstrap intervals do not include cross-process variation.
+
+Visual follow-up: the reviewer suspected a cross at short −C gain 4 in one panel. `selected-controls.json` records the production trace check: both markers are circles, damage 1.4115, admissible true. The frontend's broad `startsWith('prompting')` selector had incorrectly drawn sweep points as ordinary stars; it is now an exact two-method selector. UAT checks four unclipped stars and tests enabling only the two sweep curves. Fixed-grid paths now join only measured points, with no synthetic connection to bare. The full cached-results pipeline and UAT passed again (`outputs/logs/prompt-results-regression.log`); every score, interval, room score, seed count and admissibility count stayed exactly unchanged. Both review follow-ups report no blockers (`final-evidence-review.md`, `final-visual-review.md`). This directory retains the gain PNG, coverage log and results-regression log as audit snapshots.
+
+## Run history
 
 Short-prompt generation completed all 9 gains × 2 directions × 20 questions (360 answers). Separate Jev judging completed: 255 new aware ratings ($0.0108), 53 blind ratings ($0.0029), `JUDGE_COMPLETE missing=0`. The first judge invocation omitted the project's dotenv environment (`KeyError: OPENROUTER_API_KEY`); using `just --command` loaded it without exposing or changing credentials.
 
-Engineered-prompt same-process controls agree20/20; the historical cache differs. A fresh paired-control restart is justified by the measurements and other-family review below. No numeric tolerance was loosened, no ordinary-prompt historical answers overwritten, and the incomplete engineered sweep has not been judged.
+Engineered-prompt same-process controls agree20/20; the historical cache differs. A fresh paired-control restart was justified by the measurements and other-family review below, and completed both directions and all nine gains. No numeric tolerance was loosened, no ordinary-prompt historical answers overwritten, and the incomplete engineered sweep has not been judged.
 
-## GPU attempt audit
+## Initial failed-attempt audit (historical snapshot; resolution below)
 
 | Check | Observation and interpretation |
 |---|---|

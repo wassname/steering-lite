@@ -1,0 +1,241 @@
+{
+  "prompting_scale": {
+    "answers": 360,
+    "sign_gain_points": 18,
+    "health_failures": 0,
+    "boundary_confirmed": false,
+    "timing": {
+      "load_s": 9.452448526999998,
+      "setup_s": 54.65269242500001,
+      "total_s": 102.821312207,
+      "gpu": "NVIDIA L40S"
+    },
+    "status": "COMPLETE",
+    "unique_rows": 360,
+    "certificate_sha256": "64ddf64bb91d539c51f13c49f5d1ac236f6e23f5a06e14b25b134a5634676c5a",
+    "sources": [
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C0.jsonl",
+        "rows": 20,
+        "sha256": "a9ede44f3d81b85753bfa2d1c2e055c6b6dcd42d7bed7bfe796bd97fd22107ca"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C0.jsonl",
+        "rows": 20,
+        "sha256": "a6699d05537ac4e6a5847a631ac5c34bb6bbb775cfb4554976ac575b8f2ba0bb"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C0.125.jsonl",
+        "rows": 20,
+        "sha256": "c112d6d1def0fd7d08486ddf6a53ad83deeae880121f39f92487d97fbb332a6c"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C0.125.jsonl",
+        "rows": 20,
+        "sha256": "08b06a9af95817cab931d11f6537d308b86f0c08f9b06382e8b3798c2df8f0c7"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C0.25.jsonl",
+        "rows": 20,
+        "sha256": "4da67c8ef6e2f0ae50d816a59dbfd6ff006d6ac18566deae9a86430fa851bbb9"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C0.25.jsonl",
+        "rows": 20,
+        "sha256": "a627727987e1f5de1c7ed5819489f91bd13b445afa9bc372411dbae9e88cfa4a"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C0.5.jsonl",
+        "rows": 20,
+        "sha256": "627c1912e93eb284958adac8672bcc723a92cb8144ce52edcc172fb0bf7185f3"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C0.5.jsonl",
+        "rows": 20,
+        "sha256": "5cc6a97dba4cac73d1b473355d44b18a6724052f51515060b0c051fce1248bc8"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C1.jsonl",
+        "rows": 20,
+        "sha256": "1a79692035c44399a60e677891c695149bf764a7c869d7301aa78a0d584d1345"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C1.jsonl",
+        "rows": 20,
+        "sha256": "62d25f738b97a6d329b59917dcf97468ff6c8d0fb7f641071e1566c432ba91a9"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C2.jsonl",
+        "rows": 20,
+        "sha256": "ed1dbaa24754e523f23b64abc251058eb1171b6ad372f8ac0764a8137758fefc"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C2.jsonl",
+        "rows": 20,
+        "sha256": "8b8a61054c3673984151915cd820e70470a9b874a25c7c0496397dfd81d5dd18"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C4.jsonl",
+        "rows": 20,
+        "sha256": "4fcdf2ea7dbbdb7f3553c51863ee9490d862a51daa59ef5f8d6bdfed52cd0de0"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C4.jsonl",
+        "rows": 20,
+        "sha256": "71a09f55c8bb93f67df790c9acda5c038f1a741a2ee7e61bbe512ad9c6ae908f"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C8.jsonl",
+        "rows": 20,
+        "sha256": "aa346219bf4e30495af8390dfe06b76b1d0f1180ce0c896a2ce53967a9f0cbc3"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C8.jsonl",
+        "rows": 20,
+        "sha256": "71a6560aa56a184166d215cdd3a3c9ff34d978e0fd959111c07e9d644f7ad8a4"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/+C_C16.jsonl",
+        "rows": 20,
+        "sha256": "7069f27e64ee96a033e407ab99af3c848b39c239764b19d8f317e6804b72f6e2"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_scale_s0/-C_C16.jsonl",
+        "rows": 20,
+        "sha256": "727fcb014e6479f06b9d786184d66d7fe93467ea99bd259c19ccb690cb982f20"
+      }
+    ]
+  },
+  "prompting_engineered_scale": {
+    "answers": 360,
+    "sign_gain_points": 18,
+    "health_failures": 0,
+    "boundary_confirmed": false,
+    "timing": {
+      "load_s": 11.090421466999999,
+      "setup_s": 80.793623682,
+      "total_s": 148.513563387,
+      "gpu": "NVIDIA L40S"
+    },
+    "identity": {
+      "+C": {
+        "answers": 20,
+        "exact": true,
+        "historical_mismatches": 9,
+        "diagnostic": "prompt_checks/prompting_engineered_scale_s0_dev_+C.json"
+      },
+      "-C": {
+        "answers": 20,
+        "exact": true,
+        "historical_mismatches": 3,
+        "diagnostic": "prompt_checks/prompting_engineered_scale_s0_dev_-C.json"
+      }
+    },
+    "status": "COMPLETE",
+    "unique_rows": 360,
+    "certificate_sha256": "e27a59687491da92f03269b84993a8c5a3511b9aab80c44fb284fe43142d83b4",
+    "sources": [
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C0.jsonl",
+        "rows": 20,
+        "sha256": "83455604c4c6e2ab7f45971262b6eb4ebe9bfb2d7bf1e8ee0757b8916372d6aa"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C0.jsonl",
+        "rows": 20,
+        "sha256": "d18539b3c50db73c8fc1bc629e47dd9bf6b439b373c3b3f11a2ce534ecf6c73b"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C0.125.jsonl",
+        "rows": 20,
+        "sha256": "b7471d15c5bba4fb2093d1b5b98744b622818f3779b9ad0cf832db50fef111d8"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C0.125.jsonl",
+        "rows": 20,
+        "sha256": "5a1c0ef09271e7bd3ec4062013aa871397edfa37a3e79c1f86c7cd63add50eab"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C0.25.jsonl",
+        "rows": 20,
+        "sha256": "0104c958580ccd108d2ff68aef036ad48040c11478448a50b03bdbefb443763c"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C0.25.jsonl",
+        "rows": 20,
+        "sha256": "b22b0ad58e87f8ba45c8e540631c571dd7dde67e39dc03099d221a8217da5c3e"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C0.5.jsonl",
+        "rows": 20,
+        "sha256": "5862c9fb5a4b5dfa7515dd00c5f9a0985a9112f5b9cc1185b31e0b3438d50f1d"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C0.5.jsonl",
+        "rows": 20,
+        "sha256": "fcdc10b3b05e5aadbcf16708863f43f6e4397c765499bc854ed570319305c9a4"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C1.jsonl",
+        "rows": 20,
+        "sha256": "b95a41b245c7718dfbc278e960cf3ec55faa0ce3f05f656b03ba8c96435b9808"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C1.jsonl",
+        "rows": 20,
+        "sha256": "49d99499506c7aadd066b009a415c51ab89c0381c3fd73082e38ce2e4d1e1b4a"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C2.jsonl",
+        "rows": 20,
+        "sha256": "a314909ceacd8dfb0c81d8843e163500c57b26861e16e678c3b3e001ac308f50"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C2.jsonl",
+        "rows": 20,
+        "sha256": "11f14560c9fd4b166fc08b22b30fe67b6f3aead684963bfa1c12782ad6c7abdf"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C4.jsonl",
+        "rows": 20,
+        "sha256": "90ae760b90715433b6ce5bee11ce032dd9573828669030455fcbc00077dc73c2"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C4.jsonl",
+        "rows": 20,
+        "sha256": "d14b0f03a889a87db2cc7e5430a3819dc1e395fbb92b8a301ad38fec0ce61086"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C8.jsonl",
+        "rows": 20,
+        "sha256": "1a8059ce9f66c06648e908579364d4b37e63296bc571b4f34f37243950b3e374"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C8.jsonl",
+        "rows": 20,
+        "sha256": "b8cc057d191e7891771f67c29453ce7aaa84c65bd7099e9be796faba79a08454"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C16.jsonl",
+        "rows": 20,
+        "sha256": "312e003ab2bd5f16681fc15aba4c9489134b5d5e58845e62c7d7242b180f5da2"
+      },
+      {
+        "path": "outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/-C_C16.jsonl",
+        "rows": 20,
+        "sha256": "33adfc5362676f2843cca9ecc03b89fb9679efe9613b0dc580cae6774332eae8"
+      }
+    ],
+    "run_ids": [
+      "eaaec4853a684f4dab6c02abd3090d16"
+    ]
+  },
+  "cost_estimates": {
+    "jev_logged_usd": 0.0295,
+    "gpu_wall_proxy_seconds": 844,
+    "L40S_usd_per_second": 0.000542,
+    "gpu_wall_proxy_usd": 0.45744799999999997,
+    "note": "GPU list-price proxy uses full process wall time per launched worker; not invoice, excludes CPU/memory."
+  },
+  "unique_rows": 720
+}

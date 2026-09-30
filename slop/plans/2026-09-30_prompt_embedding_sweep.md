@@ -8,6 +8,8 @@ PI/OpenAI, 2026-09-30. User: "make prompting into a sweep ... a 'with' statement
    - Discriminator: token mask excludes padding/chat markers/question; C=1 reproduces ordinary prompting; cached decoding preserves unmodified later embeddings; no model/weight mutation.
    - Verify: real tiny-model generation through walk.py, then Qwen3.5-4B dev (20 questions, seed 0), pull, separate Jev judging, page/plot check.
    - Tasks: design review; implement one context manager and a walk.py prompt-sweep mode; tiny functional checks; bounded dev runs; read answers and report.
+   - Execution complete: `slop/reviews/2026-09-30_prompt_embedding/results.md` is the outcome; the historical planning/preflight notes below are not current blockers.
+   - Evidence: `coverage.log` reports `COVERAGE_PASS: 720 unique rows` and `fresh engineered identity 40/40`; `results-regression.log` reports `UAT_PASS` and `STATS_IDENTICAL`; `final-evidence-review.md` and `final-visual-review.md` resolve their reporting and figure concerns. All four files are in that review directory. Formal harness goal acceptance remains separate.
 
 ## Design and pseudocode
 
