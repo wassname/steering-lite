@@ -21,6 +21,7 @@ from typing import Iterable
 from pathlib import Path
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
 from judge import MAX_DAMAGE, MODEL, PREMISE, aware_request, blind_request, cached, key
@@ -548,6 +549,32 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def prompt_gain_plot(points: list[dict], title: str) -> go.Figure:
+    """Show every prompt gain, including doses omitted from the admissible frontier. PI/OpenAI."""
+    figure = make_subplots(rows=1, cols=2, subplot_titles=("Premise change from bare (− rejects, + accepts)", "Mean damage (0 clean → 4 broken)"))
+    methods = sorted({p["method"] for p in points if p["fixed_grid"]})
+    for method in methods:
+        for side in ("+C", "-C"):
+            doses = sorted({p["C"] for p in points if p["method"] == method})
+            groups = [[p for p in points if p["method"] == method and p["side"] == side and p["C"] == dose] for dose in doses]
+            for column, metric in enumerate(("effect", "steered_damage"), 1):
+                figure.add_trace(go.Scatter(
+                    x=[f"{dose:g}" for dose in doses], y=[mean(p[metric] for p in group) for group in groups],
+                    name=f"{method} {side}", legendgroup=f"{method}{side}", showlegend=column == 1,
+                    mode="lines+markers", line=dict(color=COLORS[method], dash="solid" if side == "+C" else "dash"),
+                    marker=dict(size=7, symbol=["circle" if all(p["admissible"] for p in group) else "x" for group in groups]),
+                ), row=1, col=column)
+    figure.add_hline(y=0, line_color="#aaaaaa", line_width=1, row=1, col=1)
+    figure.add_hline(y=MAX_DAMAGE, line_color="#aaaaaa", line_dash="dot", row=1, col=2)
+    figure.update_xaxes(type="category", title_text="Tested gain (categorical spacing)")
+    figure.update_yaxes(range=[0, 4], row=1, col=2)
+    figure.update_layout(template="plotly_white", title=dict(text=title, font_size=16),
+                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=110, b=100, l=55, r=25))
+    figure.add_annotation(text="× fails admissibility; dotted line: damage cap. Gain 0 keeps token positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. Finite grid, not a confirmed breakdown boundary.",
+                          x=0, y=-0.24, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
+    return figure
+
+
 def main() -> None:
     args = parse_args()
     model_dir = args.model_dir or default_model_dir()
@@ -608,7 +635,13 @@ def main() -> None:
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     if any(p["fixed_grid"] for p in points):
         intro += " Prompt embedding sweeps use a fixed gain grid and independent health checks per gain; their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
-    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
+    gain_image = ""
+    if any(p["fixed_grid"] for p in points):
+        gains = prompt_gain_plot(points, f"Prompt embedding gains: {model} ({args.cohort}, {len(scenarios)} questions)")
+        gains.write_image(out / "prompt_gains.png", width=1064, height=590, scale=2)
+        gains.write_html(out / "prompt_gains.html", include_plotlyjs="cdn")
+        gain_image = "\n\n![All tested prompt gains, including inadmissible doses](prompt_gains.png)"
+    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){gain_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>steering-lite bsbench</title>"

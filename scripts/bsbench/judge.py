@@ -23,11 +23,13 @@ import asyncio
 import hashlib
 import json
 import os
+from pathlib import Path
+from statistics import mean
 
 import httpx
 from loguru import logger
 
-from data import ROOT, default_model_dir, manifest
+from data import ROOT, default_model_dir, load_cohort, manifest
 
 CACHE = ROOT / "outputs/bsbench/judgments/jev.jsonl"
 MODEL = "typesafe/jev-1.13"
@@ -178,12 +180,48 @@ def refresh(wanted: dict[str, dict], label: str, run: bool) -> int:
     return len(todo)
 
 
+def judge_prompt_check(path: Path, run: bool) -> None:
+    """Measure rating drift in saved ordinary/C1 controls with the production rubric. PI/OpenAI."""
+    raw = path.read_bytes()
+    records = json.loads(raw)
+    sources = [name for name in records[0] if name not in ("scenario", "prompt")]
+    cohort = load_cohort()
+    requests = {
+        (row["scenario"], source): aware_request(cohort[row["scenario"]]["prompt"], cohort[row["scenario"]]["nonsensical_element"], row[source])
+        for row in records for source in sources
+    }
+    missing = refresh({key(request): request for request in requests.values()}, "prompt_identity", run)
+    if missing and not run:
+        return
+    have = cached()
+    scores = [{"scenario": row["scenario"], **{
+        source: {metric: have[key(requests[row["scenario"], source])][metric]["score"] for metric in ("premise", "damage")}
+        for source in sources
+    }} for row in records]
+    differences = {}
+    for source in sources:
+        if source == "historical":
+            continue
+        differences[source] = {}
+        for metric in ("premise", "damage"):
+            delta = [row[source][metric] - row["historical"][metric] for row in scores]
+            differences[source][metric] = {"mean_signed": mean(delta), "mean_absolute": mean(abs(x) for x in delta), "max_absolute": max(abs(x) for x in delta)}
+    output = path.with_suffix(".scores.json")
+    output.write_text(json.dumps({"source": str(path), "sha256": hashlib.sha256(raw).hexdigest(), "judge": MODEL,
+                                  "n": len(scores), "differences_from_historical": differences, "scores": scores}, indent=2) + "\n")
+    logger.info("PROMPT_CHECK_SCORED n={} differences_from_historical={} output={}", len(scores), differences, output)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
     parser.add_argument("--refresh", action="store_true", help="call the API for missing cells (else only report them)")
     parser.add_argument("--model", default="Qwen/Qwen3.5-4B", help="steered model whose walks to judge")
+    parser.add_argument("--prompt-check", type=Path, help="score a saved prompt-identity diagnostic instead of benchmark walks")
     args = parser.parse_args()
+    if args.prompt_check:
+        judge_prompt_check(args.prompt_check, args.refresh)
+        return
     model_dir = default_model_dir(args.model)
     missing = refresh(aware_requests(manifest(model_dir, args.cohort)), "aware", args.refresh)
     if missing and not args.refresh:
