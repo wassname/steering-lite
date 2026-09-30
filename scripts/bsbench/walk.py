@@ -6,7 +6,7 @@ template, greedy 512-token generation, health rule) follows the reference:
 
 - methods: every steering-lite method below, plus `prompting` (the persona as a prompt prefix) and
   `prompting_engineered` (AxBench-style LLM-written prompt, see ENGINEERED);
-  vjp_delta is steering-lite's copy of the reference estimator
+  vjp_resid is steering-lite's copy of the reference estimator
 - one process per walk: load the model and extract the vector once (the reference re-ran both per rung)
 - cohorts: `dev` = every 5th question (20), `full` = all 100, `ood` = 8 AlpacaEval instructions
   (not judged; the health rule alone gives each side's last coherent dose)
@@ -96,7 +96,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--smoke", action="store_true", help="8-token answers into outputs/bsbench-smoke; stop after --max-rungs")
     parser.add_argument("--profile", action="store_true", help="only measure where the persona contrast lives per layer (forward pass, no steering); writes profile/persona_s<seed>.json (persona-<tag>_s<seed>.json with --tag)")
     parser.add_argument("--vjp-check", action="store_true", help="only measure how the cached vector moves the target-layer activation along the persona contrast (forward only); writes vjp_check/<name>_s<seed>.json")
-    parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_delta from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
+    parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_resid from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
     args = parser.parse_args(argv)
@@ -134,12 +134,12 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
         return tuple(int(layer) for layer in value.split(","))
     n_layers = len(model.model.layers)
     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
-    if method in ("svdkv", "svdkv_resid"):
+    if method in ("sink_split", "sink_split_resid"):
         # every full-attention layer except 0 (there pos and neg end in the same token, so v* = 0); the residual part of
-        # svdkv_resid picks its own layers (mean_diff's 20-80% default)
+        # sink_split_resid picks its own layers (mean_diff's 20-80% default)
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
         return tuple(layer for layer in range(1, n_layers) if types[layer] == "full_attention")
-    if method in ("kv_cache_gram", "vjp_cache", "query_steer"):
+    if method in ("value_gram", "vjp_value", "query_steer"):
         # cache and query methods need full attention (KV cache, q_norm); hybrid models have it only on some layers
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
         layers = tuple(layer for layer in layers if types[layer] == "full_attention")
@@ -152,7 +152,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
         tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
         template=PERSONA_TEMPLATE, seed=args.seed,
     )
-    target_layer = args.target_layer if args.method in ("vjp_delta", "vjp_cache") else None
+    target_layer = args.target_layer if args.method in ("vjp_resid", "vjp_value") else None
     settings = {"layers": list(layers), "n_pairs": len(positive), "max_length": args.max_length, "target_layer": target_layer, "thinking": not args.no_think}
     if path.exists():
         saved = json.loads(path.with_suffix(".json").read_text())
@@ -166,7 +166,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
         "SHOULD: POS and NEG share the suffix and differ only in persona. ELSE extraction is invalid.\n"
         "=== extraction pair 0 ===\nPOS:\n{}\nNEG:\n{}\n=== end pair ===", positive[0], negative[0],
     )
-    extra = {"target_layer": args.target_layer} if args.method in ("vjp_delta", "vjp_cache") else {}
+    extra = {"target_layer": args.target_layer} if args.method in ("vjp_resid", "vjp_value") else {}
     config = CONFIGS[args.method](layers=layers, dtype=getattr(torch, args.dtype), seed=args.seed, **extra)
     started = time.monotonic()
     vector = Vector.train(
@@ -324,7 +324,7 @@ def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict
       cos  = cos(shift, c): how much of the movement is along c
       move = |shift| / |c|: total movement in units of the gap
     First-order VJP predicts gain linear in C, antisymmetric in sign, and cos well above a random vector's."""
-    from steering_lite.variants.vjp_delta import _activations, _encode
+    from steering_lite.variants.vjp_resid import _activations, _encode
     target = getattr(vector.cfg, "target_layer", None) or args.target_layer or len(model.model.layers) - 3
     positive, negative = make_persona_pairs(
         tokenizer, n_pairs=32, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
@@ -361,14 +361,14 @@ def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict
 
 
 def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> None:
-    """Is the vjp_delta vector signal, or noise left after a cancellation?
+    """Is the vjp_resid vector signal, or noise left after a cancellation?
 
     v = mean_pos(J.T c) - mean_neg(J.T c). Both class means share the direct residual path, so v can be a small
     difference of two large bf16 numbers.
       cancel    = |pos - neg| / |pos|: size of the difference relative to what cancels (small -> rounding noise likely)
       split_cos = cos(v from pairs[:n/2], v from pairs[n/2:]): a stable direction gives high cos, noise gives ~0
     The cotangent c uses all pairs, as in the real extraction."""
-    from steering_lite.variants.vjp_delta import _class_mean_vjp, _target_mean
+    from steering_lite.variants.vjp_resid import _class_mean_vjp, _target_mean
 
     positive, negative = make_persona_pairs(
         tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
@@ -388,7 +388,7 @@ def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> No
         va, vb = parts["a", "pos"][l] - parts["a", "neg"][l], parts["b", "pos"][l] - parts["b", "neg"][l]
         rows.append({"layer": l, "split_cos": float(cos(va, vb, dim=0)), "cancel": float(va.norm() / parts["a", "pos"][l].norm()),
                      "cos_pos_c": float(cos(parts["a", "pos"][l], c, dim=0))})
-    logger.info("VJP_SPLIT model={} target={} n_pairs={} half={}\nSHOULD: split_cos well above 0 (4B vjp_delta works); ELSE the vector is noise.\n{}",
+    logger.info("VJP_SPLIT model={} target={} n_pairs={} half={}\nSHOULD: split_cos well above 0 (4B vjp_resid works); ELSE the vector is noise.\n{}",
                 args.model, target, len(positive), half,
                 "\n".join(f"L{r['layer']:>2} split_cos={r['split_cos']:+.3f} cancel={r['cancel']:.4f} cos(pos,c)={r['cos_pos_c']:+.3f}" for r in rows))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -416,7 +416,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
     in the persona line. For the suffix tokens, compare KL(p_pos || p_neg steered at +C) with the same
     at -C: if +C brings the negative prompt's predictions closer to the positive prompt's, the sign is
     right. The KL form is confounded (both signs raise KL, so it tracks which sign damages more:
-    vjp_delta "flipped" there while the judge and blind judge agree it is correct), so the decision uses
+    vjp_resid "flipped" there while the judge and blind judge agree it is correct), so the decision uses
     the directional form: mass moved toward the tokens the positive persona prefers,
     score = move(+C) - move(-C), > 0 correct.
     """

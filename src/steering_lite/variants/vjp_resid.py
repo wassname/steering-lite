@@ -1,4 +1,4 @@
-"""VJP difference from vjp-steering efcd848 (the reference calls it vjp_delta).
+"""VJP-difference residual steering from vjp-steering efcd848 (reference name: vjp_delta).
 
 c = mean(h_target_positive) - mean(h_target_negative)
 v_layer = mean_positive(J.T @ c) - mean_negative(J.T @ c)
@@ -20,8 +20,8 @@ from ..vector import Vector
 
 @register_config
 @dataclass
-class VjpDeltaC(SteeringConfig):
-    method: str = "vjp_delta"
+class VjpResidC(SteeringConfig):
+    method: str = "vjp_resid"
     target_layer: int | None = None
     skip_first: int = 16
 
@@ -164,7 +164,7 @@ def _class_mean_vjp(
     return {layer: total / len(prompts) for layer, total in totals.items()}
 
 
-def vjp_delta(
+def vjp_resid(
     model,
     tokenizer,
     positive_prompts: list[str],
@@ -217,7 +217,7 @@ def vjp_delta(
     directions = {layer: positive[layer] - negative[layer] for layer in layers}
     directions = {layer: _unit_direction(direction) for layer, direction in directions.items()}
     stacked = {layer: {"v": direction.unsqueeze(0)} for layer, direction in directions.items()}
-    config = VjpDeltaC(
+    config = VjpResidC(
         layers=layers,
         target_layer=target_layer,
         skip_first=skip_first,
@@ -226,13 +226,13 @@ def vjp_delta(
 
 
 @register
-class VjpDelta:
-    name = "vjp_delta"
+class VjpResid:
+    name = "vjp_resid"
     extract_from_prompts = True
 
     @staticmethod
     def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
-        vector = vjp_delta(
+        vector = vjp_resid(
             model, tok, pos_prompts, neg_prompts, cfg.layers,
             target_layer=cfg.target_layer, skip_first=cfg.skip_first,
             batch_size=batch_size, max_length=max_length,

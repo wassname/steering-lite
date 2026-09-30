@@ -1,0 +1,5 @@
+All 7 new CLI IDs registered, old IDs absent; 29 renamed vector configs deserialize
+dev: summary, curves, method selection, colors and blind ratings exactly match pre-rename snapshot
+full: summary, curves, method selection, colors and blind ratings exactly match pre-rename snapshot
+olmo-full: summary, curves, method selection, colors and blind ratings exactly match pre-rename snapshot
+27b-full: summary, curves, method selection, colors and blind ratings exactly match pre-rename snapshot

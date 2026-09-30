@@ -131,7 +131,7 @@ def find_residual_linears(
     if not out:
         logger.warning(
             f"regex fallback {regex!r} also matched no Linears in layers {idxs}; "
-            "super_sspace will have an empty basis"
+            "sspace_pool will have an empty basis"
         )
     return out
 

@@ -1,7 +1,7 @@
-"""Super-SVD S-space steering on the residual stream (cosine-gated, multi-vec).
+"""Pooled S-space steering on the residual stream (cosine-gated, multi-vec).
 
 Like sspace, but the basis is shared across many Linears. Where sspace SVDs
-ONE weight matrix and steers in its column-space, super_sspace pools the
+ONE weight matrix and steers in its column-space, sspace_pool pools the
 residual-side singular vectors of ALL writers and readers in the selected
 blocks and SVDs the pool. The result is a global d_model -> r basis that
 covers what the residual stream can hold from layer activity, not just one
@@ -67,16 +67,16 @@ from ..target import find_residual_linears
 
 @register_config
 @dataclass
-class SuperSSpaceC(SteeringConfig):
-    method: str = "super_sspace"
+class SSpacePoolC(SteeringConfig):
+    method: str = "sspace_pool"
     r: int = -1                  # -1 = full d_model rank; else top-r by |dS|
     role: str = "both"           # "writer" | "reader" | "both"
     gate: str = "cosine"         # "cosine" = |cos(xS, dS_hat)| per-token; "off" = constant gate=1
 
 
 @register
-class SuperSSpace:
-    name = "super_sspace"
+class SSpacePool:
+    name = "sspace_pool"
     needs_model = True           # extract receives `model=` kwarg from train()
 
     @staticmethod
@@ -109,7 +109,7 @@ class SuperSSpace:
         λ = λ.flip(0).clamp_min(0)
         U_super = U_super.flip(1)
         Σ_super = λ.sqrt()                                # [d_model]
-        logger.info(f"super_sspace basis: d_model={d_model}, "
+        logger.info(f"sspace_pool basis: d_model={d_model}, "
                     f"writers={n_w}, readers={n_r}, "
                     f"σ_⋆[0]={Σ_super[0].item():.3g} σ_⋆[-1]={Σ_super[-1].item():.3g}")
         return U_super.float(), Σ_super.float()
@@ -118,12 +118,12 @@ class SuperSSpace:
     def extract(
         pos_acts: dict[int, Float[Tensor, "n d_model"]],
         neg_acts: dict[int, Float[Tensor, "n d_model"]],
-        cfg: SuperSSpaceC,
+        cfg: SSpacePoolC,
         *,
         model,
     ) -> dict[int, dict[str, dict[str, Tensor]]]:
         layer_indices = tuple(pos_acts.keys())
-        U_super, Σ_super = SuperSSpace._build_super_basis(model, layer_indices, cfg.role)
+        U_super, Σ_super = SSpacePool._build_super_basis(model, layer_indices, cfg.role)
         sqrtΣ = Σ_super.sqrt().clamp_min(ε)               # [d_model]; clamp avoids /0 for zero modes
 
         d_model = U_super.shape[0]
@@ -146,7 +146,7 @@ class SuperSSpace:
                 U_r, sqrtS_r, dS_r = U_super.contiguous(), sqrtΣ.contiguous(), dS
 
             # Normalize by the residual-space magnitude of dS: ||(dS_r * sqrtS_r)||.
-            # S-space normalization (||dS_r||=1) is wrong for super_sspace because
+            # S-space normalization (||dS_r||=1) is wrong for sspace_pool because
             # Gram eigenvalues (sqrtS) are pooled across ALL Linears and can be
             # orders of magnitude larger than any single Linear's σ. The roundtrip
             # (dS_unit * sqrtS) @ U_r.T would then produce a huge residual delta
@@ -168,7 +168,7 @@ class SuperSSpace:
         y: Float[Tensor, "b s d"],
         shared: dict[str, Tensor],
         stacked: dict[str, Tensor],
-        cfg: SuperSSpaceC,
+        cfg: SSpacePoolC,
     ) -> Float[Tensor, "b s d"]:
         U_r    = shared["U_r"].to(y)
         sqrtS  = shared["sqrtS"].to(y)

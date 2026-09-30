@@ -67,7 +67,7 @@ def main() -> None:
         "## Measured on Qwen3.5-4B (L40S)", "",
         f"- GPU time per fresh 100-question walk: median {gpu_min:.1f} min over {len(timed)} timed walks of the plan's methods and random "
         f"({', '.join(f'{m} s{s} {t['total_s'] / 60:.0f} min' for (m, s), t in sorted(timed.items()))}). At ${PRICE['L40S']:.2f}/h: ${gpu_min / 60 * PRICE['L40S']:.2f}. "
-        "Other methods differ: S-space methods took 48-83 min per fresh walk (super_sspace setup up to 44 min).",
+        "Other methods differ: S-space methods took 48-83 min per fresh walk (sspace_pool setup up to 44 min).",
         f"- Judge cost per 100-question walk (Jev, mean OpenRouter usage cost per request x requests per walk): aware ${judge_per_walk:.2f}, blind ${blind_per_walk:.2f}. "
         "(The earlier DeepSeek pairwise judge cost a median $0.80 + $0.13 blind per walk.)",
         "", "## Estimate for larger models (inference, about 2x uncertain)", "",

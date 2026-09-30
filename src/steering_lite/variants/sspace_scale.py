@@ -62,15 +62,15 @@ from .sspace import SSpace
 
 @register_config
 @dataclass
-class SSpaceDampAmpC(SteeringConfig):
-    method: str = "sspace_damp_amp"
+class SSpaceScaleC(SteeringConfig):
+    method: str = "sspace_scale"
     r: int = -1  # -1 = full rank; else top-r modes by |d_S|
     clamp_max: float = 4.0  # cap |log_scale| to avoid exp blowup; exp(4) ~ 55x
 
 
 @register
-class SSpaceDampAmp:
-    name = "sspace_damp_amp"
+class SSpaceScale:
+    name = "sspace_scale"
     default_target_submodule = r"mlp\.down_proj|self_attn\.o_proj"
     extract = SSpace.extract  # shared: U_r, sqrtS (+ optional b); stacked: dS [k,r]
 
@@ -81,7 +81,7 @@ class SSpaceDampAmp:
         y: Float[Tensor, "b s d_out"],
         shared: dict[str, Tensor],
         stacked: dict[str, Tensor],
-        cfg: SSpaceDampAmpC,
+        cfg: SSpaceScaleC,
     ) -> Float[Tensor, "b s d_out"]:
         U_r    = shared["U_r"].to(y)
         dS_raw = stacked["dS"].to(y)                                    # [k, r]

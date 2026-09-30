@@ -30,21 +30,21 @@ OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I gues
 N_BOOT = 1000
 PMAX = len(PREMISE) - 1  # top premise level (8)
 COLORS = {
-    "vjp_delta": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_cache": "#009e73",
-    "kv_cache_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
+    "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
+    "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
     "query_steer": "#f0e442",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
     ("angular_steering", "chars", "corda_pca", "cosine_gated", "directional_ablation", "linear_act", "spherical",
-     "sspace", "sspace_ablate", "sspace_damp_amp", "sspace_pca", "super_sspace", "topk_clusters"),
+     "sspace", "sspace_ablate", "sspace_scale", "sspace_pca", "sspace_pool", "topk_clusters"),
     ("#1f77b4", "#17becf", "#ff7f0e", "#2ca02c", "#98df8a", "#ff9896", "#d62728", "#c5b0d5", "#9467bd", "#8c564b", "#c49c94", "#e377c2", "#aec7e8"),
 ):
     COLORS[_method] = _color
 TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring learned methods; the table lists all
 LABELS = {
-    "vjp_delta": "VJP-delta", "mean_diff": "mean difference", "pca": "PCA", "vjp_cache": "VJP-cache",
-    "kv_cache_gram": "KV-cache Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
+    "vjp_resid": "VJP-resid", "mean_diff": "mean difference", "pca": "PCA", "vjp_value": "VJP-value",
+    "value_gram": "Value Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
 }
 LABELS |= {method: method for method in COLORS if method not in LABELS}
 
@@ -456,7 +456,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         figure.add_annotation(x=cone[-1][0], y=cone[-1][1] / 2, text="null zone of<br>random directions", showarrow=False, font={"color": "#666666", "size": 13})
     figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer -> abrasive", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=0.005, y=1, xref="paper", yref="paper", xanchor="left", yanchor="top", yshift=-34, align="left", showarrow=False,
+    figure.add_annotation(x=0.005, y=0.07, xref="paper", yref="paper", xanchor="left", yanchor="bottom", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
                           text="dot = Pareto point · ring = dose that sets the score<br>× = last coherent dose · ★ = prompt baseline")
     figure.add_annotation(x=0.5, y=0, xref="paper", yref="paper", text="mostly side effects", showarrow=False, yshift=18, font={"color": "#c44e52", "size": 14})
@@ -553,7 +553,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     exclude = {m for m in args.exclude.split(",") if m}
     points = build_points(model_dir, args.cohort, exclude)
-    # methods without a fixed colour (e.g. tagged variants like vjp_delta-t48) take the next spare colour, in name order
+    # methods without a fixed colour (e.g. tagged variants like vjp_resid-t48) take the next spare colour, in name order
     spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
     uncoloured = sorted({point["method"] for point in points} - set(COLORS))
     if len(uncoloured) > len(spare):
@@ -566,7 +566,7 @@ def main() -> None:
     cohort_rows = load_cohort()
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
-    # tagged variants (<method>-<tag>, e.g. vjp_delta-t47) are diagnostics: in the table, not in the default plot view
+    # tagged variants (<method>-<tag>, e.g. vjp_resid-t47) are diagnostics: in the table, not in the default plot view
     shown = [row["method"] for row in rows if row["method"] in methods and "-" not in row["method"] and not math.isnan(row["score"])][:TOP_N_PLOT]
     site = {
         "shown": shown,

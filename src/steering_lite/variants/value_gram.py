@@ -52,14 +52,14 @@ from ..target import _get_blocks
 
 @register_config
 @dataclass
-class KVCacheGramC(SteeringConfig):
-    method: str = "kv_cache_gram"
+class ValueGramC(SteeringConfig):
+    method: str = "value_gram"
     r: int = 16
 
 
 def _require_dynamic_cache() -> None:
     if DynamicCache is None or DynamicLayer is None:
-        raise ImportError("kv_cache_gram requires the steering-lite hf-test extra with transformers 5.x")
+        raise ImportError("value_gram requires the steering-lite hf-test extra with transformers 5.x")
 
 
 @dataclass
@@ -95,7 +95,7 @@ class SteeredDynamicCache(_CacheBase):
             return values
         if values.ndim != 4:
             raise ValueError(
-                f"kv_cache_gram expected value cache [b,h,t,d], got {tuple(values.shape)}"
+                f"value_gram expected value cache [b,h,t,d], got {tuple(values.shape)}"
             )
         directions = directions.to(values)
         if directions.shape[1:] != (values.shape[1], values.shape[3]):
@@ -125,7 +125,7 @@ class SteeredDynamicCache(_CacheBase):
             layer = self.layers[layer_idx]
             if type(layer) is not DynamicLayer:
                 raise TypeError(
-                    f"kv_cache_gram layer {layer_idx} requires DynamicLayer, got {type(layer).__name__}"
+                    f"value_gram layer {layer_idx} requires DynamicLayer, got {type(layer).__name__}"
                 )
             value_states = self._edit(value_states, layer_idx)
         return super().update(key_states, value_states, layer_idx, *args, **kwargs)
@@ -149,7 +149,7 @@ class SteeredDynamicCache(_CacheBase):
         for layer_idx, layer in enumerate(cache.layers):
             if type(layer) is not DynamicLayer:
                 raise TypeError(
-                    f"kv_cache_gram cannot promote a populated {type(layer).__name__} "
+                    f"value_gram cannot promote a populated {type(layer).__name__} "
                     f"at layer {layer_idx}"
                 )
             if not layer.is_initialized:
@@ -178,8 +178,8 @@ class _CacheHookHandle:
 
 
 @register
-class KVCacheGram:
-    name = "kv_cache_gram"
+class ValueGram:
+    name = "value_gram"
     cache_intervention = True
     extract_from_prompts = True
 
@@ -194,7 +194,7 @@ class KVCacheGram:
         max_length: int,
     ) -> tuple[dict[int, Tensor], dict[int, Tensor]]:
         if not prompts:
-            raise ValueError("kv_cache_gram needs at least one prompt in each class")
+            raise ValueError("value_gram needs at least one prompt in each class")
         device = next(model.parameters()).device
         gram_sum: dict[int, Tensor] = {}
         mean_sum: dict[int, Tensor] = {}
@@ -215,14 +215,14 @@ class KVCacheGram:
                     cache = outputs.past_key_values
                     if not isinstance(cache, DynamicCache):
                         raise TypeError(
-                            f"kv_cache_gram extraction requires DynamicCache, got {type(cache).__name__}"
+                            f"value_gram extraction requires DynamicCache, got {type(cache).__name__}"
                         )
                     mask = enc["attention_mask"].to(torch.bool).cpu()
                     for layer_idx in layers:
                         layer = cache.layers[layer_idx]
                         if type(layer) is not DynamicLayer:
                             raise TypeError(
-                                f"kv_cache_gram requires full-attention DynamicLayer, got "
+                                f"value_gram requires full-attention DynamicLayer, got "
                                 f"{type(layer).__name__} at layer {layer_idx}"
                             )
                         values = layer.values.detach().cpu().double()       # [b,h,t,d]
@@ -254,7 +254,7 @@ class KVCacheGram:
         tok,
         pos_prompts: list[str],
         neg_prompts: list[str],
-        cfg: KVCacheGramC,
+        cfg: ValueGramC,
         *,
         batch_size: int = 8,
         max_length: int = 256,
@@ -263,11 +263,11 @@ class KVCacheGram:
         blocks = _get_blocks(model)
         layers = tuple(range(len(blocks))) if cfg.layers is None else tuple(cfg.layers)
         if cfg.r == 0 or cfg.r < -1:
-            raise ValueError(f"kv_cache_gram r must be -1 or >= 1, got {cfg.r}")
-        pos_gram, pos_mean = KVCacheGram._class_stats(
+            raise ValueError(f"value_gram r must be -1 or >= 1, got {cfg.r}")
+        pos_gram, pos_mean = ValueGram._class_stats(
             model, tok, pos_prompts, layers, batch_size=batch_size, max_length=max_length
         )
-        neg_gram, neg_mean = KVCacheGram._class_stats(
+        neg_gram, neg_mean = ValueGram._class_stats(
             model, tok, neg_prompts, layers, batch_size=batch_size, max_length=max_length
         )
 
@@ -283,20 +283,20 @@ class KVCacheGram:
             norm = direction.norm(dim=-1, keepdim=True)
             if not torch.isfinite(norm).all() or torch.any(norm <= ε):
                 raise ValueError(
-                    f"kv_cache_gram layer {layer_idx} has a non-finite or zero head direction"
+                    f"value_gram layer {layer_idx} has a non-finite or zero head direction"
                 )
             direction = (direction / norm).float().contiguous()
             out[layer_idx] = {"shared": {}, "stacked": {"c": direction.unsqueeze(0)}}
         return out
 
     @staticmethod
-    def install(model: nn.Module, cfg: KVCacheGramC, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
+    def install(model: nn.Module, cfg: ValueGramC, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
         decoder = getattr(model, "model", model)
         if not hasattr(decoder, "layers"):
             language_model = getattr(decoder, "language_model", None)
             decoder = getattr(language_model, "model", language_model)
         if decoder is None or not hasattr(decoder, "layers"):
-            raise RuntimeError("kv_cache_gram could not find the decoder module")
+            raise RuntimeError("value_gram could not find the decoder module")
         _require_dynamic_cache()
         directions = {layer_idx: state["c"] for layer_idx, state in stacked.items()}
         config = getattr(decoder, "config", model.config)
@@ -311,7 +311,7 @@ class KVCacheGram:
                 )
             elif type(cache) is cache_type:
                 if not cache.matches(directions, cfg.coeff):
-                    raise RuntimeError("past_key_values belongs to a different kv_cache_gram attachment")
+                    raise RuntimeError("past_key_values belongs to a different value_gram attachment")
                 cache._steering_directions = directions
                 cache._steering_lease = lease
             elif isinstance(cache, SteeredDynamicCache):
@@ -322,7 +322,7 @@ class KVCacheGram:
                 )
             else:
                 raise TypeError(
-                    f"kv_cache_gram requires DynamicCache, got {type(cache).__name__}"
+                    f"value_gram requires DynamicCache, got {type(cache).__name__}"
                 )
             return args, kwargs
 

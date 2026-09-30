@@ -3,7 +3,7 @@
 Per walk and side: the last healthy dose before the confirmed boundary (2 unhealthy rungs in a row),
 its ratio to C0, and the RMS KL there. Rows for BS-bench (dev) and the held-out AlpacaEval set (ood),
 plus, from points.json when it exists, the last judge-admissible dose (the health rule misses short
-gibberish, e.g. vjp_delta +C C=1.26 "Heat shit fast like damn shit yeah.") and the Pareto-best dose.
+gibberish, e.g. vjp_resid +C C=1.26 "Heat shit fast like damn shit yeah.") and the Pareto-best dose.
 
     python calibration.py            # writes outputs/bsbench/results/calibration.md
 """

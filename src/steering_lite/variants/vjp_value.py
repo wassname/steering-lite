@@ -12,16 +12,16 @@ import torch
 from einops import einsum
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks
-from .kv_cache_gram import DynamicCache, DynamicLayer, KVCacheGram, SteeredDynamicCache, _require_dynamic_cache
-from .vjp_delta import _activations, _encode, _target_mean, _unit_direction, _valid_mask
+from .value_gram import DynamicCache, DynamicLayer, ValueGram, SteeredDynamicCache, _require_dynamic_cache
+from .vjp_resid import _activations, _encode, _target_mean, _unit_direction, _valid_mask
 
 _CacheBase = DynamicCache if DynamicCache is not None else object
 
 
 @register_config
 @dataclass
-class VjpCacheC(SteeringConfig):
-    method: str = "vjp_cache"
+class VjpValueC(SteeringConfig):
+    method: str = "vjp_value"
     target_layer: int | None = None
     skip_first: int = 16
 
@@ -35,7 +35,7 @@ class ValueGradientCache(_CacheBase):
     def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
         if layer_idx in self.selected:
             if not isinstance(self.layers[layer_idx], DynamicLayer):
-                raise TypeError(f"VJP-cache requires a full-attention DynamicLayer at {layer_idx}")
+                raise TypeError(f"VJP-value requires a full-attention DynamicLayer at {layer_idx}")
             # Seed the autograd graph at the earliest selected layer. The model
             # and input parameters are frozen, so the only graph root is a
             # value-cache input: detaching and re-requiring grad on
@@ -100,8 +100,8 @@ def _class_mean_cache_vjp(model, tok, prompts, layers, target_layer, cotangent, 
 
 
 @register
-class VjpCache:
-    name = "vjp_cache"
+class VjpValue:
+    name = "vjp_value"
     extract_from_prompts = True
     cache_intervention = True
 
@@ -113,9 +113,9 @@ class VjpCache:
         target = count - 3 if cfg.target_layer is None else cfg.target_layer
         layers = cfg.layers
         if not 0 <= target < count or not layers or len(set(layers)) != len(layers) or min(layers) < 0 or max(layers) >= target:
-            raise ValueError("VJP-cache requires unique source layers preceding an in-range target")
+            raise ValueError("VJP-value requires unique source layers preceding an in-range target")
         if not pos_prompts or len(pos_prompts) != len(neg_prompts):
-            raise ValueError("VJP-cache requires nonempty paired positive/negative prompts")
+            raise ValueError("VJP-value requires nonempty paired positive/negative prompts")
         cotangent = _target_mean(model, tok, pos_prompts, target, batch_size, max_length) - _target_mean(model, tok, neg_prompts, target, batch_size, max_length)
         positive = _class_mean_cache_vjp(model, tok, pos_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
         negative = _class_mean_cache_vjp(model, tok, neg_prompts, layers, target, cotangent, batch_size, max_length, cfg.skip_first)
@@ -128,7 +128,7 @@ class VjpCache:
 
     @staticmethod
     def install(model, cfg, stacked):
-        return KVCacheGram.install(model, cfg, stacked, cache_type=AdditiveValueCache)
+        return ValueGram.install(model, cfg, stacked, cache_type=AdditiveValueCache)
 
     @staticmethod
     def apply(_mod, _x, y, _shared, _stacked, _cfg):

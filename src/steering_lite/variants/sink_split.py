@@ -1,9 +1,9 @@
-"""svdkv: steer by letting the query choose between two halves of the attention sink (+ optional mean-diff residual).
+"""sink_split: steer by letting the query choose between two halves of the attention sink (+ optional mean-diff residual).
 
-Most heads put much of their attention on the first token (the attention sink). svdkv hides the real sink and puts two
+Most heads put much of their attention on the first token (the attention sink). sink_split hides the real sink and puts two
 copies in the KV cache, one carrying +v* and one −v*, with keys a small step apart along u. A query shift C·u moves
 attention between the halves, so C sets how much of ±v* the heads read. v* is the value mean diff (sycophantic − abrasive)
-at the last token. svdkv_resid adds mean_diff's residual vector at the same C.
+at the last token. sink_split_resid adds mean_diff's residual vector at the same C.
 
 Per attention layer L (full-attention layers ≥ 1), per KV head g, all after RoPE:
     sink±   key k_first ± ε·u,   value v_first ± ν·v̂*,   logit bias −ln 2 each   (k_first, v_first: this row's real first
@@ -17,18 +17,18 @@ the last token (a calibrated dose C0 is 1 nat); max |Δ log-prob| 3.85 (a rare t
 positions, last token mean 0.18, max 1.43 (one of 8 prompts is a full dose off bare at its last token).
 Qwen3.5-4B, ν = 550 (calibrated): 0.007 nats over positions, last token mean 0.015, max 0.043; max |Δ log-prob| 9.2.
 TODO(PI[claude]): centre the split, e.g. subtract each head's mean q·u; untested.
-svdkv_resid also:  h_L += C · r_scale · r̂*_L on mean_diff's default layers (20-80% depth)
+sink_split_resid also:  h_L += C · r_scale · r̂*_L on mean_diff's default layers (20-80% depth)
 
 Constants are set at extraction from iso-KL doses (1 nat RMS KL, steering-lite calibrate_iso_kl):
     ν_g = nu_mult · C0(sink value alone) · ‖v̂*_g‖        nu_mult 3.2 (Qwen3-4B: best −C dose 12.7 / C0 4.0)
-    r_scale = C0(mean_diff) / C0(svdkv)                    so each part contributes at its own calibrated strength
+    r_scale = C0(mean_diff) / C0(sink_split)                    so each part contributes at its own calibrated strength
 
 Evidence (Qwen3-4B, BS-bench v2, Jev), write-up https://github.com/wassname/query-steering/blob/concept-steer/outputs/results.md
-(svdkv_resid was named qslotr_sum there, svdkv q_slot_big): full 100 questions, −C side score svdkv_resid +3.94 vs mean_diff
+(sink_split_resid was named qslotr_sum there, sink_split q_slot_big): full 100 questions, −C side score sink_split_resid +3.94 vs mean_diff
 +1.71, paired 90% CI of the difference [+1.79, +2.67]; 3 dev seeds agree; +C ties (Qwen3-4B already accepts most premises).
-svdkv alone ≈ mean_diff. The random-vector control there was for a sibling method (sinkr_sum: a fixed v* written into the
+sink_split alone ≈ mean_diff. The random-vector control there was for a sibling method (sinkr_sum: a fixed v* written into the
 sink value + residual): with a random unit vector in place of v* its −C gain fell to mean_diff's level. No random control
-was run for svdkv / svdkv_resid themselves.
+was run for sink_split / sink_split_resid themselves.
 Requires attention that goes through transformers' ALL_ATTENTION_FUNCTIONS (Qwen3, Qwen3.5 full-attention layers).
 PI[claude] 2026-09-29.
 """
@@ -42,7 +42,7 @@ from loguru import logger
 
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks
-from .vjp_delta import _encode, _unit_direction
+from .vjp_resid import _encode, _unit_direction
 
 MIN_VISIBLE = 4  # a query position reads the sink halves only once it sees this many real tokens (hand-set; 1-3 broke Qwen3-0.6B)
 N_DIR_PROMPTS = 16  # prompts per class for u's key/query statistics (hand-set on Qwen3-4B)
@@ -166,7 +166,7 @@ def _extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_lengt
     # C0 of the sink write alone: both halves carry +v̂* write via ν = C: equivalent to sink_value (v_first += C·v̂*)
     c0_sink = None
     if cfg.nu_scale is None:  # given explicitly: use it (tests); else calibrate
-        probe = replace(cfg, method="svdkv", layers=layers, nu_scale=1.0, sink_only=True, r_scale=0.0)
+        probe = replace(cfg, method="sink_split", layers=layers, nu_scale=1.0, sink_only=True, r_scale=0.0)
         c0_sink = _iso_kl_c0(model, tok, probe, {L: {**shared[L], "vstar": unit[L]} for L in layers}, {L: {"u": shared[L]["u"].flatten()[None]} for L in layers})
         cfg.nu_scale = cfg.nu_mult * c0_sink
     for L in layers:
@@ -183,7 +183,7 @@ def _extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_lengt
         for L in r_layers:
             stacked.setdefault(L, {})["r"] = r[L][None].cpu()
     cfg.layers = tuple(sorted(set(shared) | set(stacked)))  # attention layers ∪ residual layers: attach targets exactly these
-    logger.info("svdkv C0 sink={} -> nu_scale={:.3g}; r_scale={}", c0_sink, cfg.nu_scale, cfg.r_scale if cfg.with_residual else None)
+    logger.info("sink_split C0 sink={} -> nu_scale={:.3g}; r_scale={}", c0_sink, cfg.nu_scale, cfg.r_scale if cfg.with_residual else None)
     return {L: {"shared": shared.get(L, {}), "stacked": stacked[L]} for L in sorted(set(shared) | set(stacked))}
 
 
@@ -260,25 +260,25 @@ def _install(model, cfg, stacked):
 
 @register_config
 @dataclass
-class SvdkvC(SteeringConfig):
-    method: str = "svdkv"
+class SinkSplitC(SteeringConfig):
+    method: str = "sink_split"
     eps: float = 1.0  # key offset along u; logit gap between the halves = 2·eps·(q·u + C)·scale (hand-set on Qwen3-0.6B: 0.05 too weak, 5 moved C=0)
     nu_mult: float = 3.2  # ν in units of the sink write's own C0 (hand-set: Qwen3-4B best −C dose 12.7 / C0 4.0)
     nu_scale: float | None = None  # set at extraction
     with_residual: bool = False
-    r_scale: float | None = None  # set at extraction (svdkv_resid)
+    r_scale: float | None = None  # set at extraction (sink_split_resid)
     sink_only: bool = False  # calibration probe only
     attn_off: bool = False  # calibration probe only
 
 
 @register_config
 @dataclass
-class SvdkvResidC(SvdkvC):
-    method: str = "svdkv_resid"
+class SinkSplitResidC(SinkSplitC):
+    method: str = "sink_split_resid"
     with_residual: bool = True
 
 
-for _name in ("svdkv", "svdkv_resid"):
+for _name in ("sink_split", "sink_split_resid"):
     register(type(_name, (), {
         "name": _name, "extract_from_prompts": True, "cache_intervention": True,
         "extract": staticmethod(_extract), "install": staticmethod(_install),

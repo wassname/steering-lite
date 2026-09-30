@@ -79,7 +79,7 @@ def cached_on_volume(argv: list[str]) -> bool:
 
 
 @app.local_entrypoint()
-def main(methods: str = "mean_diff,pca,vjp_delta", seeds: str = "0", cohort: str = "dev", extra: str = ""):
+def main(methods: str = "mean_diff,pca,vjp_resid", seeds: str = "0", cohort: str = "dev", extra: str = ""):
     jobs = [(method, seed) for seed in seeds.split(",") for method in methods.split(",")]
     argvs = {job: [job[0], "--seed", job[1], "--cohort", cohort, *extra.split()] for job in jobs}
     todo = [job for job in jobs if not cached_on_volume(argvs[job])]
@@ -100,5 +100,5 @@ def main(methods: str = "mean_diff,pca,vjp_delta", seeds: str = "0", cohort: str
 @app.local_entrypoint()
 def smoke():
     """Same image, mounts and Volume as the real fan-out, real Qwen3.5-4B, 8-token answers, 2 rungs."""
-    print(run.remote("vjp_cache --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
+    print(run.remote("vjp_value --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
     print(run.remote("mean_diff --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))

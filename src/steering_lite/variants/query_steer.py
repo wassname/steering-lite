@@ -26,7 +26,7 @@ from torch import Tensor
 
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks
-from .vjp_delta import _encode
+from .vjp_resid import _encode
 
 
 ε = 1e-8

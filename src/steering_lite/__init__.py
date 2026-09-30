@@ -19,19 +19,19 @@ from .variants.sspace import SSpaceC
 from .variants.sspace_pca import SSpacePCAC
 from .variants.corda_pca import CordaPCAC
 from .variants.sspace_ablate import SSpaceAblateC
-from .variants.sspace_damp_amp import SSpaceDampAmpC
-from .variants.super_sspace import SuperSSpaceC
+from .variants.sspace_scale import SSpaceScaleC
+from .variants.sspace_pool import SSpacePoolC
 from .variants.spherical import SphericalC
 from .variants.directional_ablation import DirectionalAblationC
 from .variants.chars import CHaRSC
 from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
 from .variants.random import RandomC
-from .variants.kv_cache_gram import KVCacheGramC
-from .variants.vjp_delta import VjpDeltaC
-from .variants.vjp_cache import VjpCacheC
+from .variants.value_gram import ValueGramC
+from .variants.vjp_resid import VjpResidC
+from .variants.vjp_value import VjpValueC
 from .variants.query_steer import QuerySteerC
-from .variants.svdkv import SvdkvC, SvdkvResidC
+from .variants.sink_split import SinkSplitC, SinkSplitResidC
 
 __all__ = [
     "SteeringConfig",
@@ -43,20 +43,20 @@ __all__ = [
     "SSpacePCAC",
     "CordaPCAC",
     "SSpaceAblateC",
-    "SSpaceDampAmpC",
-    "SuperSSpaceC",
+    "SSpaceScaleC",
+    "SSpacePoolC",
     "SphericalC",
     "DirectionalAblationC",
     "CHaRSC",
     "LinearAcTC",
     "AngularSteeringC",
     "RandomC",
-    "KVCacheGramC",
-    "VjpDeltaC",
-    "VjpCacheC",
+    "ValueGramC",
+    "VjpResidC",
+    "VjpValueC",
     "QuerySteerC",
-    "SvdkvC",
-    "SvdkvResidC",
+    "SinkSplitC",
+    "SinkSplitResidC",
     "record_activations",
     "train",
     "attach",

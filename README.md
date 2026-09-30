@@ -70,10 +70,10 @@ The table shows every method we tested. Brackets are 90% bootstrap intervals. Mo
 
 | method | Qwen3.5-4B score↑ | Qwen3.5-27B score↑ | OLMo-2-32B score↑ |
 | --- | ---: | ---: | ---: |
-| [vjp_cache](src/steering_lite/variants/vjp_cache.py) | **+1.14** [+0.75, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.75, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
 | [chars](src/steering_lite/variants/chars.py) | +0.88 [+0.49, +1.23] | +0.43 [+0.01, +1.11] | +0.13 [-0.04, +0.34] |
 | [linear_act](src/steering_lite/variants/linear_act.py) | +0.71 [+0.39, +1.01] |  |  |
-| [vjp_delta](src/steering_lite/variants/vjp_delta.py) | +0.66 [+0.39, +1.14] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.39, +1.14] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
 | [spherical](src/steering_lite/variants/spherical.py) | +0.54 [+0.10, +1.01] |  |  |
 | [directional_ablation](src/steering_lite/variants/directional_ablation.py) | +0.47 [+0.20, +0.84] |  |  |
 | [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.15, +0.78] | **+0.91** [+0.60, +1.33] | **+0.21** [+0.04, +0.50] |
@@ -82,13 +82,13 @@ The table shows every method we tested. Brackets are 90% bootstrap intervals. Mo
 | [cosine_gated](src/steering_lite/variants/cosine_gated.py) | +0.14 [-0.03, +0.49] |  |  |
 | [query_steer](src/steering_lite/variants/query_steer.py) | +0.10 [-0.15, +0.41] |  |  |
 | [sspace_ablate](src/steering_lite/variants/sspace_ablate.py) | +0.07 [-0.09, +0.36] |  |  |
-| [super_sspace](src/steering_lite/variants/super_sspace.py) | +0.06 [-0.13, +0.33] |  |  |
+| [sspace_pool](src/steering_lite/variants/sspace_pool.py) | +0.06 [-0.13, +0.33] |  |  |
 | [sspace](src/steering_lite/variants/sspace.py) | +0.01 [-0.08, +0.27] |  |  |
 | [sspace_pca](src/steering_lite/variants/sspace_pca.py) | -0.07 [-0.28, +0.16] |  |  |
 | *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.22, +0.13] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.01] |
 | [pca](src/steering_lite/variants/pca.py) | -0.12 [-0.30, +0.21] |  |  |
-| [sspace_damp_amp](src/steering_lite/variants/sspace_damp_amp.py) | -0.14 [-0.32, +0.14] |  |  |
-| [kv_cache_gram](src/steering_lite/variants/kv_cache_gram.py) | -0.25 [-0.50, -0.12] |  |  |
+| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | -0.14 [-0.32, +0.14] |  |  |
+| [value_gram](src/steering_lite/variants/value_gram.py) | -0.25 [-0.50, -0.12] |  |  |
 | *[prompting](scripts/bsbench/walk.py#L62)* | — | — | — |
 | *[prompting_engineered](scripts/bsbench/walk.py#L55)* | — | — | — |
 
@@ -102,13 +102,13 @@ Four methods also ran on Qwen3.5-27B and OLMo-2-0325-32B-Instruct. The score can
 
 | method | 4B score↑ | 4B on ÷ room↑ | 27B score↑ | 27B on ÷ room↑ | OLMo score↑ | OLMo on ÷ room↑ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| [vjp_cache](src/steering_lite/variants/vjp_cache.py) | **+1.14** [+0.75, +1.56] | **+0.40** | +0.34 [+0.09, +0.69] | +0.33 | -0.20 [-0.38, -0.10] | +0.00 |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.75, +1.56] | **+0.40** | +0.34 [+0.09, +0.69] | +0.33 | -0.20 [-0.38, -0.10] | +0.00 |
 | [chars](src/steering_lite/variants/chars.py) | +0.88 [+0.49, +1.23] | +0.35 | +0.43 [+0.01, +1.11] | +0.36 | +0.13 [-0.04, +0.34] | +0.23 |
-| [vjp_delta](src/steering_lite/variants/vjp_delta.py) | +0.66 [+0.39, +1.14] | +0.24 | -0.01 [-0.13, +0.25] | +0.13 | -0.05 [-0.16, +0.03] | +0.03 |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.39, +1.14] | +0.24 | -0.01 [-0.13, +0.25] | +0.13 | -0.05 [-0.16, +0.03] | +0.03 |
 | [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.15, +0.78] | +0.14 | **+0.91** [+0.60, +1.33] | **+0.64** | **+0.21** [+0.04, +0.50] | **+0.27** |
 | *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.22, +0.13] | +0.01 | -0.05 [-0.12, +0.14] | +0.02 | -0.10 [-0.15, -0.01] | +0.01 |
 
-Within each model, the two columns rank these four methods in the same order, so the room correction does not change which of them looks best there. Between models the order changes: mean_diff is 4th of 4 on the 4B model and 1st on both larger models. On Qwen3.5-27B the VJP methods keep much of their effect per unit of room (vjp_cache +0.40 → +0.33). On OLMo they barely steer (on ÷ room +0.00 and +0.03, random +0.01), while mean_diff and chars still do. The [research journal](RESEARCH_JOURNAL.md) has the checks for a bug (none found) and extra `vjp_delta` runs with other settings.
+Within each model, the two columns rank these four methods in the same order, so the room correction does not change which of them looks best there. Between models the order changes: mean_diff is 4th of 4 on the 4B model and 1st on both larger models. On Qwen3.5-27B the VJP methods keep much of their effect per unit of room (vjp_value +0.40 → +0.33). On OLMo they barely steer (on ÷ room +0.00 and +0.03, random +0.01), while mean_diff and chars still do. The [research journal](RESEARCH_JOURNAL.md) has the checks for a bug (none found) and extra `vjp_resid` runs with other settings.
 
 Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (7th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
 
@@ -132,7 +132,7 @@ The outputs go to `outputs/bsbench/results/<cohort>/`. [`calibration.py`](script
 
 ## Methods and debugging
 
-Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). Newer variants are [VJP delta](src/steering_lite/variants/vjp_delta.py), [VJP cache](src/steering_lite/variants/vjp_cache.py), [KV-cache Gram](src/steering_lite/variants/kv_cache_gram.py) and [query steering](src/steering_lite/variants/query_steer.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
+Each implementation includes its own math and references in [the variants directory](src/steering_lite/variants). Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). Newer variants are [VJP residual](src/steering_lite/variants/vjp_resid.py), [VJP value](src/steering_lite/variants/vjp_value.py), [Value Gram](src/steering_lite/variants/value_gram.py) and [query steering](src/steering_lite/variants/query_steer.py). [S-space](src/steering_lite/variants/sspace.py) also supports `gate="signed"`. [Random](src/steering_lite/variants/random.py) is an evaluation-only null baseline.
 
 The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 

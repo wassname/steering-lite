@@ -17,22 +17,22 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 import steering_lite as sl
 from steering_lite import Vector
 from steering_lite.config import REGISTRY, _CONFIG_REGISTRY
-from steering_lite.variants.kv_cache_gram import (
+from steering_lite.variants.value_gram import (
     SteeredDynamicCache,
     _CacheSteeringLease,
 )
-from steering_lite.variants.vjp_cache import ValueGradientCache, _cache_gradients
-from steering_lite.variants.vjp_delta import _activations, _encode, _target_mean
-import steering_lite.variants.vjp_delta as vjp_delta_module
+from steering_lite.variants.vjp_value import ValueGradientCache, _cache_gradients
+from steering_lite.variants.vjp_resid import _activations, _encode, _target_mean
+import steering_lite.variants.vjp_resid as vjp_resid_module
 
 TINY_MODEL = "hf-internal-testing/tiny-random-LlamaForCausalLM"
 TINY_QWEN = "wassname/qwen3-5lyr-tiny-random"  # query_steer needs self_attn.q_norm, which Llama lacks
 METHODS = [
     "mean_diff", "pca", "topk_clusters", "cosine_gated",
-    "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_damp_amp", "super_sspace",
+    "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_scale", "sspace_pool",
     "spherical", "directional_ablation", "chars", "linear_act",
-    "angular_steering", "random", "kv_cache_gram", "vjp_delta", "vjp_cache", "query_steer",
-    "svdkv", "svdkv_resid",
+    "angular_steering", "random", "value_gram", "vjp_resid", "vjp_value", "query_steer",
+    "sink_split", "sink_split_resid",
 ]
 
 POS = [
@@ -54,29 +54,29 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
     coeff = 0.1 if method in low else 2.0
     common = dict(layers=layers, coeff=coeff, dtype=torch.float32, seed=0)
     table = {
-        "mean_diff":             sl.MeanDiffC(**common),
-        "pca":                   sl.PCAC(**common),
-        "topk_clusters":         sl.TopKClustersC(**common, k=2),
-        "cosine_gated":          sl.CosineGatedC(**common, tau=0.0),
-        "sspace":                sl.SSpaceC(**common, r=2),
-        "sspace_pca":            sl.SSpacePCAC(**common, r=2),
-        "corda_pca":             sl.CordaPCAC(**common, r=2),
-        "sspace_ablate":         sl.SSpaceAblateC(**common, r=2),
-        "sspace_damp_amp":       sl.SSpaceDampAmpC(**common, r=2),
-        "super_sspace":          sl.SuperSSpaceC(**common, r=2),
-        "spherical":             sl.SphericalC(**common),
-        "directional_ablation":  sl.DirectionalAblationC(**common),
-        "chars":                 sl.CHaRSC(**common, k=2),
-        "linear_act":            sl.LinearAcTC(**common),
-        "angular_steering":      sl.AngularSteeringC(**common),
-        "random":                sl.RandomC(**common),
-        "kv_cache_gram":         sl.KVCacheGramC(**common, r=2),
-        "vjp_delta":             sl.VjpDeltaC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
-        "vjp_cache":             sl.VjpCacheC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
-        "query_steer":           sl.QuerySteerC(**common),
+        "mean_diff":            sl.MeanDiffC(**common),
+        "pca":                  sl.PCAC(**common),
+        "topk_clusters":        sl.TopKClustersC(**common, k=2),
+        "cosine_gated":         sl.CosineGatedC(**common, tau=0.0),
+        "sspace":               sl.SSpaceC(**common, r=2),
+        "sspace_pca":           sl.SSpacePCAC(**common, r=2),
+        "corda_pca":            sl.CordaPCAC(**common, r=2),
+        "sspace_ablate":        sl.SSpaceAblateC(**common, r=2),
+        "sspace_scale":         sl.SSpaceScaleC(**common, r=2),
+        "sspace_pool":          sl.SSpacePoolC(**common, r=2),
+        "spherical":            sl.SphericalC(**common),
+        "directional_ablation": sl.DirectionalAblationC(**common),
+        "chars":                sl.CHaRSC(**common, k=2),
+        "linear_act":           sl.LinearAcTC(**common),
+        "angular_steering":     sl.AngularSteeringC(**common),
+        "random":               sl.RandomC(**common),
+        "value_gram":           sl.ValueGramC(**common, r=2),
+        "vjp_resid":            sl.VjpResidC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+        "vjp_value":            sl.VjpValueC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+        "query_steer":          sl.QuerySteerC(**common),
         # nu_scale / r_scale given: skip the in-extraction iso-KL calibration (slow on CPU; exercised by just smoke-bsbench)
-        "svdkv":                 sl.SvdkvC(**{**common, "layers": (1, 2)}, nu_scale=2.0),
-        "svdkv_resid":           sl.SvdkvResidC(**{**common, "layers": (1, 2)}, nu_scale=2.0, r_scale=0.5),
+        "sink_split":           sl.SinkSplitC(**{**common, "layers": (1, 2)}, nu_scale=2.0),
+        "sink_split_resid":     sl.SinkSplitResidC(**{**common, "layers": (1, 2)}, nu_scale=2.0, r_scale=0.5),
     }
     return table[method]
 
@@ -104,7 +104,7 @@ def test_methods_list_covers_registry():
 @pytest.mark.parametrize("method", METHODS)
 def test_pipeline(method, request, tmp_path):
     """extract + calibrate + steer + save/load. One test per method."""
-    model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "svdkv", "svdkv_resid") else "tiny_model")
+    model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
     sl.detach(model)
 
     cfg = _make_cfg(method)
@@ -151,8 +151,8 @@ def test_pipeline(method, request, tmp_path):
 
 
 # methods that put per-contrast tensors in `stacked` -> Vector + Vector works
-MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_damp_amp",
-            "super_sspace", "topk_clusters", "random", "kv_cache_gram"]
+MULTI_OK = ["mean_diff", "sspace", "sspace_pca", "sspace_ablate", "sspace_scale",
+            "sspace_pool", "topk_clusters", "random", "value_gram"]
 # methods that keep contrasts in `shared` -> Vector + Vector raises (natural fail)
 MULTI_FAIL = ["pca", "cosine_gated", "spherical", "directional_ablation",
               "chars", "linear_act", "angular_steering", "corda_pca"]
@@ -213,10 +213,10 @@ def test_multi_round_natural_fail(method, tiny_model):
         _ = v1 + v2
 
 
-def test_kv_cache_gram_edits_values_not_keys(tiny_model):
+def test_value_gram_edits_values_not_keys(tiny_model):
     model, tok = tiny_model
     sl.detach(model)
-    cfg = sl.KVCacheGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.float32)
+    cfg = sl.ValueGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.float32)
     vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     prompt = tok("Tell me the truth.", return_tensors="pt")
 
@@ -231,12 +231,12 @@ def test_kv_cache_gram_edits_values_not_keys(tiny_model):
     torch.testing.assert_close(steered.layers[0].values, base.layers[0].values, rtol=0, atol=0)
 
 
-def test_kv_cache_gram_zero_and_signed_symmetry(tiny_model):
+def test_value_gram_zero_and_signed_symmetry(tiny_model):
     model, tok = tiny_model
     sl.detach(model)
     vector = sl.train(
         model, tok, POS, NEG,
-        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32),
         batch_size=2, max_length=64,
     )
     prompt = tok("Tell me the truth.", return_tensors="pt")
@@ -253,10 +253,10 @@ def test_kv_cache_gram_zero_and_signed_symmetry(tiny_model):
     )
 
 
-def test_kv_cache_gram_batch_invariant_and_label_swap(tiny_model):
+def test_value_gram_batch_invariant_and_label_swap(tiny_model):
     model, tok = tiny_model
     sl.detach(model)
-    cfg = sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32)
+    cfg = sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32)
     batch1 = sl.train(model, tok, POS, NEG, cfg, batch_size=1, max_length=64)
     batch2 = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     swapped = sl.train(model, tok, NEG, POS, cfg, batch_size=2, max_length=64)
@@ -268,12 +268,12 @@ def test_kv_cache_gram_batch_invariant_and_label_swap(tiny_model):
     )
 
 
-def test_kv_cache_gram_promotes_existing_prefix_and_detaches(tiny_model):
+def test_value_gram_promotes_existing_prefix_and_detaches(tiny_model):
     model, tok = tiny_model
     sl.detach(model)
     vector = sl.train(
         model, tok, POS, NEG,
-        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32),
         batch_size=2, max_length=64,
     )
     prefix = tok("Tell me", return_tensors="pt")
@@ -312,12 +312,12 @@ def test_kv_cache_gram_promotes_existing_prefix_and_detaches(tiny_model):
     torch.testing.assert_close(detached.layers[1].values[..., -1:, :], raw_value, rtol=0, atol=0)
 
 
-def test_kv_cache_gram_same_vector_can_reattach(tiny_model):
+def test_value_gram_same_vector_can_reattach(tiny_model):
     model, tok = tiny_model
     sl.detach(model)
     vector = sl.train(
         model, tok, POS, NEG,
-        sl.KVCacheGramC(layers=(1,), r=2, dtype=torch.float32),
+        sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32),
         batch_size=2, max_length=64,
     )
     prompt = tok("Tell me", return_tensors="pt")
@@ -334,7 +334,7 @@ def test_kv_cache_gram_same_vector_can_reattach(tiny_model):
     torch.testing.assert_close(continued.layers[1].values[..., :-1, :], history, rtol=0, atol=0)
 
 
-def test_kv_cache_gram_formula_and_empty_hybrid_promotion():
+def test_value_gram_formula_and_empty_hybrid_promotion():
     config = PreTrainedConfig(
         num_hidden_layers=2,
         layer_types=["linear_attention", "full_attention"],
@@ -354,7 +354,7 @@ def test_kv_cache_gram_formula_and_empty_hybrid_promotion():
     torch.testing.assert_close(cache._edit(values, 1), expected)
 
 
-@pytest.mark.parametrize("method", ["kv_cache_gram", "vjp_cache"])
+@pytest.mark.parametrize("method", ["value_gram", "vjp_value"])
 def test_cache_hybrid_generate(method, tiny_model):
     _, tok = tiny_model
     config = Qwen3_5TextConfig(
@@ -378,8 +378,8 @@ def test_cache_hybrid_generate(method, tiny_model):
     )
     model = Qwen3_5ForCausalLM(config).eval()
     cfg = (
-        sl.VjpCacheC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32)
-        if method == "vjp_cache" else sl.KVCacheGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32)
+        sl.VjpValueC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32)
+        if method == "vjp_value" else sl.ValueGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32)
     )
     vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     with vector(model):
@@ -389,7 +389,7 @@ def test_cache_hybrid_generate(method, tiny_model):
     assert output.shape == (1, 5)
 
 
-def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
+def test_vjp_value_gradient_flows_through_real_cache_values(tiny_model):
     """VJP-cache differentiates the target through the actual values returned by
     DynamicCache.update, not through a projection/activation hook.
 
@@ -437,7 +437,7 @@ def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
         assert grad.norm().item() > 0
 
 
-def test_vjp_cache_two_source_real_storage_hybrid_exclusion(tiny_model):
+def test_vjp_value_two_source_real_storage_hybrid_exclusion(tiny_model):
     """Two preceding full-attention source layers and a later target.
 
     A direct real-model observation (3 full-attention layers) showed that
@@ -517,9 +517,9 @@ def test_vjp_class_mean_matches_direct_pinned_estimator_fixture(monkeypatch):
         ({1: torch.tensor([[[1.0, 10.0], [3.0, 30.0], [99.0, 99.0]], [[2.0, 20.0], [4.0, 40.0], [6.0, 60.0]]])}, torch.tensor([[True, True, False], [True, True, True]])),
         ({1: torch.tensor([[[5.0, 50.0], [7.0, 70.0], [99.0, 99.0]]])}, torch.tensor([[True, True, False]])),
     ))
-    monkeypatch.setattr(vjp_delta_module, "_batch_gradients", lambda *_args, **_kwargs: next(gradients))
+    monkeypatch.setattr(vjp_resid_module, "_batch_gradients", lambda *_args, **_kwargs: next(gradients))
 
-    actual = vjp_delta_module._class_mean_vjp(
+    actual = vjp_resid_module._class_mean_vjp(
         object(), object(), ["a", "b", "c"], (1,), 3, torch.zeros(2), 2, 8, 1,
     )[1]
     per_prompt = torch.stack((
@@ -530,7 +530,7 @@ def test_vjp_class_mean_matches_direct_pinned_estimator_fixture(monkeypatch):
     torch.testing.assert_close(actual, per_prompt.mean(0))
 
 
-def test_vjp_delta_matches_pinned_difference_normalization_without_sign_flip(monkeypatch):
+def test_vjp_resid_matches_pinned_difference_normalization_without_sign_flip(monkeypatch):
     """Numerical fixture for vendored vjp.py: normalize(mean_pos - mean_neg) exactly."""
     class FrozenModel:
         def requires_grad_(self, _enabled):
@@ -538,11 +538,11 @@ def test_vjp_delta_matches_pinned_difference_normalization_without_sign_flip(mon
 
     target_means = iter((torch.tensor([2.0, 0.0]), torch.tensor([0.0, 0.0])))
     class_means = iter(({1: torch.tensor([1.0, 2.0])}, {1: torch.tensor([3.0, 1.0])}))
-    monkeypatch.setattr(vjp_delta_module, "_blocks", lambda _model: [None] * 4)
-    monkeypatch.setattr(vjp_delta_module, "_target_mean", lambda *_args, **_kwargs: next(target_means))
-    monkeypatch.setattr(vjp_delta_module, "_class_mean_vjp", lambda *_args, **_kwargs: next(class_means))
+    monkeypatch.setattr(vjp_resid_module, "_blocks", lambda _model: [None] * 4)
+    monkeypatch.setattr(vjp_resid_module, "_target_mean", lambda *_args, **_kwargs: next(target_means))
+    monkeypatch.setattr(vjp_resid_module, "_class_mean_vjp", lambda *_args, **_kwargs: next(class_means))
 
-    vector = vjp_delta_module.vjp_delta(FrozenModel(), object(), ["positive"], ["negative"], (1,), target_layer=3, skip_first=16)
+    vector = vjp_resid_module.vjp_resid(FrozenModel(), object(), ["positive"], ["negative"], (1,), target_layer=3, skip_first=16)
     expected = torch.tensor([-2.0, 1.0]) / torch.tensor([-2.0, 1.0]).norm()
     torch.testing.assert_close(vector.stacked[1]["v"][0], expected)
 
@@ -551,7 +551,7 @@ def test_vjp_registration_and_config_roundtrip():
     """VJP methods are registered and importable with a working config
     round-trip, and the config classes are exported from the package root.
     """
-    for name, cfg_cls in (("vjp_delta", sl.VjpDeltaC), ("vjp_cache", sl.VjpCacheC)):
+    for name, cfg_cls in (("vjp_resid", sl.VjpResidC), ("vjp_value", sl.VjpValueC)):
         assert name in REGISTRY, f"{name} missing from runtime REGISTRY"
         assert name in _CONFIG_REGISTRY, f"{name} missing from config registry"
         cfg = cfg_cls(layers=(0,), target_layer=1, skip_first=0, coeff=0.2)
@@ -562,12 +562,12 @@ def test_vjp_registration_and_config_roundtrip():
         assert restored.skip_first == 0
 
 
-def test_kv_cache_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_path):
+def test_value_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_path):
     model, tok = tiny_model
     sl.detach(model)
     vector = sl.train(
         model, tok, POS, NEG,
-        sl.KVCacheGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.bfloat16),
+        sl.ValueGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.bfloat16),
         batch_size=2, max_length=64,
     )
     prompt = tok("Tell me the truth.", return_tensors="pt")
@@ -585,10 +585,10 @@ def test_kv_cache_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_p
     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
 
 
-def test_svdkv_float_mask_matches_bool_mask():
-    """svdkv's attention must treat an additive float mask (finfo.min for masked keys) like the bool mask, with left padding."""
+def test_sink_split_float_mask_matches_bool_mask():
+    """sink_split's attention must treat an additive float mask (finfo.min for masked keys) like the bool mask, with left padding."""
     from types import SimpleNamespace
-    from steering_lite.variants import svdkv as S
+    from steering_lite.variants import sink_split as S
     torch.manual_seed(0)
     B, H, KVH, T, d = 2, 4, 2, 7, 8
     q, k, v = torch.randn(B, H, T, d), torch.randn(B, KVH, T, d), torch.randn(B, KVH, T, d)

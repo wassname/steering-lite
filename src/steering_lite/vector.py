@@ -122,7 +122,7 @@ class Vector:
         for kind, tree in (("shared", self.shared), ("stacked", self.stacked)):
             for layer_key, s in tree.items():
                 for k, t in s.items():
-                    # clone: methods that broadcast one basis to every layer (super_sspace's sqrtS)
+                    # clone: methods that broadcast one basis to every layer (sspace_pool's sqrtS)
                     # hand back six views of one storage, and safetensors refuses aliased tensors.
                     v = t.detach().cpu().clone()
                     if sub_mode:
