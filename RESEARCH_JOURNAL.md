@@ -188,3 +188,43 @@ Observations: cutting answers at 128 tokens moves the health-check breakdown run
 Interpretation (PI/Claude): with 20 questions the ranking ceiling is about 0.8 whatever the dose rule, so question count, not the dose rule, limits dev. The 128-token cap is safe and cuts most generation cost. A one-dose rule saves judge calls (cheap) but not GPU unless breakdown is found with fewer rungs (bisection); 0.4 was picked on the same data, so expect a little optimism. One model, one seed.
 
 -- PI/Claude
+
+## 2026-09-30 -- Attention-sink steering on the full benchmark
+
+The combined attention and residual intervention improves the benchmark score over mean difference.
+
+Observed on Qwen3.5-4B, 100 questions, extraction seeds 0-2, Jev. Score is the weaker direction's best admissible premise change minus damage. Both new methods ran through the existing dose walk without retuning; generation and calibration code were unchanged by the method renames (svdkv to sink_split, svdkv_resid to sink_split_resid).
+
+| method | score | 90% interval | -C on / off | +C on / off |
+|---|---:|---:|---:|---:|
+| sink_split_resid | +0.70 | [+0.44, +1.16] | +0.92 / 0.21 | +2.81 / 0.53 |
+| mean_diff | +0.37 | [+0.14, +0.78] | +0.56 / 0.19 | +3.10 / 1.11 |
+| sink_split | +0.34 | [+0.09, +0.68] | +0.56 / 0.22 | +1.04 / 0.25 |
+| random | -0.07 | [-0.23, +0.14] | +0.05 / 0.12 | +2.68 / 0.76 |
+
+Source: `outputs/bsbench/results/full/index.md:12-27`. Random retains the published eleven-seed reference. The combined method ranks fourth by point estimate, below vjp_value, chars and linear_act.
+
+Paired score differences, from `slop/reviews/2026-09-29_svdkv/full-comparison.md`:
+
+| comparison | difference | 90% paired interval |
+|---|---:|---:|
+| sink_split_resid - mean_diff | +0.330 | [+0.078, +0.634] |
+| sink_split - mean_diff | -0.033 | [-0.424, +0.300] |
+| sink_split_resid - sink_split | +0.362 | [+0.129, +0.706] |
+| sink_split - random | +0.408 | [+0.165, +0.745] |
+
+`full_analysis.py` uses production scoring and resampling: 1000 shared question draws and shared extraction-seed draws for learned methods, with dose selection repeated. Random's eleven seeds are resampled independently. Intervals are conditional on the original admissibility decisions; the full questions include the dev questions and are also used for dose selection. This is not independent held-out validation or evidence that the attention component causes the combined gain. A matched random-attention-plus-residual control is absent. Zero dose is approximately bare, not identity; the author's target-model check covered only eight prompts (last-token KL mean 0.015, max 0.043 nats, cited in `src/steering_lite/variants/sink_split.py`).
+
+I read the complete answers for ten fixed questions outside the dev subset, at both selected signs for both new methods and mean_diff (`full-examples.md`). Both the combined method and mean_diff reject the finance question's arbitrary tiers: "No, a three-tier or five-tier stratification is not standard". Neither identifies the fabricated ABA requirement: the combined method instead recommends "statistical software like R, Python, or SAS". Positive steering also increases premise acceptance: on the SOAP/GraphQL question the combined method says "We measure the coefficient of static friction by analyzing the maximum force required". These examples show real target changes and remaining errors, rather than reliable nonsense detection.
+
+Reporting correction: the full pull brought in extra cached seeds from earlier runs (mean_diff 3, corda_pca 3-5, random 11-15). The first results build pooled them. The final report restores learned seeds 0-2 and random 0-10; `data.py` now logs and excludes extra report seeds. The restoration assertions recover the previous mean_diff, corda_pca and random scores exactly. Rebuilding with the new methods changes the shared bootstrap RNG's draw allocation, so old point scores are unchanged but some marginal intervals move slightly. The first judge refresh cost $1.7794 in logged API charges, including any extra-seed rows; the corrected refresh reports missing=0 for both aware and blind ratings. Sources: `outputs/logs/sink-split-full-results.log` and `outputs/logs/sink-split-full-standard-seeds.log`.
+
+Correction to the preceding dev simulation entry: an empirical correlation near 0.8 is not a proved ceiling, and truncating cached answers did not measure an online 128-token run's speed or quality. The shorter cap remains a proposal.
+
+The author's earlier Qwen3-4B result is quoted in `src/steering_lite/variants/sink_split.py:25-30`: "full 100 questions, -C side score sink_split_resid +3.94 vs mean_diff +1.71" (minus sign normalized to ASCII here). It is an external, different-model result, not evidence that this magnitude transfers to Qwen3.5-4B.
+
+The independent audit read the complete generation log and found no scoring or seed-restoration bug (`slop/reviews/2026-09-29_svdkv/full-audit.md`). The score gain is in the weaker, premise-rejecting direction. At its selected C, the composite residual's raw coefficients are 0.261, 0.285 and 0.278 across seeds, close to mean_diff's selected 0.315; an unsampled residual dose remains an alternative explanation. The audit also notes first-token KL spikes during calibration and prompt echo above the chosen +C dose. The health table in `full-comparison.md` shows measured behavior before and after breakdown on both signs for all six runs, not just their usable dose counts.
+
+Interpretation (PI/OpenAI): the paired result supports a combined-method advantage on this benchmark. Attention-only moves beyond the random reference but does not show an advantage over mean difference. I would retain both measured results without attributing the combined gain to a specific component.
+
+-- PI/OpenAI

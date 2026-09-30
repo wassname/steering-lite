@@ -1,0 +1,18 @@
+2026-09-30 15:53:38.561 | INFO     | <run_path>:walk_certificates:39 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-09-30 15:53:38.568 | INFO     | <run_path>:walk_certificates:39 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-09-30 15:53:38.594 | INFO     | <run_path>:walk_certificates:39 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-09-30 15:53:38.750 | INFO     | <run_path>:walk_certificates:39 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-09-30 15:53:38.889 | INFO     | <run_path>:walk_certificates:39 - exclude random_s11_full.json: seed outside published full report
+2026-09-30 15:53:38.897 | INFO     | <run_path>:walk_certificates:39 - exclude random_s12_full.json: seed outside published full report
+2026-09-30 15:53:38.898 | INFO     | <run_path>:walk_certificates:39 - exclude random_s13_full.json: seed outside published full report
+2026-09-30 15:53:38.898 | INFO     | <run_path>:walk_certificates:39 - exclude random_s14_full.json: seed outside published full report
+2026-09-30 15:53:38.898 | INFO     | <run_path>:walk_certificates:39 - exclude random_s15_full.json: seed outside published full report
+REPORT_SEEDS_PASS mean_diff [0, 1, 2]
+REPORT_SEEDS_PASS corda_pca [0, 1, 2]
+REPORT_SEEDS_PASS sink_split [0, 1, 2]
+REPORT_SEEDS_PASS sink_split_resid [0, 1, 2]
+REPORT_SEEDS_PASS random [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+README_SCORE_CI_PASS all numeric rows
+PNG_IDENTICAL 0f3ff7ef3fe47d0f1ed7983a46ceede691d1adae1ad5ec642b8fc15df80fdc7e
+UAT_PASS full and dev
+PAIRED_AND_COVERAGE_RUN:  six completed walks, 17200 answer rows. Measured sum of walk times: 11586.5 GPU seconds on L40S. GPU-only estimate at the previously recorded $0.000542/s list rate: $6.28; excludes CPU/memory charges and is not an invoice.

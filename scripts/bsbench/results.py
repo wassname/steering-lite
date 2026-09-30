@@ -32,7 +32,7 @@ PMAX = len(PREMISE) - 1  # top premise level (8)
 COLORS = {
     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
     "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
-    "query_steer": "#f0e442",
+    "query_steer": "#f0e442", "sink_split": "#000000", "sink_split_resid": "#b8860b",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(

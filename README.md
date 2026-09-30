@@ -52,7 +52,7 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 ## Results
 
 <!-- Results section drafted by PI/claude-opus 2026-09-28. Numbers copied by script from `just results` output:
-outputs/bsbench/results/{full,27b-full,olmo-full}/index.md (2026-09-28). Needs wassname's review. -->
+outputs/bsbench/results/{full,27b-full,olmo-full}/index.md. Qwen3.5-4B updated by PI/OpenAI 2026-09-30; larger models retain the 2026-09-28 results. Needs wassname's review. -->
 
 We test sycophancy with petergpt's [Bullshit Benchmark v2](https://github.com/petergpt/bullshit-benchmark): 100 questions with a false premise. A sycophantic answer accepts the premise. A candid answer says what is wrong with it.
 
@@ -62,37 +62,41 @@ The score is the change we want minus the damage, at the best strength, in the w
 
 ![Pareto plot, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_full.png)
 
-The plot shows the 5 best methods on Qwen3.5-4B. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers.
+The plot shows the 5 best methods on Qwen3.5-4B. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers. The grey region spans roughly the 10th–90th percentile of random directions' on-axis changes at each dose, at their median damage, using seeds admissible in both signs. It is not a confidence region. <!-- PI/OpenAI -->
 
-The stars are prompt baselines: they ask the model to act a certain way, and leave its internals alone. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results.
+The stars are prompt baselines: they ask the model to act a certain way, and leave its internals alone. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results. On 4B, the prompt −C and engineered-prompt +C stars fail the checks and are shown only for reference. <!-- PI/OpenAI -->
 
 The table shows every method we tested. Brackets are 90% bootstrap intervals. Most methods were tested only on the small model.
 
 | method | Qwen3.5-4B score↑ | Qwen3.5-27B score↑ | OLMo-2-32B score↑ |
 | --- | ---: | ---: | ---: |
-| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.75, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.73, +1.56] | +0.34 [+0.09, +0.69] | -0.20 [-0.38, -0.10] |
 | [chars](src/steering_lite/variants/chars.py) | +0.88 [+0.49, +1.23] | +0.43 [+0.01, +1.11] | +0.13 [-0.04, +0.34] |
-| [linear_act](src/steering_lite/variants/linear_act.py) | +0.71 [+0.39, +1.01] |  |  |
-| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.39, +1.14] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
-| [spherical](src/steering_lite/variants/spherical.py) | +0.54 [+0.10, +1.01] |  |  |
+| [linear_act](src/steering_lite/variants/linear_act.py) | +0.71 [+0.42, +1.02] |  |  |
+| [sink_split_resid](src/steering_lite/variants/sink_split.py) | +0.70 [+0.44, +1.16] |  |  |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.38, +1.13] | -0.01 [-0.13, +0.25] | -0.05 [-0.16, +0.03] |
+| [spherical](src/steering_lite/variants/spherical.py) | +0.54 [+0.09, +1.01] |  |  |
 | [directional_ablation](src/steering_lite/variants/directional_ablation.py) | +0.47 [+0.20, +0.84] |  |  |
-| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.15, +0.78] | **+0.91** [+0.60, +1.33] | **+0.21** [+0.04, +0.50] |
-| [topk_clusters](src/steering_lite/variants/topk_clusters.py) | +0.33 [+0.09, +0.63] |  |  |
+| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.14, +0.78] | **+0.91** [+0.60, +1.33] | **+0.21** [+0.04, +0.50] |
+| [sink_split](src/steering_lite/variants/sink_split.py) | +0.34 [+0.09, +0.68] |  |  |
+| [topk_clusters](src/steering_lite/variants/topk_clusters.py) | +0.33 [+0.10, +0.64] |  |  |
 | [corda_pca](src/steering_lite/variants/corda_pca.py) | +0.26 [-0.02, +0.72] |  |  |
 | [cosine_gated](src/steering_lite/variants/cosine_gated.py) | +0.14 [-0.03, +0.49] |  |  |
-| [query_steer](src/steering_lite/variants/query_steer.py) | +0.10 [-0.15, +0.41] |  |  |
-| [sspace_ablate](src/steering_lite/variants/sspace_ablate.py) | +0.07 [-0.09, +0.36] |  |  |
+| [query_steer](src/steering_lite/variants/query_steer.py) | +0.10 [-0.12, +0.41] |  |  |
+| [sspace_ablate](src/steering_lite/variants/sspace_ablate.py) | +0.07 [-0.08, +0.35] |  |  |
 | [sspace_pool](src/steering_lite/variants/sspace_pool.py) | +0.06 [-0.13, +0.33] |  |  |
-| [sspace](src/steering_lite/variants/sspace.py) | +0.01 [-0.08, +0.27] |  |  |
+| [sspace](src/steering_lite/variants/sspace.py) | +0.01 [-0.09, +0.25] |  |  |
 | [sspace_pca](src/steering_lite/variants/sspace_pca.py) | -0.07 [-0.28, +0.16] |  |  |
-| *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.22, +0.13] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.01] |
-| [pca](src/steering_lite/variants/pca.py) | -0.12 [-0.30, +0.21] |  |  |
-| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | -0.14 [-0.32, +0.14] |  |  |
-| [value_gram](src/steering_lite/variants/value_gram.py) | -0.25 [-0.50, -0.12] |  |  |
+| *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.23, +0.14] | -0.05 [-0.12, +0.14] | -0.10 [-0.15, -0.01] |
+| [pca](src/steering_lite/variants/pca.py) | -0.12 [-0.28, +0.19] |  |  |
+| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | -0.14 [-0.30, +0.16] |  |  |
+| [value_gram](src/steering_lite/variants/value_gram.py) | -0.25 [-0.49, -0.13] |  |  |
 | *[prompting](scripts/bsbench/walk.py#L62)* | — | — | — |
 | *[prompting_engineered](scripts/bsbench/walk.py#L55)* | — | — | — |
 
-Seeds: 3 per method on the Qwen models, 1 on OLMo. `—`: the prompting baselines have no score, because one of their directions failed the coherence or damage check. These results are exploratory.
+Seeds: 3 per learned method on the Qwen models, 1 on OLMo. The 4B random reference uses seeds 0–10. Extra cached seeds are excluded from these reports. `—`: the prompting baselines have no score, because one of their directions failed the coherence or damage check. These results are exploratory.
+
+The attention-sink method with a residual vector (`sink_split_resid`) ranks fourth on 4B. Its score exceeds mean_diff by +0.33, with a paired 90% interval of [+0.08, +0.63]; the weaker, premise-rejecting direction sets both scores. Attention-only (`sink_split`) is not distinguishable from mean_diff in that comparison. These intervals reselect doses on the evaluated questions; the full set includes the dev questions. Zero dose is approximately, not exactly, the bare model, and we have no matched random-attention-plus-residual control. [Paired comparison](slop/reviews/2026-09-29_svdkv/full-comparison.md), [answer samples](slop/reviews/2026-09-29_svdkv/full-examples.md). <!-- PI/OpenAI -->
 
 ### Larger models
 
@@ -102,15 +106,15 @@ Four methods also ran on Qwen3.5-27B and OLMo-2-0325-32B-Instruct. The score can
 
 | method | 4B score↑ | 4B on ÷ room↑ | 27B score↑ | 27B on ÷ room↑ | OLMo score↑ | OLMo on ÷ room↑ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.75, +1.56] | **+0.40** | +0.34 [+0.09, +0.69] | +0.33 | -0.20 [-0.38, -0.10] | +0.00 |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | **+1.14** [+0.73, +1.56] | **+0.40** | +0.34 [+0.09, +0.69] | +0.33 | -0.20 [-0.38, -0.10] | +0.00 |
 | [chars](src/steering_lite/variants/chars.py) | +0.88 [+0.49, +1.23] | +0.35 | +0.43 [+0.01, +1.11] | +0.36 | +0.13 [-0.04, +0.34] | +0.23 |
-| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.39, +1.14] | +0.24 | -0.01 [-0.13, +0.25] | +0.13 | -0.05 [-0.16, +0.03] | +0.03 |
-| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.15, +0.78] | +0.14 | **+0.91** [+0.60, +1.33] | **+0.64** | **+0.21** [+0.04, +0.50] | **+0.27** |
-| *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.22, +0.13] | +0.01 | -0.05 [-0.12, +0.14] | +0.02 | -0.10 [-0.15, -0.01] | +0.01 |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.66 [+0.38, +1.13] | +0.24 | -0.01 [-0.13, +0.25] | +0.13 | -0.05 [-0.16, +0.03] | +0.03 |
+| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.37 [+0.14, +0.78] | +0.14 | **+0.91** [+0.60, +1.33] | **+0.64** | **+0.21** [+0.04, +0.50] | **+0.27** |
+| *[random](src/steering_lite/variants/random.py)* | -0.07 [-0.23, +0.14] | +0.01 | -0.05 [-0.12, +0.14] | +0.02 | -0.10 [-0.15, -0.01] | +0.01 |
 
 Within each model, the two columns rank these four methods in the same order, so the room correction does not change which of them looks best there. Between models the order changes: mean_diff is 4th of 4 on the 4B model and 1st on both larger models. On Qwen3.5-27B the VJP methods keep much of their effect per unit of room (vjp_value +0.40 → +0.33). On OLMo they barely steer (on ÷ room +0.00 and +0.03, random +0.01), while mean_diff and chars still do. The [research journal](RESEARCH_JOURNAL.md) has the checks for a bug (none found) and extra `vjp_resid` runs with other settings.
 
-Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (7th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
+Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (8th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
 
 ![Pareto plot, Qwen3.5-27B](assets/bsbench_qwen3.5-27b_full.png)
 

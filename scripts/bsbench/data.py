@@ -10,6 +10,8 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[2]
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
+REPORT_SEEDS = {"dev": range(1), "full": range(3)}
+RANDOM_SEEDS = range(11)  # published null reference: seeds 0-10; PI/OpenAI
 
 
 def load_cohort() -> dict[str, dict]:
@@ -25,12 +27,16 @@ def default_model_dir(model: str = "Qwen/Qwen3.5-4B") -> Path:
 
 
 def walk_certificates(model_dir: Path, cohort: str) -> list[dict]:
-    """COMPLETE walks for this cohort. A RUNNING walk is not judged, so a later rung cannot change its rows."""
+    """COMPLETE walks at the published report seeds; extra cached seeds do not change the comparison. PI/OpenAI"""
     certificates = []
     for path in sorted((model_dir / "walks").glob(f"*_{cohort}.json")):
         certificate = json.loads(path.read_text())
         if certificate["status"] != "COMPLETE":
             logger.warning("skip {} status={}", path.name, certificate["status"])
+            continue
+        seeds = RANDOM_SEEDS if certificate["method"] == "random" else REPORT_SEEDS[cohort]
+        if certificate["seed"] not in seeds:
+            logger.info("exclude {}: seed outside published {} report", path.name, cohort)
             continue
         certificates.append(certificate)
     return certificates

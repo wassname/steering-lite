@@ -4,7 +4,7 @@ PI/OpenAI. User approved the approximately $15 full evaluation before the naming
 
 Question: does the combined attention/residual method's dev advantage over mean_diff persist on the standard 100-question, three-seed Qwen3.5-4B protocol?
 
-Choice: run both methods, seeds 0,1,2, cohort full, max-rungs 32. Reuse existing full mean_diff and random controls. Jev judging is a separate step after generation/pull. Do not run dev and full simultaneously for the same method/seed: they share answer files.
+Choice: run both methods, seeds 0,1,2, cohort full, with at most 32 dose steps. Reuse existing full mean_diff and random controls. Jev judging is a separate step after generation/pull. Do not run dev and full simultaneously for the same method/seed: they share answer files.
 
 Evidence before launch:
 - `outputs/bsbench/results/dev/index.md`: sink_split_resid score +1.16 [90% CI +0.41,+1.76]; mean_diff +0.70 [+0.22,+1.41]; sink_split +0.52 [-0.03,+1.07]; random +0.05 [-0.18,+0.61]. These are selected dev doses, 20 questions; they do not establish a paired gain.
