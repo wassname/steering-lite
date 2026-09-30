@@ -25,4 +25,6 @@ The result relabelling reuses saved statistics. `results.summary` shares a seede
 - `verification.log`: `All 7 new CLI IDs registered, old IDs absent; 29 renamed vector configs deserialize`. All four reports' summaries, curves, method selection, colors and blind ratings exactly match pre-rename snapshots.
 - `plot-review.md`: independent PNG review reports consistent naming and no clipping, with annotation/marker crowding still present. Parent inspected all four PNGs and moved the symbol key to unused lower-left space after it overlapped the dev VJP label.
 
-Remaining: finish the Modal cache migration. The first Volume attempt verified all 1099 remote source hashes, then failed during backup copies with `ResourceExhaustedError: too many layers in volume`. Active paths were unchanged. The revised migration uses one batched upload and verifies new hashes before deleting old paths.
+Modal cache migration completed: `volume-migration.json` records 1099 files, 106 metadata rewrites, and `all_before_and_after_hashes_verified: true`. Old active paths were removed only after verification. Original metadata remains under `method-name-backup/bsbench/` on the Volume; all local originals remain backed up.
+
+The first Volume attempt verified all remote source hashes, then failed during backup copies with `ResourceExhaustedError: too many layers in volume`. Active paths were unchanged. The successful retry used one batched upload instead of one Volume layer per file copy. See `outputs/logs/method-renames-volume-batched.log`.
