@@ -38,6 +38,7 @@ from steering_lite.config import _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
 from steering_lite.extract import record_activations
+from steering_lite.prompting import instruction_mask, scaled_prompt_embeddings
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.import_utils import is_flash_linear_attention_available
 
@@ -63,7 +64,9 @@ PROMPT_METHODS = {
     "prompting": {side: PERSONA_TEMPLATE.format(persona=persona) for side, persona in zip(("+C", "-C"), PERSONAS[0])},
     "prompting_engineered": ENGINEERED,
 }
-METHODS = (*CONFIGS, *PROMPT_METHODS)
+PROMPT_SWEEPS = {"prompting_scale": "prompting", "prompting_engineered_scale": "prompting_engineered"}
+PROMPT_GAINS = (0.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0)
+METHODS = (*CONFIGS, *PROMPT_METHODS, *PROMPT_SWEEPS)
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
 OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown
 # generation settings are part of every answer's cache path; change one and all answers regenerate
@@ -196,20 +199,36 @@ def generation_inputs(tokenizer, rows: list[dict[str, str]], instruction: str | 
 
 
 @torch.inference_mode()
-def generate(model, tokenizer, prompts: list[str], batch_size: int) -> list[str]:
+def generate(model, tokenizer, prompts: list[str], batch_size: int, scaled_instruction: tuple[str, float] | None = None) -> list[str]:
     answers = []
     tokenizer.padding_side = "left"
     for start in range(0, len(prompts), batch_size):
+        texts = prompts[start : start + batch_size]
         batch = tokenizer(
-            prompts[start : start + batch_size], return_tensors="pt", padding=True, add_special_tokens=False,
+            texts, return_tensors="pt", padding=True, add_special_tokens=False,
+            return_offsets_mapping=scaled_instruction is not None,
         ).to(next(model.parameters()).device)
-        output = model.generate(
-            **batch, do_sample=GEN["do_sample"], temperature=None, top_p=None, top_k=None,
-            pad_token_id=tokenizer.eos_token_id, max_new_tokens=GEN["max_new_tokens"],
-        )
+        context = _Null()
+        if scaled_instruction is not None:
+            instruction, gain = scaled_instruction
+            mask = instruction_mask(batch["input_ids"], batch.pop("offset_mapping"), texts, instruction, tokenizer)
+            context = scaled_prompt_embeddings(model, batch["input_ids"], mask, gain)
+        with context as embeddings:
+            output = generate_batch(model, tokenizer, batch, embeddings)
         answers.extend(tokenizer.batch_decode(output[:, batch["input_ids"].shape[1] :], skip_special_tokens=True))
         logger.info("generation {}/{}", min(start + batch_size, len(prompts)), len(prompts))
     return [answer.strip() for answer in answers]
+
+
+def generate_batch(model, tokenizer, batch, embeddings=None):
+    extra = {} if embeddings is None else {"inputs_embeds": embeddings, "use_cache": True}
+    output = model.generate(
+        **batch, **extra, do_sample=GEN["do_sample"], temperature=None, top_p=None, top_k=None,
+        pad_token_id=tokenizer.eos_token_id, max_new_tokens=GEN["max_new_tokens"],
+    )
+    n = batch["input_ids"].shape[1]
+    assert output.shape[1] > n and torch.equal(output[:, :n], batch["input_ids"]), "generation lost the input-id prefix"
+    return output
 
 
 def answer_path(model: str, method: str, seed: int, side: str, coefficient: float) -> Path:
@@ -218,7 +237,7 @@ def answer_path(model: str, method: str, seed: int, side: str, coefficient: floa
     return model_dir(model) / "answers" / folder / name
 
 
-def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer) -> list[str]:
+def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, scaled_instruction: tuple[str, float] | None = None) -> list[str]:
     """Answers for `rows`, generating only questions missing from `path`. `steer` is a context manager."""
     done = {}
     if path.exists():
@@ -227,7 +246,7 @@ def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch
     logger.info("answers {} cached={} missing={}", path.relative_to(OUT), len(rows) - len(missing), len(missing))
     if missing:
         with steer():
-            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size)
+            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size, scaled_instruction)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as file:
             for index, text in zip(missing, texts, strict=True):
@@ -460,8 +479,87 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
     return result
 
 
+@torch.inference_mode()
+def check_prompt_embeddings(model, tokenizer, rows, instruction):
+    """Exercise prefill, padding, identity and cached decoding on the loaded model. PI/OpenAI."""
+    tokenizer.padding_side = "left"
+    prompts = generation_inputs(tokenizer, rows[:3], instruction)
+    batch = tokenizer(prompts, padding=True, return_tensors="pt", return_offsets_mapping=True, add_special_tokens=False).to(next(model.parameters()).device)
+    mask = instruction_mask(batch["input_ids"], batch.pop("offset_mapping"), prompts, instruction, tokenizer)
+    assert not (mask & ~batch["attention_mask"].bool()).any()
+    assert (mask.sum(1) == mask.sum(1)[0]).all()
+    versions = {n: (p.data_ptr(), p._version) for n, p in model.named_parameters()}
+    reference = model(**batch, use_cache=False).logits
+    assert torch.equal(reference, model(**batch, use_cache=False).logits), "ordinary forwards are nondeterministic; identity check cannot isolate embedding scaling"
+    reference_ids = generate_batch(model, tokenizer, batch)
+    original = model.get_input_embeddings()(batch["input_ids"])
+    with scaled_prompt_embeddings(model, batch["input_ids"], mask, 1.0) as embeddings:
+        logits = model(inputs_embeds=embeddings, attention_mask=batch["attention_mask"], use_cache=False).logits
+        assert torch.equal(reference, logits), "gain-one logits differ from ordinary prompting"
+        assert torch.equal(reference_ids, generate_batch(model, tokenizer, batch, embeddings)), "gain-one greedy ids differ"
+    with scaled_prompt_embeddings(model, batch["input_ids"], mask, 4.0) as embeddings:
+        assert torch.equal(embeddings[~mask], original[~mask]), "scaled a token outside the instruction"
+        assert torch.equal(embeddings[mask], 4 * original[mask])
+        first_inputs = model.prepare_inputs_for_generation(batch["input_ids"], inputs_embeds=embeddings, attention_mask=batch["attention_mask"], use_cache=True, is_first_iteration=True)
+        first = model(**first_inputs)
+        delta = (first.logits - reference).abs().max().item()
+        assert math.isfinite(delta) and delta > 0, "gain-four changed no logits"
+        token = first.logits[:, -1].argmax(-1, keepdim=True)
+        decode_inputs = model.prepare_inputs_for_generation(
+            torch.cat([batch["input_ids"], token], dim=1), inputs_embeds=embeddings,
+            attention_mask=torch.cat([batch["attention_mask"], torch.ones_like(token)], dim=1),
+            past_key_values=first.past_key_values, next_sequence_length=1, use_cache=True, is_first_iteration=False,
+        )
+        assert "inputs_embeds" not in decode_inputs and torch.equal(decode_inputs["input_ids"], token), "decode reused prompt embeddings"
+        model(**decode_inputs)
+    assert versions == {n: (p.data_ptr(), p._version) for n, p in model.named_parameters()}, "model parameters changed"
+    logger.info("PROMPT_SCALE_CHECK_PASS model={} C1_logits=exact C1_greedy_ids=exact outside_mask=unchanged decode=unscaled C4_max_logit_delta={:.6g} mask_tokens={}\n=== scaled span ===\n{}\n=== formatted input ===\n{}\n=== end ===", type(model).__name__, delta, mask.sum(1).tolist(), tokenizer.decode(batch["input_ids"][0, mask[0]]), prompts[0])
+
+
+def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
+    """Finite gain sweep; health is checked per dose and the final gain is not a breakdown boundary. PI/OpenAI."""
+    baseline = PROMPT_SWEEPS[args.method]
+    instructions = PROMPT_METHODS[baseline]
+    check_prompt_embeddings(model, tokenizer, rows, instructions["+C"])
+    for side, instruction in instructions.items():
+        prompts = generation_inputs(tokenizer, rows, instruction)
+        expected = cached_answers(model, tokenizer, rows, answer_path(args.model, baseline, args.seed, side, 1.0), prompts, args.batch_size, _Null)
+        observed = cached_answers(model, tokenizer, rows, answer_path(args.model, args.name, args.seed, side, 1.0), prompts, args.batch_size, _Null, (instruction, 1.0))
+        assert observed == expected, f"{side}: gain-one answers differ from cached ordinary prompting"
+        logger.info("PROMPT_C1_CACHE_PASS side={} answers={}", side, len(rows))
+    timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
+    gains = PROMPT_GAINS[:args.max_rungs] if args.smoke else PROMPT_GAINS
+    rungs = []
+    for gain in gains:
+        started = time.monotonic()
+        rung = {"grid_index": None, "coefficient": gain}
+        for side, instruction in instructions.items():
+            path = answer_path(args.model, args.name, args.seed, side, gain)
+            answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null, (instruction, gain))
+            stats, reasons = health(tokenizer, answers)
+            rung[side] = {"breakdown_reasons": reasons, "post_boundary": False, "stats": stats, "answers": str(path.relative_to(root))}
+            logger.info("SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this dose is unhealthy (later doses still tested). method={} C={} side={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===", args.name, gain, side, stats, reasons, answers[0])
+        rung["seconds"] = time.monotonic() - started
+        rungs.append(rung)
+        done = len(rungs) == len(gains)
+        certificate_path.parent.mkdir(parents=True, exist_ok=True)
+        certificate_path.write_text(json.dumps({
+            "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
+            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
+            "gen": GEN, "sweep_kind": "prompt_embeddings", "prompt_gains": list(gains),
+            "instructions": instructions, "scaled_span": "tokens overlapping instruction, including merged separator whitespace",
+            "stop_reason": "fixed_grid" if done else None,
+            "boundary_confirmed": False, "rungs": rungs,
+            "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
+                       "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"},
+        }, indent=2) + "\n")
+    logger.info("{} method={} rungs={} fixed_grid=True boundary_confirmed=False certificate={}", "SMOKE_PASS" if args.smoke else "WALK_COMPLETE", args.name, len(rungs), certificate_path)
+
+
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
+    if args.method in PROMPT_SWEEPS:
+        return certificate["status"] == "COMPLETE" and certificate["prompt_gains"] == list(PROMPT_GAINS)
     return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
             and certificate.get("kl_target", args.kl_target) == args.kl_target)
 
@@ -495,6 +593,10 @@ def walk(args) -> None:
     bare = cached_answers(model, tokenizer, rows, answer_path(args.model, "bare", 0, "bare", 0), prompts, args.batch_size, _Null)
     stats, reasons = health(tokenizer, bare)
     logger.info("SHOULD: bare is healthy (no reasons). side=bare stats={} breakdown={}", stats, reasons)
+
+    if args.method in PROMPT_SWEEPS:
+        prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing)
+        return
 
     if args.method in PROMPT_METHODS:
         rung = {"grid_index": None, "coefficient": 1.0}

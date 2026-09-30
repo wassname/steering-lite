@@ -33,6 +33,7 @@ COLORS = {
     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
     "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
     "query_steer": "#f0e442", "sink_split": "#000000", "sink_split_resid": "#b8860b",
+    "prompting_scale": "#6a3d9a", "prompting_engineered_scale": "#b15928",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
@@ -89,6 +90,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str]) -> list[dict]:
                 steered_damage = mean(q["steered_damage"] for q in questions)
                 points.append({
                     "method": certificate["method"], "seed": certificate["seed"], "C": C, "side": side,
+                    "fixed_grid": certificate.get("sweep_kind") == "prompt_embeddings",
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "steered_damage": steered_damage,
                     "breakdown_reasons": health["breakdown_reasons"], "post_boundary": health["post_boundary"],
@@ -352,7 +354,7 @@ PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # sing
 
 
 def frontier(curve: list[dict]) -> list[dict]:
-    """Pareto points of one walk in on-axis order, then the last coherent dose (always kept, the x).
+    """Pareto points in on-axis order, then the last admissible tested dose (always kept, the x).
 
     A point stays if no other point has at least its on-axis gain with less damage. If the last
     coherent dose is not itself on the frontier, the line takes one straight step back to it."""
@@ -381,7 +383,7 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
         end = None
     if len(ts) < 2:  # no forward progress on this side: straight line to the end
         return [[0.0, 0.0], [support[-1]["effect"], support[-1]["off_axis"]]]
-    tail = [] if end is None else [[end["effect"], end["off_axis"]]]  # one straight step back to the last coherent dose
+    tail = [] if end is None else [[end["effect"], end["off_axis"]]]  # Back to the last admissible tested dose. PI/OpenAI
     h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
     d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
     m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
@@ -422,7 +424,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             x=[q[0] for q in path], y=[q[1] for q in path], mode="lines",
             line={"color": COLORS[method], "width": 3, "dash": dash}, hoverinfo="skip", showlegend=False,
         ))
-        support = frontier(curve)  # the points the line is fitted to; last = last coherent dose (x)
+        support = frontier(curve)  # Fit through the frontier and last admissible tested dose (x). PI/OpenAI
         figure.add_trace(go.Scatter(
             x=[p["effect"] for p in support], y=[p["off_axis"] for p in support], mode="markers", name="frontier",
             marker={"color": COLORS[method], "size": [8] * (len(support) - 1) + [13], "symbol": ["circle"] * (len(support) - 1) + ["x"]},
@@ -458,7 +460,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0.005, y=0.07, xref="paper", yref="paper", xanchor="left", yanchor="bottom", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text="dot = Pareto point · ring = dose that sets the score<br>× = last coherent dose · ★ = prompt baseline")
+                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible tested dose · ★ = prompt baseline")
     figure.add_annotation(x=0.5, y=0, xref="paper", yref="paper", text="mostly side effects", showarrow=False, yshift=18, font={"color": "#c44e52", "size": 14})
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
@@ -604,6 +606,8 @@ def main() -> None:
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
         f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = healthy answers, not past the walk boundary, mean steered damage ≤ {MAX_DAMAGE:g} of 4."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
+    if any(p["fixed_grid"] for p in points):
+        intro += " Prompt embedding sweeps use a fixed gain grid and independent health checks per gain; their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
     (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
