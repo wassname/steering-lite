@@ -527,15 +527,22 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
         observed = cached_answers(model, tokenizer, rows, answer_path(args.model, args.name, args.seed, side, 1.0), prompts, args.batch_size, _Null, (instruction, 1.0))
         if observed != expected:
             fresh = generate(model, tokenizer, prompts, args.batch_size)
+            fresh_scaled = generate(model, tokenizer, prompts, args.batch_size, (instruction, 1.0))
+            fresh_repeat = generate(model, tokenizer, prompts, args.batch_size)
             diagnostic = root / "prompt_checks" / f"{args.name}_s{args.seed}_{args.cohort}_{side}.json"
             diagnostic.parent.mkdir(parents=True, exist_ok=True)
             diagnostic.write_text(json.dumps([
-                {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new, "scaled_C1": scaled}
-                for row, prompt, old, new, scaled in zip(rows, prompts, expected, fresh, observed, strict=True)
+                {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new,
+                 "scaled_C1": scaled, "fresh_scaled_C1": paired, "fresh_repeat": repeat}
+                for row, prompt, old, new, scaled, paired, repeat in zip(rows, prompts, expected, fresh, observed, fresh_scaled, fresh_repeat, strict=True)
             ], indent=2) + "\n")
             logger.error("PROMPT_C1_MISMATCH side={} historical_vs_scaled={} fresh_vs_scaled={} diagnostic={}", side,
                          sum(a != b for a, b in zip(expected, observed, strict=True)),
                          sum(a != b for a, b in zip(fresh, observed, strict=True)), diagnostic)
+            logger.error("PROMPT_C1_PAIRED side={} fresh_vs_fresh_scaled={} fresh_vs_repeat={} gpu={} model_revision={}", side,
+                         sum(a != b for a, b in zip(fresh, fresh_scaled, strict=True)),
+                         sum(a != b for a, b in zip(fresh, fresh_repeat, strict=True)),
+                         torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu", model.config._commit_hash)
         assert observed == expected, f"{side}: gain-one answers differ from cached ordinary prompting"
         logger.info("PROMPT_C1_CACHE_PASS side={} answers={}", side, len(rows))
     timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
