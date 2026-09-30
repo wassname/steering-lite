@@ -1,0 +1,93 @@
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:50: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:65: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"{fig_name}.png", width=1064, height=590, scale=2)
+GAIN_FILTER_PASS: rejected doses omitted; identical method_curve admissibility; no lines across failed gains
+prompt-dev {'shown': ['prompting_scale', 'prompting_engineered_scale', 'mean_diff'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': 'b896c58b81d44599081fc8e864520c72ff34bc459f5808bf27c5c94b6dd23928', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:50: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:65: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"{fig_name}.png", width=1064, height=590, scale=2)
+GAIN_FILTER_PASS: rejected doses omitted; identical method_curve admissibility; no lines across failed gains
+dev {'shown': ['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': '3800bdb3287c96ff2c26f74d73b0e0bed3e9160ec93deeffbd72b1c878fe5122', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:50: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+full {'shown': ['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': '4748dfb008dcd6ed88f3a374010d6e9639e29bde0c2240c726e150e8dae9c70d', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+27b-full {'shown': ['mean_diff', 'chars', 'vjp_value', 'vjp_resid'], 'doses': 10, 'percentiles': [90, 75, 50], 'plot_sha256': 'e6c51616bb2b96a647d3c9596a08b1b081ecd49b39c916305335fe2efbc6c52b', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+olmo-full {'shown': ['mean_diff', 'chars', 'vjp_resid', 'vjp_value'], 'doses': 15, 'percentiles': [90, 75, 50], 'plot_sha256': '6af2caf55738f4566138b9ee35dcf3286c31b5da525a869c35060a283b56d18e', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+127.0.0.1 - - [01/Oct/2026 06:32:25] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:25] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:25] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:25] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:26] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:26] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=23 drawn=23
+PNG frontier marks (plot_marks.json from results.py)=23 page drawn=23 methods png=['prompting_scale', 'prompting_engineered_scale', 'mean_diff'] page=['prompting_scale', 'prompting_engineered_scale', 'mean_diff']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:34103/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:33] "GET /prompt_gains.png HTTP/1.1" 200 -
+curve points in points.json=71 drawn=71
+PNG frontier marks (plot_marks.json from results.py)=71 page drawn=71 methods png=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'] page=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:42013/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:32:44] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:44] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:44] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:44] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=91 drawn=91
+PNG frontier marks (plot_marks.json from results.py)=91 page drawn=91 methods png=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'] page=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=45
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:38715/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:32:54] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:54] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:54] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:54] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=72 drawn=72
+PNG frontier marks (plot_marks.json from results.py)=72 page drawn=72 methods png=['mean_diff', 'chars', 'vjp_value', 'vjp_resid'] page=['mean_diff', 'chars', 'vjp_value', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=13
+blind judge lines=11 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:34741/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:32:59] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:59] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:59] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:32:59] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=63 drawn=63
+PNG frontier marks (plot_marks.json from results.py)=63 page drawn=63 methods png=['mean_diff', 'chars', 'vjp_resid', 'vjp_value'] page=['mean_diff', 'chars', 'vjp_resid', 'vjp_value']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=16
+blind judge lines=15 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:38611/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

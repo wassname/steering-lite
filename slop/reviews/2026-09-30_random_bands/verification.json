@@ -1,0 +1,106 @@
+{
+  "prompt-dev": {
+    "shown": [
+      "prompting_scale",
+      "prompting_engineered_scale",
+      "mean_diff"
+    ],
+    "doses": 11,
+    "percentiles": [
+      90,
+      75,
+      50
+    ],
+    "plot_sha256": "5fe82c9e3ec060652094eff8ebf5b5ebeaf2f4cb4ccd949acb2c43cd955ef55b",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
+    "accepted_prompt_doses": {
+      "prompting_scale": 10,
+      "prompting_engineered_scale": 11
+    },
+    "admissible_stars": 2,
+    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+  },
+  "dev": {
+    "shown": [
+      "vjp_value",
+      "chars",
+      "sink_split_resid",
+      "linear_act",
+      "mean_diff",
+      "prompting_scale",
+      "prompting_engineered_scale"
+    ],
+    "doses": 11,
+    "percentiles": [
+      90,
+      75,
+      50
+    ],
+    "plot_sha256": "bf5044b4e01c02e7d31ce6935f15c987b4d87b015f84b6d7be63df8d580f81ef",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
+    "accepted_prompt_doses": {
+      "prompting_scale": 10,
+      "prompting_engineered_scale": 11
+    },
+    "admissible_stars": 2,
+    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+  },
+  "full": {
+    "shown": [
+      "vjp_value",
+      "chars",
+      "linear_act",
+      "sink_split_resid",
+      "vjp_resid"
+    ],
+    "doses": 11,
+    "percentiles": [
+      90,
+      75,
+      50
+    ],
+    "plot_sha256": "731280b8df9fc556c54d02f11d112d6a3bb93319115ba39335ff74141a2bd7d0",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
+    "accepted_prompt_doses": {},
+    "admissible_stars": 2,
+    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+  },
+  "27b-full": {
+    "shown": [
+      "mean_diff",
+      "chars",
+      "vjp_value",
+      "vjp_resid"
+    ],
+    "doses": 10,
+    "percentiles": [
+      90,
+      75,
+      50
+    ],
+    "plot_sha256": "12e527deb2b18c4f2e3ad4d8bfd3cc2c2e0a3d410bc500e711107dbb722ba76b",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
+    "accepted_prompt_doses": {},
+    "admissible_stars": 1,
+    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+  },
+  "olmo-full": {
+    "shown": [
+      "mean_diff",
+      "chars",
+      "vjp_resid",
+      "vjp_value"
+    ],
+    "doses": 15,
+    "percentiles": [
+      90,
+      75,
+      50
+    ],
+    "plot_sha256": "fb287f6e9080d12efda8bd26dbbccc50bcd31150ffb794b3e25811f5f413798d",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
+    "accepted_prompt_doses": {},
+    "admissible_stars": 1,
+    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+  }
+}

@@ -13,18 +13,13 @@ const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
-  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method));
+  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method) && p.admissible);
   const shown = [...curves.flatMap(c => c.points), ...prompts];
-  const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), 0.5);
-  const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), 0.3);
+  const zonePoints = data.zones.flatMap(zone => zone.path);
+  const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
+  const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.3);
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
-  const zone = data.zone;
-  // Chaikin corner cutting (3 passes) so the band is smooth like the PNG's spline
-  const chaikin = (pts, n) => n === 0 ? pts : chaikin(pts.flatMap((p, i) => { const q = pts[(i + 1) % pts.length];
-    return [[0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]], [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]]; }), n - 1);
-  const ring = [...zone.map(z => [x(z[2]), y(z[1])]), ...[...zone].reverse().map(z => [x(z[3]), y(z[1])])];
-  const zonePath = zone.length > 1 ? 'M' + chaikin(ring, 3).map(([a, b]) => `${a},${b}`).join('L') + 'Z' : null;
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
@@ -35,7 +30,8 @@ function Plot({ data, visible, selected, onSelect }) {
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: abrasive / candid, right: sycophantic)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis damage (lower is better)</text>
-      {zonePath && <path d={zonePath} className="zone" />}
+      {data.zones.map(zone => <path key={zone.percentile} className="zone" data-percentile={zone.percentile}
+        d={'M' + zone.path.map(([a, b]) => `${x(a)},${y(b)}`).join('L') + 'Z'} fill={`rgba(150,150,150,${zone.opacity})`} />)}
       {curves.filter(c => c.points.length).map(c => {
         const end = c.points.at(-1);
         return <g key={c.method + c.side}>
@@ -143,24 +139,32 @@ function App() {
   }, []);
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
-    <h1>steering-lite on Bullshit Bench v2</h1>
-    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? Explanation below the plot. The plot starts with the {data.shown.length} best-scoring methods; click a name to add or hide it.</p>
+    <h1>{data.view === 'prompt' ? 'Prompt embedding sweeps on Bullshit Bench v2' : 'steering-lite on Bullshit Bench v2'}</h1>
+    <p className="lede">{data.view === 'prompt'
+      ? <>Both prompt sweeps are shown below, with mean difference and shaded random references. The multiplier scales instruction embeddings only; +C and −C select different personas. <a href="#prompt-gains">See the gain sweep, with rejected doses filtered out.</a></>
+      : <>How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods and any prompt embedding sweeps.</>} Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
-    {/* intro text: PI/Claude, rewrite freely */}
+    {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">
+      <h2>Prompt gain sweep — admissible doses</h2>
+      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. Gaps are rejected gains, not untested gains. A passing dose can still contain damaged answers.</p>
+      <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at admissible prompt embedding gains; gaps at rejected doses" style={{ width: '100%' }} /></a>
+      <details><summary>Diagnostic: all tested gains, including rejected doses</summary>
+        <a href="prompt_gains_all.html"><img src="prompt_gains_all.png" alt="Diagnostic including rejected prompt gains, marked with crosses" style={{ width: '100%' }} /></a>
+      </details>
+    </section>}
     <section className="intro">
-      <p>We add a steering vector to a small language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
+      <p>We compare prompting and steering on a language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
         Each question rests on a made-up premise, such as the thermal conductivity of a CI pipeline. A good answer points out the made-up part.
         Steering one way (+C) should make the model go along with the premise (sycophantic). Steering the other way (−C) should make it point out the problem (candid).</p>
-      <p>Each colour is one method. We raise the steering strength step by step until the answers stop making sense.
+      <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
         The line joins each method's best trade-offs (dots) and ends at its last tested strength that passes the checks (×). The ring marks the strength used for the score. Other strengths are in the answer explorer below.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
-        The grey band is where random directions of the same strength land (10–90% over seeds); a method is only doing something specific if it gets outside it.</p>
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
+        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are joined in damage order. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
       {data.points.some(p => p.fixed_grid) && <>
         <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
-        <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at every tested prompt embedding gain" style={{ width: '100%' }} /></a>
       </>}
     </section>
     <h2>Best strength per method</h2>

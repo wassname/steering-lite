@@ -1,0 +1,6 @@
+MULTISEED_FILTER_PASS: one failed seed excludes the whole gain; accepted next gain preserved; failed gains not bridged
+prompting_scale -C accepted gains [0.0, 4.0, 8.0, 16.0] rejected 5
+prompting_scale +C accepted gains [0.0, 0.5, 1.0, 4.0, 8.0, 16.0] rejected 3
+prompting_engineered_scale -C accepted gains [0.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0] rejected 0
+prompting_engineered_scale +C accepted gains [0.0, 16.0] rejected 7
+SAME_RULE_PASS: every prompt point follows the existing health/boundary/damage rule

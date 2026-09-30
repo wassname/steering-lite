@@ -47,6 +47,7 @@ TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring le
 LABELS = {
     "vjp_resid": "VJP-resid", "mean_diff": "mean difference", "pca": "PCA", "vjp_value": "VJP-value",
     "value_gram": "Value Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
+    "prompting_scale": "prompt × gain", "prompting_engineered_scale": "eng. prompt × gain",
 }
 LABELS |= {method: method for method in COLORS if method not in LABELS}
 
@@ -57,6 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
     parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
+    parser.add_argument("--view", choices=("benchmark", "prompt"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
     return parser.parse_args()
 
 
@@ -292,8 +294,8 @@ def place_labels(
         top = center_y - box_height / 2
         bottom = center_y + box_height / 2
         candidate_cost = 0.0
-        candidate_cost += max(0.0, edge_pad - left) + max(0.0, right - (fig_w - edge_pad))
-        candidate_cost += max(0.0, edge_pad - top) + max(0.0, bottom - (fig_h - edge_pad))
+        candidate_cost += 1000 * (max(0.0, margin["l"] + edge_pad - left) + max(0.0, right - (fig_w - margin["r"] - edge_pad)))
+        candidate_cost += 1000 * (max(0.0, margin["t"] + 24 - top) + max(0.0, bottom - (fig_h - margin["b"] - edge_pad)))
         for point_x, point_y in obstacle_pixels:
             if left - pad <= point_x <= right + pad and top - pad <= point_y <= bottom + pad:
                 candidate_cost += overlap_cost
@@ -333,12 +335,13 @@ def place_labels(
 
 
 
-def random_zone(points: list[dict]) -> list[tuple[float, float, float, float]]:
-    """Reference cone: per C, median and 10/90% effect over seeds coherent in both signs, until fewer than half are."""
+def random_zones(points: list[dict]) -> list[dict]:
+    """Pooled-sign empirical p90/p75 tails and p50 median, filled to zero; not CIs. -- PI/OpenAI"""
     random_points = [point for point in points if point["method"] == "random"]
     seeds = sorted({point["seed"] for point in random_points})
     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
-    cone = [(0.0, 0.0, 0.0, 0.0)]
+    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)]}
+             for p, alpha in ((90, .16), (75, .22), (50, .30))]
     for C in sorted({point["C"] for point in random_points}):
         if len({seed for seed in seeds if (seed, C, "+C") in at}) < max(1, len(seeds) // 2):
             continue  # seeds start at their own C0/8, so the lowest doses are sampled by only some seeds
@@ -347,8 +350,16 @@ def random_zone(points: list[dict]) -> list[tuple[float, float, float, float]]:
             break
         chosen = [at[seed, C, side] for seed in coherent for side in ("+C", "-C")]
         effects = sorted(point["effect"] for point in chosen)
-        cone.append((median(effects), median(point["off_axis"] for point in chosen), effects[len(effects) // 10], effects[-(len(effects) // 10) - 1]))
-    return cone
+        center = median(effects)
+        damage = median(point["off_axis"] for point in chosen)
+        for zone in zones:
+            tail = len(effects) * (100 - zone["percentile"]) // 100
+            lo, hi = (center, center) if zone["percentile"] == 50 else (effects[tail], effects[-tail - 1])
+            zone["bounds"].append((center, damage, lo, hi))
+    for zone in zones:
+        ordered = sorted(zone["bounds"], key=lambda row: row[1])
+        zone["path"] = [[min(0.0, row[2]), row[1]] for row in ordered] + [[max(0.0, row[3]), row[1]] for row in reversed(ordered)]
+    return zones
 
 
 PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
@@ -405,18 +416,19 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
 def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
-    prompting = [point for point in points if point["method"] in PROMPTS]
+    prompting = [point for point in points if point["method"] in PROMPTS and point["admissible"]]
     random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
     shown = [point for curve in curves.values() for point in curve] + random_live + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
     y_range = (1.08 * max(point["off_axis"] for point in shown), -0.07)
-    margin = {"l": 75, "r": 10, "t": 40, "b": 58}
-    cone = random_zone(points)
-    figure.add_trace(go.Scatter(
-        x=[p[2] for p in cone] + [p[3] for p in reversed(cone)], y=[p[1] for p in cone] + [p[1] for p in reversed(cone)],
-        fill="toself", fillcolor="rgba(150,150,150,0.22)", line={"color": "rgba(150,150,150,0)", "width": 0},
-        line_shape="spline", line_smoothing=0.8, hoverinfo="skip", showlegend=False,
-    ))
+    margin = {"l": 75, "r": 10, "t": 40, "b": 150}
+    for zone in random_zones(points):
+        figure.add_trace(go.Scatter(
+            x=[p[0] for p in zone["path"]], y=[p[1] for p in zone["path"]],
+            name=f"random p{zone['percentile']}", mode="lines", fill="toself",
+            fillcolor=f"rgba(150,150,150,{zone['opacity']})", line={"width": 0},
+            hoverinfo="skip", showlegend=False,
+        ))
     obstacles = [(0.0, 0.0)]
     labels = []
     for (method, side), curve in curves.items():
@@ -455,17 +467,15 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
         labels, (-x_limit, x_limit), y_range, obstacles=obstacles, fig_w=1064, fig_h=590, margin=margin,
-        font={"size": 13}, bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
+        font={"size": 11}, char_w=6.5, line_h=15, overlap_cost_label=.2, radii=(40, 62, 88, 118, 160, 205),
+        bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
         figure.add_annotation(**annotation)
-    if len(cone) > 1:
-        figure.add_annotation(x=cone[-1][0], y=cone[-1][1] / 2, text="null zone of<br>random directions", showarrow=False, font={"color": "#666666", "size": 13})
     figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer -> abrasive", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=0.005, y=0.07, xref="paper", yref="paper", xanchor="left", yanchor="bottom", align="left", showarrow=False,
+    figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible tested dose · ★ = prompt baseline")
-    figure.add_annotation(x=0.5, y=0, xref="paper", yref="paper", text="mostly side effects", showarrow=False, yshift=18, font={"color": "#c44e52", "size": 14})
+                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible tested dose · ★ = admissible prompt baseline<br>random shading: p90 = 10th–90th, p75 = 25th–75th, p50 = median<br>filled to zero; not confidence or sample-coverage regions")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
@@ -552,20 +562,23 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def prompt_gain_plot(points: list[dict], title: str) -> go.Figure:
-    """Show every prompt gain, including doses omitted from the admissible frontier. PI/OpenAI."""
+def prompt_gain_plot(points: list[dict], title: str, *, include_rejected: bool = False) -> go.Figure:
+    """Use the benchmark's admissible seed means; rejected doses appear only in diagnostics. PI/OpenAI."""
     figure = make_subplots(rows=1, cols=2, subplot_titles=("Premise change from bare (− rejects, + accepts)", "Mean damage (0 clean → 4 broken)"))
     methods = sorted({p["method"] for p in points if p["fixed_grid"]})
     for method in methods:
         for side in ("+C", "-C"):
             doses = sorted({p["C"] for p in points if p["method"] == method})
             groups = [[p for p in points if p["method"] == method and p["side"] == side and p["C"] == dose] for dose in doses]
+            accepted = {p["C"] for p in method_curve(points, method, side)}
             for column, metric in enumerate(("effect", "steered_damage"), 1):
                 figure.add_trace(go.Scatter(
-                    x=[f"{dose:g}" for dose in doses], y=[mean(p[metric] for p in group) for group in groups],
-                    name=f"{method} {side}", legendgroup=f"{method}{side}", showlegend=column == 1,
+                    x=[f"{dose:g}" for dose in doses],
+                    y=[mean(p[metric] for p in group) if include_rejected or dose in accepted else None
+                       for dose, group in zip(doses, groups, strict=True)], connectgaps=False,
+                    name=f"{LABELS[method]} {side}", legendgroup=f"{method}{side}", showlegend=column == 1,
                     mode="lines+markers", line=dict(color=COLORS[method], dash="solid" if side == "+C" else "dash"),
-                    marker=dict(size=7, symbol=["circle" if all(p["admissible"] for p in group) else "x" for group in groups]),
+                    marker=dict(size=7, symbol=["circle" if dose in accepted else "x" for dose in doses]),
                 ), row=1, col=column)
     figure.add_hline(y=0, line_color="#aaaaaa", line_width=1, row=1, col=1)
     figure.add_hline(y=MAX_DAMAGE, line_color="#aaaaaa", line_dash="dot", row=1, col=2)
@@ -573,7 +586,8 @@ def prompt_gain_plot(points: list[dict], title: str) -> go.Figure:
     figure.update_yaxes(range=[0, 4], row=1, col=2)
     figure.update_layout(template="plotly_white", title=dict(text=title, font_size=16),
                         legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=150, b=120, l=55, r=25))
-    figure.add_annotation(text="× fails admissibility; dotted line: damage cap. Gain 0 keeps token positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. ±C selects persona, not a negative gain. Endpoints do not confirm breakdown.",
+    note = "× fails admissibility." if include_rejected else "Rejected doses omitted; lines do not bridge failed gains."
+    figure.add_annotation(text=f"{note} Dotted line: damage cap. Gain 0 keeps positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. ±C selects persona, not a negative gain. Endpoints do not confirm breakdown.",
                           x=0, y=-0.24, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
     return figure
 
@@ -600,12 +614,16 @@ def main() -> None:
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     # tagged variants (<method>-<tag>, e.g. vjp_resid-t47) are diagnostics: in the table, not in the default plot view
     shown = [row["method"] for row in rows if row["method"] in methods and "-" not in row["method"] and not math.isnan(row["score"])][:TOP_N_PLOT]
+    shown += [m for m in ("prompting_scale", "prompting_engineered_scale") if m in methods and m not in shown]
+    if args.view == "prompt":
+        shown = ["prompting_scale", "prompting_engineered_scale", "mean_diff"]
+        assert set(shown) <= set(methods), "prompt view needs both prompt sweeps and mean_diff"
     site = {
-        "shown": shown,
+        "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
-        "zone": random_zone(points),
+        "zones": random_zones(points),
         "curves": [{
             "method": m, "side": side,
             "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in frontier(method_curve(points, m, side))],
@@ -622,7 +640,8 @@ def main() -> None:
     }
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
-    title = f"steering-lite on Bullshit Bench v2: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
+    heading = "Prompt embedding sweeps vs mean difference" if args.view == "prompt" else "steering-lite on Bullshit Bench v2"
+    title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
     table = tables(rows) + (
@@ -643,7 +662,10 @@ def main() -> None:
         gains = prompt_gain_plot(points, f"Prompt embedding gains: {model} ({args.cohort}, {len(scenarios)} questions)")
         gains.write_image(out / "prompt_gains.png", width=1064, height=590, scale=2)
         gains.write_html(out / "prompt_gains.html", include_plotlyjs="cdn")
-        gain_image = "\n\n![All tested prompt gains, including inadmissible doses](prompt_gains.png)"
+        diagnostic = prompt_gain_plot(points, f"Diagnostic — all tested prompt gains: {model}", include_rejected=True)
+        diagnostic.write_image(out / "prompt_gains_all.png", width=1064, height=590, scale=2)
+        diagnostic.write_html(out / "prompt_gains_all.html", include_plotlyjs="cdn")
+        gain_image = "\n\n![Admissible prompt gains](prompt_gains.png)\n\n[Diagnostic: all gains, including rejected doses](prompt_gains_all.html)"
     (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){gain_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(

@@ -1,0 +1,61 @@
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:47] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=23 drawn=23
+PNG frontier marks (plot_marks.json from results.py)=23 page drawn=23 methods png=['prompting_scale', 'prompting_engineered_scale', 'mean_diff'] page=['prompting_scale', 'prompting_engineered_scale', 'mean_diff']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:37711/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:41:53] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=71 drawn=71
+PNG frontier marks (plot_marks.json from results.py)=71 page drawn=71 methods png=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'] page=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:44617/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:42:00] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:00] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:00] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:00] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=91 drawn=91
+PNG frontier marks (plot_marks.json from results.py)=91 page drawn=91 methods png=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'] page=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=45
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:36029/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:42:08] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:08] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:08] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:08] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=72 drawn=72
+PNG frontier marks (plot_marks.json from results.py)=72 page drawn=72 methods png=['mean_diff', 'chars', 'vjp_value', 'vjp_resid'] page=['mean_diff', 'chars', 'vjp_value', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=13
+blind judge lines=11 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:34863/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+127.0.0.1 - - [01/Oct/2026 06:42:12] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:12] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:12] "GET /assets/index-YxD64GSc.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 06:42:12] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=63 drawn=63
+PNG frontier marks (plot_marks.json from results.py)=63 page drawn=63 methods png=['mean_diff', 'chars', 'vjp_resid', 'vjp_value'] page=['mean_diff', 'chars', 'vjp_resid', 'vjp_value']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=16
+blind judge lines=15 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:46327/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
