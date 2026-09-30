@@ -1,0 +1,7 @@
+{
+  "source": "bsbench/Qwen--Qwen3.5-4B-g7c7712c6/answers/prompting_engineered_scale_s0/+C_C1.jsonl",
+  "archive": "bsbench/Qwen--Qwen3.5-4B-g7c7712c6/prompt_checks/failed-run-20260930/prompting_engineered_scale_s0/+C_C1.jsonl",
+  "sha256": "dd52e9fef246f7387100b329477f91a217cacabac07861a4351490a81e339b1c",
+  "rows": 20,
+  "reason": "Incomplete engineered sweep: preserve failed-run C1 before a same-process paired-control restart. Ordinary prompting_engineered cache untouched."
+}

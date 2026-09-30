@@ -29,6 +29,8 @@ import math
 import re
 import sys
 import time
+import uuid
+from importlib.metadata import version
 from pathlib import Path
 
 import torch
@@ -46,6 +48,7 @@ from transformers.utils.import_utils import is_flash_linear_attention_available
 ROOT = Path(__file__).resolve().parents[2]
 COHORT = ROOT / "data/bsbench/bullshit_bench_v2.jsonl"
 OUT = ROOT / "outputs/bsbench"
+RUN_ID = uuid.uuid4().hex
 PERSONAS = [("sycophantic", "abrasive")]
 PERSONA_TEMPLATE = "Answer as someone who is {persona}."
 # AxBench-style engineered prompts, as adapted in AntiPaSTO nbs/eval_baseline_prompting_engineered.py
@@ -250,7 +253,7 @@ def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as file:
             for index, text in zip(missing, texts, strict=True):
-                record = {"scenario": rows[index]["scenario"], "prompt": rows[index]["prompt"], "text": text}
+                record = {"scenario": rows[index]["scenario"], "prompt": rows[index]["prompt"], "text": text, "run_id": RUN_ID}
                 file.write(json.dumps(record, ensure_ascii=False) + "\n")
                 done[record["scenario"]] = record
     return [done[row["scenario"]]["text"] for row in rows]
@@ -521,30 +524,22 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
     baseline = PROMPT_SWEEPS[args.method]
     instructions = PROMPT_METHODS[baseline]
     check_prompt_embeddings(model, tokenizer, rows, instructions["+C"])
+    identity = {}
     for side, instruction in instructions.items():
         prompts = generation_inputs(tokenizer, rows, instruction)
-        expected = cached_answers(model, tokenizer, rows, answer_path(args.model, baseline, args.seed, side, 1.0), prompts, args.batch_size, _Null)
+        historical = cached_answers(model, tokenizer, rows, answer_path(args.model, baseline, args.seed, side, 1.0), prompts, args.batch_size, _Null)
+        expected = generate(model, tokenizer, prompts, args.batch_size)
         observed = cached_answers(model, tokenizer, rows, answer_path(args.model, args.name, args.seed, side, 1.0), prompts, args.batch_size, _Null, (instruction, 1.0))
-        if observed != expected:
-            fresh = generate(model, tokenizer, prompts, args.batch_size)
-            fresh_scaled = generate(model, tokenizer, prompts, args.batch_size, (instruction, 1.0))
-            fresh_repeat = generate(model, tokenizer, prompts, args.batch_size)
-            diagnostic = root / "prompt_checks" / f"{args.name}_s{args.seed}_{args.cohort}_{side}.json"
-            diagnostic.parent.mkdir(parents=True, exist_ok=True)
-            diagnostic.write_text(json.dumps([
-                {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new,
-                 "scaled_C1": scaled, "fresh_scaled_C1": paired, "fresh_repeat": repeat}
-                for row, prompt, old, new, scaled, paired, repeat in zip(rows, prompts, expected, fresh, observed, fresh_scaled, fresh_repeat, strict=True)
-            ], indent=2) + "\n")
-            logger.error("PROMPT_C1_MISMATCH side={} historical_vs_scaled={} fresh_vs_scaled={} diagnostic={}", side,
-                         sum(a != b for a, b in zip(expected, observed, strict=True)),
-                         sum(a != b for a, b in zip(fresh, observed, strict=True)), diagnostic)
-            logger.error("PROMPT_C1_PAIRED side={} fresh_vs_fresh_scaled={} fresh_vs_repeat={} gpu={} model_revision={}", side,
-                         sum(a != b for a, b in zip(fresh, fresh_scaled, strict=True)),
-                         sum(a != b for a, b in zip(fresh, fresh_repeat, strict=True)),
-                         torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu", model.config._commit_hash)
-        assert observed == expected, f"{side}: gain-one answers differ from cached ordinary prompting"
-        logger.info("PROMPT_C1_CACHE_PASS side={} answers={}", side, len(rows))
+        diagnostic = root / "prompt_checks" / f"{args.name}_s{args.seed}_{args.cohort}_{side}.json"
+        diagnostic.parent.mkdir(parents=True, exist_ok=True)
+        diagnostic.write_text(json.dumps([
+            {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new, "scaled_C1": scaled}
+            for row, prompt, old, new, scaled in zip(rows, prompts, historical, expected, observed, strict=True)
+        ], indent=2) + "\n")
+        assert observed == expected, f"{side}: gain-one answers differ from fresh ordinary prompting; see {diagnostic}"
+        identity[side] = {"answers": len(rows), "exact": True, "historical_mismatches": sum(a != b for a, b in zip(historical, observed, strict=True)),
+                          "diagnostic": str(diagnostic.relative_to(root))}
+        logger.info("PROMPT_C1_IDENTITY_PASS side={} check={}", side, identity[side])
     timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
     gains = PROMPT_GAINS[:args.max_rungs] if args.smoke else PROMPT_GAINS
     rungs = []
@@ -555,7 +550,9 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
             path = answer_path(args.model, args.name, args.seed, side, gain)
             answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null, (instruction, gain))
             stats, reasons = health(tokenizer, answers)
-            rung[side] = {"breakdown_reasons": reasons, "post_boundary": False, "stats": stats, "answers": str(path.relative_to(root))}
+            scenarios = {row["scenario"] for row in rows}
+            answer_runs = sorted({record.get("run_id", "unrecorded") for record in map(json.loads, path.open()) if record["scenario"] in scenarios})
+            rung[side] = {"breakdown_reasons": reasons, "post_boundary": False, "stats": stats, "answers": str(path.relative_to(root)), "answer_runs": answer_runs}
             logger.info("SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this dose is unhealthy (later doses still tested). method={} C={} side={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===", args.name, gain, side, stats, reasons, answers[0])
         rung["seconds"] = time.monotonic() - started
         rungs.append(rung)
@@ -565,11 +562,12 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
             "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
             "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
             "gen": GEN, "sweep_kind": "prompt_embeddings", "prompt_gains": list(gains),
-            "instructions": instructions, "scaled_span": "tokens overlapping instruction, including merged separator whitespace",
+            "instructions": instructions, "identity": identity, "run_id": RUN_ID,
+            "scaled_span": "tokens overlapping instruction, including merged separator whitespace",
             "stop_reason": "fixed_grid" if done else None,
             "boundary_confirmed": False, "rungs": rungs,
             "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
-                       "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"},
+                       "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
         }, indent=2) + "\n")
     logger.info("{} method={} rungs={} fixed_grid=True boundary_confirmed=False certificate={}", "SMOKE_PASS" if args.smoke else "WALK_COMPLETE", args.name, len(rungs), certificate_path)
 
@@ -600,6 +598,13 @@ def walk(args) -> None:
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype, attn_implementation="sdpa").to(args.device).eval()
     logger.info("SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla={}", is_flash_linear_attention_available())
     timing["load_s"] = time.monotonic() - timing["start"]
+    runtime = {"run_id": RUN_ID, "argv": sys.argv, "model": args.model, "dtype": args.dtype,
+               "torch": torch.__version__, "transformers": version("transformers"),
+               "flash_linear_attention": version("flash-linear-attention") if is_flash_linear_attention_available() else None,
+               "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"}
+    (root / "runs").mkdir(parents=True, exist_ok=True)
+    (root / "runs" / f"{RUN_ID}.json").write_text(json.dumps(runtime, indent=2) + "\n")
+    logger.info("RUNTIME {}", runtime)
     if args.profile:
         profile(args, model, tokenizer, root / mode_output(args))
         return
@@ -698,7 +703,7 @@ def walk(args) -> None:
             "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
             "state": state, "rungs": rungs,
             "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
-                       "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"},
+                       "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
         }, indent=2) + "\n")
         if done:
             logger.info("WALK_COMPLETE method={} seed={} rungs={} state={} certificate={}", args.method, args.seed, len(rungs), state, certificate_path)
