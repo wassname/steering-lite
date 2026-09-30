@@ -1,14 +1,36 @@
 # steering-lite
 
-When we steer a model, we want to change one thing without changing everything else. We might want less sycophancy, for example, while keeping its answers to ordinary factual questions the same.
-
-steering-lite does this by changing the model's hidden activations during inference, without retraining. Give it pairs of prompts showing opposite behaviours, extract a steering vector, and apply it while the model generates. How well that works depends on the method and the strength of the steer.
-
-The code is meant to be easy to change: one file per method, starting with [mean_diff.py](src/steering_lite/variants/mean_diff.py). It is a sister project of [lora-lite](https://github.com/wassname/lora-lite), for activation steering rather than adapter fine-tuning.
+steering-lite changes a model's hidden activations during inference, without retraining.
 
 [Try it](#quickstart) · [Results](#results) · [Value maps](https://github.com/wassname/moral-maps#can-we-steer-these-values)
 
+## Curious Plot, Models are grown not built
+
+<!-- From wassname's tweet; shortened and arranged by PI/OpenAI for review. -->
+
+Why a shoe pointing right vs a banana pointing left?!? Why are these plots so different?
+
+![Pareto plot, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_full.png)
+
+![Pareto plot, OLMo-2-0325-32B-Instruct](assets/bsbench_olmo-2-32b_full.png)
+
+The gray shows how much random interventions can change model sycophancy (horizontal) vs side effects (vertical). The curves stop at the last dose that passes the checks. The axis ranges differ between plots. <!-- PI/OpenAI: clarified endpoints; path length does not measure breakdown. -->
+
+I think it shows that models' internal landscapes vary a lot! I also think this curiousity will hopefully get you, dear reader, to read a little longer.
+
+The sweeps show that as we increase the dose of a steering intervention, it gets stronger effects and side effects, until it breaks down.
+
+I compare to prompting, which is I susepect is better if the model wants to change behaviour as instructed, and worse if it doesn't.
+
+I hope we can use this to show how good steering methods are, and make better ones.
+
 ## Quickstart
+
+When we steer a model, we want to change one thing without changing everything else. We might want less sycophancy, for example, while keeping its answers to ordinary factual questions the same.
+
+Give it pairs of prompts showing opposite behaviours, extract a steering vector, and apply it while the model generates. How well that works depends on the method and the strength of the steer.
+
+The code is meant to be easy to change: one file per method, starting with [mean_diff.py](src/steering_lite/variants/mean_diff.py). It is a sister project of [lora-lite](https://github.com/wassname/lora-lite), for activation steering rather than adapter fine-tuning.
 
 From a local checkout, install with `uv pip install -e ".[hf-test]"`. The example uses a CUDA GPU.
 
@@ -60,9 +82,7 @@ We steer in both directions: +C toward sycophantic, -C toward abrasive. For each
 
 The score is the change we want minus the damage, at the best strength, in the weaker of the two directions. Higher is better. `random` (a random direction) shows what noise scores.
 
-![Pareto plot, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_full.png)
-
-The plot shows the 5 best methods on Qwen3.5-4B. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers. The grey region spans roughly the 10th–90th percentile of random directions' on-axis changes at each dose, at their median damage, using seeds admissible in both signs. It is not a confidence region. <!-- PI/OpenAI -->
+The Qwen3.5-4B plot at the top shows its 5 best methods. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers. The grey region spans roughly the 10th–90th percentile of random directions' on-axis changes at each dose, at their median damage, using seeds admissible in both signs. It is not a confidence region. <!-- PI/OpenAI -->
 
 The stars are prompt baselines: they ask the model to act a certain way, and leave its internals alone. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results. On 4B, the prompt −C and engineered-prompt +C stars fail the checks and are shown only for reference. <!-- PI/OpenAI -->
 
@@ -117,8 +137,6 @@ Within each model, the two columns rank these four methods in the same order, so
 Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (8th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
 
 ![Pareto plot, Qwen3.5-27B](assets/bsbench_qwen3.5-27b_full.png)
-
-![Pareto plot, OLMo-2-0325-32B-Instruct](assets/bsbench_olmo-2-32b_full.png)
 
 To run the benchmark you need [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), pnpm, a Modal account (`uv run --extra benchmark modal setup`) and `OPENROUTER_API_KEY` in `.env`.
 
