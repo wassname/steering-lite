@@ -1,0 +1,211 @@
+diff --git a/scripts/bsbench/results.py b/scripts/bsbench/results.py
+index c686074..53173ec 100644
+--- a/scripts/bsbench/results.py
++++ b/scripts/bsbench/results.py
+@@ -336,11 +336,11 @@ def place_labels(
+ 
+ 
+ def random_zones(points: list[dict]) -> list[dict]:
+-    """Pooled-sign empirical p90/p75 tails and p50 median, filled to zero; not CIs. -- PI/OpenAI"""
++    """Pooled-sign percentiles, zero-filled; common Chaikin weights preserve nesting. PI/OpenAI."""
+     random_points = [point for point in points if point["method"] == "random"]
+     seeds = sorted({point["seed"] for point in random_points})
+     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
+-    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)]}
++    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)], "doses": [None], "seed_counts": [0]}
+              for p, alpha in ((90, .16), (75, .22), (50, .30))]
+     for C in sorted({point["C"] for point in random_points}):
+         if len({seed for seed in seeds if (seed, C, "+C") in at}) < max(1, len(seeds) // 2):
+@@ -356,49 +356,44 @@ def random_zones(points: list[dict]) -> list[dict]:
+             tail = len(effects) * (100 - zone["percentile"]) // 100
+             lo, hi = (center, center) if zone["percentile"] == 50 else (effects[tail], effects[-tail - 1])
+             zone["bounds"].append((center, damage, lo, hi))
++            zone["doses"].append(C)
++            zone["seed_counts"].append(len(coherent))
+     for zone in zones:
+-        ordered = sorted(zone["bounds"], key=lambda row: row[1])
+-        zone["path"] = [[min(0.0, row[2]), row[1]] for row in ordered] + [[max(0.0, row[3]), row[1]] for row in reversed(ordered)]
++        edge = [(row[1], min(0.0, row[2]), max(0.0, row[3])) for row in sorted(zone["bounds"], key=lambda row: row[1])]
++        for _ in range(3):
++            edge = [edge[0]] + [tuple(w * a + (1 - w) * b for a, b in zip(left, right, strict=True))
++                               for left, right in zip(edge, edge[1:]) for w in (.75, .25)] + [edge[-1]]
++        zone["path"] = [[lo, damage] for damage, lo, hi in edge] + [[hi, damage] for damage, lo, hi in reversed(edge)]
+     return zones
+ 
+ 
+ PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
+ 
+ 
+-def frontier(curve: list[dict]) -> list[dict]:
+-    """Pareto points in on-axis order, then the last admissible tested dose (always kept, the x).
+-
+-    A point stays if no other point has at least its on-axis gain with less damage. If the last
+-    coherent dose is not itself on the frontier, the line takes one straight step back to it."""
++def frontier(curve: list[dict], *, include_endpoint: bool = True) -> list[dict]:
++    """Pareto points in effect order, optionally followed by the last-dose reference cross. PI/OpenAI."""
+     if not curve:
+         return []
+-    end = curve[-1]
++    end = curve[-1] if include_endpoint else None
+     kept = [
+         p for p in curve
+         if p is not end and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
+     ]
+-    return sorted(kept, key=directed) + [end]
++    return sorted(kept, key=directed) + ([end] if end is not None else [])
+ 
+ 
+ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]]:
+-    """Monotone cubic (Fritsch-Carlson PCHIP) of damage over on-axis gain, pinned at bare and at the end.
+-
+-    Fixed grids join measured support only, without a synthetic bare anchor. -- PI/OpenAI
+-    Monotone interpolation cannot overshoot, so the drawn line stays between its support points."""
+-    if support[0]["fixed_grid"]:
+-        return [[p["effect"], p["off_axis"]] for p in support]
++    """Shape-preserving cubic through Pareto supports; last-dose crosses never force a return. PI/OpenAI."""
++    support = frontier(support, include_endpoint=False)
++    fixed_grid = support[0]["fixed_grid"]
+     sign = 1.0 if side == "+C" else -1.0
+-    end = support[-1]
+-    ts, ys = [0.0], [0.0]
+-    for p in support[:-1]:
++    ts, ys = ([directed(support[0])], [support[0]["off_axis"]]) if fixed_grid else ([0.0], [0.0])
++    rest = support[1:] if fixed_grid else support
++    for p in rest:
+         if directed(p) > ts[-1]:
+             ts.append(directed(p)); ys.append(p["off_axis"])
+-    if directed(end) > ts[-1]:  # the end continues the monotone frontier
+-        ts.append(directed(end)); ys.append(end["off_axis"])
+-        end = None
+-    if len(ts) < 2:  # no forward progress on this side: straight line to the end
+-        return [[0.0, 0.0], [support[-1]["effect"], support[-1]["off_axis"]]]
+-    tail = [] if end is None else [[end["effect"], end["off_axis"]]]  # Back to the last admissible tested dose. PI/OpenAI
++    if len(ts) < 2:
++        return [[sign * ts[0], ys[0]]]
+     h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+     d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
+     m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
+@@ -410,7 +405,7 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
+             y = h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
+             path.append([sign * (ts[i] + u * h[i]), y])
+     path.append([sign * ts[-1], ys[-1]])
+-    return path + tail
++    return path
+ 
+ 
+ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
+@@ -455,7 +450,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
+             ))
+         obstacles.extend((q[0], q[1]) for q in path[::4])
+         obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
+-        labels.append({"x": curve[-1]["effect"], "y": curve[-1]["off_axis"], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
++        labels.append({"x": path[-1][0], "y": path[-1][1], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
+     for point in prompting:
+         figure.add_trace(go.Scatter(
+             x=[point["effect"]], y=[point["off_axis"]], mode="markers",
+@@ -475,7 +470,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
+     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
+                           font={"color": "#555555", "size": 12},
+-                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible tested dose · ★ = admissible prompt baseline<br>random shading: p90 = 10th–90th, p75 = 25th–75th, p50 = median<br>filled to zero; not confidence or sample-coverage regions")
++                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible dose (not forced into curve) · ★ = admissible prompt baseline<br>random shading: p90 ≈ 10th–90th, p75 ≈ 25th–75th, p50 = median<br>smoothed, filled to zero; not confidence or sample-coverage regions")
+     figure.update_layout(
+         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
+         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
+diff --git a/scripts/bsbench/web/src/main.jsx b/scripts/bsbench/web/src/main.jsx
+index 31986a0..a1241c7 100644
+--- a/scripts/bsbench/web/src/main.jsx
++++ b/scripts/bsbench/web/src/main.jsx
+@@ -24,6 +24,7 @@ function Plot({ data, visible, selected, onSelect }) {
+   return <div className="chart-shell">
+     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
+       <rect className="canvas" width={W} height={H} />
++      <text className="label" x={M.l} y={18}>{data.cohort.toUpperCase()} · {data.questions.length} questions</text>
+       <g className="grid">
+         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
+         {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>; })}
+@@ -48,7 +49,7 @@ function Plot({ data, visible, selected, onSelect }) {
+           })}
+           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
+             return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
+-          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
++          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(c.path.at(-1)[0])} y={y(c.path.at(-1)[1]) - 11} textAnchor={anchor(x(c.path.at(-1)[0]))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
+         </g>;
+       })}
+       {prompts.map(p => <g key={pointId(p)} className="mark prompt-baseline" onClick={() => onSelect(p)}
+@@ -160,9 +161,9 @@ function App() {
+       <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
+         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
+         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
+-        The line joins each method's best trade-offs (dots) and ends at its last tested strength that passes the checks (×). The ring marks the strength used for the score. Other strengths are in the answer explorer below.
++        The line joins each method's best trade-offs (dots), ordered by effect, not dose. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score. Other strengths are in the answer explorer below.
+         Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
+-        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are joined in damage order. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
++        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
+       {data.points.some(p => p.fixed_grid) && <>
+         <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
+       </>}
+diff --git a/scripts/bsbench/web/uat.py b/scripts/bsbench/web/uat.py
+index 6e979cd..43ad25f 100644
+--- a/scripts/bsbench/web/uat.py
++++ b/scripts/bsbench/web/uat.py
+@@ -27,6 +27,7 @@ with sync_playwright() as p:
+     page.on("pageerror", lambda e: errors.append(str(e)))
+     page.goto(url)
+     page.wait_for_selector("svg")
++    assert f"{data['cohort'].upper()} · {len(data['questions'])} questions" in page.locator("svg").text_content()
+     curve_points = sum(len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
+     drawn = page.locator("circle.mark, path.mark.end").count()
+     print(f"curve points in points.json={curve_points} drawn={drawn}")
+@@ -46,6 +47,8 @@ with sync_playwright() as p:
+             assert page.get_by_role("button", name=method, exact=True).get_attribute("aria-pressed") == "true"
+     print("random regions: p90/p75/p50 with distinct fills; requested opening methods visible")
+     for curve in data["curves"]:
++        directed_path = [(x if curve["side"] == "+C" else -x) for x, y in curve["path"]]
++        assert all(a <= b for a, b in zip(directed_path, directed_path[1:])), "Pareto path must not double back"
+         seeds = {p["seed"] for p in data["points"] if p["method"] == curve["method"]}
+         for mark in curve["points"]:
+             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
+@@ -75,7 +78,7 @@ with sync_playwright() as p:
+     if sweep_methods:
+         for curve in data["curves"]:
+             if curve["method"] in sweep_methods:
+-                assert curve["path"] == [[p["effect"], p["off_axis"]] for p in curve["points"]], "fixed-grid path must not invent a bare anchor"
++                assert curve["path"][0] in [[p["effect"], p["off_axis"]] for p in curve["points"]], "prompt curve must start at a measured point, not bare"
+         for method in set(data["shown"]) ^ sweep_methods:
+             page.get_by_role("button", name=method, exact=True).click()
+         expected = sum(len(c["points"]) for c in data["curves"] if c["method"] in sweep_methods)
+diff --git a/slop/reviews/2026-09-30_random_bands/render_saved.py b/slop/reviews/2026-09-30_random_bands/render_saved.py
+index d567703..ea41e6e 100644
+--- a/slop/reviews/2026-09-30_random_bands/render_saved.py
++++ b/slop/reviews/2026-09-30_random_bands/render_saved.py
+@@ -34,10 +34,14 @@ for report in ("prompt-dev", "dev", "full", "27b-full", "olmo-full"):
+         lo = [min(0, r[2]) for r in rows]
+         hi = [max(0, r[3]) for r in rows]
+         assert lo[0] <= lo[1] <= lo[2] <= 0 <= hi[2] <= hi[1] <= hi[0]
+-    for zone in site["zones"]:
+-        ordered = sorted(zone["bounds"], key=lambda row: row[1])
+-        assert len({r[1] for r in ordered}) == len(ordered)
+-        assert zone["path"] == [[min(0, r[2]), r[1]] for r in ordered] + [[max(0, r[3]), r[1]] for r in reversed(ordered)]
++    half = len(site["zones"][0]["path"]) // 2
++    edges = [list(zip(z["path"][:half], reversed(z["path"][half:]), strict=True)) for z in site["zones"]]
++    for row in zip(*edges, strict=True):
++        assert len({p[1] for edge in row for p in edge}) == 1
++        assert row[0][0][0] <= row[1][0][0] <= row[2][0][0] <= 0 <= row[2][1][0] <= row[1][1][0] <= row[0][1][0]
++    for curve in site["curves"]:
++        full = results.method_curve(site["points"], curve["method"], curve["side"])
++        curve["path"] = results.smooth_path(results.frontier(full), curve["side"]) if full else []
+     results.COLORS.update(site["colors"])
+     results.LABELS.update({m: m for m in site["colors"] if m not in results.LABELS})
+     model = site["model_dir"].rsplit("-g", 1)[0].split("--")[-1]
+@@ -53,8 +57,9 @@ for report in ("prompt-dev", "dev", "full", "27b-full", "olmo-full"):
+     (out / "plot.html").write_text(text[:start] + fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True}) + text[end:])
+     marks = sum(len(t.x) for t in fig.data if t.name == "frontier")
+     (out / "plot_marks.json").write_text(json.dumps({"frontier_marks": marks, "methods": site["shown"]}) + "\n")
+-    for field in ("summary", "blind", "curves", "questions"):
++    for field in ("summary", "blind", "questions"):
+         assert site[field] == original[field], f"{field} changed"
++    assert [c["points"] for c in site["curves"]] == [c["points"] for c in original["curves"]], "markers changed"
+     for before, after in zip(original["points"], site["points"], strict=True):
+         assert all(after[k] == v for k, v in before.items())
+     (out / "points.json").write_text(json.dumps(site, indent=1) + "\n")

@@ -1,0 +1,15 @@
+prompt-dev p90 global left/right extrema shrink by 0.004375/0.000000; raw support bounds unchanged
+prompt-dev p75 global left/right extrema shrink by 0.006734/0.000000; raw support bounds unchanged
+prompt-dev p50 global left/right extrema shrink by 0.016437/0.000000; raw support bounds unchanged
+dev p90 global left/right extrema shrink by 0.004375/0.000000; raw support bounds unchanged
+dev p75 global left/right extrema shrink by 0.006734/0.000000; raw support bounds unchanged
+dev p50 global left/right extrema shrink by 0.016437/0.000000; raw support bounds unchanged
+full p90 global left/right extrema shrink by 0.010012/0.000000; raw support bounds unchanged
+full p75 global left/right extrema shrink by 0.031856/0.000000; raw support bounds unchanged
+full p50 global left/right extrema shrink by 0.006863/0.000000; raw support bounds unchanged
+27b-full p90 global left/right extrema shrink by 0.032053/0.000000; raw support bounds unchanged
+27b-full p75 global left/right extrema shrink by 0.009295/0.000000; raw support bounds unchanged
+27b-full p50 global left/right extrema shrink by 0.006370/0.000000; raw support bounds unchanged
+olmo-full p90 global left/right extrema shrink by 0.000000/0.000350; raw support bounds unchanged
+olmo-full p75 global left/right extrema shrink by 0.000000/0.006473; raw support bounds unchanged
+olmo-full p50 global left/right extrema shrink by 0.000000/0.008225; raw support bounds unchanged

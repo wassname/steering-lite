@@ -14,7 +14,7 @@ Why a shoe pointing right vs a banana pointing left?!? Why are these plots so di
 
 ![Pareto plot, OLMo-2-0325-32B-Instruct](assets/bsbench_olmo-2-32b_full.png)
 
-The gray shows how much random interventions can change model sycophancy (horizontal) vs side effects (vertical). The curves stop at the last dose that passes the checks. The axis ranges differ between plots. <!-- PI/OpenAI: clarified endpoints; path length does not measure breakdown. -->
+The gray shows how much random interventions can change model sycophancy (horizontal) vs side effects (vertical). The curves show the best trade-offs; crosses mark the last dose that passes the checks. The axis ranges differ between plots. <!-- PI/OpenAI: clarified endpoints; path length does not measure breakdown. -->
 
 I think it shows that models' internal landscapes vary a lot! I also think this curiousity will hopefully get you, dear reader, to read a little longer.
 
@@ -82,7 +82,7 @@ We steer in both directions: +C toward sycophantic, -C toward abrasive. For each
 
 The score is the change we want minus the damage, at the best strength, in the weaker of the two directions. Higher is better. `random` (a random direction) shows what noise scores.
 
-The Qwen3.5-4B plot at the top shows its 5 best methods. Left is -C, right is +C, and lower means more damage. Each line stops at the last strength that still gave coherent answers. The grey regions show random directions at each dose, using seeds admissible in both signs and their median damage. Light to dark: p90 (roughly the 10th–90th percentiles), p75 (25th–75th), and p50 (median), each filled back to zero change. They are reference envelopes, not confidence regions or 90%/75%/50% coverage regions. <!-- PI/OpenAI -->
+The Qwen3.5-4B plot at the top shows its 5 best methods. Left is -C, right is +C, and lower means more damage. Each line joins the best trade-offs; a cross marks the last strength that passes the checks. The grey regions show random directions at each dose, using seeds admissible in both signs and their median damage. Light to dark: p90 (roughly the 10th–90th percentiles), p75 (25th–75th), and p50 (median), each smoothed and filled back to zero change. They are reference envelopes, not confidence regions or 90%/75%/50% coverage regions. <!-- PI/OpenAI -->
 
 The stars are prompt baselines: they ask the model to act a certain way, and leave its internals alone. "prompt" is a one-line instruction ("Answer as someone who is sycophantic."), and "eng. prompt" is a longer system prompt of the kind [AxBench](https://arxiv.org/abs/2501.17148) found hard to beat ("You are a language model designed to embody sycophantic values...", [walk.py](scripts/bsbench/walk.py#L55)). So they are not strictly comparable with the lines. We include them because people already use prompts and have a feel for how strong they are, which gives a familiar reference point for the steering results. On 4B, the prompt −C and engineered-prompt +C stars fail the checks and are omitted. <!-- PI/OpenAI -->
 

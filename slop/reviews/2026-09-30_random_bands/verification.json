@@ -11,14 +11,8 @@
       75,
       50
     ],
-    "plot_sha256": "5fe82c9e3ec060652094eff8ebf5b5ebeaf2f4cb4ccd949acb2c43cd955ef55b",
-    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
-    "accepted_prompt_doses": {
-      "prompting_scale": 10,
-      "prompting_engineered_scale": 11
-    },
-    "admissible_stars": 2,
-    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+    "plot_sha256": "ef5e499e0565f4beb1ebb5aaeb0f89abdd80b183dea0fbc058f1852bfa3394b9",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged"
   },
   "dev": {
     "shown": [
@@ -36,14 +30,8 @@
       75,
       50
     ],
-    "plot_sha256": "bf5044b4e01c02e7d31ce6935f15c987b4d87b015f84b6d7be63df8d580f81ef",
-    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
-    "accepted_prompt_doses": {
-      "prompting_scale": 10,
-      "prompting_engineered_scale": 11
-    },
-    "admissible_stars": 2,
-    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+    "plot_sha256": "4070fc29f98f16a15bc8e116dff6e71ebffe7c2375196516c7a3a2a75f321473",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged"
   },
   "full": {
     "shown": [
@@ -59,11 +47,8 @@
       75,
       50
     ],
-    "plot_sha256": "731280b8df9fc556c54d02f11d112d6a3bb93319115ba39335ff74141a2bd7d0",
-    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
-    "accepted_prompt_doses": {},
-    "admissible_stars": 2,
-    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+    "plot_sha256": "dfdd8bb6f3a5e26a4d632420b4213d8ba817b16a004db40704c728190a71da5e",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged"
   },
   "27b-full": {
     "shown": [
@@ -78,11 +63,8 @@
       75,
       50
     ],
-    "plot_sha256": "12e527deb2b18c4f2e3ad4d8bfd3cc2c2e0a3d410bc500e711107dbb722ba76b",
-    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
-    "accepted_prompt_doses": {},
-    "admissible_stars": 1,
-    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+    "plot_sha256": "d5259c4e114475c531d7f9770160cd6e6ee2e7809517da50a1e969c8f92a6fcc",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged"
   },
   "olmo-full": {
     "shown": [
@@ -97,10 +79,7 @@
       75,
       50
     ],
-    "plot_sha256": "fb287f6e9080d12efda8bd26dbbccc50bcd31150ffb794b3e25811f5f413798d",
-    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged",
-    "accepted_prompt_doses": {},
-    "admissible_stars": 1,
-    "results_source_sha256": "45732211855aaeb4d0495b8ffc35335182cf0f737385d97bbae0896f7ca765f8"
+    "plot_sha256": "94ba011f5ae25511bb4aeb24a9feefa5377b2aea6a20fda1780a3e4f719ffe8a",
+    "checks": "old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged"
   }
 }

@@ -24,6 +24,7 @@ function Plot({ data, visible, selected, onSelect }) {
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
       <rect className="canvas" width={W} height={H} />
+      <text className="label" x={M.l} y={18}>{data.cohort.toUpperCase()} · {data.questions.length} questions</text>
       <g className="grid">
         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
         {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>; })}
@@ -48,7 +49,7 @@ function Plot({ data, visible, selected, onSelect }) {
           })}
           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
             return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
-          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(end.effect)} y={y(end.off_axis) - 11} textAnchor={anchor(x(end.effect))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
+          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(c.path.at(-1)[0])} y={y(c.path.at(-1)[1]) - 11} textAnchor={anchor(x(c.path.at(-1)[0]))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
         </g>;
       })}
       {prompts.map(p => <g key={pointId(p)} className="mark prompt-baseline" onClick={() => onSelect(p)}
@@ -160,9 +161,9 @@ function App() {
       <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
-        The line joins each method's best trade-offs (dots) and ends at its last tested strength that passes the checks (×). The ring marks the strength used for the score. Other strengths are in the answer explorer below.
+        The line joins each method's best trade-offs (dots), ordered by effect, not dose. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score. Other strengths are in the answer explorer below.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
-        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are joined in damage order. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
+        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
       {data.points.some(p => p.fixed_grid) && <>
         <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
       </>}

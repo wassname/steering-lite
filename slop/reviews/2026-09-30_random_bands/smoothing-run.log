@@ -1,0 +1,148 @@
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:54: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:70: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"{fig_name}.png", width=1064, height=590, scale=2)
+GAIN_FILTER_PASS: rejected doses omitted; identical method_curve admissibility; no lines across failed gains
+prompt-dev {'shown': ['prompting_scale', 'prompting_engineered_scale', 'mean_diff'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': 'd07dca3c91d7cd89ee75b69a1631cf5132755f69ef89b4322acd74864154f26d', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:54: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:70: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"{fig_name}.png", width=1064, height=590, scale=2)
+GAIN_FILTER_PASS: rejected doses omitted; identical method_curve admissibility; no lines across failed gains
+dev {'shown': ['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': '77033678c24095ec998bed7d038503050283916653690505a2a18748dc838e74', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-09-30_random_bands/render_saved.py:54: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  fig.write_image(out / "plot.png", width=1064, height=590, scale=2)
+full {'shown': ['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'], 'doses': 11, 'percentiles': [90, 75, 50], 'plot_sha256': '135f23190fa1bdd4716c0ef5f119647d7e2cddb1f2bd7f692b49e760703bd4d2', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+27b-full {'shown': ['mean_diff', 'chars', 'vjp_value', 'vjp_resid'], 'doses': 10, 'percentiles': [90, 75, 50], 'plot_sha256': '2aaa65865d83a3bad6662275b26761a1f983de10da2399e31e2f323832757305', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+olmo-full {'shown': ['mean_diff', 'chars', 'vjp_resid', 'vjp_value'], 'doses': 15, 'percentiles': [90, 75, 50], 'plot_sha256': '19e79dd755d94d2bcfd0091fb0b0aabef35686b78d45c8454eb70b41d5382fce', 'checks': 'old p90 bounds exact; nested zero-filled polygons; PNG/JSON paths exact; scores/intervals/selections/answers unchanged'}
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/prompt-dev/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/prompt-dev/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/prompt-dev/assets/index-B4NAHeUs.js   236.20 kB │ gzip: 74.41 kB
+
+✓ built in 1.38s
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /assets/index-B4NAHeUs.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:26] "GET /prompt_gains.png HTTP/1.1" 200 -
+curve points in points.json=23 drawn=23
+PNG frontier marks (plot_marks.json from results.py)=23 page drawn=23 methods png=['prompting_scale', 'prompting_engineered_scale', 'mean_diff'] page=['prompting_scale', 'prompting_engineered_scale', 'mean_diff']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:39899/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/dev/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/dev/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/dev/assets/index-B4NAHeUs.js   236.20 kB │ gzip: 74.41 kB
+
+✓ built in 310ms
+127.0.0.1 - - [01/Oct/2026 18:32:33] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:33] "GET /assets/index-B4NAHeUs.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:33] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:33] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:34] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:34] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=71 drawn=71
+PNG frontier marks (plot_marks.json from results.py)=71 page drawn=71 methods png=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'] page=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=13; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:35289/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/full/assets/index-B4NAHeUs.js   236.20 kB │ gzip: 74.41 kB
+
+✓ built in 264ms
+127.0.0.1 - - [01/Oct/2026 18:32:43] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:43] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:43] "GET /assets/index-B4NAHeUs.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:43] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=91 drawn=91
+PNG frontier marks (plot_marks.json from results.py)=91 page drawn=91 methods png=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'] page=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=45
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:45077/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/27b-full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/27b-full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/27b-full/assets/index-B4NAHeUs.js   236.20 kB │ gzip: 74.41 kB
+
+✓ built in 204ms
+127.0.0.1 - - [01/Oct/2026 18:32:53] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:53] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:53] "GET /assets/index-B4NAHeUs.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:53] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=72 drawn=72
+PNG frontier marks (plot_marks.json from results.py)=72 page drawn=72 methods png=['mean_diff', 'chars', 'vjp_value', 'vjp_resid'] page=['mean_diff', 'chars', 'vjp_value', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=13
+blind judge lines=11 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:33457/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/olmo-full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/olmo-full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/olmo-full/assets/index-B4NAHeUs.js   236.20 kB │ gzip: 74.41 kB
+
+✓ built in 276ms
+127.0.0.1 - - [01/Oct/2026 18:32:58] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:58] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:58] "GET /assets/index-B4NAHeUs.js HTTP/1.1" 200 -
+127.0.0.1 - - [01/Oct/2026 18:32:58] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=63 drawn=63
+PNG frontier marks (plot_marks.json from results.py)=63 page drawn=63 methods png=['mean_diff', 'chars', 'vjp_resid', 'vjp_value'] page=['mean_diff', 'chars', 'vjp_resid', 'vjp_value']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=16
+blind judge lines=15 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:41981/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

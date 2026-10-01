@@ -27,6 +27,7 @@ with sync_playwright() as p:
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(url)
     page.wait_for_selector("svg")
+    assert f"{data['cohort'].upper()} · {len(data['questions'])} questions" in page.locator("svg").text_content()
     curve_points = sum(len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
     drawn = page.locator("circle.mark, path.mark.end").count()
     print(f"curve points in points.json={curve_points} drawn={drawn}")
@@ -46,6 +47,8 @@ with sync_playwright() as p:
             assert page.get_by_role("button", name=method, exact=True).get_attribute("aria-pressed") == "true"
     print("random regions: p90/p75/p50 with distinct fills; requested opening methods visible")
     for curve in data["curves"]:
+        directed_path = [(x if curve["side"] == "+C" else -x) for x, y in curve["path"]]
+        assert all(a <= b for a, b in zip(directed_path, directed_path[1:])), "Pareto path must not double back"
         seeds = {p["seed"] for p in data["points"] if p["method"] == curve["method"]}
         for mark in curve["points"]:
             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
@@ -75,7 +78,7 @@ with sync_playwright() as p:
     if sweep_methods:
         for curve in data["curves"]:
             if curve["method"] in sweep_methods:
-                assert curve["path"] == [[p["effect"], p["off_axis"]] for p in curve["points"]], "fixed-grid path must not invent a bare anchor"
+                assert curve["path"][0] in [[p["effect"], p["off_axis"]] for p in curve["points"]], "prompt curve must start at a measured point, not bare"
         for method in set(data["shown"]) ^ sweep_methods:
             page.get_by_role("button", name=method, exact=True).click()
         expected = sum(len(c["points"]) for c in data["curves"] if c["method"] in sweep_methods)

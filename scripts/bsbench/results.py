@@ -336,11 +336,11 @@ def place_labels(
 
 
 def random_zones(points: list[dict]) -> list[dict]:
-    """Pooled-sign empirical p90/p75 tails and p50 median, filled to zero; not CIs. -- PI/OpenAI"""
+    """Pooled-sign percentiles, zero-filled; common Chaikin weights preserve nesting. PI/OpenAI."""
     random_points = [point for point in points if point["method"] == "random"]
     seeds = sorted({point["seed"] for point in random_points})
     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
-    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)]}
+    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)], "doses": [None], "seed_counts": [0]}
              for p, alpha in ((90, .16), (75, .22), (50, .30))]
     for C in sorted({point["C"] for point in random_points}):
         if len({seed for seed in seeds if (seed, C, "+C") in at}) < max(1, len(seeds) // 2):
@@ -356,49 +356,44 @@ def random_zones(points: list[dict]) -> list[dict]:
             tail = len(effects) * (100 - zone["percentile"]) // 100
             lo, hi = (center, center) if zone["percentile"] == 50 else (effects[tail], effects[-tail - 1])
             zone["bounds"].append((center, damage, lo, hi))
+            zone["doses"].append(C)
+            zone["seed_counts"].append(len(coherent))
     for zone in zones:
-        ordered = sorted(zone["bounds"], key=lambda row: row[1])
-        zone["path"] = [[min(0.0, row[2]), row[1]] for row in ordered] + [[max(0.0, row[3]), row[1]] for row in reversed(ordered)]
+        edge = [(row[1], min(0.0, row[2]), max(0.0, row[3])) for row in sorted(zone["bounds"], key=lambda row: row[1])]
+        for _ in range(3):
+            edge = [edge[0]] + [tuple(w * a + (1 - w) * b for a, b in zip(left, right, strict=True))
+                               for left, right in zip(edge, edge[1:]) for w in (.75, .25)] + [edge[-1]]
+        zone["path"] = [[lo, damage] for damage, lo, hi in edge] + [[hi, damage] for damage, lo, hi in reversed(edge)]
     return zones
 
 
 PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
 
 
-def frontier(curve: list[dict]) -> list[dict]:
-    """Pareto points in on-axis order, then the last admissible tested dose (always kept, the x).
-
-    A point stays if no other point has at least its on-axis gain with less damage. If the last
-    coherent dose is not itself on the frontier, the line takes one straight step back to it."""
+def frontier(curve: list[dict], *, include_endpoint: bool = True) -> list[dict]:
+    """Pareto points in effect order, optionally followed by the last-dose reference cross. PI/OpenAI."""
     if not curve:
         return []
-    end = curve[-1]
+    end = curve[-1] if include_endpoint else None
     kept = [
         p for p in curve
         if p is not end and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
     ]
-    return sorted(kept, key=directed) + [end]
+    return sorted(kept, key=directed) + ([end] if end is not None else [])
 
 
 def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]]:
-    """Monotone cubic (Fritsch-Carlson PCHIP) of damage over on-axis gain, pinned at bare and at the end.
-
-    Fixed grids join measured support only, without a synthetic bare anchor. -- PI/OpenAI
-    Monotone interpolation cannot overshoot, so the drawn line stays between its support points."""
-    if support[0]["fixed_grid"]:
-        return [[p["effect"], p["off_axis"]] for p in support]
+    """Shape-preserving cubic through Pareto supports; last-dose crosses never force a return. PI/OpenAI."""
+    support = frontier(support, include_endpoint=False)
+    fixed_grid = support[0]["fixed_grid"]
     sign = 1.0 if side == "+C" else -1.0
-    end = support[-1]
-    ts, ys = [0.0], [0.0]
-    for p in support[:-1]:
+    ts, ys = ([directed(support[0])], [support[0]["off_axis"]]) if fixed_grid else ([0.0], [0.0])
+    rest = support[1:] if fixed_grid else support
+    for p in rest:
         if directed(p) > ts[-1]:
             ts.append(directed(p)); ys.append(p["off_axis"])
-    if directed(end) > ts[-1]:  # the end continues the monotone frontier
-        ts.append(directed(end)); ys.append(end["off_axis"])
-        end = None
-    if len(ts) < 2:  # no forward progress on this side: straight line to the end
-        return [[0.0, 0.0], [support[-1]["effect"], support[-1]["off_axis"]]]
-    tail = [] if end is None else [[end["effect"], end["off_axis"]]]  # Back to the last admissible tested dose. PI/OpenAI
+    if len(ts) < 2:
+        return [[sign * ts[0], ys[0]]]
     h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
     d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
     m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
@@ -410,7 +405,7 @@ def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float]
             y = h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
             path.append([sign * (ts[i] + u * h[i]), y])
     path.append([sign * ts[-1], ys[-1]])
-    return path + tail
+    return path
 
 
 def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
@@ -455,7 +450,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             ))
         obstacles.extend((q[0], q[1]) for q in path[::4])
         obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
-        labels.append({"x": curve[-1]["effect"], "y": curve[-1]["off_axis"], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
+        labels.append({"x": path[-1][0], "y": path[-1][1], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
     for point in prompting:
         figure.add_trace(go.Scatter(
             x=[point["effect"]], y=[point["off_axis"]], mode="markers",
@@ -475,7 +470,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible tested dose · ★ = admissible prompt baseline<br>random shading: p90 = 10th–90th, p75 = 25th–75th, p50 = median<br>filled to zero; not confidence or sample-coverage regions")
+                          text="dot = Pareto point · ring = dose that sets the score<br>× = last admissible dose (not forced into curve) · ★ = admissible prompt baseline<br>random shading: p90 ≈ 10th–90th, p75 ≈ 25th–75th, p50 = median<br>smoothed, filled to zero; not confidence or sample-coverage regions")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,

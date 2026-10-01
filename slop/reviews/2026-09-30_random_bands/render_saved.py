@@ -34,10 +34,14 @@ for report in ("prompt-dev", "dev", "full", "27b-full", "olmo-full"):
         lo = [min(0, r[2]) for r in rows]
         hi = [max(0, r[3]) for r in rows]
         assert lo[0] <= lo[1] <= lo[2] <= 0 <= hi[2] <= hi[1] <= hi[0]
-    for zone in site["zones"]:
-        ordered = sorted(zone["bounds"], key=lambda row: row[1])
-        assert len({r[1] for r in ordered}) == len(ordered)
-        assert zone["path"] == [[min(0, r[2]), r[1]] for r in ordered] + [[max(0, r[3]), r[1]] for r in reversed(ordered)]
+    half = len(site["zones"][0]["path"]) // 2
+    edges = [list(zip(z["path"][:half], reversed(z["path"][half:]), strict=True)) for z in site["zones"]]
+    for row in zip(*edges, strict=True):
+        assert len({p[1] for edge in row for p in edge}) == 1
+        assert row[0][0][0] <= row[1][0][0] <= row[2][0][0] <= 0 <= row[2][1][0] <= row[1][1][0] <= row[0][1][0]
+    for curve in site["curves"]:
+        full = results.method_curve(site["points"], curve["method"], curve["side"])
+        curve["path"] = results.smooth_path(results.frontier(full), curve["side"]) if full else []
     results.COLORS.update(site["colors"])
     results.LABELS.update({m: m for m in site["colors"] if m not in results.LABELS})
     model = site["model_dir"].rsplit("-g", 1)[0].split("--")[-1]
@@ -53,8 +57,9 @@ for report in ("prompt-dev", "dev", "full", "27b-full", "olmo-full"):
     (out / "plot.html").write_text(text[:start] + fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True}) + text[end:])
     marks = sum(len(t.x) for t in fig.data if t.name == "frontier")
     (out / "plot_marks.json").write_text(json.dumps({"frontier_marks": marks, "methods": site["shown"]}) + "\n")
-    for field in ("summary", "blind", "curves", "questions"):
+    for field in ("summary", "blind", "questions"):
         assert site[field] == original[field], f"{field} changed"
+    assert [c["points"] for c in site["curves"]] == [c["points"] for c in original["curves"]], "markers changed"
     for before, after in zip(original["points"], site["points"], strict=True):
         assert all(after[k] == v for k, v in before.items())
     (out / "points.json").write_text(json.dumps(site, indent=1) + "\n")

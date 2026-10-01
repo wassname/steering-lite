@@ -255,3 +255,28 @@ Interpretation (PI/OpenAI): I would not use embedding magnitude as a monotonic i
 The measured score is not proof of more accurate reasoning.
 
 -- PI/OpenAI
+
+
+## 2026-10-01 -- Correct the Pareto return segments
+
+Corrected trade-off drawings after the user found a doubled-back curve.
+
+All methods now connect effect-ordered Pareto supports, meaning the best measured trade-offs, rather than appending the last dose out of order. Crosses still show the last passing dose. Smoothed random shading uses shared positive weights, which preserve nesting; measured percentile bounds and published seeds remain unchanged. Prompt results are still dev-20, not full-100, and the browser plot states its cohort size.
+
+> PURE_PRODUCTION_PASS: scores, intervals, selection, answers and markers unchanged; cached redraw equals production geometry
+
+Source: `slop/reviews/2026-09-30_random_bands/pure-production.log:105`. Browser assertions passed for every path in all five reports (`slop/reviews/2026-09-30_random_bands/pure-frontier-run.log`).
+
+A separate probe reuses cached full random directions; it does not generate or judge anything new:
+
+> FULL_REFERENCE seeds=11 questions=100 supported_doses=11
+> FULL_REFERENCE seeds=16 questions=100 supported_doses=11
+> C=2 coherent_seeds=11->16 p90_left=-0.010->+0.065 p90_right=+2.721->+2.820 median_damage=0.608->0.608
+
+Source: `slop/reviews/2026-09-30_random_bands/reference-probe.log:1`. C is the random-vector dose. The p90 bounds are empirical approximate tenth/ninetieth percentiles, not confidence intervals. Here coherent means passing the existing cohort-average checks; it does not mean every answer is sound.
+
+Interpretation: my read is that more random generation is unlikely to repair this drawing error, which came from the forced return segment. The cached full comparison does not establish that dev tails are stable. Full prompt sweeps and their uncertainty remain unmeasured.
+
+The correction changes the drawing, not the measured result.
+
+-- PI/OpenAI

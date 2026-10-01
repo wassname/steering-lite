@@ -1,0 +1,5 @@
+prompting_scale +C Pareto gains ordered by effect [0.0, 16.0, 1.0, 0.5] cross gain 16.0 path_points 121 monotone=True measured_endpoints=True
+prompting_scale -C Pareto gains ordered by effect [0.0, 8.0, 4.0] cross gain 16.0 path_points 81 monotone=True measured_endpoints=True
+prompting_engineered_scale +C Pareto gains ordered by effect [0.0] cross gain 16.0 path_points 1 monotone=True measured_endpoints=True
+prompting_engineered_scale -C Pareto gains ordered by effect [16.0, 8.0, 4.0] cross gain 16.0 path_points 81 monotone=True measured_endpoints=True
+CURVE_ORDER_PASS: no prompt return segment; measured Pareto endpoints; no bare anchor
