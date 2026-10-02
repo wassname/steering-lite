@@ -40,8 +40,15 @@ with sync_playwright() as p:
     assert page.locator(".curve-line").count() == sum(bool(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
     for curve in data["curves"]:
         assert all((x is None) == (y is None) for x, y in curve["path"])
+    for label in data["plot_labels"]:
+        drawn_label = page.locator(f'.curve-label[data-method="{label["method"]}"][data-side="{label["side"]}"] text')
+        assert drawn_label.text_content() == label["text"], "default-view curves, including prompt sweeps, need labels"
+        assert drawn_label.evaluate("el => { const b = el.getBBox(); return b.x >= 70 && b.x+b.width <= 980 && b.y >= 30 && b.y+b.height <= 510; }")
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
+    explanation = page.locator("body").text_content()
+    assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
+    assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"
     zones = page.locator(".zone")
     assert zones.count() == 3
     for i, zone in enumerate(data["zones"]):

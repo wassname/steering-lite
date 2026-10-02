@@ -280,3 +280,31 @@ Interpretation: my read is that more random generation is unlikely to repair thi
 The correction changes the drawing, not the measured result.
 
 -- PI/OpenAI
+
+
+## 2026-10-02 -- Dense dev prompt gains and 32 random directions
+
+Measured the requested finer short-prompt schedule and additional random directions on Qwen3.5-4B. Prompt evidence remains 20 dev questions and seed 0, not full-100. The short grid retains the original nine gains and now has 31; engineered prompting stays at nine.
+
+> HASH_PASS: 568 historical answer/full-certificate files unchanged
+> COVERAGE_PASS: prompting_scale seed=0 rungs=31 dev_rows=1240
+
+Source: `slop/reviews/2026-10-02_prompt_refinement/coverage.log`. Generation, separate download, and Jev judging completed. All 32 random dev certificates are COMPLETE. No full/larger-model prompt sweep was run.
+
+Observation: short +C gain 3.75 gives premise change +1.736 and mean damage 1.367, an admitted intermediate. Other measured middle gains fail the existing 1.5 mean-damage cap. The remaining Pareto effect gaps stay disconnected, rather than being filled by a smooth curve. Faint dots expose dominated passing measurements; the gain chart and tables expose tested gains and exclusions. Source: `comparison.json` (`short_gains`, `pareto_supports`) in the same audit directory.
+
+Short prompt score is 0.6795, 90% interval [-0.0235, 1.5690], versus mean difference 0.7005 [0.2020, 1.4030]. These are conditional in-sample selections, not held-out comparisons. The selected negative-side gain is 1/256: effect -0.841 versus -0.707 for the opposite persona at that gain and -0.417 for the same persona at gain zero. This does not establish an abrasive-instruction benefit. Nonzero gain is not an absent-persona control; low-norm-prefix, decoding and instruction explanations remain unresolved.
+
+At random coefficient 2, 49/56 paired-admissible signed interventions move positive and 7 negative; before filtering, 56/64 positive and 8 negative. The skew persists before filtering. Eleven to 32 dev directions change raw p90 bounds by at most 0.3225 premise points over 11 shared doses. Single-direction selected scores range -0.495 to +0.9875, median +0.31825; 6/32 reach the short prompt's score. This is descriptive, not a p-value or matched dose search. Source: `comparison.json` and `comparison.log`.
+
+> FULL_SCIENTIFIC_REGRESSION_PASS full keyed points, scores/selection, selected blind ratings, raw random bounds unchanged; CI changes 0 ; random seeds [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+Source: `comparison.log`. All three full reports retain measurements, scores, selected doses and prior blind ratings. 319 previously absent per-question blind ratings attach on 4B. Larger-model confidence endpoints shift by at most 0.0226 (27B) / 0.0183 (OLMo): the shared bootstrap RNG is allocated in method-name order, changed by the earlier semantic rename. Historical-order replay reproduces every old endpoint exactly. This is not new measurement evidence.
+
+The normal five-report pipeline passed browser UAT. Fresh figure review found misleading percentile precision for OLMo's six signed samples: p90 is min-max there. Captions now state discrete observed ranks and small-sample limitations. The wording-only normal rebuild preserved all five scientific JSON files byte-for-byte (`caption-verification.log`), passed all five updated browser UATs, and independent caption review resolved the issue. Empirical reference envelopes are not confidence or sample-coverage regions. Passing cohort means do not guarantee each answer is coherent.
+
+Cost: 16741.450 worker seconds -> $9.0739 GPU-only list-rate proxy; Jev $0.4349; combined proxy $9.5088. This excludes startup/wrapper, CPU, memory and invoice reconciliation. The original $3.58 forecast was low. No more generation or judging is queued.
+
+Evidence and reviewed limitations: `slop/reviews/2026-10-02_prompt_refinement/results.md`. Interpretation: the denser schedule adds a measured intermediate, but does not support a smooth instruction-strength interpretation. More random directions do not justify forcing symmetric contours. A neutral-prefix/fixed-dose repeat could distinguish some remaining small-gain explanations; not run here.
+
+-- PI/OpenAI

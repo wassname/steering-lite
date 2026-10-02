@@ -1,0 +1,29 @@
+2026-10-02 12:16:16.194 | WARNING  | data:walk_certificates:35 - skip angular_steering_s0_dev.json status=RUNNING
+HASH_PASS: 568 historical answer/full-certificate files unchanged
+COVERAGE_PASS: prompting_scale seed=0 rungs=31 dev_rows=1240
+COVERAGE_PASS: prompting_engineered_scale seed=0 rungs=9 dev_rows=360
+COVERAGE_PASS: random seed=0 rungs=13 dev_rows=520
+COVERAGE_PASS: random seed=10 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=11 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=12 rungs=16 dev_rows=640
+COVERAGE_PASS: random seed=13 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=14 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=15 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=16 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=17 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=18 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=19 rungs=14 dev_rows=560
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-10-02_prompt_refinement/verify_coverage.py", line 32, in <module>
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+               ~~~~~~~~~~^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 376 (char 375)

@@ -21,6 +21,13 @@ function Plot({ data, visible, selected, onSelect }) {
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
+  const curveLabel = (method, side, px, py) => {
+    const label = data.plot_labels.find(p => p.method === method && p.side === side);
+    return label ? <g className="curve-label" data-method={method} data-side={side}>
+      <line x1={x(label.x)} y1={y(label.y)} x2={x(label.x) + label.ax} y2={y(label.y) + label.ay} stroke="#8c8177" strokeWidth="0.8" />
+      <text x={x(label.x) + label.ax} y={y(label.y) + label.ay} textAnchor="middle" dominantBaseline="middle" className="label" fill={data.colors[method]} style={{ fontSize: 11 }}>{label.text}</text>
+    </g> : <text x={px} y={py - 11} textAnchor={anchor(px)} className="label" fill={data.colors[method]}>{method} {side}</text>;
+  };
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
       <rect className="canvas" width={W} height={H} />
@@ -53,13 +60,13 @@ function Plot({ data, visible, selected, onSelect }) {
           })}
           {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
             return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
-          {!data.points.some(p => p.method === c.method && p.fixed_grid) && <text x={x(c.path.at(-1)[0])} y={y(c.path.at(-1)[1]) - 11} textAnchor={anchor(x(c.path.at(-1)[0]))} className="label" fill={data.colors[c.method]}>{c.method} {c.side}</text>}
+          {curveLabel(c.method, c.side, x(c.path.at(-1)[0]), y(c.path.at(-1)[1]))}
         </g>;
       })}
       {prompts.map(p => <g key={pointId(p)} className="mark prompt-baseline" onClick={() => onSelect(p)}
         onPointerEnter={() => setHover(p)} onPointerLeave={() => setHover(null)}>
         <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={data.colors[p.method]} />
-        <text x={x(p.effect)} y={y(p.off_axis) - 11} textAnchor={anchor(x(p.effect))} className="label" fill={data.colors[p.method]}>{p.method === 'prompting' ? 'prompt' : 'eng. prompt'} {p.side}</text>
+        {curveLabel(p.method, p.side, x(p.effect), y(p.off_axis))}
       </g>)}
       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
     </svg>
@@ -156,13 +163,13 @@ function App() {
   return <main>
     <h1>{data.view === 'prompt' ? 'Prompt embedding sweeps on Bullshit Bench v2' : 'steering-lite on Bullshit Bench v2'}</h1>
     <p className="lede">{data.view === 'prompt'
-      ? <>Both prompt sweeps are shown below, with mean difference and shaded random references. The multiplier scales instruction embeddings only; +C and −C select different personas. <a href="#prompt-gains">See the gain sweep, with rejected doses filtered out.</a></>
+      ? <>Both prompt sweeps are shown below, with mean difference and shaded random references. The multiplier scales instruction embeddings only; +C and −C select different personas. Low-gain responses can be similar across personas; scores do not establish instruction-specific steering. <a href="#prompt-gains">See the gain sweep, with rejected doses filtered out.</a></>
       : <>How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods and any prompt embedding sweeps.</>} Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">
       <h2>Prompt gain sweep — admissible doses</h2>
-      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The table lists all passing gains, including those not on the Pareto line.</p>
+      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The main plot uses absolute damage change; the cutoff uses mean steered damage. The table lists all passing gains, including those not on the Pareto line.</p>
       <GainStatus data={data} />
       <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at admissible prompt embedding gains; gaps at rejected doses" style={{ width: '100%' }} /></a>
       <details><summary>Diagnostic: all tested gains, including rejected doses</summary>
@@ -176,9 +183,9 @@ function App() {
       <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
-        The line joins each method's best trade-offs (solid dots), ordered by effect, not dose. Faint dots show other passing doses. Gaps larger than {data.plot_gap} premise-score point between line supports are not interpolated. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score. Other strengths are in the answer explorer below.
+        The line joins each method's best trade-offs (solid dots), ordered by effect, not dose. Faint dots show other passing doses. Gaps larger than {data.plot_gap} premise-score point between line supports are not interpolated. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score, even if the effect is near zero or in the wrong direction. Checks use cohort means; individual retained answers can still be badly damaged. Other strengths are in the answer explorer below.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
-        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples. A median or percentile interval can be entirely on one side even if some random points are on the other; opposite intervention signs need not give opposite behavioral effects.</p>
+        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 targets the 10th–90th percentiles, p75 the 25th–75th, and p50 is the median, each filled to zero change. Bounds use discrete observed ranks: with few samples, p90 can be min–max (for example, OLMo's three directions give six signed values). Eligible counts vary by dose; see the table below. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples. A median or percentile interval can be entirely on one side even if some random points are on the other; opposite intervention signs need not give opposite behavioral effects.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
         <table className="random-reference"><thead><tr><th>C</th><th>directions</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>

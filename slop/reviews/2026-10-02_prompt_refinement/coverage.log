@@ -1,0 +1,38 @@
+2026-10-02 13:46:37.475 | WARNING  | data:walk_certificates:35 - skip angular_steering_s0_dev.json status=RUNNING
+HASH_PASS: 568 historical answer/full-certificate files unchanged
+COVERAGE_PASS: prompting_scale seed=0 rungs=31 dev_rows=1240
+COVERAGE_PASS: prompting_engineered_scale seed=0 rungs=9 dev_rows=360
+COVERAGE_PASS: random seed=0 rungs=13 dev_rows=520
+COVERAGE_PASS: random seed=10 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=11 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=12 rungs=16 dev_rows=640
+COVERAGE_PASS: random seed=13 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=14 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=15 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=16 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=17 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=18 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=19 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=1 rungs=13 dev_rows=520
+COVERAGE_PASS: random seed=20 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=21 rungs=13 dev_rows=520
+COVERAGE_PASS: random seed=22 rungs=20 dev_rows=800
+COVERAGE_PASS: random seed=23 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=24 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=25 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=26 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=27 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=28 rungs=16 dev_rows=640
+COVERAGE_PASS: random seed=29 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=2 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=30 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=31 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=3 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=4 rungs=14 dev_rows=560
+COVERAGE_PASS: random seed=5 rungs=17 dev_rows=680
+COVERAGE_PASS: random seed=6 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=7 rungs=13 dev_rows=520
+COVERAGE_PASS: random seed=8 rungs=15 dev_rows=600
+COVERAGE_PASS: random seed=9 rungs=15 dev_rows=600
+IDENTITY_PASS: fresh ordinary vs cached scaled gain-one 40/40; historical mismatches 0; same-process fresh identity separately checked on first 3 prompts; original nine gains preserved
+COST_PROXY: worker-total seconds=16741.450; L40S GPU-only list-price proxy=$9.0739; not invoice; excludes wrapper/CPU/memory

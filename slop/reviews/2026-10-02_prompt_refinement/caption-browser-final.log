@@ -1,0 +1,116 @@
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/dev/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/dev/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/dev/assets/index-BAZB7REA.js   240.05 kB │ gzip: 75.49 kB
+
+✓ built in 374ms
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /assets/index-BAZB7REA.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:13] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=77 drawn=77
+PNG frontier marks (plot_marks.json from results.py)=77 page drawn=77 methods png=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale'] page=['vjp_value', 'chars', 'sink_split_resid', 'linear_act', 'mean_diff', 'prompting_scale', 'prompting_engineered_scale']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=19; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:43797/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/prompt-dev/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/prompt-dev/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/prompt-dev/assets/index-BAZB7REA.js   240.05 kB │ gzip: 75.49 kB
+
+✓ built in 516ms
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /assets/index-BAZB7REA.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /prompt_gains.png HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:21] "GET /prompt_gains_all.png HTTP/1.1" 200 -
+curve points in points.json=29 drawn=29
+PNG frontier marks (plot_marks.json from results.py)=29 page drawn=29 methods png=['prompting_scale', 'prompting_engineered_scale', 'mean_diff'] page=['prompting_scale', 'prompting_engineered_scale', 'mean_diff']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+sweep-only curve marks=19; baseline stars still=2
+question=syco_bullshit_v2_med_pnf_03 answer blocks=51
+blind judge lines=50 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:39963/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/full/assets/index-BAZB7REA.js   240.05 kB │ gzip: 75.49 kB
+
+✓ built in 475ms
+127.0.0.1 - - [02/Oct/2026 13:44:29] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:29] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:29] "GET /assets/index-BAZB7REA.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:29] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=91 drawn=91
+PNG frontier marks (plot_marks.json from results.py)=91 page drawn=91 methods png=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'] page=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=45
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:43823/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/27b-full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/27b-full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/27b-full/assets/index-BAZB7REA.js   240.05 kB │ gzip: 75.49 kB
+
+✓ built in 332ms
+127.0.0.1 - - [02/Oct/2026 13:44:37] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:37] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:37] "GET /assets/index-BAZB7REA.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:37] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=72 drawn=72
+PNG frontier marks (plot_marks.json from results.py)=72 page drawn=72 methods png=['mean_diff', 'chars', 'vjp_value', 'vjp_resid'] page=['mean_diff', 'chars', 'vjp_value', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=13
+blind judge lines=11 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:42767/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/olmo-full/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/olmo-full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/olmo-full/assets/index-BAZB7REA.js   240.05 kB │ gzip: 75.49 kB
+
+✓ built in 549ms
+127.0.0.1 - - [02/Oct/2026 13:44:42] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:42] "GET /assets/index-BAZB7REA.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:42] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 13:44:42] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=63 drawn=63
+PNG frontier marks (plot_marks.json from results.py)=63 page drawn=63 methods png=['mean_diff', 'chars', 'vjp_resid', 'vjp_value'] page=['mean_diff', 'chars', 'vjp_resid', 'vjp_value']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=1; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=16
+blind judge lines=15 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:35347/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

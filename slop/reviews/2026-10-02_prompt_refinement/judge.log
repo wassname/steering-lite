@@ -1,0 +1,31 @@
+2026-10-02 12:11:34.660 | WARNING  | data:walk_certificates:35 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-02 12:11:39.943 | INFO     | data:manifest:71 - manifest walks=57 rows=32560
+2026-10-02 12:11:52.164 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK aware required=26791 cached=18535 missing=8256
+2026-10-02 12:12:01.337 | INFO     | __main__:_refresh:171 - jev progress=400/8256 cost=$0.0170
+2026-10-02 12:12:08.970 | INFO     | __main__:_refresh:171 - jev progress=800/8256 cost=$0.0341
+2026-10-02 12:12:15.701 | INFO     | __main__:_refresh:171 - jev progress=1200/8256 cost=$0.0536
+2026-10-02 12:12:21.939 | INFO     | __main__:_refresh:171 - jev progress=1600/8256 cost=$0.0724
+2026-10-02 12:12:28.181 | INFO     | __main__:_refresh:171 - jev progress=2000/8256 cost=$0.0906
+2026-10-02 12:12:34.451 | INFO     | __main__:_refresh:171 - jev progress=2400/8256 cost=$0.1093
+2026-10-02 12:12:40.776 | INFO     | __main__:_refresh:171 - jev progress=2800/8256 cost=$0.1279
+2026-10-02 12:12:47.578 | INFO     | __main__:_refresh:171 - jev progress=3200/8256 cost=$0.1471
+2026-10-02 12:12:53.825 | INFO     | __main__:_refresh:171 - jev progress=3600/8256 cost=$0.1654
+2026-10-02 12:13:00.534 | INFO     | __main__:_refresh:171 - jev progress=4000/8256 cost=$0.1853
+2026-10-02 12:13:06.857 | INFO     | __main__:_refresh:171 - jev progress=4400/8256 cost=$0.2038
+2026-10-02 12:13:13.734 | INFO     | __main__:_refresh:171 - jev progress=4800/8256 cost=$0.2230
+2026-10-02 12:13:19.840 | INFO     | __main__:_refresh:171 - jev progress=5200/8256 cost=$0.2430
+2026-10-02 12:13:25.947 | INFO     | __main__:_refresh:171 - jev progress=5600/8256 cost=$0.2618
+2026-10-02 12:13:32.263 | INFO     | __main__:_refresh:171 - jev progress=6000/8256 cost=$0.2811
+2026-10-02 12:13:38.506 | INFO     | __main__:_refresh:171 - jev progress=6400/8256 cost=$0.3001
+2026-10-02 12:13:44.746 | INFO     | __main__:_refresh:171 - jev progress=6800/8256 cost=$0.3185
+2026-10-02 12:13:50.847 | INFO     | __main__:_refresh:171 - jev progress=7200/8256 cost=$0.3368
+2026-10-02 12:13:57.001 | INFO     | __main__:_refresh:171 - jev progress=7600/8256 cost=$0.3560
+2026-10-02 12:14:03.583 | INFO     | __main__:_refresh:171 - jev progress=8000/8256 cost=$0.3747
+2026-10-02 12:14:07.775 | INFO     | __main__:_refresh:171 - jev progress=8256/8256 cost=$0.3879
+2026-10-02 12:14:18.762 | WARNING  | data:walk_certificates:35 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-02 12:14:29.120 | WARNING  | data:walk_certificates:35 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-02 12:14:40.121 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK blind required=2307 cached=1450 missing=857
+2026-10-02 12:14:46.546 | INFO     | __main__:_refresh:171 - jev progress=400/857 cost=$0.0219
+2026-10-02 12:14:52.731 | INFO     | __main__:_refresh:171 - jev progress=800/857 cost=$0.0439
+2026-10-02 12:14:53.653 | INFO     | __main__:_refresh:171 - jev progress=857/857 cost=$0.0470
+2026-10-02 12:14:53.956 | INFO     | __main__:main:231 - JUDGE_COMPLETE missing=0

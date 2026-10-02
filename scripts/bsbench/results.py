@@ -422,9 +422,10 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
     shown = [point for curve in curves.values() for point in curve] + random_live + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
-    y_range = (1.08 * max(point["off_axis"] for point in shown), -0.07)
+    zones = random_zones(points)
+    y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
     margin = {"l": 75, "r": 10, "t": 40, "b": 150}
-    for zone in random_zones(points):
+    for zone in zones:
         figure.add_trace(go.Scatter(
             x=[p[0] for p in zone["path"]], y=[p[1] for p in zone["path"]],
             name=f"random p{zone['percentile']}", mode="lines", fill="toself",
@@ -484,7 +485,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"faint dot = other passing dose · solid dot = Pareto point · ring = score-setting dose<br>× = last passing dose · ★ = prompt baseline · gaps >{MAX_PLOT_GAP:g} premise point are not interpolated<br>random: {len({p['seed'] for p in points if p['method'] == 'random'})} directions, both signs; p90 ≈ 10th–90th, p75 ≈ 25th–75th, p50 = median<br>smoothed, filled to zero; not confidence/coverage regions or required to be symmetric")
+                          text=f"faint dot = other passing dose · solid dot = Pareto point · ring = score-setting dose<br>× = last passing dose · ★ = prompt baseline · gaps >{MAX_PLOT_GAP:g} premise point are not interpolated<br>random: {len({p['seed'] for p in points if p['method'] == 'random'})} directions, both signs; p90/p75 target 10–90%/25–75%; p50 = median<br>discrete ranks; small samples can span min–max; smoothed, zero-filled; not confidence/coverage regions; may be asymmetric")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
@@ -571,6 +572,26 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def svg_labels(site: dict) -> list[dict]:
+    """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
+    curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
+    prompts = [p for p in site["points"] if p["method"] in PROMPTS and p["admissible"]]
+    shown = [p for c in curves for p in c["tested"]] + prompts
+    zones = [p for zone in site["zones"] for p in zone["path"]]
+    x_max = 1.08 * max([abs(p["effect"]) for p in shown] + [abs(p[0]) for p in zones] + [.5])
+    y_max = 1.08 * max([p["off_axis"] for p in shown] + [p[1] for p in zones] + [.3])
+    labels = [{"method": c["method"], "side": c["side"], "x": c["path"][-1][0], "y": c["path"][-1][1],
+               "text": f"{LABELS[c['method']]} {c['side']}", "color": site["colors"][c["method"]]} for c in curves]
+    labels += [{"method": p["method"], "side": p["side"], "x": p["effect"], "y": p["off_axis"],
+                "text": f"{PROMPTS[p['method']]} {p['side']}", "color": site["colors"][p["method"]]} for p in prompts]
+    obstacles = [(0., 0.)] + [(p["effect"], p["off_axis"]) for p in shown]
+    placed = place_labels(labels, (-x_max, x_max), (y_max, -.05), obstacles=obstacles,
+                          fig_w=1000, fig_h=560, margin={"l": 70, "r": 20, "t": 30, "b": 50},
+                          radii=(40, 62, 88, 118, 160), char_w=6.5, overlap_cost_label=.2)
+    return [annotation | {"method": label["method"], "side": label["side"]}
+            for label, annotation in zip(labels, placed, strict=True)]
+
+
 def prompt_gain_plot(points: list[dict], title: str, *, include_rejected: bool = False) -> go.Figure:
     """Use the benchmark's admissible seed means; rejected doses appear only in diagnostics. PI/OpenAI."""
     figure = make_subplots(rows=1, cols=2, subplot_titles=("Premise change from bare (− rejects, + accepts)", "Mean damage (0 clean → 4 broken)"))
@@ -592,16 +613,15 @@ def prompt_gain_plot(points: list[dict], title: str, *, include_rejected: bool =
     figure.add_hline(y=0, line_color="#aaaaaa", line_width=1, row=1, col=1)
     figure.add_hline(y=MAX_DAMAGE, line_color="#aaaaaa", line_dash="dot", row=1, col=2)
     all_doses = sorted({p["C"] for p in points if p["fixed_grid"]})
-    tick_doses = sorted(set(all_doses[::max(1, math.ceil(len(all_doses) / 10))] + [all_doses[-1]]))
     figure.update_xaxes(type="category", categoryorder="array", categoryarray=[f"{dose:g}" for dose in all_doses],
-                        tickvals=[f"{dose:g}" for dose in tick_doses], ticktext=[f"{dose:.3g}" for dose in tick_doses],
-                        title_text="Tested gain (categorical spacing; hover for every gain)")
+                        tickvals=[f"{dose:g}" for dose in all_doses], ticktext=[f"{dose:g}" for dose in all_doses],
+                        tickangle=-75, tickfont_size=9, title_text="Tested gain (categorical spacing)")
     figure.update_yaxes(range=[0, 4], row=1, col=2)
     figure.update_layout(template="plotly_white", title=dict(text=title, font_size=16),
-                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=150, b=120, l=55, r=25))
+                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=150, b=175, l=55, r=25))
     note = "× fails admissibility." if include_rejected else "Rejected doses omitted; lines do not bridge failed gains."
     figure.add_annotation(text=f"{note} Dotted line: damage cap. Gain 0 keeps positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. ±C selects persona, not a negative gain. Endpoints do not confirm breakdown.",
-                          x=0, y=-0.24, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
+                          x=0, y=-0.39, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
     return figure
 
 
@@ -653,6 +673,7 @@ def main() -> None:
                   for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],
         "points": points,
     }
+    site["plot_labels"] = svg_labels(site)
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
     heading = "Prompt embedding sweeps vs mean difference" if args.view == "prompt" else "steering-lite on Bullshit Bench v2"
@@ -675,10 +696,10 @@ def main() -> None:
     gain_image = ""
     if any(p["fixed_grid"] for p in points):
         gains = prompt_gain_plot(points, f"Prompt embedding gains: {model} ({args.cohort}, {len(scenarios)} questions)")
-        gains.write_image(out / "prompt_gains.png", width=1064, height=590, scale=2)
+        gains.write_image(out / "prompt_gains.png", width=1064, height=650, scale=2)
         gains.write_html(out / "prompt_gains.html", include_plotlyjs="cdn")
         diagnostic = prompt_gain_plot(points, f"Diagnostic — all tested prompt gains: {model}", include_rejected=True)
-        diagnostic.write_image(out / "prompt_gains_all.png", width=1064, height=590, scale=2)
+        diagnostic.write_image(out / "prompt_gains_all.png", width=1064, height=650, scale=2)
         diagnostic.write_html(out / "prompt_gains_all.html", include_plotlyjs="cdn")
         gain_image = "\n\n![Admissible prompt gains](prompt_gains.png)\n\n[Diagnostic: all gains, including rejected doses](prompt_gains_all.html)"
     (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){gain_image}\n\n{table}\n")
