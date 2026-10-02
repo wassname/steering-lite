@@ -1,0 +1,18 @@
+HISTORICAL_BYTES_PASS: 568 answers and full certificates unchanged
+JEV_ONLY_FILTER_PASS dev newly_admitted 2 [{'method': 'corda_pca', 'seed': 0, 'side': '-C', 'C': 25.398416831491197, 'damage': 1.377, 'mechanical': ['role_leak'], 'post_boundary': False}, {'method': 'value_gram', 'seed': 0, 'side': '-C', 'C': 6.3496042078727974, 'damage': 1.3425, 'mechanical': ['repetition'], 'post_boundary': False}]
+SUMMARY_CHANGED dev corda_pca {'N': {'before': 21, 'after': 22}, 'rejected': {'before': 11, 'after': 10}}
+SUMMARY_CHANGED dev value_gram {'N': {'before': 20, 'after': 21}, 'rejected': {'before': 8, 'after': 7}}
+RAW_MEASUREMENTS_PASS dev all answers, premise/damage ratings, mechanical diagnostics and prior blind ratings unchanged
+JEV_ONLY_FILTER_PASS prompt-dev newly_admitted 2 [{'method': 'corda_pca', 'seed': 0, 'side': '-C', 'C': 25.398416831491197, 'damage': 1.377, 'mechanical': ['role_leak'], 'post_boundary': False}, {'method': 'value_gram', 'seed': 0, 'side': '-C', 'C': 6.3496042078727974, 'damage': 1.3425, 'mechanical': ['repetition'], 'post_boundary': False}]
+SUMMARY_CHANGED prompt-dev corda_pca {'N': {'before': 21, 'after': 22}, 'rejected': {'before': 11, 'after': 10}}
+SUMMARY_CHANGED prompt-dev value_gram {'N': {'before': 20, 'after': 21}, 'rejected': {'before': 8, 'after': 7}}
+RAW_MEASUREMENTS_PASS prompt-dev all answers, premise/damage ratings, mechanical diagnostics and prior blind ratings unchanged
+JEV_ONLY_FILTER_PASS full newly_admitted 3 [{'method': 'sspace_pool', 'seed': 0, 'side': '-C', 'C': 6.3496042078727974, 'damage': 1.2319, 'mechanical': ['repetition'], 'post_boundary': False}, {'method': 'sspace_pool', 'seed': 1, 'side': '-C', 'C': 6.3496042078727974, 'damage': 1.4287, 'mechanical': ['repetition'], 'post_boundary': False}, {'method': 'value_gram', 'seed': 0, 'side': '-C', 'C': 6.3496042078727974, 'damage': 1.3819, 'mechanical': ['repetition'], 'post_boundary': False}]
+SUMMARY_CHANGED full sspace_pool {'rejected': {'before': 18, 'after': 16}}
+SUMMARY_CHANGED full value_gram {'N': {'before': 19, 'after': 20}, 'rejected': {'before': 23, 'after': 22}}
+RAW_MEASUREMENTS_PASS full all answers, premise/damage ratings, mechanical diagnostics and prior blind ratings unchanged
+JEV_ONLY_FILTER_PASS 27b-full newly_admitted 1 [{'method': 'random', 'seed': 6, 'side': '+C', 'C': 10.079368399158986, 'damage': 1.0625, 'mechanical': ['role_leak'], 'post_boundary': False}]
+SUMMARY_CHANGED 27b-full random {'best': {'before': {'+C': {'C': 10.079368399158986, 'effect': 3.964066666666667, 'off_axis': 0.7606666666666667}, '-C': {'C': 0.7937005259840998, 'effect': -0.029299999999999972, 'off_axis': 0.0781}}, 'after': {'+C': {'C': 10.079368399158986, 'effect': 3.1027250000000004, 'off_axis': 0.788475}, '-C': {'C': 0.7937005259840998, 'effect': -0.029299999999999972, 'off_axis': 0.0781}}}, 'rejected': {'before': 57, 'after': 56}}
+RAW_MEASUREMENTS_PASS 27b-full all answers, premise/damage ratings, mechanical diagnostics and prior blind ratings unchanged
+JEV_ONLY_FILTER_PASS olmo-full newly_admitted 0 []
+RAW_MEASUREMENTS_PASS olmo-full all answers, premise/damage ratings, mechanical diagnostics and prior blind ratings unchanged

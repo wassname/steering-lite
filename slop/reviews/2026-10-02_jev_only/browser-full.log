@@ -1,0 +1,22 @@
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/full/index.html                   0.39 kB │ gzip:  0.27 kB
+../../../outputs/bsbench/results/full/assets/index-CQXCMfuK.css    2.39 kB │ gzip:  1.06 kB
+../../../outputs/bsbench/results/full/assets/index-CUrCnFM6.js   240.08 kB │ gzip: 75.51 kB
+
+✓ built in 460ms
+127.0.0.1 - - [02/Oct/2026 14:37:13] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 14:37:13] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 14:37:13] "GET /assets/index-CUrCnFM6.js HTTP/1.1" 200 -
+127.0.0.1 - - [02/Oct/2026 14:37:13] "GET /points.json HTTP/1.1" 200 -
+curve points in points.json=91 drawn=91
+PNG frontier marks (plot_marks.json from results.py)=91 page drawn=91 methods png=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid'] page=['vjp_value', 'chars', 'linear_act', 'sink_split_resid', 'vjp_resid']
+random regions: p90/p75/p50 with distinct fills; requested opening methods visible
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=45
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:43301/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

@@ -1,0 +1,4 @@
+2026-10-02 14:26:23.510 | INFO     | data:manifest:71 - manifest walks=11 rows=34800
+2026-10-02 14:26:33.471 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK aware required=25206 cached=25206 missing=0
+2026-10-02 14:26:52.021 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK blind required=2681 cached=2681 missing=0
+2026-10-02 14:26:52.357 | INFO     | __main__:main:231 - JUDGE_COMPLETE missing=0

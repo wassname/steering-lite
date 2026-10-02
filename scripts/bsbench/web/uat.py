@@ -46,6 +46,8 @@ with sync_playwright() as p:
         assert drawn_label.evaluate("el => { const b = el.getBBox(); return b.x >= 70 && b.x+b.width <= 980 && b.y >= 30 && b.y+b.height <= 510; }")
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
+    assert data["admissibility"] == "jev_mean_damage"
+    assert all(p["admissible"] == (p["steered_damage"] <= data["max_damage"]) for p in data["points"]), "mechanical diagnostics must not reject Jev-passing points"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
     assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"
@@ -72,6 +74,9 @@ with sync_playwright() as p:
     gain_image = page.locator('img[src="prompt_gains.png"]')
     if any(p.get("fixed_grid", False) for p in data["points"]):
         assert gain_image.count() == 1
+        gain_explanation = page.locator("#prompt-gains").text_content()
+        assert "only mean Jev steered damage" in gain_explanation and "not coherence filters" in gain_explanation
+        assert "healthy answers" not in gain_explanation and "not past a walk boundary" not in gain_explanation
         page.wait_for_function("document.querySelector('img[src=\"prompt_gains.png\"]').naturalWidth > 0")
         assert not page.locator('img[src="prompt_gains_all.png"]').is_visible(), "rejected doses must be hidden by default"
         gain_rows = page.locator("table.gain-status tbody tr")

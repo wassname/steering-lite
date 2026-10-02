@@ -1,0 +1,7 @@
+JEV_ONLY_NEWLY_ADMITTED dev 2 mechanical_failures 2 post_boundary 0
+JEV_ONLY_NEWLY_ADMITTED prompt-dev 2 mechanical_failures 2 post_boundary 0
+JEV_ONLY_NEWLY_ADMITTED full 3 mechanical_failures 3 post_boundary 0
+JEV_ONLY_NEWLY_ADMITTED 27b-full 1 mechanical_failures 1 post_boundary 0
+JEV_ONLY_NEWLY_ADMITTED olmo-full 0 mechanical_failures 0 post_boundary 0
+PREFIX_JEV_VERIFIED 12 mean 0.2635 max 1.29 above_cap 0
+PREFIX_JEV_VERIFIED 16 mean 0.20400000000000001 max 0.79 above_cap 0

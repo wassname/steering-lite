@@ -169,7 +169,7 @@ function App() {
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">
       <h2>Prompt gain sweep — admissible doses</h2>
-      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The main plot uses absolute damage change; the cutoff uses mean steered damage. The table lists all passing gains, including those not on the Pareto line.</p>
+      <p>Same rule as the other methods: only mean Jev steered damage ≤ 1.5 of 4 determines coherence. Mechanical checks and walk boundaries are calibration diagnostics, not coherence filters. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The main plot uses absolute damage change; the cutoff uses mean steered damage. The table lists all passing gains, including those not on the Pareto line.</p>
       <GainStatus data={data} />
       <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at admissible prompt embedding gains; gaps at rejected doses" style={{ width: '100%' }} /></a>
       <details><summary>Diagnostic: all tested gains, including rejected doses</summary>
@@ -180,7 +180,7 @@ function App() {
       <p>We compare prompting and steering on a language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
         Each question rests on a made-up premise, such as the thermal conductivity of a CI pipeline. A good answer points out the made-up part.
         Steering one way (+C) should make the model go along with the premise (sycophantic). Steering the other way (−C) should make it point out the problem (candid).</p>
-      <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
+      <p>Each colour is one method. Existing vector walks used mechanical checks to choose tested dose ranges; only Jev ratings decide which measured points appear here.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
         The line joins each method's best trade-offs (solid dots), ordered by effect, not dose. Faint dots show other passing doses. Gaps larger than {data.plot_gap} premise-score point between line supports are not interpolated. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score, even if the effect is near zero or in the wrong direction. Checks use cohort means; individual retained answers can still be badly damaged. Other strengths are in the answer explorer below.
@@ -193,7 +193,7 @@ function App() {
         </tbody></table>
       </details>
       {data.points.some(p => p.fixed_grid) && <>
-        <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
+        <p>Prompt embedding sweeps use a fixed grid of gains, with Jev judging each gain independently. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
       </>}
     </section>
     <h2>Best strength per method</h2>

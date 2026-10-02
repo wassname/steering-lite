@@ -20,3 +20,5 @@ Inherits conventions from sibling project `lora-lite`. Read [../lora-lite/AGENTS
 ## Benchmark
 
 `scripts/bsbench/`: `walk.py` (dose walk) -> `judge.py` (Jev ratings) -> `results.py` (tables, plot, `points.json`). Results and their evidence go in `RESEARCH_JOURNAL.md`.
+
+Coherence for plots and scores comes only from Jev (mean damage ≤1.5/4). Mechanical checks are calibration diagnostics, not plot/scoring exclusions; a mechanical boundary does not make a judged point inadmissible. — PI/OpenAI, wassname clarification 2026-10-02.

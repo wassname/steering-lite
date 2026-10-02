@@ -2,8 +2,8 @@
 
 Adapted from vjp-steering 7f0782a `scripts/export.py` + `src/vjp_steering/results.py`, merged so one
 file writes the one data artifact (`points.json`) that the plot, the tables and the React page read.
-Kept from the reference: the admissible rule shape (healthy, not past the walk boundary, mean steered
-damage under a cap), the random zone, the plot style.
+Jev mean damage alone determines admissibility; mechanical health and boundary fields are diagnostics.
+The random zone and plot style follow the reference. PI/OpenAI.
 Changed: the judge is Jev (judge.py: premise level and damage per answer, 1 call each, deterministic)
 instead of the DeepSeek pairwise judge, so numbers are in Jev units and not comparable with the
 vjp-steering README. All steering-lite methods plus prompting points. The headline table picks, for each
@@ -98,7 +98,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str]) -> list[dict]:
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "steered_damage": steered_damage,
                     "breakdown_reasons": health["breakdown_reasons"], "post_boundary": health["post_boundary"],
-                    "admissible": not health["breakdown_reasons"] and not health["post_boundary"] and steered_damage <= MAX_DAMAGE,
+                    "admissible": steered_damage <= MAX_DAMAGE,
                     "kl_rms": rungs[C].get("kl_rms", {}).get(side), "stats": health["stats"],
                     "answers": health["answers"], "questions": questions,
                 })
@@ -154,8 +154,8 @@ def room_score(best: dict) -> float:
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    The damage cap is applied again to the draw; doses rejected on the full data (health rule, walk
-    boundary, or damage) stay rejected, so the interval is conditional on those."""
+    The damage cap is reapplied to each draw; intervals remain conditional on original Jev
+    admissibility and seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
         by = {}
@@ -655,6 +655,7 @@ def main() -> None:
         "view": args.view, "shown": shown, "plot_gap": MAX_PLOT_GAP,
         "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
+        "max_damage": MAX_DAMAGE, "admissibility": "jev_mean_damage",
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zones": random_zones(points),
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
@@ -689,10 +690,10 @@ def main() -> None:
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
-        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = healthy answers, not past the walk boundary, mean steered damage ≤ {MAX_DAMAGE:g} of 4."
+        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     if any(p["fixed_grid"] for p in points):
-        intro += " Prompt embedding sweeps use a fixed gain grid and independent health checks per gain; their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
+        intro += " Prompt embedding sweeps use a fixed gain grid; Jev judges each gain independently. Endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
     gain_image = ""
     if any(p["fixed_grid"] for p in points):
         gains = prompt_gain_plot(points, f"Prompt embedding gains: {model} ({args.cohort}, {len(scenarios)} questions)")

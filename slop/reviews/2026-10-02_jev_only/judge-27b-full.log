@@ -1,0 +1,5 @@
+2026-10-02 14:25:43.936 | INFO     | data:manifest:71 - manifest walks=23 rows=66200
+2026-10-02 14:25:55.003 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK aware required=45211 cached=45211 missing=0
+2026-10-02 14:26:16.445 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK blind required=3870 cached=3770 missing=100
+2026-10-02 14:26:21.549 | INFO     | __main__:_refresh:171 - jev progress=100/100 cost=$0.0059
+2026-10-02 14:26:21.847 | INFO     | __main__:main:231 - JUDGE_COMPLETE missing=0

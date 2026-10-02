@@ -1,0 +1,31 @@
+2026-10-02 14:24:39.059 | INFO     | data:walk_certificates:39 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-02 14:24:39.064 | INFO     | data:walk_certificates:39 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-02 14:24:39.066 | INFO     | data:walk_certificates:39 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-02 14:24:39.220 | INFO     | data:walk_certificates:39 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-02 14:24:39.391 | INFO     | data:walk_certificates:39 - exclude random_s11_full.json: seed outside published full report
+2026-10-02 14:24:39.391 | INFO     | data:walk_certificates:39 - exclude random_s12_full.json: seed outside published full report
+2026-10-02 14:24:39.401 | INFO     | data:walk_certificates:39 - exclude random_s13_full.json: seed outside published full report
+2026-10-02 14:24:39.407 | INFO     | data:walk_certificates:39 - exclude random_s14_full.json: seed outside published full report
+2026-10-02 14:24:39.417 | INFO     | data:walk_certificates:39 - exclude random_s15_full.json: seed outside published full report
+2026-10-02 14:24:49.177 | INFO     | data:manifest:71 - manifest walks=73 rows=202200
+2026-10-02 14:25:05.210 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK aware required=134700 cached=134700 missing=0
+2026-10-02 14:25:14.485 | INFO     | data:walk_certificates:39 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-02 14:25:14.485 | INFO     | data:walk_certificates:39 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-02 14:25:14.486 | INFO     | data:walk_certificates:39 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-02 14:25:14.487 | INFO     | data:walk_certificates:39 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-02 14:25:14.488 | INFO     | data:walk_certificates:39 - exclude random_s11_full.json: seed outside published full report
+2026-10-02 14:25:14.488 | INFO     | data:walk_certificates:39 - exclude random_s12_full.json: seed outside published full report
+2026-10-02 14:25:14.489 | INFO     | data:walk_certificates:39 - exclude random_s13_full.json: seed outside published full report
+2026-10-02 14:25:14.489 | INFO     | data:walk_certificates:39 - exclude random_s14_full.json: seed outside published full report
+2026-10-02 14:25:14.489 | INFO     | data:walk_certificates:39 - exclude random_s15_full.json: seed outside published full report
+2026-10-02 14:25:28.520 | INFO     | data:walk_certificates:39 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-02 14:25:28.520 | INFO     | data:walk_certificates:39 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-02 14:25:28.521 | INFO     | data:walk_certificates:39 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-02 14:25:28.522 | INFO     | data:walk_certificates:39 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-02 14:25:28.523 | INFO     | data:walk_certificates:39 - exclude random_s11_full.json: seed outside published full report
+2026-10-02 14:25:28.524 | INFO     | data:walk_certificates:39 - exclude random_s12_full.json: seed outside published full report
+2026-10-02 14:25:28.524 | INFO     | data:walk_certificates:39 - exclude random_s13_full.json: seed outside published full report
+2026-10-02 14:25:28.524 | INFO     | data:walk_certificates:39 - exclude random_s14_full.json: seed outside published full report
+2026-10-02 14:25:28.524 | INFO     | data:walk_certificates:39 - exclude random_s15_full.json: seed outside published full report
+2026-10-02 14:25:39.437 | INFO     | __main__:refresh:177 - JUDGE_CACHE_CHECK blind required=11909 cached=11909 missing=0
+2026-10-02 14:25:39.801 | INFO     | __main__:main:231 - JUDGE_COMPLETE missing=0
