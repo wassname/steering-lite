@@ -161,7 +161,8 @@ function App() {
   }, []);
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
-    <h1>{data.view === 'prompt' ? 'Prompt embedding sweeps on Bullshit Bench v2' : 'steering-lite on Bullshit Bench v2'}</h1>
+    <h1>{{ prompt: 'Prompt embedding sweeps on Bullshit Bench v2', user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
+    {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Prompt sweeps and plain prompts also act only on the prompt.</p>}
     <p className="lede">{data.view === 'prompt'
       ? <>Both prompt sweeps are shown below, with mean difference and shaded random references. The multiplier scales instruction embeddings only; +C and −C select different personas. Low-gain responses can be similar across personas; scores do not establish instruction-specific steering. <a href="#prompt-gains">See the gain sweep, with rejected doses filtered out.</a></>
       : <>How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods and any prompt embedding sweeps.</>} Click a name to add or hide it.</p>

@@ -25,6 +25,7 @@ from torch.utils.hooks import RemovableHandle
 from .config import SteeringConfig, REGISTRY
 from .target import find_targets
 from .extract import record_activations
+from .positions import select
 
 
 _ATTACHED_ATTR = "_steering_lite_attached"
@@ -55,16 +56,16 @@ def _hook(mod, args, out):
     x = args[0]
     if isinstance(out, tuple):
         y = out[0]
-        y_new = method.apply(mod, x, y, shared, stacked, cfg)
+        y_new = select(method.apply(mod, x, y, shared, stacked, cfg), y)
         return (y_new,) + out[1:]
-    return method.apply(mod, x, out, shared, stacked, cfg)
+    return select(method.apply(mod, x, out, shared, stacked, cfg), out)
 
 
 def _linear_hook(mod, args, out):
     cfg: SteeringConfig = mod._steering_cfg
     method = mod._steering_method
     shared, stacked = _gather_split_state(mod)
-    return method.apply(mod, args[0], out, shared, stacked, cfg)
+    return select(method.apply(mod, args[0], out, shared, stacked, cfg), out)
 
 
 def _install_state(mod: nn.Module, shared: dict, stacked: dict, cfg: SteeringConfig) -> None:

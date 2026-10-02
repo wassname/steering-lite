@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import torch
 from einops import einsum
 from ..config import SteeringConfig, register, register_config
+from ..positions import select
 from ..target import _get_blocks
 from .value_gram import DynamicCache, DynamicLayer, ValueGram, SteeredDynamicCache, _require_dynamic_cache
 from .vjp_resid import _activations, _encode, _target_mean, _unit_direction, _valid_mask
@@ -62,7 +63,7 @@ class AdditiveValueCache(SteeredDynamicCache):
         directions = self._steering_directions[layer_idx].to(values)
         if directions.shape[1:] != (values.shape[1], values.shape[3]):
             raise ValueError(f"layer {layer_idx}: direction shape does not match cache heads/dim")
-        return values + self._steering_coeff * directions.sum(dim=0)[None, :, None, :]
+        return select(values + self._steering_coeff * directions.sum(dim=0)[None, :, None, :], values, seq_dim=2)
 
 
 def _cache_gradients(model, tok, prompts, layers, target_layer, cotangent, skip_first, max_length):

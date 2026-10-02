@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
 REPORT_SEEDS = {"dev": range(1), "full": range(3)}
 RANDOM_SEEDS = {"dev": range(32), "full": range(11)}  # denser dev reference; published full unchanged. PI/OpenAI
+USER_RANDOM_SEEDS = {"dev": range(32), "full": range(50)}  # random-user: reference for user-positions steering
+PROMPT_WALKS = ("prompting", "prompting_engineered", "prompting_scale", "prompting_engineered_scale")
 
 
 def load_cohort() -> dict[str, dict]:
@@ -26,18 +28,26 @@ def default_model_dir(model: str = "Qwen/Qwen3.5-4B") -> Path:
     return dirs[0]
 
 
-def walk_certificates(model_dir: Path, cohort: str) -> list[dict]:
-    """COMPLETE walks at the published report seeds; extra cached seeds do not change the comparison. PI/OpenAI"""
+def walk_certificates(model_dir: Path, cohort: str, view: str = "benchmark") -> list[dict]:
+    """COMPLETE walks at the published report seeds; extra cached seeds do not change the comparison. PI/OpenAI
+
+    view: benchmark = steering everywhere; user = user-positions walks (renamed without -user) plus prompt
+    walks, which also act only on the prompt; all = both populations, unrenamed (for the judge)."""
     certificates = []
     for path in sorted((model_dir / "walks").glob(f"*_{cohort}.json")):
         certificate = json.loads(path.read_text())
+        user = certificate["method"].endswith("-user")
+        if view == "benchmark" and user or view == "user" and not user and certificate["method"] not in PROMPT_WALKS:
+            continue
         if certificate["status"] != "COMPLETE":
             logger.warning("skip {} status={}", path.name, certificate["status"])
             continue
-        seeds = RANDOM_SEEDS[cohort] if certificate["method"] == "random" else REPORT_SEEDS[cohort]
+        seeds = {"random": RANDOM_SEEDS, "random-user": USER_RANDOM_SEEDS}.get(certificate["method"], REPORT_SEEDS)[cohort]
         if certificate["seed"] not in seeds:
             logger.info("exclude {}: seed outside published {} report", path.name, cohort)
             continue
+        if view == "user" and user:
+            certificate["method"] = certificate["method"].removesuffix("-user")
         certificates.append(certificate)
     return certificates
 
@@ -66,7 +76,7 @@ def demo_rows(model_dir: Path, certificate: dict) -> list[dict]:
 
 
 def manifest(model_dir: Path, cohort: str) -> list[dict]:
-    certificates = walk_certificates(model_dir, cohort)
+    certificates = walk_certificates(model_dir, cohort, view="all")
     rows = [row for certificate in certificates for row in demo_rows(model_dir, certificate)]
     logger.info("manifest walks={} rows={}", len(certificates), len(rows))
     return rows

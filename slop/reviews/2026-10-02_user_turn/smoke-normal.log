@@ -1,0 +1,44 @@
+uv run --extra benchmark python scripts/bsbench/walk.py mean_diff --smoke --model wassname/qwen3-5lyr-tiny-random --device cpu --dtype float32 --n-pairs 4 --batch-size 8 --extract-batch-size 2 --max-length 256 --layers 1,2 --target-layer 4 --max-rungs 2
+21:16:36 | stage=load model=wassname/qwen3-5lyr-tiny-random device=cpu dtype=float32 gen_key=4e919800 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 8}
+Loading weights:   0%|          | 0/57 [00:00<?, ?it/s]Loading weights: 100%|██████████| 57/57 [00:00<00:00, 49859.30it/s]
+21:16:39 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=False
+21:16:39 | RUNTIME {'run_id': '624bfe90330b4a3297408ee12ee5b409', 'argv': ['scripts/bsbench/walk.py', 'mean_diff', '--smoke', '--model', 'wassname/qwen3-5lyr-tiny-random', '--device', 'cpu', '--dtype', 'float32', '--n-pairs', '4', '--batch-size', '8', '--extract-batch-size', '2', '--max-length', '256', '--layers', '1,2', '--target-layer', '4', '--max-rungs', '2'], 'model': 'wassname/qwen3-5lyr-tiny-random', 'dtype': 'float32', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': None, 'gpu': 'cpu'}
+21:16:39 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+21:16:39 | answers wassname--qwen3-5lyr-tiny-random-g4e919800/answers/bare/bare.jsonl cached=20 missing=0
+21:16:39 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+21:16:39 | resolved method=mean_diff seed=0 cohort=dev n=20 layers=(1, 2) target=4
+21:16:40 | Loaded 200 branching suffixes
+21:16:40 | Persona-branching pairs: n=4 from 1 persona pairs
+21:16:40 | cache hit vector /workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-g4e919800/vectors/mean_diff_s0.safetensors settings={'layers': [1, 2], 'n_pairs': 4, 'max_length': 256, 'target_layer': None, 'thinking': True}
+21:16:40 | C0=59.7 (kl_rms=1.0 nats) start C=6.35 stride=2
+21:16:40 | answers wassname--qwen3-5lyr-tiny-random-g4e919800/answers/mean_diff_s0/+C_C6.349604208.jsonl cached=20 missing=0
+21:16:40 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=6.35 side=+C kl_rms=0.018377361819148064 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.16666666666666663, 'mean_words': 3.45} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+21:16:40 | answers wassname--qwen3-5lyr-tiny-random-g4e919800/answers/mean_diff_s0/-C_C6.349604208.jsonl cached=20 missing=0
+21:16:40 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=6.35 side=-C kl_rms=0.01837361976504326 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.1428571428571429, 'mean_words': 3.55} breakdown=['unfinished']
+=== output 0 ===
+尥 startXהתחיל KPиндивиду Lansshots汫
+=== end ===
+21:16:40 | answers wassname--qwen3-5lyr-tiny-random-g4e919800/answers/mean_diff_s0/+C_C8.jsonl cached=20 missing=0
+21:16:40 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=8 side=+C kl_rms=0.02664104476571083 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.6} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+21:16:40 | answers wassname--qwen3-5lyr-tiny-random-g4e919800/answers/mean_diff_s0/-C_C8.jsonl cached=20 missing=0
+21:16:40 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=8 side=-C kl_rms=0.030006181448698044 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.33333333333333337, 'mean_words': 3.65} breakdown=['unfinished']
+=== output 0 ===
+尥 startXהתחיל KPиндивиду Lansshots汫
+=== end ===
+21:16:40 | SMOKE_PASS method=mean_diff rungs=2 certificate=/workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-g4e919800/walks/mean_diff_s0_dev.json

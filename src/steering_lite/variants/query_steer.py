@@ -25,6 +25,7 @@ from jaxtyping import Float
 from torch import Tensor
 
 from ..config import SteeringConfig, register, register_config
+from ..positions import select
 from ..target import _get_blocks
 from .vjp_resid import _encode
 
@@ -84,7 +85,7 @@ class QuerySteer:
     @staticmethod
     def install(model, cfg, stacked):
         def hook(_m, _i, out, q):
-            return out + cfg.coeff * q.to(out)  # [b s h d] + [h d]
+            return select(out + cfg.coeff * q.to(out), out)  # [b s h d] + [h d]
         return [m.register_forward_hook(lambda _m, _i, out, q=stacked[layer]["q"].sum(0): hook(_m, _i, out, q))
                 for layer, m in _q_norms(model, stacked).items()]
 

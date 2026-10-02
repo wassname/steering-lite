@@ -44,6 +44,7 @@ except ImportError:
     DynamicLayer = None
 
 from ..config import SteeringConfig, register, register_config
+from ..positions import select
 from ..target import _get_blocks
 
 
@@ -111,7 +112,7 @@ class SteeredDynamicCache(_CacheBase):
             direction,
             "b h t k, k h d -> b h t d",
         )
-        return values + self._steering_coeff * delta
+        return select(values + self._steering_coeff * delta, values, seq_dim=2)
 
     def update(
         self,

@@ -40,7 +40,8 @@ from steering_lite.config import _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
 from steering_lite.extract import record_activations
-from steering_lite.prompting import instruction_mask, scaled_prompt_embeddings
+from steering_lite.positions import only_tokens
+from steering_lite.prompting import instruction_mask, scaled_prompt_embeddings, span_mask
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.import_utils import is_flash_linear_attention_available
 
@@ -110,13 +111,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_resid from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+    parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
     args = parser.parse_args(argv)
     extraction = (("--layers", "layers"), ("--target-layer", "target_layer"), ("--n-pairs", "n_pairs"), ("--max-length", "max_length"), ("--no-think", "no_think"))
     changed = [flag for flag, dest in extraction if getattr(args, dest) != parser.get_default(dest)]
     # --smoke writes to its own throw-away tree (outputs/bsbench-smoke), where extract_vector still fails on a mismatched cached vector
     if changed and not args.tag and not args.smoke:
         parser.error(f"extraction settings differ from the defaults ({', '.join(changed)}); add --tag so this run's vector, answers and diagnostics do not share the default run's cache")
-    args.name = args.method + (f"-{args.tag}" if args.tag else "")
+    args.vector_name = args.method + (f"-{args.tag}" if args.tag else "")
+    args.name = args.vector_name + ("-user" if args.positions == "user" else "")
+    if args.positions == "user":
+        assert args.method in CONFIGS and args.method not in ("sink_split", "sink_split_resid"), "user positions need a per-token steering method"
     return args
 
 
@@ -158,7 +163,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
 
 
 def extract_vector(args, model, tokenizer, layers) -> Vector:
-    path = model_dir(args.model) / "vectors" / f"{args.name}_s{args.seed}.safetensors"
+    path = model_dir(args.model) / "vectors" / f"{args.vector_name}_s{args.seed}.safetensors"
     positive, negative = make_persona_pairs(
         tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
         template=PERSONA_TEMPLATE, seed=args.seed,
@@ -188,7 +193,7 @@ def extract_vector(args, model, tokenizer, layers) -> Vector:
     path.parent.mkdir(parents=True, exist_ok=True)
     vector.save(str(path))
     path.with_suffix(".json").write_text(json.dumps({
-        "method": args.name, "seed": args.seed, "layers": layers, "n_pairs": len(positive), "thinking": not args.no_think,
+        "method": args.vector_name, "seed": args.seed, "layers": layers, "n_pairs": len(positive), "thinking": not args.no_think,
         "max_length": args.max_length, "extraction_seconds": time.monotonic() - started,
         "config": vector.cfg.to_dict(),
     }, indent=2) + "\n")
@@ -206,21 +211,30 @@ def generation_inputs(tokenizer, rows: list[dict[str, str]], instruction: str | 
     ]
 
 
+def user_spans(rows: list[dict[str, str]]) -> list[str]:
+    """The user message as it appears in generation_inputs (no instruction prefix in user-positions walks)."""
+    return [row["prompt"] + GEN["suffix"] for row in rows]
+
+
 @torch.inference_mode()
-def generate(model, tokenizer, prompts: list[str], batch_size: int, scaled_instruction: tuple[str, float] | None = None) -> list[str]:
+def generate(model, tokenizer, prompts: list[str], batch_size: int, scaled_instruction: tuple[str, float] | None = None, steer_spans: list[str] | None = None) -> list[str]:
+    """steer_spans: steer only these prompt tokens (one span per prompt); the attached vector must be active."""
     answers = []
     tokenizer.padding_side = "left"
+    assert scaled_instruction is None or steer_spans is None
     for start in range(0, len(prompts), batch_size):
         texts = prompts[start : start + batch_size]
         batch = tokenizer(
             texts, return_tensors="pt", padding=True, add_special_tokens=False,
-            return_offsets_mapping=scaled_instruction is not None,
+            return_offsets_mapping=scaled_instruction is not None or steer_spans is not None,
         ).to(next(model.parameters()).device)
         context = _Null()
         if scaled_instruction is not None:
             instruction, gain = scaled_instruction
             mask = instruction_mask(batch["input_ids"], batch.pop("offset_mapping"), texts, instruction, tokenizer)
             context = scaled_prompt_embeddings(model, batch["input_ids"], mask, gain)
+        if steer_spans is not None:
+            context = only_tokens(span_mask(batch["input_ids"], batch.pop("offset_mapping"), texts, steer_spans[start : start + batch_size], tokenizer))
         with context as embeddings:
             output = generate_batch(model, tokenizer, batch, embeddings)
         answers.extend(tokenizer.batch_decode(output[:, batch["input_ids"].shape[1] :], skip_special_tokens=True))
@@ -245,7 +259,7 @@ def answer_path(model: str, method: str, seed: int, side: str, coefficient: floa
     return model_dir(model) / "answers" / folder / name
 
 
-def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, scaled_instruction: tuple[str, float] | None = None) -> list[str]:
+def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, scaled_instruction: tuple[str, float] | None = None, steer_spans: list[str] | None = None) -> list[str]:
     """Answers for `rows`, generating only questions missing from `path`. `steer` is a context manager."""
     done = {}
     if path.exists():
@@ -254,7 +268,8 @@ def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch
     logger.info("answers {} cached={} missing={}", path.relative_to(OUT), len(rows) - len(missing), len(missing))
     if missing:
         with steer():
-            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size, scaled_instruction)
+            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size, scaled_instruction,
+                             None if steer_spans is None else [steer_spans[index] for index in missing])
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as file:
             for index, text in zip(missing, texts, strict=True):
@@ -578,6 +593,36 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
     logger.info("{} method={} rungs={} fixed_grid=True boundary_confirmed=False certificate={}", "SMOKE_PASS" if args.smoke else "WALK_COMPLETE", args.name, len(rungs), certificate_path)
 
 
+@torch.inference_mode()
+def check_user_positions(model, tokenizer, rows, vector: Vector, coefficient: float) -> None:
+    """User-positions steering on the loaded model: an empty mask is bare, tokens before the user span are
+    unchanged, the span changes logits, and decode steps are unsteered. PI/OpenAI."""
+    tokenizer.padding_side = "left"
+    prompts = generation_inputs(tokenizer, rows[:3])
+    batch = tokenizer(prompts, padding=True, return_tensors="pt", return_offsets_mapping=True, add_special_tokens=False).to(next(model.parameters()).device)
+    mask = span_mask(batch["input_ids"], batch.pop("offset_mapping"), prompts, user_spans(rows[:3]), tokenizer)
+    assert not (mask & ~batch["attention_mask"].bool()).any() and mask.any(1).all()
+    bare = model(**batch, use_cache=False).logits
+    bare_ids = generate_batch(model, tokenizer, batch)
+    with vector(model, C=coefficient):
+        with only_tokens(torch.zeros_like(mask)):
+            empty = model(**batch, use_cache=False).logits
+            assert torch.equal(bare_ids, generate_batch(model, tokenizer, batch)), "an empty position mask changed greedy generation (decode steps must be unsteered)"
+        with only_tokens(mask):
+            steered = model(**batch, use_cache=False).logits
+            ids = generate_batch(model, tokenizer, batch)
+        everywhere = model(**batch, use_cache=False).logits
+    assert torch.equal(bare, empty), "an empty position mask changed logits"
+    first = mask.float().argmax(1)
+    before = torch.arange(mask.shape[1], device=mask.device)[None] < first[:, None]
+    assert torch.equal(bare[before], steered[before]), "steering changed logits before the user span"
+    delta = (steered - bare).abs().amax().item()
+    assert delta > 0 and not torch.equal(steered, everywhere), "user-span steering changed no logits, or equals steering everywhere"
+    logger.info("USER_POSITIONS_CHECK_PASS C={:.4g} empty_mask=bare before_span=unchanged max_logit_delta={:.4g} span_tokens={} prompt_tokens={}\n=== steered span ===\n{}\n=== first answer ===\n{}\n=== end ===",
+                coefficient, delta, mask.sum(1).tolist(), batch["attention_mask"].sum(1).tolist(), tokenizer.decode(batch["input_ids"][0, mask[0]]),
+                tokenizer.decode(ids[0, batch["input_ids"].shape[1]:], skip_special_tokens=True))
+
+
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
     if args.method in PROMPT_SWEEPS:
@@ -648,7 +693,7 @@ def walk(args) -> None:
         vjp_split(args, model, tokenizer, layers, root / mode_output(args))
         return
     vector = extract_vector(args, model, tokenizer, layers)
-    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.name}_s{args.seed}.json")
+    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.vector_name}_s{args.seed}.json")  # user positions: the method's own C0, so doses match
     if args.vjp_check:
         vjp_check(args, model, tokenizer, vector, c0, rows, root / mode_output(args))
         return
@@ -666,29 +711,52 @@ def walk(args) -> None:
         with vector(model, C=GRID[start]):
             assert not torch.equal(base_logits, model(**encoded).logits), "steering changed no logits"
 
+    user = args.positions == "user"
+    spans = user_spans(rows) if user else None
+    if user:
+        check_user_positions(model, tokenizer, rows, vector, GRID[start])
     timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]  # bare answers, vector, C0
     state = {side: {"streak": 0, "boundary": None} for side in ("+C", "-C")}
     rungs = []
+
+    def write_certificate(stop_reason: str | None) -> None:
+        certificate_path.parent.mkdir(parents=True, exist_ok=True)
+        certificate_path.write_text(json.dumps({
+            "schema": "bsbench_walk_v3", "status": "RUNNING" if stop_reason is None else "COMPLETE",
+            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
+            "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
+            "positions": args.positions, "vector": args.vector_name, "start_below": args.start_below, "stop_reason": stop_reason,
+            "state": state, "rungs": rungs,
+            "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
+                       "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
+        }, indent=2) + "\n")
+
     for step, grid_index in enumerate(range(start, len(GRID), args.stride)):
         rung_started = time.monotonic()
         if step >= args.max_rungs and args.smoke:
             logger.info("SMOKE_PASS method={} rungs={} certificate={}", args.method, len(rungs), certificate_path)
             return
+        if step >= args.max_rungs and user:  # prompt-only steering may stay mechanically healthy; the cap bounds cost
+            write_certificate(stop_reason="max_rungs")
+            logger.info("WALK_COMPLETE method={} seed={} rungs={} stop=max_rungs state={} certificate={}", args.name, args.seed, len(rungs), state, certificate_path)
+            return
         if step >= args.max_rungs:
             raise RuntimeError(f"{args.method} s{args.seed}: no confirmed breakdown within {args.max_rungs} rungs from C={GRID[start]:.4g}")
         coefficient = GRID[grid_index]
-        rung = {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": rung_kl(args, model, tokenizer, vector, coefficient, root)}
+        rung = {"grid_index": grid_index, "coefficient": coefficient}
+        if not user:  # calibration-prompt KL measures steering everywhere, not this walk's intervention
+            rung["kl_rms"] = rung_kl(args, model, tokenizer, vector, coefficient, root)
         for side, sign in (("+C", 1.0), ("-C", -1.0)):
             path = answer_path(args.model, args.name, args.seed, side, coefficient)
             answers = cached_answers(
                 model, tokenizer, rows, path, prompts, args.batch_size,
-                lambda sign=sign: vector(model, C=sign * coefficient),
+                lambda sign=sign: vector(model, C=sign * coefficient), steer_spans=spans,
             )
             side_stats, side_reasons = health(tokenizer, answers)
             logger.info(
                 "SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. "
-                "C={:.4g} side={} kl_rms={:.3f} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===",
-                coefficient, side, rung["kl_rms"][side], side_stats, side_reasons, answers[0],
+                "C={:.4g} side={} kl_rms={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===",
+                coefficient, side, rung.get("kl_rms", {}).get(side), side_stats, side_reasons, answers[0],
             )
             if state[side]["boundary"] is None:
                 state[side]["streak"] = state[side]["streak"] + 1 if side_reasons else 0
@@ -702,15 +770,7 @@ def walk(args) -> None:
         rung["seconds"] = time.monotonic() - rung_started
         rungs.append(rung)
         done = all(state[side]["boundary"] is not None and step + 1 >= state[side]["boundary"] + 2 for side in state)
-        certificate_path.parent.mkdir(parents=True, exist_ok=True)
-        certificate_path.write_text(json.dumps({
-            "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING",
-            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
-            "layers": layers, "gen": GEN, "c0": c0, "kl_target": args.kl_target, "stride": args.stride,
-            "state": state, "rungs": rungs,
-            "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
-                       "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
-        }, indent=2) + "\n")
+        write_certificate(stop_reason="boundary" if done else None)
         if done:
             logger.info("WALK_COMPLETE method={} seed={} rungs={} state={} certificate={}", args.method, args.seed, len(rungs), state, certificate_path)
             return

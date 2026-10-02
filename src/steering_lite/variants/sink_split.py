@@ -41,6 +41,7 @@ from einops import einsum
 from loguru import logger
 
 from ..config import SteeringConfig, register, register_config
+from .. import positions
 from ..target import _get_blocks
 from .vjp_resid import _encode, _unit_direction
 
@@ -192,6 +193,7 @@ def _slot_attention(original):
         P = _ACTIVE.get(id(module))
         if P is None:
             return original(module, query, key, value, attention_mask, scaling=scaling, dropout=dropout, **kw)
+        assert positions.active() is None, "sink_split's extra attention slots are read by every query; it has no per-token form"
         g = module.num_key_value_groups
         B, T, S = query.shape[0], query.shape[2], key.shape[2]
         if attention_mask is None:

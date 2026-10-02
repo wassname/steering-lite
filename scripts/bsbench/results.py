@@ -59,18 +59,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
     parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
-    parser.add_argument("--view", choices=("benchmark", "prompt"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
+    parser.add_argument("--view", choices=("benchmark", "prompt", "user"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
     return parser.parse_args()
 
 
-def build_points(model_dir: Path, cohort: str, exclude: set[str]) -> list[dict]:
+def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "benchmark") -> list[dict]:
     """One point per (method, seed, C, side) with per-question Jev ratings kept for bootstrap and the explorer.
 
     effect = premise level(steered) - level(bare), + = more sycophantic (the plot's x axis; -C working is negative).
     off_axis = |damage(steered) - damage(bare)|. Blind ratings are attached where judged (blind table doses)."""
     have = cached()
     points = []
-    for certificate in [c for c in walk_certificates(model_dir, cohort) if c["method"] not in exclude]:
+    for certificate in [c for c in walk_certificates(model_dir, cohort, view) if c["method"] not in exclude]:
         rows = demo_rows(model_dir, certificate)
         rungs = {rung["coefficient"]: rung for rung in certificate["rungs"]}
         for C in sorted(rungs):
@@ -239,9 +239,18 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
 
 
 def blind_targets(model_dir: Path, cohort: str) -> dict[str, dict]:
-    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose."""
-    points = build_points(model_dir, cohort, set())
-    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort) for r in demo_rows(model_dir, c)}
+    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose, in each report view."""
+    out = {}
+    for view in ("benchmark", "user"):
+        out |= _blind_targets(model_dir, cohort, view)
+    return out
+
+
+def _blind_targets(model_dir: Path, cohort: str, view: str) -> dict[str, dict]:
+    points = build_points(model_dir, cohort, set(), view)
+    if not points:
+        return {}
+    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort, view) for r in demo_rows(model_dir, c)}
     out = {}
     for method, (_, best, strongest) in choose(points).items():
         for side in ("+C", "-C"):
@@ -631,7 +640,7 @@ def main() -> None:
     out = args.out or ROOT / "outputs/bsbench/results" / args.cohort
     out.mkdir(parents=True, exist_ok=True)
     exclude = {m for m in args.exclude.split(",") if m}
-    points = build_points(model_dir, args.cohort, exclude)
+    points = build_points(model_dir, args.cohort, exclude, "user" if args.view == "user" else "benchmark")
     # methods without a fixed colour (e.g. tagged variants like vjp_resid-t48) take the next spare colour, in name order
     spare = [c for c in ("#56b4e9", "#000000", "#b8860b", "#8b008b", "#2f4f4f", "#ff1493", "#556b2f") if c not in COLORS.values()]
     uncoloured = sorted({point["method"] for point in points} - set(COLORS))
@@ -677,7 +686,7 @@ def main() -> None:
     site["plot_labels"] = svg_labels(site)
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
-    heading = "Prompt embedding sweeps vs mean difference" if args.view == "prompt" else "steering-lite on Bullshit Bench v2"
+    heading = {"prompt": "Prompt embedding sweeps vs mean difference", "user": "User-turn steering on Bullshit Bench v2"}.get(args.view, "steering-lite on Bullshit Bench v2")
     title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
@@ -692,6 +701,10 @@ def main() -> None:
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
         f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
+    if args.view == "user":
+        intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
+                  "using the method's own vector and C0, one seed. Random is random-user: random directions steered the same way. "
+                  "Prompt sweeps and plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
     if any(p["fixed_grid"] for p in points):
         intro += " Prompt embedding sweeps use a fixed gain grid; Jev judges each gain independently. Endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
     gain_image = ""

@@ -607,3 +607,30 @@ def test_sink_split_float_mask_matches_bool_mask():
         S._ACTIVE.pop(id(module))
     keep = real[:, :, None, None].expand_as(out_b)  # compare real query rows only (pad rows are unused)
     assert torch.allclose(out_b[keep], out_f[keep], atol=1e-5), (out_b - out_f)[keep].abs().max()
+
+
+@pytest.mark.parametrize("method", ["mean_diff", "linear_act", "value_gram", "vjp_value", "query_steer", "sink_split"])
+def test_user_positions_mask(method, request):
+    """only_tokens: empty mask = bare (prefill and cached decode), earlier tokens unchanged, masked span steered. PI/OpenAI."""
+    from steering_lite.positions import only_tokens
+    model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split") else "tiny_model")
+    sl.detach(model)
+    v = sl.train(model, tok, POS, NEG, _make_cfg(method), batch_size=2, max_length=64)
+    ids = tok("Tell me the truth about the moon, please.", return_tensors="pt").input_ids
+    mask = torch.zeros_like(ids, dtype=torch.bool)
+    mask[:, 4:] = True
+    with torch.no_grad():
+        bare = model(ids).logits
+        bare_gen = model.generate(ids, max_new_tokens=4, do_sample=False, pad_token_id=0)
+        with v(model, C=_make_cfg(method).coeff):
+            if method == "sink_split":
+                with only_tokens(mask), pytest.raises(AssertionError, match="no per-token form"):
+                    model(ids)
+                return
+            with only_tokens(torch.zeros_like(mask)):
+                assert torch.equal(model(ids).logits, bare)
+                assert torch.equal(model.generate(ids, max_new_tokens=4, do_sample=False, pad_token_id=0), bare_gen)
+            with only_tokens(mask):
+                steered = model(ids).logits
+    assert torch.equal(steered[:, :4], bare[:, :4])
+    assert (steered[:, 4:] - bare[:, 4:]).abs().max() > 1e-6

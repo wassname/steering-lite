@@ -15,19 +15,24 @@ from torch import Tensor, nn
 from jaxtyping import Bool, Float, Int
 
 
-def instruction_mask(
+def span_mask(
     input_ids: Int[Tensor, "b s"],
     offsets: Int[Tensor, "b s 2"],
     prompts: list[str],
-    instruction: str,
+    spans: list[str],
     tokenizer,
 ) -> Bool[Tensor, "b s"]:
-    """Select instruction tokens, including merged whitespace; reject other text. PI/OpenAI."""
-    starts = torch.tensor([p.index(instruction) for p in prompts], device=offsets.device)[:, None]
-    mask = (offsets[..., 1] > starts) & (offsets[..., 0] < starts + len(instruction))
-    for ids, selected in zip(input_ids, mask, strict=True):
-        assert tokenizer.decode(ids[selected]).strip() == instruction, "instruction token span includes other text"
+    """Tokens overlapping each row's first occurrence of its span, including merged whitespace; reject other text. PI/OpenAI."""
+    starts = torch.tensor([p.index(span) for p, span in zip(prompts, spans, strict=True)], device=offsets.device)[:, None]
+    ends = starts + torch.tensor([len(span) for span in spans], device=offsets.device)[:, None]
+    mask = (offsets[..., 1] > starts) & (offsets[..., 0] < ends)
+    for ids, selected, span in zip(input_ids, mask, spans, strict=True):
+        assert tokenizer.decode(ids[selected]).strip() == span.strip(), "token span includes other text"
     return mask
+
+
+def instruction_mask(input_ids, offsets, prompts: list[str], instruction: str, tokenizer) -> Bool[Tensor, "b s"]:
+    return span_mask(input_ids, offsets, prompts, [instruction] * len(prompts), tokenizer)
 
 
 @contextmanager
