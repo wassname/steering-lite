@@ -15,7 +15,7 @@ smoke-bsbench method="mean_diff":
 	uv run --extra benchmark python scripts/bsbench/walk.py {{method}} --smoke --model wassname/qwen3-5lyr-tiny-random --device cpu --dtype float32 --n-pairs 4 --batch-size 8 --extract-batch-size 2 --max-length 256 --layers 1,2 --target-layer 4 --max-rungs 2
 
 # dose walks on Modal (cached per question), then pull outputs/bsbench back
-sweep cohort="dev" methods="mean_diff,pca,vjp_resid,vjp_value,value_gram,prompting,prompting_engineered,prompting_scale,prompting_engineered_scale" seeds="0" random_seeds="0,1,2,3,4":
+sweep cohort="dev" methods="mean_diff,pca,vjp_resid,vjp_value,value_gram,prompting,prompting_engineered,prompting_scale,prompting_engineered_scale" seeds="0" random_seeds="auto":
 	uv run --extra benchmark modal run scripts/bsbench/run_modal.py::main --cohort {{cohort}} --methods {{methods}} --seeds {{seeds}}
 	uv run --extra benchmark modal run scripts/bsbench/run_modal.py::main --cohort {{cohort}} --methods random --seeds {{random_seeds}}
 	just pull

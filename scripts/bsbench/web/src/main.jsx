@@ -14,7 +14,7 @@ function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
   const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method) && p.admissible);
-  const shown = [...curves.flatMap(c => c.points), ...prompts];
+  const shown = [...curves.flatMap(c => c.tested), ...prompts];
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
   const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.3);
@@ -25,6 +25,7 @@ function Plot({ data, visible, selected, onSelect }) {
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged on-axis change against off-axis damage">
       <rect className="canvas" width={W} height={H} />
       <text className="label" x={M.l} y={18}>{data.cohort.toUpperCase()} · {data.questions.length} questions</text>
+      <text className="label" x={W - M.r} y={18} textAnchor="end">random: {data.random_seeds.length} directions · both signs</text>
       <g className="grid">
         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
         {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>; })}
@@ -36,7 +37,10 @@ function Plot({ data, visible, selected, onSelect }) {
       {curves.filter(c => c.points.length).map(c => {
         const end = c.points.at(-1);
         return <g key={c.method + c.side}>
-          <polyline points={c.path.map(([a, b]) => `${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
+          <path className="curve-line" d={c.path.map(([a, b], i) => a === null ? '' : `${i === 0 || c.path[i - 1][0] === null ? 'M' : 'L'}${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
+          {c.tested.filter(p => !c.points.some(q => q.C === p.C)).map(p => <circle key={`sample${p.C}`} cx={x(p.effect)} cy={y(p.off_axis)} r="2.5" fill={data.colors[c.method]} fillOpacity="0.4" className="sample"
+            onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)}
+            onClick={() => onSelect(data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C))} />)}
           {c.points.map(p => {
             const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C);
             const isSel = selected && full && pointId(full) === pointId(selected);
@@ -60,14 +64,24 @@ function Plot({ data, visible, selected, onSelect }) {
       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
     </svg>
     {hover && <aside className="tooltip" style={{ left: `${(x(hover.effect) / W) * 100}%`, top: `${(y(hover.off_axis) / H) * 100}%` }}>
-      <strong>{hover.method} {hover.side} C={hover.C.toPrecision(3)}</strong>
+      <strong>{hover.method} {hover.side} {data.points.some(p => p.method === hover.method && p.fixed_grid) ? 'gain' : 'C'}={hover.C.toPrecision(3)}</strong>
       <span>on-axis {fmt(hover.effect)}, off-axis {hover.off_axis.toFixed(2)}</span><span>click to open its answers</span>
     </aside>}
   </div>;
 }
 
+function GainStatus({ data }) {
+  return <table className="gain-status"><thead><tr><th>prompt / side</th><th>passing gains</th><th>excluded gains</th></tr></thead><tbody>
+    {data.curves.filter(c => data.points.some(p => p.method === c.method && p.fixed_grid)).map(c => {
+      const tested = [...new Set(data.points.filter(p => p.method === c.method && p.side === c.side).map(p => p.C))].sort((a, b) => a - b);
+      const passing = new Set(c.tested.map(p => p.C));
+      return <tr key={c.method + c.side}><td>{c.method} {c.side}</td><td style={{ whiteSpace: 'normal' }}>{tested.filter(g => passing.has(g)).join(', ')}</td><td style={{ whiteSpace: 'normal' }}>{tested.filter(g => !passing.has(g)).join(', ') || 'none'}</td></tr>;
+    })}
+  </tbody></table>;
+}
+
 function Summary({ data }) {
-  return <table>
+  return <table className="summary">
     <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>on-axis ÷ room↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
     <tbody>{data.summary.map(r => <tr key={r.method}>
       <td className={r.method === 'random' || r.method.startsWith('prompting') ? 'control' : ''}><span className="swatch" style={{ background: data.colors[r.method] }} />{r.method}</td>
@@ -148,7 +162,8 @@ function App() {
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">
       <h2>Prompt gain sweep — admissible doses</h2>
-      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. Gaps are rejected gains, not untested gains. A passing dose can still contain damaged answers.</p>
+      <p>Same filters as the other methods: healthy answers, not past a walk boundary, and mean Jev damage ≤ 1.5. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The table lists all passing gains, including those not on the Pareto line.</p>
+      <GainStatus data={data} />
       <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at admissible prompt embedding gains; gaps at rejected doses" style={{ width: '100%' }} /></a>
       <details><summary>Diagnostic: all tested gains, including rejected doses</summary>
         <a href="prompt_gains_all.html"><img src="prompt_gains_all.png" alt="Diagnostic including rejected prompt gains, marked with crosses" style={{ width: '100%' }} /></a>
@@ -161,9 +176,15 @@ function App() {
       <p>Each colour is one method. For vector methods, we raise the steering strength step by step until the answers stop making sense.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
-        The line joins each method's best trade-offs (dots), ordered by effect, not dose. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score. Other strengths are in the answer explorer below.
+        The line joins each method's best trade-offs (solid dots), ordered by effect, not dose. Faint dots show other passing doses. Gaps larger than {data.plot_gap} premise-score point between line supports are not interpolated. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score. Other strengths are in the answer explorer below.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
-        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples.</p>
+        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 (10th–90th empirical percentiles), p75 (25th–75th), and p50 (median), each filled to zero change. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples. A median or percentile interval can be entirely on one side even if some random points are on the other; opposite intervention signs need not give opposite behavioral effects.</p>
+      <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
+        <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
+        <table className="random-reference"><thead><tr><th>C</th><th>directions</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>
+          {data.zones[0].bounds.slice(1).map((b, j) => { const i = j + 1; const z = data.zones[0]; return <tr key={i}><td>{z.doses[i].toPrecision(3)}</td><td>{z.seed_counts[i]}</td><td>{z.negative_counts[i]}</td><td>{z.positive_counts[i]}</td><td>{fmt(b[0])}</td><td>{fmt(z.mean_effect[i])}</td></tr>; })}
+        </tbody></table>
+      </details>
       {data.points.some(p => p.fixed_grid) && <>
         <p>Prompt embedding sweeps use a fixed grid of gains, with health checked independently at each gain. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
       </>}

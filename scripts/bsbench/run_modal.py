@@ -80,6 +80,11 @@ def cached_on_volume(argv: list[str]) -> bool:
 
 @app.local_entrypoint()
 def main(methods: str = "mean_diff,pca,vjp_resid", seeds: str = "0", cohort: str = "dev", extra: str = ""):
+    if seeds == "auto":
+        assert methods == "random", "auto seeds is the cohort's random-reference schedule"
+        sys.path.insert(0, str(REPO / "scripts/bsbench"))
+        from data import RANDOM_SEEDS
+        seeds = ",".join(map(str, RANDOM_SEEDS[cohort]))
     jobs = [(method, seed) for seed in seeds.split(",") for method in methods.split(",")]
     argvs = {job: [job[0], "--seed", job[1], "--cohort", cohort, *extra.split()] for job in jobs}
     todo = [job for job in jobs if not cached_on_volume(argvs[job])]

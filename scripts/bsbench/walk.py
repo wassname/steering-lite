@@ -68,7 +68,12 @@ PROMPT_METHODS = {
     "prompting_engineered": ENGINEERED,
 }
 PROMPT_SWEEPS = {"prompting_scale": "prompting", "prompting_engineered_scale": "prompting_engineered"}
-PROMPT_GAINS = (0.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0)
+BASE_PROMPT_GAINS = (0.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0)
+PROMPT_GAINS = {
+    "prompting_scale": tuple(sorted((*BASE_PROMPT_GAINS, *(2.0**i for i in range(-10, -3)),
+                                    0.09375, 0.375, 0.75, *(i / 4 for i in range(5, 16) if i != 8), 6.0, 12.0))),
+    "prompting_engineered_scale": BASE_PROMPT_GAINS,
+}
 METHODS = (*CONFIGS, *PROMPT_METHODS, *PROMPT_SWEEPS)
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
 OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown
@@ -541,7 +546,8 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
                           "diagnostic": str(diagnostic.relative_to(root))}
         logger.info("PROMPT_C1_IDENTITY_PASS side={} check={}", side, identity[side])
     timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
-    gains = PROMPT_GAINS[:args.max_rungs] if args.smoke else PROMPT_GAINS
+    gains = PROMPT_GAINS[args.method]
+    gains = gains[:args.max_rungs] if args.smoke else gains
     rungs = []
     for gain in gains:
         started = time.monotonic()
@@ -575,7 +581,7 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
     if args.method in PROMPT_SWEEPS:
-        return certificate["status"] == "COMPLETE" and certificate["prompt_gains"] == list(PROMPT_GAINS)
+        return certificate["status"] == "COMPLETE" and certificate["prompt_gains"] == list(PROMPT_GAINS[args.method])
     return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
             and certificate.get("kl_target", args.kl_target) == args.kl_target)
 

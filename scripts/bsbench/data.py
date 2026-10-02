@@ -11,7 +11,7 @@ from loguru import logger
 ROOT = Path(__file__).resolve().parents[2]
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
 REPORT_SEEDS = {"dev": range(1), "full": range(3)}
-RANDOM_SEEDS = range(11)  # published null reference: seeds 0-10; PI/OpenAI
+RANDOM_SEEDS = {"dev": range(32), "full": range(11)}  # denser dev reference; published full unchanged. PI/OpenAI
 
 
 def load_cohort() -> dict[str, dict]:
@@ -34,7 +34,7 @@ def walk_certificates(model_dir: Path, cohort: str) -> list[dict]:
         if certificate["status"] != "COMPLETE":
             logger.warning("skip {} status={}", path.name, certificate["status"])
             continue
-        seeds = RANDOM_SEEDS if certificate["method"] == "random" else REPORT_SEEDS[cohort]
+        seeds = RANDOM_SEEDS[cohort] if certificate["method"] == "random" else REPORT_SEEDS[cohort]
         if certificate["seed"] not in seeds:
             logger.info("exclude {}: seed outside published {} report", path.name, cohort)
             continue

@@ -35,6 +35,12 @@ with sync_playwright() as p:
     png_marks = json.loads((site / "plot_marks.json").read_text())
     print(f"PNG frontier marks (plot_marks.json from results.py)={png_marks['frontier_marks']} page drawn={drawn} methods png={png_marks['methods']} page={data['shown']}")
     assert png_marks["frontier_marks"] == drawn and png_marks["methods"] == data["shown"], "page and PNG draw different points"
+    other = sum(len(c["tested"]) - len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
+    assert page.locator("circle.sample").count() == png_marks["passing_marks"] == other, "passing non-Pareto doses must remain visible"
+    assert page.locator(".curve-line").count() == sum(bool(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
+    for curve in data["curves"]:
+        assert all((x is None) == (y is None) for x, y in curve["path"])
+    assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
     zones = page.locator(".zone")
     assert zones.count() == 3
@@ -47,10 +53,10 @@ with sync_playwright() as p:
             assert page.get_by_role("button", name=method, exact=True).get_attribute("aria-pressed") == "true"
     print("random regions: p90/p75/p50 with distinct fills; requested opening methods visible")
     for curve in data["curves"]:
-        directed_path = [(x if curve["side"] == "+C" else -x) for x, y in curve["path"]]
+        directed_path = [(x if curve["side"] == "+C" else -x) for x, y in curve["path"] if x is not None]
         assert all(a <= b for a, b in zip(directed_path, directed_path[1:])), "Pareto path must not double back"
         seeds = {p["seed"] for p in data["points"] if p["method"] == curve["method"]}
-        for mark in curve["points"]:
+        for mark in curve["tested"]:
             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
             assert {p["seed"] for p in at} == seeds and all(p["admissible"] for p in at), "curve includes a rejected dose"
     prompt_count = sum(p["method"] in ("prompting", "prompting_engineered") and p["admissible"] for p in data["points"])
@@ -61,9 +67,18 @@ with sync_playwright() as p:
         assert gain_image.count() == 1
         page.wait_for_function("document.querySelector('img[src=\"prompt_gains.png\"]').naturalWidth > 0")
         assert not page.locator('img[src="prompt_gains_all.png"]').is_visible(), "rejected doses must be hidden by default"
+        gain_rows = page.locator("table.gain-status tbody tr")
+        fixed_curves = [c for c in data["curves"] if any(p["method"] == c["method"] and p["fixed_grid"] for p in data["points"])]
+        assert gain_rows.count() == len(fixed_curves)
+        for i, curve in enumerate(fixed_curves):
+            tested = sorted({p["C"] for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"]})
+            passing = {p["C"] for p in curve["tested"]}
+            expected = [g for g in tested if g in passing]
+            observed = [float(g) for g in gain_rows.nth(i).locator("td").nth(1).inner_text().split(', ') if g]
+            assert observed == expected, "gain table must expose all passing doses, not just frontier doses"
         page.locator("#prompt-gains").screenshot(path=str(site / "uat_prompt_gains.png"))
     print(f"prompt baseline stars={prompt_count}; no rejected curve points, rejected stars, or swept-prompt stars")
-    rows = page.locator("table:not(.blind) tbody tr").count()
+    rows = page.locator("table.summary tbody tr").count()
     assert rows == len(data["summary"]), (rows, len(data["summary"]))
     blind_rows = page.locator("table.blind tbody tr").count()
     assert blind_rows == len(data["blind"]), (blind_rows, len(data["blind"]))
