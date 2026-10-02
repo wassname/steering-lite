@@ -56,6 +56,10 @@ with sync_playwright() as p:
     for i, zone in enumerate(data["zones"]):
         assert zones.nth(i).get_attribute("data-percentile") == str(zone["percentile"])
         assert zones.nth(i).evaluate("el => getComputedStyle(el).fill.replaceAll(' ', '') === el.getAttribute('fill')")
+    if data["view"] == "user":
+        assert "User-turn steering" in page.locator("h1").text_content()
+        assert "only while the model reads the user's message" in explanation
+        assert not any(p["method"].endswith("-user") for p in data["points"]), "user view renames <method>-user to <method>"
     if data["view"] == "prompt":
         assert set(data["shown"]) == {"prompting_scale", "prompting_engineered_scale", "mean_diff"}
         for method in data["shown"]:
