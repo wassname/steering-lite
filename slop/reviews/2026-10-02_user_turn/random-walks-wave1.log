@@ -7,3 +7,109 @@ https://modal.com/apps/wassname/main/ap-zoiEeWa6imN7GLDr3ESnod
 ├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
 ├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
 └── 🔨 Created function run.
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 944.68it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 947.59it/s]
+13:49:05 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:49:06 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 550.51it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   5%|▍         | 20/426 [00:00<00:02, 165.41it/s]
+[1ALoading weights:   9%|▊         | 37/426 [00:00<00:02, 147.55it/s]
+[1ALoading weights:  12%|█▏        | 53/426 [00:00<00:02, 143.31it/s]
+[1ALoading weights:  17%|█▋        | 74/426 [00:00<00:02, 164.37it/s]
+[1ALoading weights:  23%|██▎       | 99/426 [00:00<00:01, 186.15it/s]
+[1ALoading weights:  29%|██▉       | 125/426 [00:00<00:01, 200.99it/s]
+[1ALoading weights:  35%|███▍      | 149/426 [00:00<00:01, 212.62it/s]
+[1ALoading weights:  40%|████      | 171/426 [00:00<00:01, 192.23it/s]
+[1ALoading weights:  45%|████▍     | 191/426 [00:01<00:01, 177.56it/s]
+[1ALoading weights:  50%|████▉     | 212/426 [00:01<00:01, 183.29it/s]
+[1ALoading weights:  54%|█████▍    | 232/426 [00:01<00:01, 177.82it/s]
+[1ALoading weights:  60%|██████    | 257/426 [00:01<00:00, 194.25it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  66%|██████▌   | 281/426 [00:01<00:00, 205.28it/s]
+[1ALoading weights:  72%|███████▏  | 305/426 [00:01<00:00, 200.28it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 608.80it/s]
+
+[1ALoading weights:  77%|███████▋  | 326/426 [00:01<00:00, 202.02it/s]
+[1ALoading weights:  81%|████████▏ | 347/426 [00:01<00:00, 189.84it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  88%|████████▊ | 376/426 [00:01<00:00, 205.55it/s]
+[1ALoading weights:  93%|█████████▎| 398/426 [00:02<00:00, 207.60it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 203.71it/s]
+
+[1ALoading weights:   4%|▍         | 17/426 [00:00<00:02, 154.65it/s]
+[1ALoading weights:   8%|▊         | 33/426 [00:00<00:02, 131.11it/s]
+[1ALoading weights:  12%|█▏        | 50/426 [00:00<00:02, 142.24it/s]
+[1ALoading weights:  16%|█▌        | 67/426 [00:00<00:02, 151.85it/s]
+[1ALoading weights:  20%|█▉        | 85/426 [00:00<00:02, 154.31it/s]
+[1ALoading weights:  25%|██▌       | 107/426 [00:00<00:01, 168.63it/s]
+[1ALoading weights:  29%|██▉       | 125/426 [00:00<00:01, 169.18it/s]
+[1ALoading weights:  35%|███▍      | 149/426 [00:00<00:01, 174.66it/s]
+[1ALoading weights:  39%|███▉      | 167/426 [00:01<00:01, 164.52it/s]
+[1ALoading weights:  44%|████▍     | 187/426 [00:01<00:01, 167.22it/s]
+[1ALoading weights:  49%|████▊     | 207/426 [00:01<00:01, 173.05it/s]
+[1ALoading weights:  53%|█████▎    | 225/426 [00:01<00:01, 168.29it/s]
+[1ALoading weights:  57%|█████▋    | 242/426 [00:01<00:01, 165.57it/s]
+[1ALoading weights:  63%|██████▎   | 268/426 [00:01<00:00, 185.34it/s]
+[1ALoading weights:  67%|██████▋   | 287/426 [00:01<00:00, 156.32it/s]
+[1ALoading weights:  73%|███████▎  | 309/426 [00:01<00:00, 171.95it/s]
+[1ALoading weights:  78%|███████▊  | 332/426 [00:01<00:00, 183.29it/s]
+[1ALoading weights:  82%|████████▏ | 351/426 [00:02<00:00, 179.14it/s]
+[1ALoading weights:  87%|████████▋ | 370/426 [00:02<00:00, 172.96it/s]
+[1ALoading weights:  91%|█████████ | 388/426 [00:02<00:00, 170.81it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 182.87it/s]
+13:49:16 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:49:16 | RUNTIME {'run_id': '9735e1c2a2aa4b5b8b99af24a4a2b328', 'argv': ['scripts/bsbench/walk.py', 'random', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:49:16 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:49:16 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:49:17 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:49:17 | resolved method=random seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:49:17 | Loaded 200 branching suffixes
+13:49:17 | Persona-branching pairs: n=200 from 1 persona pairs
+13:49:17 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/random_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:49:17 | C0=1.9 (kl_rms=1.0 nats) start C=1 stride=2
+13:49:19 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:49:19 | RUNTIME {'run_id': '6e7a5a368047440ab9fd665ce1ccbf5d', 'argv': ['scripts/bsbench/walk.py', 'random', '--seed', '1', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:49:19 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:49:19 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:49:19 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:49:19 | resolved method=random seed=1 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:49:19 | Loaded 200 branching suffixes
+13:49:19 | Persona-branching pairs: n=200 from 1 persona pairs
+13:49:19 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/random_s1.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:49:20 | C0=1.913 (kl_rms=1.0 nats) start C=1 stride=2

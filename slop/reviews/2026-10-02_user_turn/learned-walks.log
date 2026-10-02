@@ -7,3 +7,865 @@ https://modal.com/apps/wassname/main/ap-OhpRccqYy9qBRH26nXtF5h
 ├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
 ├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
 └── 🔨 Created function run.
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 1001.28it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 838.66it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 952.48it/s]
+
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 1000.24it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 959.58it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]Fetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 631.03it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 762.45it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]
+[1AFetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 1030.43it/s]
+13:46:25 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:46:25 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+13:46:25 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:46:26 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+13:46:26 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:46:27 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:46:27 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+13:46:28 | stage=load model=Qwen/Qwen3.5-4B device=cuda dtype=bfloat16 gen_key=7c7712c6 gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 512}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 674.98it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 465.28it/s]
+
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 537.11it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   6%|▌         | 26/426 [00:00<00:01, 239.66it/s]
+[1ALoading weights:   6%|▌         | 24/426 [00:00<00:01, 224.42it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:   4%|▍         | 16/426 [00:00<00:02, 148.09it/s]
+[1ALoading weights:  12%|█▏        | 50/426 [00:00<00:02, 140.08it/s]
+[1ALoading weights:  11%|█         | 47/426 [00:00<00:02, 179.19it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 611.50it/s]
+
+[1ALoading weights:   7%|▋         | 31/426 [00:00<00:03, 99.46it/s] 
+[1ALoading weights:  18%|█▊        | 77/426 [00:00<00:01, 177.10it/s]
+[1ALoading weights:  17%|█▋        | 72/426 [00:00<00:01, 197.75it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  10%|█         | 44/426 [00:00<00:03, 106.54it/s]
+[1ALoading weights:  23%|██▎       | 98/426 [00:00<00:01, 187.17it/s]
+[1ALoading weights:  22%|██▏       | 95/426 [00:00<00:01, 195.57it/s]
+[1ALoading weights:  15%|█▍        | 62/426 [00:00<00:02, 128.32it/s]
+[1ALoading weights:  28%|██▊       | 120/426 [00:00<00:01, 192.70it/s]
+[1ALoading weights:  28%|██▊       | 120/426 [00:00<00:01, 212.62it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  34%|███▎      | 143/426 [00:00<00:01, 198.78it/s]
+[1ALoading weights:  18%|█▊        | 76/426 [00:00<00:03, 113.45it/s]
+[1ALoading weights:  33%|███▎      | 142/426 [00:00<00:01, 189.82it/s]
+[1ALoading weights:   4%|▎         | 15/426 [00:00<00:02, 145.63it/s]
+[1ALoading weights:  22%|██▏       | 94/426 [00:00<00:02, 130.91it/s]
+[1ALoading weights:  38%|███▊      | 164/426 [00:00<00:01, 184.12it/s]
+[1ALoading weights:   8%|▊         | 34/426 [00:00<00:02, 157.82it/s]
+[1ALoading weights:  40%|████      | 171/426 [00:00<00:01, 217.86it/s]
+[1ALoading weights:  14%|█▎        | 58/426 [00:00<00:01, 187.19it/s]
+[1ALoading weights:  45%|████▍     | 190/426 [00:01<00:01, 193.05it/s]
+[1ALoading weights:  26%|██▌       | 111/426 [00:00<00:02, 126.30it/s]
+[1ALoading weights:  46%|████▌     | 194/426 [00:00<00:01, 186.36it/s]
+[1ALoading weights:  19%|█▉        | 83/426 [00:00<00:01, 208.32it/s]
+[1ALoading weights:  31%|███       | 130/426 [00:01<00:02, 138.12it/s]
+[1ALoading weights:  53%|█████▎    | 226/426 [00:01<00:00, 214.89it/s]
+[1ALoading weights:  49%|████▉     | 210/426 [00:01<00:01, 156.04it/s]
+[1ALoading weights:  24%|██▍       | 104/426 [00:00<00:01, 187.98it/s]
+[1ALoading weights:  35%|███▍      | 147/426 [00:01<00:01, 141.12it/s]
+[1ALoading weights:  56%|█████▌    | 238/426 [00:01<00:01, 181.66it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  58%|█████▊    | 249/426 [00:01<00:00, 201.40it/s]
+[1ALoading weights:  29%|██▉       | 124/426 [00:00<00:01, 183.33it/s]
+[1ALoading weights:  61%|██████    | 258/426 [00:01<00:00, 186.08it/s]
+[1ALoading weights:  66%|██████▌   | 281/426 [00:01<00:00, 228.85it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 627.61it/s]
+
+[1ALoading weights:  34%|███▍      | 144/426 [00:00<00:01, 174.84it/s]
+[1ALoading weights:  67%|██████▋   | 284/426 [00:01<00:00, 201.69it/s]
+[1ALoading weights:  38%|███▊      | 162/426 [00:01<00:01, 136.61it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  41%|████      | 175/426 [00:00<00:01, 205.87it/s]
+[1ALoading weights:  72%|███████▏  | 305/426 [00:01<00:00, 201.60it/s]
+[1ALoading weights:  41%|████▏     | 176/426 [00:01<00:01, 133.41it/s]
+[1ALoading weights:  45%|████▌     | 192/426 [00:01<00:01, 126.80it/s]
+[1ALoading weights:  72%|███████▏  | 306/426 [00:01<00:00, 189.83it/s]
+[1ALoading weights:  78%|███████▊  | 331/426 [00:01<00:00, 214.45it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  46%|████▌     | 196/426 [00:01<00:01, 205.78it/s]
+[1ALoading weights:  78%|███████▊  | 333/426 [00:01<00:00, 200.57it/s]
+[1ALoading weights:  50%|████▉     | 212/426 [00:01<00:01, 129.37it/s]
+[1ALoading weights:  83%|████████▎ | 354/426 [00:01<00:00, 217.07it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  51%|█████     | 217/426 [00:01<00:01, 189.31it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1ALoading weights:  54%|█████▎    | 228/426 [00:01<00:01, 136.47it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 565.88it/s]
+
+[1ALoading weights:   5%|▌         | 22/426 [00:00<00:01, 215.43it/s]
+[1ALoading weights:  83%|████████▎ | 354/426 [00:01<00:00, 186.98it/s]
+[1ALoading weights:  88%|████████▊ | 377/426 [00:01<00:00, 201.43it/s]
+[1ALoading weights:  57%|█████▋    | 243/426 [00:01<00:00, 195.44it/s]
+[1ALoading weights:  58%|█████▊    | 246/426 [00:01<00:01, 144.82it/s]
+[1ALoading weights:  89%|████████▉ | 379/426 [00:02<00:00, 198.35it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  10%|█         | 44/426 [00:00<00:02, 166.05it/s]
+[1ALoading weights:  62%|██████▏   | 265/426 [00:01<00:00, 200.13it/s]
+[1ALoading weights:  95%|█████████▍| 404/426 [00:01<00:00, 204.99it/s]
+[1ALoading weights:  61%|██████▏   | 261/426 [00:01<00:01, 138.21it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 212.61it/s]
+
+[1ALoading weights:  16%|█▌        | 67/426 [00:00<00:01, 186.11it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  67%|██████▋   | 286/426 [00:01<00:00, 200.76it/s]
+[1ALoading weights:  94%|█████████▍| 402/426 [00:02<00:00, 170.94it/s]
+[1ALoading weights:  65%|██████▍   | 275/426 [00:02<00:01, 138.29it/s]Loading weights: 100%|██████████| 426/426 [00:02<00:00, 192.72it/s]
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  68%|██████▊   | 290/426 [00:02<00:00, 140.59it/s]
+[1ALoading weights:  72%|███████▏  | 307/426 [00:01<00:00, 196.25it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 654.59it/s]
+
+[1ALoading weights:   2%|▏         | 10/426 [00:00<00:04, 95.41it/s]
+[1ALoading weights:  78%|███████▊  | 331/426 [00:01<00:00, 202.04it/s]
+[1ALoading weights:  72%|███████▏  | 308/426 [00:02<00:00, 138.81it/s]
+[1ALoading weights:  20%|██        | 87/426 [00:00<00:03, 106.96it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  83%|████████▎ | 355/426 [00:01<00:00, 205.86it/s]
+[1ALoading weights:   5%|▌         | 22/426 [00:00<00:04, 96.30it/s]
+[1ALoading weights:  77%|███████▋  | 327/426 [00:02<00:00, 147.93it/s]
+[1ALoading weights:  24%|██▍       | 102/426 [00:00<00:02, 112.52it/s]
+[1ALoading weights:  88%|████████▊ | 376/426 [00:01<00:00, 193.09it/s]
+[1ALoading weights:   8%|▊         | 35/426 [00:00<00:03, 109.59it/s]
+[1ALoading weights:  82%|████████▏ | 348/426 [00:02<00:00, 164.31it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  11%|█▏        | 48/426 [00:00<00:03, 113.79it/s]
+[1ALoading weights:  27%|██▋       | 116/426 [00:00<00:02, 105.83it/s]
+[1ALoading weights:  95%|█████████▌| 406/426 [00:02<00:00, 210.50it/s]
+[1ALoading weights:  86%|████████▌ | 365/426 [00:02<00:00, 156.38it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 201.75it/s]
+
+[1ALoading weights:   4%|▍         | 17/426 [00:00<00:02, 161.67it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 160.06it/s]
+
+[1ALoading weights:  34%|███▍      | 146/426 [00:01<00:01, 149.50it/s]
+[1ALoading weights:  15%|█▍        | 62/426 [00:00<00:03, 109.95it/s]
+[1ALoading weights:   8%|▊         | 34/426 [00:00<00:03, 124.25it/s]
+[1ALoading weights:  19%|█▉        | 81/426 [00:00<00:02, 131.02it/s]
+[1ALoading weights:  38%|███▊      | 164/426 [00:01<00:01, 146.16it/s]
+[1ALoading weights:  12%|█▏        | 49/426 [00:00<00:02, 129.72it/s]
+[1ALoading weights:  22%|██▏       | 95/426 [00:00<00:02, 126.21it/s]
+[1ALoading weights:  42%|████▏     | 181/426 [00:01<00:01, 131.66it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  16%|█▌        | 67/426 [00:00<00:02, 142.22it/s]
+[1ALoading weights:  25%|██▌       | 108/426 [00:00<00:02, 120.72it/s]
+[1ALoading weights:  20%|█▉        | 84/426 [00:00<00:02, 150.61it/s]
+[1ALoading weights:  30%|██▉       | 127/426 [00:01<00:02, 136.85it/s]
+[1ALoading weights:  46%|████▌     | 196/426 [00:01<00:02, 113.08it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1ALoading weights:  24%|██▍       | 104/426 [00:00<00:02, 155.79it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 585.55it/s]
+
+[1ALoading weights:  34%|███▍      | 146/426 [00:01<00:01, 149.23it/s]
+[1ALoading weights:  49%|████▉     | 210/426 [00:01<00:01, 116.35it/s]
+[1ALoading weights:  29%|██▉       | 125/426 [00:00<00:01, 168.77it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  39%|███▊      | 165/426 [00:01<00:01, 158.87it/s]
+[1ALoading weights:  53%|█████▎    | 226/426 [00:01<00:01, 126.43it/s]
+[1ALoading weights:  34%|███▎      | 143/426 [00:00<00:01, 161.45it/s]
+[1ALoading weights:  43%|████▎     | 182/426 [00:01<00:01, 156.77it/s]
+[1ALoading weights:  60%|██████    | 257/426 [00:01<00:00, 170.50it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  39%|███▉      | 166/426 [00:01<00:01, 179.27it/s]
+[1ALoading weights:  48%|████▊     | 203/426 [00:01<00:01, 166.26it/s]
+[1ALoading weights:  65%|██████▌   | 277/426 [00:01<00:00, 170.08it/s]
+[1ALoading weights:   4%|▎         | 15/426 [00:00<00:02, 140.50it/s]
+[1ALoading weights:  71%|███████   | 303/426 [00:02<00:00, 189.48it/s]
+[1ALoading weights:  52%|█████▏    | 220/426 [00:01<00:01, 155.83it/s]
+[1ALoading weights:  43%|████▎     | 185/426 [00:01<00:01, 166.91it/s]
+[1ALoading weights:   7%|▋         | 30/426 [00:00<00:03, 127.66it/s]
+[1ALoading weights:  77%|███████▋  | 328/426 [00:02<00:00, 204.09it/s]
+[1ALoading weights:  58%|█████▊    | 245/426 [00:01<00:01, 177.19it/s]
+[1ALoading weights:  48%|████▊     | 203/426 [00:01<00:01, 161.01it/s]
+[1ALoading weights:  11%|█         | 46/426 [00:00<00:02, 138.34it/s]
+[1ALoading weights:  52%|█████▏    | 222/426 [00:01<00:01, 163.29it/s]
+[1ALoading weights:  82%|████████▏ | 350/426 [00:02<00:00, 199.19it/s]
+[1ALoading weights:  62%|██████▏   | 263/426 [00:01<00:01, 156.57it/s]
+[1ALoading weights:  18%|█▊        | 77/426 [00:00<00:01, 194.41it/s]
+[1ALoading weights:  59%|█████▉    | 252/426 [00:01<00:00, 185.05it/s]
+[1ALoading weights:  87%|████████▋ | 371/426 [00:02<00:00, 186.53it/s]
+[1ALoading weights:  66%|██████▋   | 283/426 [00:01<00:00, 161.94it/s]
+[1ALoading weights:  23%|██▎       | 98/426 [00:00<00:01, 193.42it/s]
+[1ALoading weights:  92%|█████████▏| 392/426 [00:02<00:00, 191.41it/s]
+[1ALoading weights:  64%|██████▎   | 271/426 [00:01<00:00, 173.10it/s]
+[1ALoading weights:  72%|███████▏  | 305/426 [00:02<00:00, 172.72it/s]Loading weights: 100%|██████████| 426/426 [00:02<00:00, 167.40it/s]
+
+[1ALoading weights:  29%|██▊       | 122/426 [00:00<00:01, 203.63it/s]
+[1ALoading weights:  72%|███████▏  | 306/426 [00:01<00:00, 214.47it/s]
+[1ALoading weights:  76%|███████▌  | 323/426 [00:02<00:00, 161.91it/s]
+[1ALoading weights:  34%|███▎      | 143/426 [00:00<00:01, 184.65it/s]13:46:37 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:37 | RUNTIME {'run_id': '4a1e187065dc47808492e06c0864c8a8', 'argv': ['scripts/bsbench/walk.py', 'directional_ablation', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:37 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:37 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+
+[1ALoading weights:  77%|███████▋  | 328/426 [00:01<00:00, 202.50it/s]
+[1ALoading weights:  80%|███████▉  | 340/426 [00:02<00:00, 148.92it/s]
+[1ALoading weights:  38%|███▊      | 162/426 [00:00<00:01, 172.84it/s]13:46:37 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:37 | resolved method=directional_ablation seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:37 | Loaded 200 branching suffixes
+
+[1ALoading weights:  83%|████████▎ | 355/426 [00:02<00:00, 217.67it/s]13:46:37 | Persona-branching pairs: n=200 from 1 persona pairs
+
+[1ALoading weights:  84%|████████▍ | 359/426 [00:02<00:00, 153.43it/s]
+[1ALoading weights:  43%|████▎     | 185/426 [00:01<00:01, 182.58it/s]
+[1ALoading weights:  89%|████████▊ | 378/426 [00:02<00:00, 194.86it/s]
+[1ALoading weights:  48%|████▊     | 204/426 [00:01<00:01, 183.71it/s]
+[1ALoading weights:  90%|█████████ | 384/426 [00:02<00:00, 175.82it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 193.56it/s]13:46:37 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/directional_ablation_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+
+13:46:37 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:37 | RUNTIME {'run_id': '61a1260d59f3487daffa8d0d33865df8', 'argv': ['scripts/bsbench/walk.py', 'linear_act', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+
+[1ALoading weights:  95%|█████████▍| 403/426 [00:02<00:00, 170.79it/s]
+[1ALoading weights:  52%|█████▏    | 223/426 [00:01<00:01, 176.59it/s]13:46:37 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:37 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:37 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:37 | resolved method=linear_act seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:37 | Loaded 200 branching suffixes
+
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 158.95it/s]
+13:46:37 | Persona-branching pairs: n=200 from 1 persona pairs
+
+[1ALoading weights:  58%|█████▊    | 246/426 [00:01<00:00, 186.59it/s]
+[1ALoading weights:  62%|██████▏   | 265/426 [00:01<00:00, 183.52it/s]13:46:38 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/linear_act_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:46:38 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+
+[1ALoading weights:  67%|██████▋   | 287/426 [00:01<00:00, 188.90it/s]13:46:38 | C0=2.401 (kl_rms=1.0 nats) start C=1.26 stride=2
+13:46:38 | RUNTIME {'run_id': '6e7846c1b7a146fda7a61311063140b8', 'argv': ['scripts/bsbench/walk.py', 'cosine_gated', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:38 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:38 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:38 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:38 | resolved method=cosine_gated seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:38 | Loaded 200 branching suffixes
+
+[1ALoading weights:  72%|███████▏  | 306/426 [00:01<00:00, 188.68it/s]13:46:38 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:38 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:38 | RUNTIME {'run_id': '1b238e3a7e5f4c2fa6e58d00b479a95a', 'argv': ['scripts/bsbench/walk.py', 'chars', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:38 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:38 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:38 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:38 | resolved method=chars seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:38 | Loaded 200 branching suffixes
+
+[1ALoading weights:  76%|███████▋  | 325/426 [00:01<00:00, 170.36it/s]13:46:38 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:38 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/cosine_gated_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+
+[1ALoading weights:  81%|████████  | 343/426 [00:01<00:00, 169.96it/s]13:46:38 | C0=0.6254 (kl_rms=1.0 nats) start C=0.315 stride=2
+
+[1ALoading weights:  86%|████████▋ | 368/426 [00:02<00:00, 185.91it/s]13:46:38 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/chars_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+
+[1ALoading weights:  91%|█████████ | 387/426 [00:02<00:00, 176.66it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 191.88it/s]
+13:46:39 | C0=4.978 (kl_rms=1.0 nats) start C=2.52 stride=2
+13:46:39 | C0=0.6849 (kl_rms=1.0 nats) start C=0.315 stride=2
+13:46:39 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:39 | RUNTIME {'run_id': 'f1b2c9022b6e4ef0aa1f7e621afef21d', 'argv': ['scripts/bsbench/walk.py', 'spherical', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:39 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:39 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:39 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:39 | resolved method=spherical seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:39 | Loaded 200 branching suffixes
+13:46:39 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:39 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/spherical_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:46:40 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:40 | RUNTIME {'run_id': 'eb51b289d3754929b336a8d28ebc2095', 'argv': ['scripts/bsbench/walk.py', 'query_steer', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:40 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:40 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:40 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:40 | resolved method=query_steer seed=0 cohort=full n=100 layers=(7, 11, 15, 19, 23) target=None
+13:46:40 | Loaded 200 branching suffixes
+13:46:40 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:40 | C0=0.05929 (kl_rms=1.0 nats) start C=0.03125 stride=2
+13:46:40 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:40 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/query_steer_s0.safetensors settings={'layers': [7, 11, 15, 19, 23], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:46:40 | RUNTIME {'run_id': '246bae5078474b70901076e5dd7eb42a', 'argv': ['scripts/bsbench/walk.py', 'corda_pca', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:40 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:40 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:40 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:40 | resolved method=corda_pca seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:40 | Loaded 200 branching suffixes
+13:46:40 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:41 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/corda_pca_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:46:41 | C0=156.9 (kl_rms=1.0 nats) start C=80.63 stride=2
+13:46:41 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=True
+13:46:41 | RUNTIME {'run_id': '57f3cdce6884424499631f724b9d1dac', 'argv': ['scripts/bsbench/walk.py', 'pca', '--seed', '0', '--cohort', 'full', '--positions', 'user', '--start-below', '2', '--max-rungs', '18'], 'model': 'Qwen/Qwen3.5-4B', 'dtype': 'bfloat16', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': '0.5.2', 'gpu': 'NVIDIA L40S'}
+13:46:41 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:46:41 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/bare/bare.jsonl cached=100 missing=0
+13:46:41 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 46.93} breakdown=[]
+13:46:41 | resolved method=pca seed=0 cohort=full n=100 layers=(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24) target=None
+13:46:41 | Loaded 200 branching suffixes
+13:46:41 | Persona-branching pairs: n=200 from 1 persona pairs
+13:46:42 | cache hit vector /repo/outputs/bsbench/Qwen--Qwen3.5-4B-g7c7712c6/vectors/pca_s0.safetensors settings={'layers': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 'n_pairs': 200, 'max_length': 384, 'target_layer': None, 'thinking': True}
+13:46:42 | C0=0.8674 (kl_rms=1.0 nats) start C=0.3969 stride=2
+13:46:44 | C0=19.9 (kl_rms=1.0 nats) start C=10.08 stride=2
+13:47:38 | USER_POSITIONS_CHECK_PASS C=0.315 empty_mask=bare before_span=unchanged max_logit_delta=16.75 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate indemnity obligations by specific IP asset class and jurisdiction to precisely quantify exposure from your target's concentrated intellectual property. This granular approach allows you to negotiate targeted price adjustments or holdbacks rather than applying a broad, potentially inaccurate aggregate reduction.
+
+=== end ===
+13:47:38 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/+C_C0.3149802625.jsonl cached=0 missing=100
+13:47:39 | USER_POSITIONS_CHECK_PASS C=1.26 empty_mask=bare before_span=unchanged max_logit_delta=16.25 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP assets and their associated revenue streams to accurately reflect the risk profile of your mid-market SaaS target. This granular approach ensures that the indemnity limits are calibrated precisely to the concentration of material intellectual property, protecting against disproportionate liability.
+
+=== end ===
+13:47:39 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/+C_C1.25992105.jsonl cached=0 missing=100
+13:47:40 | USER_POSITIONS_CHECK_PASS C=0.03125 empty_mask=bare before_span=unchanged max_logit_delta=16.75 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, alongside general indemnity categories. This granular approach ensures that the purchase price accurately reflects the risk profile of your material IP concentration before finalizing the agreement.
+
+=== end ===
+13:47:40 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/+C_C0.03125.jsonl cached=0 missing=100
+13:47:43 | USER_POSITIONS_CHECK_PASS C=0.315 empty_mask=bare before_span=unchanged max_logit_delta=17.12 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general indemnity categories to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are calibrated precisely to the unique intellectual property risks of the mid-market SaaS entity.
+
+=== end ===
+13:47:43 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/chars-user_s0/+C_C0.3149802625.jsonl cached=0 missing=100
+13:47:43 | USER_POSITIONS_CHECK_PASS C=80.63 empty_mask=bare before_span=unchanged max_logit_delta=10.38 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate each distinct IP asset and its specific revenue contribution to accurately quantify the risk of losing that core value. This granular approach ensures the indemnity cap reflects the precise financial impact of any potential IP breach or infringement.
+
+=== end ===
+13:47:43 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/+C_C80.63494719.jsonl cached=0 missing=100
+13:47:44 | USER_POSITIONS_CHECK_PASS C=2.52 empty_mask=bare before_span=unchanged max_logit_delta=17 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general indemnity categories to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are calibrated precisely to the unique intellectual property risks inherent in the mid-market SaaS transaction.
+
+=== end ===
+13:47:44 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/+C_C2.5198421.jsonl cached=0 missing=100
+13:47:48 | USER_POSITIONS_CHECK_PASS C=0.3969 empty_mask=bare before_span=unchanged max_logit_delta=16.75 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, alongside general indemnity categories. This granular approach ensures that the risk profile of your material IP concentration is fully understood and accurately priced within the acquisition agreement.
+
+=== end ===
+13:47:48 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/+C_C0.396850263.jsonl cached=0 missing=100
+13:47:54 | USER_POSITIONS_CHECK_PASS C=10.08 empty_mask=bare before_span=unchanged max_logit_delta=6.125 span_tokens=[43, 40, 47] prompt_tokens=[55, 52, 59]
+=== steered span ===
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.
+=== first answer ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general contract indemnities to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are tailored to the unique intellectual property risks inherent in a mid-market SaaS acquisition.
+
+=== end ===
+13:47:54 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/corda_pca-user_s0/+C_C10.0793684.jsonl cached=0 missing=100
+13:47:57 | generation 32/100
+13:47:58 | generation 32/100
+13:47:58 | generation 32/100
+13:48:01 | generation 32/100
+13:48:02 | generation 64/100
+13:48:03 | generation 64/100
+13:48:03 | generation 64/100
+13:48:04 | generation 32/100
+13:48:04 | generation 32/100
+13:48:05 | generation 64/100
+13:48:06 | generation 96/100
+13:48:07 | generation 32/100
+13:48:07 | generation 96/100
+13:48:07 | generation 96/100
+13:48:08 | generation 64/100
+13:48:09 | generation 96/100
+13:48:09 | generation 64/100
+13:48:10 | generation 100/100
+13:48:10 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.315 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06451612903225812, 'mean_words': 48.95} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity exposure by specific IP asset class and jurisdiction to pinpoint the most material risks. This granular approach allows you to negotiate targeted price adjustments or holdbacks rather than applying a broad, inefficient discount.
+=== end ===
+13:48:10 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/-C_C0.3149802625.jsonl cached=0 missing=100
+13:48:11 | generation 64/100
+13:48:12 | generation 100/100
+13:48:12 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=1.26 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.020000000000000018, 'mean_words': 48.34} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to accurately quantify potential indemnity exposure. This granular approach ensures the deal price reflects the true risk profile of the target's concentrated intellectual property.
+=== end ===
+13:48:12 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/-C_C1.25992105.jsonl cached=0 missing=100
+13:48:12 | generation 100/100
+13:48:12 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.03125 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.03389830508474578, 'mean_words': 49.33} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, alongside general indemnity categories. This granular approach ensures that the purchase price accurately reflects the risk profile of your material intellectual property concentration.
+=== end ===
+13:48:12 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/-C_C0.03125.jsonl cached=0 missing=100
+13:48:12 | generation 96/100
+13:48:13 | generation 100/100
+13:48:14 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=80.63 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06153846153846154, 'mean_words': 48.03} breakdown=[]
+=== output 0 ===
+The decomposition should isolate each distinct IP asset and its specific revenue contribution to accurately quantify the risk of losing that core value. This granular approach ensures the indemnity cap reflects the precise financial impact of any potential IP infringement or misappropriation claims.
+=== end ===
+13:48:14 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/-C_C80.63494719.jsonl cached=0 missing=100
+13:48:14 | generation 96/100
+13:48:14 | generation 32/100
+13:48:15 | generation 96/100
+13:48:16 | generation 32/100
+13:48:16 | generation 32/100
+13:48:17 | generation 32/100
+13:48:17 | generation 100/100
+13:48:17 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=2.52 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06666666666666665, 'mean_words': 48.39} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general indemnity categories to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are calibrated precisely to the unique intellectual property risks inherent in the mid-market SaaS transaction.
+=== end ===
+13:48:17 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/-C_C2.5198421.jsonl cached=0 missing=100
+13:48:18 | generation 32/100
+13:48:19 | generation 64/100
+13:48:19 | generation 100/100
+13:48:19 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.315 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06666666666666665, 'mean_words': 48.39} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity obligations by specific IP asset class and jurisdiction to precisely quantify exposure from your target's concentrated intellectual property. This granular approach ensures you can accurately price the risk and structure appropriate holdbacks or escrow arrangements before finalizing the agreement.
+=== end ===
+13:48:19 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/chars-user_s0/-C_C0.3149802625.jsonl cached=0 missing=100
+13:48:20 | generation 100/100
+13:48:20 | generation 64/100
+13:48:20 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.10447761194029848, 'mean_words': 48.12} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity exposure by specific IP asset classes and distinct litigation risks to accurately reflect the target's material IP concentration. This granular approach ensures the agreement captures the full spectrum of potential liabilities, including both known defects and emerging third-party claims.
+=== end ===
+13:48:20 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/-C_C0.396850263.jsonl cached=0 missing=100
+13:48:21 | generation 64/100
+13:48:21 | generation 32/100
+13:48:22 | generation 64/100
+13:48:23 | generation 96/100
+13:48:24 | generation 96/100
+13:48:24 | generation 96/100
+13:48:24 | generation 64/100
+13:48:25 | generation 32/100
+13:48:25 | generation 96/100
+13:48:25 | generation 32/100
+13:48:26 | generation 64/100
+13:48:27 | generation 100/100
+13:48:27 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.315 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06578947368421051, 'mean_words': 46.13} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to precisely quantify the risk of losing that concentration post-acquisition. This level of granularity ensures the indemnity accurately reflects the potential loss of value if the target's core intellectual property is compromised or invalidated.
+=== end ===
+13:48:27 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/+C_C0.396850263.jsonl cached=0 missing=100
+13:48:28 | generation 100/100
+13:48:28 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.03125 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.04878048780487809, 'mean_words': 45.13} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately reflect the risk of losing that concentration. This level of granularity ensures the indemnity cap is calibrated to the actual value of the target's most critical intellectual property.
+=== end ===
+13:48:28 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/+C_C0.03937253281.jsonl cached=0 missing=100
+13:48:28 | generation 100/100
+13:48:28 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=1.26 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.03125, 'mean_words': 42.56} breakdown=[]
+=== output 0 ===
+The decomposition must be granular enough to isolate specific IP assets and their associated revenue streams, as this is the primary driver of the target's valuation. You should break down liabilities by individual technology module or patent family to accurately assess the true cost of indemnifying for IP concentration risks.
+=== end ===
+13:48:28 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/+C_C1.587401052.jsonl cached=0 missing=100
+13:48:28 | generation 100/100
+13:48:28 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=80.63 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.032258064516129004, 'mean_words': 45.69} breakdown=[]
+=== output 0 ===
+The decomposition should isolate each distinct IP asset or technology stream to accurately reflect their individual risk profiles and valuation impacts. This level of granularity ensures that the indemnity limits are calibrated specifically to the material concentration of intellectual property in the mid-market SaaS target.
+=== end ===
+13:48:28 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/+C_C101.5936673.jsonl cached=0 missing=100
+13:48:29 | generation 64/100
+13:48:30 | generation 64/100
+13:48:30 | generation 96/100
+13:48:32 | generation 32/100
+13:48:32 | generation 96/100
+13:48:33 | generation 32/100
+13:48:33 | generation 32/100
+13:48:33 | generation 96/100
+13:48:33 | generation 32/100
+13:48:34 | generation 100/100
+13:48:34 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=2.52 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08196721311475408, 'mean_words': 47.55} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity liabilities by specific IP asset class and jurisdiction to accurately reflect the target's material concentration risks. This granular approach ensures the purchase price allocation and escrow holdbacks are calibrated precisely to the unique exposure profile of the SaaS business.
+=== end ===
+13:48:34 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/+C_C3.174802104.jsonl cached=0 missing=100
+13:48:35 | generation 96/100
+13:48:36 | generation 64/100
+13:48:37 | generation 100/100
+13:48:37 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.04109589041095896, 'mean_words': 46.97} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately quantify the risk of losing that concentration post-acquisition. This level of granularity ensures the indemnity reflects the true economic impact of any breach regarding those critical intellectual property holdings.
+=== end ===
+13:48:37 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/+C_C0.5.jsonl cached=0 missing=100
+13:48:37 | generation 64/100
+13:48:37 | generation 64/100
+13:48:38 | generation 64/100
+13:48:39 | generation 100/100
+13:48:39 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=10.08 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07042253521126762, 'mean_words': 47.68} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general contract indemnities to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are tailored to the unique intellectual property risks inherent in a mid-market SaaS acquisition.
+=== end ===
+13:48:39 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/corda_pca-user_s0/-C_C10.0793684.jsonl cached=0 missing=100
+13:48:39 | generation 100/100
+13:48:39 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.315 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06578947368421051, 'mean_words': 46.14} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to pinpoint the exact risk exposure of each concentration. This level of granularity ensures the indemnity accurately reflects the potential loss from a single point of failure rather than applying a blanket percentage.
+=== end ===
+13:48:39 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/chars-user_s0/+C_C0.396850263.jsonl cached=0 missing=100
+13:48:40 | generation 32/100
+13:48:41 | generation 96/100
+13:48:41 | generation 96/100
+13:48:41 | generation 96/100
+13:48:42 | generation 32/100
+13:48:43 | generation 96/100
+13:48:44 | generation 64/100
+13:48:45 | generation 100/100
+13:48:45 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=101.6 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06557377049180324, 'mean_words': 48.63} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to quantify the exact risk exposure for each technology component. This granular approach ensures that the indemnity limits are calibrated precisely to the material concentration of your intellectual property, preventing over- or under-compensation for the most critical risks.
+=== end ===
+13:48:45 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/-C_C101.5936673.jsonl cached=0 missing=100
+13:48:45 | generation 100/100
+13:48:45 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.03937 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.023255813953488413, 'mean_words': 49.91} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, to accurately reflect the target's concentrated risk profile. Additionally, it must distinguish between indemnities tied to the core IP assets versus those covering general contractual breaches or data privacy violations to ensure a precise valuation adjustment.
+=== end ===
+13:48:45 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/-C_C0.03937253281.jsonl cached=0 missing=100
+13:48:45 | generation 100/100
+13:48:45 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0625, 'mean_words': 49.23} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity obligations by specific IP asset class and jurisdiction to precisely quantify exposure from your target's concentrated intellectual property. This granular approach ensures you can accurately price the risk and structure appropriate holdbacks or escrow arrangements before finalizing the agreement.
+=== end ===
+13:48:45 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/-C_C0.396850263.jsonl cached=0 missing=100
+13:48:46 | generation 100/100
+13:48:46 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=1.587 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.04081632653061229, 'mean_words': 48.03} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific high-value IP assets and their associated liabilities to accurately reflect the concentration risk. This granular approach ensures the indemnity cap is calibrated precisely to the target's unique intellectual property profile.
+=== end ===
+13:48:46 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/-C_C1.587401052.jsonl cached=0 missing=100
+13:48:47 | generation 32/100
+13:48:47 | generation 32/100
+13:48:48 | generation 64/100
+13:48:49 | generation 96/100
+13:48:49 | generation 32/100
+13:48:49 | generation 32/100
+13:48:50 | generation 32/100
+13:48:50 | generation 32/100
+13:48:52 | generation 96/100
+13:48:52 | generation 64/100
+13:48:52 | generation 64/100
+13:48:53 | generation 100/100
+13:48:53 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=3.175 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06666666666666665, 'mean_words': 48.78} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general indemnity categories to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are calibrated precisely to the unique intellectual property risks of the mid-market SaaS entity.
+=== end ===
+13:48:53 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/-C_C3.174802104.jsonl cached=0 missing=100
+13:48:53 | generation 64/100
+13:48:54 | generation 64/100
+13:48:54 | generation 64/100
+13:48:55 | generation 64/100
+13:48:56 | generation 100/100
+13:48:56 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.5 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07792207792207795, 'mean_words': 49.71} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, alongside general indemnity categories. This granular approach ensures that the risk profile of the material IP concentration is fully understood and accurately priced within the acquisition agreement.
+=== end ===
+13:48:56 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/-C_C0.5.jsonl cached=0 missing=100
+13:48:56 | generation 96/100
+13:48:57 | generation 96/100
+13:48:57 | generation 32/100
+13:48:58 | generation 96/100
+13:48:58 | generation 96/100
+13:48:59 | generation 96/100
+13:48:59 | generation 100/100
+13:48:59 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=101.6 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.1515151515151515, 'mean_words': 44.14} breakdown=[]
+=== output 0 ===
+The decomposition should isolate each distinct IP asset or technology stream to precisely quantify the specific indemnity exposure for every major concentration area. This level of granularity ensures that the acquisition agreement accurately reflects the risk profile of the material IP while preventing over- or under-compensation for non-critical components.
+=== end ===
+13:48:59 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/+C_C128.jsonl cached=0 missing=100
+13:49:00 | generation 32/100
+13:49:01 | generation 100/100
+13:49:01 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=1.587 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07499999999999996, 'mean_words': 41.19} breakdown=[]
+=== output 0 ===
+The decomposition should be granular enough to isolate specific IP assets and their associated risks, as your material IP concentration makes generic liability caps ineffective. You must break down indemnities by technology stack, data category, and third-party dependency to accurately price the true risk exposure of a SaaS target.
+=== end ===
+13:49:01 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/+C_C2.jsonl cached=0 missing=100
+13:49:01 | generation 100/100
+13:49:01 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0625, 'mean_words': 48.65} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general indemnity categories to accurately reflect the target's material IP concentration. This granular approach ensures the purchase price allocation and risk reserves are calibrated precisely to the unique intellectual property risks of the mid-market SaaS entity.
+=== end ===
+13:49:01 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/chars-user_s0/-C_C0.396850263.jsonl cached=0 missing=100
+13:49:02 | generation 64/100
+13:49:02 | generation 96/100
+13:49:02 | generation 100/100
+13:49:02 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.05154639175257736, 'mean_words': 46.8} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately quantify the risk of material loss. This granular approach ensures the indemnity cap reflects the precise value of the concentrated intellectual property rather than applying a generic, potentially insufficient, overall limit.
+=== end ===
+13:49:02 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/+C_C0.5.jsonl cached=0 missing=100
+13:49:02 | generation 100/100
+13:49:02 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.03937 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.04255319148936165, 'mean_words': 44.63} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately reflect the risk of losing that concentration. This level of granularity ensures the indemnity cap is calibrated to the actual value of the target's most critical intellectual property.
+=== end ===
+13:49:02 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/+C_C0.04960628287.jsonl cached=0 missing=100
+13:49:04 | generation 32/100
+13:49:05 | generation 64/100
+13:49:06 | generation 32/100
+13:49:07 | generation 32/100
+13:49:07 | generation 32/100
+13:49:08 | generation 96/100
+13:49:08 | generation 64/100
+13:49:08 | generation 100/100
+13:49:08 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=10.08 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.052631578947368474, 'mean_words': 46.07} breakdown=[]
+=== output 0 ===
+The decomposition should isolate each distinct IP asset and its specific revenue streams to accurately reflect the target's material concentration risks. This granular approach ensures the indemnity limits are calibrated precisely to the value of the most critical intellectual property.
+=== end ===
+13:49:08 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/corda_pca-user_s0/+C_C12.69920842.jsonl cached=0 missing=100
+13:49:09 | generation 32/100
+13:49:09 | generation 96/100
+13:49:11 | generation 64/100
+13:49:11 | generation 100/100
+13:49:11 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=3.175 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07058823529411762, 'mean_words': 46.95} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to precisely quantify the risk of losing that concentration post-acquisition. This granular approach ensures the indemnity accurately reflects the potential loss of value if the target's core intellectual property is compromised or invalidated.
+=== end ===
+13:49:11 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/+C_C4.jsonl cached=0 missing=100
+13:49:11 | generation 64/100
+13:49:11 | generation 64/100
+13:49:12 | generation 96/100
+13:49:13 | generation 100/100
+13:49:13 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.5 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.04477611940298509, 'mean_words': 46.97} breakdown=[]
+=== output 0 ===
+The decomposition must isolate each distinct IP asset and its specific revenue contribution to accurately quantify the indemnity exposure. This level of granularity ensures the buyer can negotiate precise price adjustments or holdbacks rather than relying on broad, inaccurate estimates.
+=== end ===
+13:49:13 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/+C_C0.6299605249.jsonl cached=0 missing=100
+13:49:14 | generation 64/100
+13:49:15 | generation 96/100
+13:49:15 | generation 96/100
+13:49:16 | generation 100/100
+13:49:16 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=128 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.125, 'mean_words': 48.0} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to quantify the exact value of your material concentration risk. This granular approach allows you to negotiate targeted indemnity caps that directly reflect the potential loss from IP-specific breaches rather than applying a broad, one-size-fits-all formula.
+=== end ===
+13:49:16 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/-C_C128.jsonl cached=0 missing=100
+13:49:16 | generation 32/100
+13:49:17 | generation 96/100
+13:49:17 | generation 32/100
+13:49:18 | generation 96/100
+13:49:18 | generation 100/100
+13:49:18 | generation 32/100
+13:49:18 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=2 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06451612903225812, 'mean_words': 47.69} breakdown=[]
+=== output 0 ===
+The decomposition should isolate the specific value of the material IP from other assets to accurately reflect the target's true economic worth. This granular approach ensures the indemnity structure adequately protects against the unique risks associated with that concentrated intellectual property.
+=== end ===
+13:49:18 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/-C_C2.jsonl cached=0 missing=100
+13:49:19 | generation 100/100
+13:49:19 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.04961 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06382978723404253, 'mean_words': 48.92} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP assets and their associated revenue streams to precisely quantify exposure for each major technology component. This granular approach ensures that the indemnity limits are calibrated to the actual risk profile of the concentrated intellectual property rather than applying a broad, generic cap.
+=== end ===
+13:49:19 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/-C_C0.04960628287.jsonl cached=0 missing=100
+13:49:19 | generation 32/100
+13:49:21 | generation 100/100
+13:49:21 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.3969 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.08333333333333337, 'mean_words': 46.08} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately quantify the risk of losing that concentration post-acquisition. This granular approach ensures the indemnity reflects the precise financial impact of each distinct technology cluster rather than applying a broad, generic liability cap.
+=== end ===
+13:49:21 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/chars-user_s0/+C_C0.5.jsonl cached=0 missing=100
+13:49:22 | generation 64/100
+13:49:22 | generation 100/100
+13:49:22 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.5 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.052631578947368474, 'mean_words': 49.81} breakdown=[]
+=== output 0 ===
+The decomposition should isolate indemnity exposure by specific IP asset class and geographic region to pinpoint the concentration risks accurately. This granular approach ensures the agreement allocates liability appropriately between the seller and buyer based on the distinct nature of the material intellectual property.
+=== end ===
+13:49:22 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/-C_C0.5.jsonl cached=0 missing=100
+13:49:22 | generation 64/100
+13:49:23 | generation 32/100
+13:49:23 | generation 32/100
+13:49:24 | generation 64/100
+13:49:24 | generation 64/100
+13:49:26 | generation 32/100
+13:49:26 | generation 96/100
+13:49:27 | generation 96/100
+13:49:27 | generation 96/100
+13:49:27 | generation 64/100
+13:49:29 | generation 32/100
+13:49:29 | generation 64/100
+13:49:30 | generation 100/100
+13:49:30 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=4 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.06666666666666665, 'mean_words': 49.54} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and open-source compliance) alongside general indemnity categories to reflect the target's material IP concentration. This granular approach ensures the purchase price accurately reflects the risk profile of the intellectual property assets, preventing overpayment for assets with high litigation exposure.
+=== end ===
+13:49:30 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/cosine_gated-user_s0/-C_C4.jsonl cached=0 missing=100
+13:49:30 | generation 64/100
+13:49:31 | generation 96/100
+13:49:31 | generation 100/100
+13:49:31 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=128 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07352941176470584, 'mean_words': 45.7} breakdown=[]
+=== output 0 ===
+The decomposition should isolate each distinct IP asset or technology stream to precisely quantify the specific indemnity exposure for every material concentration. This granular approach ensures the acquisition agreement accurately reflects the risk profile of the target's core intellectual property while avoiding over- or under-compensation.
+=== end ===
+13:49:31 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/query_steer-user_s0/+C_C161.2698944.jsonl cached=0 missing=100
+13:49:31 | generation 100/100
+13:49:31 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.63 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07272727272727275, 'mean_words': 49.05} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities, such as patent infringement, copyright, and trade secret misappropriation, alongside general indemnity categories. This granular approach ensures that the risk profile of the material IP concentration is fully understood and accurately priced within the acquisition agreement.
+=== end ===
+13:49:31 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/pca-user_s0/-C_C0.6299605249.jsonl cached=0 missing=100
+13:49:32 | generation 96/100
+13:49:34 | generation 96/100
+13:49:34 | generation 64/100
+13:49:34 | generation 96/100
+13:49:35 | generation 32/100
+13:49:35 | generation 32/100
+13:49:35 | generation 32/100
+13:49:36 | generation 100/100
+13:49:36 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.04961 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.025316455696202556, 'mean_words': 43.74} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately reflect the risk transfer for each distinct technology component. This granular approach ensures the indemnity caps align precisely with the target's material IP concentration rather than applying a blunt, aggregate financial figure.
+=== end ===
+13:49:36 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/spherical-user_s0/+C_C0.0625.jsonl cached=0 missing=100
+13:49:36 | generation 100/100
+13:49:36 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=12.7 side=+C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.046511627906976716, 'mean_words': 47.83} breakdown=[]
+=== output 0 ===
+The decomposition should isolate specific IP-related liabilities (such as patent infringement, trade secret misappropriation, and copyright claims) alongside general contract indemnities to accurately reflect the target's material IP concentration. This granular approach allows you to negotiate targeted price adjustments or holdbacks specifically for IP risks, rather than applying a broad, undifferentiated indemnity cap.
+=== end ===
+13:49:36 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/corda_pca-user_s0/-C_C12.69920842.jsonl cached=0 missing=100
+13:49:37 | generation 100/100
+13:49:37 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=0.5 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0461538461538461, 'mean_words': 46.08} breakdown=[]
+=== output 0 ===
+The decomposition must isolate specific IP assets and their associated revenue streams to accurately quantify the risk of material loss. This granular approach ensures the indemnity cap reflects the precise value of the concentrated intellectual property rather than applying a generic, potentially insufficient, overall limit.
+=== end ===
+13:49:37 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/linear_act-user_s0/+C_C0.6299605249.jsonl cached=0 missing=100
+13:49:38 | generation 100/100
+13:49:38 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. C=2 side=-C kl_rms=None stats={'answers': 100, 'unfinished': 0, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.07499999999999996, 'mean_words': 39.68} breakdown=[]
+=== output 0 ===
+Decompose the indemnity by specific IP asset class (e.g., patents, trade secrets, source code) and the corresponding jurisdiction of infringement. Then, allocate the total exposure to each asset based on its projected revenue contribution and the target's historical litigation frequency.
+=== end ===
+13:49:38 | answers Qwen--Qwen3.5-4B-g7c7712c6/answers/directional_ablation-user_s0/+C_C2.5198421.jsonl cached=0 missing=100
+13:49:39 | generation 64/100
+13:49:39 | generation 96/100
+13:49:39 | generation 64/100
+13:49:40 | generation 64/100
+13:49:41 | generation 32/100
+13:49:43 | generation 96/100

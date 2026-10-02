@@ -548,16 +548,21 @@ def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
     for side, instruction in instructions.items():
         prompts = generation_inputs(tokenizer, rows, instruction)
         historical = cached_answers(model, tokenizer, rows, answer_path(args.model, baseline, args.seed, side, 1.0), prompts, args.batch_size, _Null)
+        # identity on identical batches in one process: batch composition alone changes bf16 greedy answers
+        # (full cohort 2026-10-02: the cache's 80 missing questions batched differently gave 44/100 mismatches)
         expected = generate(model, tokenizer, prompts, args.batch_size)
+        fresh_scaled = generate(model, tokenizer, prompts, args.batch_size, (instruction, 1.0))
         observed = cached_answers(model, tokenizer, rows, answer_path(args.model, args.name, args.seed, side, 1.0), prompts, args.batch_size, _Null, (instruction, 1.0))
         diagnostic = root / "prompt_checks" / f"{args.name}_s{args.seed}_{args.cohort}_{side}.json"
         diagnostic.parent.mkdir(parents=True, exist_ok=True)
         diagnostic.write_text(json.dumps([
-            {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new, "scaled_C1": scaled}
-            for row, prompt, old, new, scaled in zip(rows, prompts, historical, expected, observed, strict=True)
+            {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new, "fresh_scaled_C1": same, "scaled_C1": scaled}
+            for row, prompt, old, new, same, scaled in zip(rows, prompts, historical, expected, fresh_scaled, observed, strict=True)
         ], indent=2) + "\n")
-        assert observed == expected, f"{side}: gain-one answers differ from fresh ordinary prompting; see {diagnostic}"
-        identity[side] = {"answers": len(rows), "exact": True, "historical_mismatches": sum(a != b for a, b in zip(historical, observed, strict=True)),
+        assert fresh_scaled == expected, f"{side}: gain-one answers differ from ordinary prompting on identical batches; see {diagnostic}"
+        identity[side] = {"answers": len(rows), "exact": True, "batches": "identical, one process",
+                          "historical_mismatches": sum(a != b for a, b in zip(historical, observed, strict=True)),
+                          "cached_C1_mismatches": sum(a != b for a, b in zip(expected, observed, strict=True)),
                           "diagnostic": str(diagnostic.relative_to(root))}
         logger.info("PROMPT_C1_IDENTITY_PASS side={} check={}", side, identity[side])
     timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
