@@ -1,0 +1,9 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-zoiEeWa6imN7GLDr3ESnod
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/run_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/data
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
+└── 🔨 Created function run.

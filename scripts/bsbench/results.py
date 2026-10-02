@@ -24,7 +24,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import MAX_DAMAGE, MODEL, PREMISE, aware_request, blind_request, cached, key
+from judge import MAX_DAMAGE, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, key
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
@@ -88,6 +88,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                         "bare_premise": b["premise"]["score"],
                         "evidence": f"premise level {b['premise']['score']:.2f} -> {st['premise']['score']:.2f}, damage {b['damage']['score']:.2f} -> {st['damage']['score']:.2f}",
                         "blind": have.get(key(blind_request(row["prompt"], row["bare"], row["steered"]))),
+                        "audit": have.get(key(audit_request(row["prompt"], row["flaw"], row["steered"]))),
                         "text": row["steered"],
                     })
                 health = rungs[C][side]
@@ -238,15 +239,16 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
     return sorted(rows, key=lambda row: (math.isnan(row["score"]), -row["score"] if not math.isnan(row["score"]) else 0))
 
 
-def blind_targets(model_dir: Path, cohort: str) -> dict[str, dict]:
-    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose, in each report view."""
+def blind_targets(model_dir: Path, cohort: str, make=None) -> dict[str, dict]:
+    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose, in each report view.
+    make(prompt, flaw, steered): another request type (judge.audit_request) at the same answers."""
     out = {}
     for view in ("benchmark", "user"):
-        out |= _blind_targets(model_dir, cohort, view)
+        out |= _blind_targets(model_dir, cohort, view, make)
     return out
 
 
-def _blind_targets(model_dir: Path, cohort: str, view: str) -> dict[str, dict]:
+def _blind_targets(model_dir: Path, cohort: str, view: str, make) -> dict[str, dict]:
     points = build_points(model_dir, cohort, set(), view)
     if not points:
         return {}
@@ -257,7 +259,7 @@ def _blind_targets(model_dir: Path, cohort: str, view: str) -> dict[str, dict]:
             for point in (best[side], strongest[side]):
                 for q in (point or {}).get("questions", []):
                     row = rows[method, q["seed"], point["C"], side, q["scenario"]]
-                    request = blind_request(row["prompt"], row["bare"], row["steered"])
+                    request = blind_request(row["prompt"], row["bare"], row["steered"]) if make is None else make(row["prompt"], row["flaw"], row["steered"])
                     out[key(request)] = request
     return out
 
@@ -581,6 +583,23 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def audit_table(rows: list[dict]) -> str:
+    """Jev yes/no audit (judge.audit_request) at each Pareto-best dose: is a premise 'win' on target, and does it invent facts? PI/OpenAI."""
+    def cell(point):
+        audits = [q["audit"] for q in (point or {}).get("questions", []) if q["audit"]]
+        if not audits:
+            return "— | — | 0"
+        yes = lambda name: mean(a[name]["probabilities"]["yes"] for a in audits)
+        return f"{yes('on_target'):.2f} | {yes('fabricates'):.2f} | {len(audits)}"
+    lines = ["| method | side | C | P(on target)↑ | P(fabricates)↓ | n |", "|---|---|---|---|---|---|"]
+    for row in rows:
+        for side in ("-C", "+C"):
+            point = row["best"][side]
+            dose = "—" if point is None else f"{point['C']:.3g}"
+            lines.append(f"| {row['method']} | {side} | {dose} | {cell(point)} |")
+    return "\n".join(lines)
+
+
 def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
@@ -695,6 +714,10 @@ def main() -> None:
         "stance(steered) - stance(bare), stance = P(accepts) - P(rejects), signed so + is toward the side's target "
         "(+C accept the premise, -C reject it). Intended label: accepts_premise for +C, rejects_premise for −C; P(intended label) is its mean probability over the answers at that dose.\n\n"
     ) + blind_table(rows)
+    if any(q["audit"] for p in points for q in p["questions"]):
+        table += ("\n\nJev audit at the Pareto-best dose (separate yes/no request, judge.audit_request): P(on target) = the answer responds to the "
+                  "request asked, not a different one; P(fabricates) = it invents specifics about the flawed element, whether it accepts or rejects the premise. "
+                  "Mean probability over the answers.\n\n") + audit_table(rows)
     intro = (
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
