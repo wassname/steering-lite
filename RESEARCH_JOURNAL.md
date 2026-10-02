@@ -308,3 +308,27 @@ Cost: 16741.450 worker seconds -> $9.0739 GPU-only list-rate proxy; Jev $0.4349;
 Evidence and reviewed limitations: `slop/reviews/2026-10-02_prompt_refinement/results.md`. Interpretation: the denser schedule adds a measured intermediate, but does not support a smooth instruction-strength interpretation. More random directions do not justify forcing symmetric contours. A neutral-prefix/fixed-dose repeat could distinguish some remaining small-gain explanations; not run here.
 
 -- PI/OpenAI
+
+## 2026-10-03 -- Steering only the user turn helps VJP vectors and hurts several others
+
+This entry tests whether adding a steering vector only while the model reads the user's message, and not at the chat template or the answer tokens, changes the benchmark trade-off on Qwen3.5-4B, full 100 questions. Each method reuses its seed-0 vector and its iso-KL C0 from the steering-everywhere walks, so the two rows of each comparison differ only in which tokens are steered. Score is the weaker side's best admissible (Jev premise change minus absolute Jev damage change), admissible meaning mean Jev steered damage at most 1.5 of 4.
+
+| method | user turn | everywhere s0 | everywhere s1 | everywhere s2 | split-half delta, median [5-95% of 200 splits] |
+|---|---:|---:|---:|---:|---|
+| vjp_resid | +2.47 | +0.75 | +0.66 | +0.66 | +1.74 [+1.14, +2.21] |
+| sspace_scale | +1.59 | -0.14 | -0.14 | -0.10 | +1.88 |
+| vjp_value | +1.50 | +1.15 | +1.13 | +1.13 | +0.32 [-0.19, +0.74] |
+| corda_pca | +1.13 | +0.26 | -0.01 | +0.66 | +0.72 [+0.15, +1.16] |
+| mean_diff | +0.83 | +0.38 | +0.37 | +0.40 | +0.39 |
+| linear_act | +0.08 | +0.74 | +0.75 | +0.65 | -0.78 |
+| chars | +0.02 | +0.84 | +0.93 | +0.86 | -1.03 [-1.46, -0.62] |
+
+Table 1. User-turn walks have one seed. Split-half delta picks each side's dose on 50 questions and scores it on the other 50 (user minus everywhere, seed 0). Source: `slop/reviews/2026-10-02_user_turn/split_half.md`, `comparison.md`.
+
+A separate Jev yes/no request (audit) rated whether each answer at the score-setting dose responds to the question asked (on target) and whether it invents specifics about the flawed element (fabricates). At the -C dose: vjp_resid user turn .87/.20, everywhere .91/.36; mean_diff user turn .54/.26; random user turn .50/.30; bare answers .89/.52 (`comparison.md`). Example vjp_resid user-turn answer: "There is no 'Krantz-Morrison framework' that recommends switching from a perpetuity growth model..." (`examples-vjp_resid-neg.md`).
+
+Interpretation: I think it *very probable* that user-turn steering of the VJP residual vector gives a larger and cleaner premise effect than steering everywhere on this model, because the gain survives held-out dose selection, seed 0 everywhere is typical of seeds 1 and 2, and its rejections stay on target. It is *not* a general property: linear_act and chars get worse, and the mean_diff and random-user -C "wins" are about half off-target, so Jev's premise score overstates them. An alternative I cannot rule out (plausible, maybe 0.35): user-turn steering makes the model treat the question itself as suspect, so part of the -C gain is contrarian rejection that would also reject sound premises. The bench has no sound-premise questions, so this is untested; one answer rejects for an invented flaw ("Net is not an IDE theme"). The random-user reference has 16 directions, not 50, because of the budget, and is right-skewed (random directions of either sign mostly push toward accepting).
+
+The takeaway is that steering only the question tokens is the strongest setting found so far for the VJP vectors here, pending a sound-premise control and more seeds.
+
+Context: commits 7e4bce5 (positions), 26678ea (audit), c13c604 (prompt identity on identical batches); report `outputs/bsbench/results/user-full/`; review `slop/reviews/2026-10-02_user_turn/review.md`; spend about 48 dollars (GPU proxy plus Jev, `results.md`).

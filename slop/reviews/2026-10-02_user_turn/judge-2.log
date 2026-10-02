@@ -1,0 +1,181 @@
+2026-10-03 00:22:59.685 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 00:22:59.710 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 00:22:59.836 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 00:23:00.168 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 00:23:00.252 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 00:23:00.264 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 00:23:00.272 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 00:23:00.273 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 00:23:00.275 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 00:23:00.275 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 00:25:18.670 | INFO     | data:manifest:81 - manifest walks=109 rows=328600
+2026-10-03 00:25:45.117 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK aware required=247971 cached=218832 missing=29139
+2026-10-03 00:25:53.709 | INFO     | __main__:_refresh:188 - jev progress=400/29139 cost=$0.0172
+2026-10-03 00:26:00.628 | INFO     | __main__:_refresh:188 - jev progress=800/29139 cost=$0.0344
+2026-10-03 00:26:07.296 | INFO     | __main__:_refresh:188 - jev progress=1200/29139 cost=$0.0519
+2026-10-03 00:26:13.573 | INFO     | __main__:_refresh:188 - jev progress=1600/29139 cost=$0.0705
+2026-10-03 00:26:19.835 | INFO     | __main__:_refresh:188 - jev progress=2000/29139 cost=$0.0896
+2026-10-03 00:26:26.159 | INFO     | __main__:_refresh:188 - jev progress=2400/29139 cost=$0.1086
+2026-10-03 00:26:32.358 | INFO     | __main__:_refresh:188 - jev progress=2800/29139 cost=$0.1276
+2026-10-03 00:26:38.632 | INFO     | __main__:_refresh:188 - jev progress=3200/29139 cost=$0.1458
+2026-10-03 00:26:44.890 | INFO     | __main__:_refresh:188 - jev progress=3600/29139 cost=$0.1634
+2026-10-03 00:26:51.044 | INFO     | __main__:_refresh:188 - jev progress=4000/29139 cost=$0.1806
+2026-10-03 00:26:57.018 | INFO     | __main__:_refresh:188 - jev progress=4400/29139 cost=$0.1978
+2026-10-03 00:27:03.852 | INFO     | __main__:_refresh:188 - jev progress=4800/29139 cost=$0.2159
+2026-10-03 00:27:10.760 | INFO     | __main__:_refresh:188 - jev progress=5200/29139 cost=$0.2356
+2026-10-03 00:27:16.849 | INFO     | __main__:_refresh:188 - jev progress=5600/29139 cost=$0.2563
+2026-10-03 00:27:23.150 | INFO     | __main__:_refresh:188 - jev progress=6000/29139 cost=$0.2763
+2026-10-03 00:27:29.405 | INFO     | __main__:_refresh:188 - jev progress=6400/29139 cost=$0.2952
+2026-10-03 00:27:35.494 | INFO     | __main__:_refresh:188 - jev progress=6800/29139 cost=$0.3132
+2026-10-03 00:27:41.652 | INFO     | __main__:_refresh:188 - jev progress=7200/29139 cost=$0.3304
+2026-10-03 00:27:47.820 | INFO     | __main__:_refresh:188 - jev progress=7600/29139 cost=$0.3476
+2026-10-03 00:27:53.712 | INFO     | __main__:_refresh:188 - jev progress=8000/29139 cost=$0.3651
+2026-10-03 00:27:59.665 | INFO     | __main__:_refresh:188 - jev progress=8400/29139 cost=$0.3849
+2026-10-03 00:28:05.658 | INFO     | __main__:_refresh:188 - jev progress=8800/29139 cost=$0.4050
+2026-10-03 00:28:11.639 | INFO     | __main__:_refresh:188 - jev progress=9200/29139 cost=$0.4246
+2026-10-03 00:28:17.588 | INFO     | __main__:_refresh:188 - jev progress=9600/29139 cost=$0.4432
+2026-10-03 00:28:23.655 | INFO     | __main__:_refresh:188 - jev progress=10000/29139 cost=$0.4612
+2026-10-03 00:28:29.698 | INFO     | __main__:_refresh:188 - jev progress=10400/29139 cost=$0.4785
+2026-10-03 00:28:35.605 | INFO     | __main__:_refresh:188 - jev progress=10800/29139 cost=$0.4957
+2026-10-03 00:28:41.607 | INFO     | __main__:_refresh:188 - jev progress=11200/29139 cost=$0.5132
+2026-10-03 00:28:47.726 | INFO     | __main__:_refresh:188 - jev progress=11600/29139 cost=$0.5324
+2026-10-03 00:28:53.913 | INFO     | __main__:_refresh:188 - jev progress=12000/29139 cost=$0.5522
+2026-10-03 00:28:59.916 | INFO     | __main__:_refresh:188 - jev progress=12400/29139 cost=$0.5720
+2026-10-03 00:29:05.948 | INFO     | __main__:_refresh:188 - jev progress=12800/29139 cost=$0.5908
+2026-10-03 00:29:11.937 | INFO     | __main__:_refresh:188 - jev progress=13200/29139 cost=$0.6088
+2026-10-03 00:29:18.042 | INFO     | __main__:_refresh:188 - jev progress=13600/29139 cost=$0.6260
+2026-10-03 00:29:24.103 | INFO     | __main__:_refresh:188 - jev progress=14000/29139 cost=$0.6432
+2026-10-03 00:29:30.106 | INFO     | __main__:_refresh:188 - jev progress=14400/29139 cost=$0.6610
+2026-10-03 00:29:36.144 | INFO     | __main__:_refresh:188 - jev progress=14800/29139 cost=$0.6808
+2026-10-03 00:29:42.214 | INFO     | __main__:_refresh:188 - jev progress=15200/29139 cost=$0.7018
+2026-10-03 00:29:47.647 | WARNING  | __main__:run:172 - jev 429 attempt=1/6
+2026-10-03 00:29:47.905 | WARNING  | __main__:run:172 - jev 429 attempt=1/6
+2026-10-03 00:29:47.975 | WARNING  | __main__:run:172 - jev 429 attempt=1/6
+2026-10-03 00:29:53.262 | INFO     | __main__:_refresh:188 - jev progress=15600/29139 cost=$0.7219
+2026-10-03 00:29:59.741 | INFO     | __main__:_refresh:188 - jev progress=16000/29139 cost=$0.7407
+2026-10-03 00:30:05.654 | INFO     | __main__:_refresh:188 - jev progress=16400/29139 cost=$0.7587
+2026-10-03 00:30:11.710 | INFO     | __main__:_refresh:188 - jev progress=16800/29139 cost=$0.7760
+2026-10-03 00:30:18.186 | INFO     | __main__:_refresh:188 - jev progress=17200/29139 cost=$0.7932
+2026-10-03 00:30:24.574 | INFO     | __main__:_refresh:188 - jev progress=17600/29139 cost=$0.8108
+2026-10-03 00:30:31.164 | INFO     | __main__:_refresh:188 - jev progress=18000/29139 cost=$0.8304
+2026-10-03 00:30:37.200 | INFO     | __main__:_refresh:188 - jev progress=18400/29139 cost=$0.8491
+2026-10-03 00:30:43.345 | INFO     | __main__:_refresh:188 - jev progress=18800/29139 cost=$0.8675
+2026-10-03 00:30:49.653 | INFO     | __main__:_refresh:188 - jev progress=19200/29139 cost=$0.8857
+2026-10-03 00:30:55.784 | INFO     | __main__:_refresh:188 - jev progress=19600/29139 cost=$0.9031
+2026-10-03 00:31:01.812 | INFO     | __main__:_refresh:188 - jev progress=20000/29139 cost=$0.9203
+2026-10-03 00:31:11.350 | INFO     | __main__:_refresh:188 - jev progress=20400/29139 cost=$0.9377
+2026-10-03 00:31:18.045 | INFO     | __main__:_refresh:188 - jev progress=20800/29139 cost=$0.9564
+2026-10-03 00:31:24.192 | INFO     | __main__:_refresh:188 - jev progress=21200/29139 cost=$0.9763
+2026-10-03 00:31:30.211 | INFO     | __main__:_refresh:188 - jev progress=21600/29139 cost=$0.9954
+2026-10-03 00:31:36.465 | INFO     | __main__:_refresh:188 - jev progress=22000/29139 cost=$1.0139
+2026-10-03 00:31:42.977 | INFO     | __main__:_refresh:188 - jev progress=22400/29139 cost=$1.0320
+2026-10-03 00:31:49.203 | INFO     | __main__:_refresh:188 - jev progress=22800/29139 cost=$1.0495
+2026-10-03 00:31:55.395 | INFO     | __main__:_refresh:188 - jev progress=23200/29139 cost=$1.0667
+2026-10-03 00:32:02.001 | INFO     | __main__:_refresh:188 - jev progress=23600/29139 cost=$1.0841
+2026-10-03 00:32:08.025 | INFO     | __main__:_refresh:188 - jev progress=24000/29139 cost=$1.1026
+2026-10-03 00:32:14.281 | INFO     | __main__:_refresh:188 - jev progress=24400/29139 cost=$1.1223
+2026-10-03 00:32:20.534 | INFO     | __main__:_refresh:188 - jev progress=24800/29139 cost=$1.1417
+2026-10-03 00:32:26.570 | INFO     | __main__:_refresh:188 - jev progress=25200/29139 cost=$1.1610
+2026-10-03 00:32:32.550 | INFO     | __main__:_refresh:188 - jev progress=25600/29139 cost=$1.1799
+2026-10-03 00:32:38.527 | INFO     | __main__:_refresh:188 - jev progress=26000/29139 cost=$1.1981
+2026-10-03 00:32:44.783 | INFO     | __main__:_refresh:188 - jev progress=26400/29139 cost=$1.2153
+2026-10-03 00:32:50.911 | INFO     | __main__:_refresh:188 - jev progress=26800/29139 cost=$1.2325
+2026-10-03 00:32:56.999 | INFO     | __main__:_refresh:188 - jev progress=27200/29139 cost=$1.2500
+2026-10-03 00:33:03.070 | INFO     | __main__:_refresh:188 - jev progress=27600/29139 cost=$1.2686
+2026-10-03 00:33:09.261 | INFO     | __main__:_refresh:188 - jev progress=28000/29139 cost=$1.2881
+2026-10-03 00:33:15.348 | INFO     | __main__:_refresh:188 - jev progress=28400/29139 cost=$1.3079
+2026-10-03 00:33:21.517 | INFO     | __main__:_refresh:188 - jev progress=28800/29139 cost=$1.3265
+2026-10-03 00:33:26.633 | INFO     | __main__:_refresh:188 - jev progress=29139/29139 cost=$1.3420
+2026-10-03 00:33:42.690 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 00:33:42.714 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 00:33:42.740 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 00:33:42.931 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 00:33:43.227 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 00:33:43.235 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 00:33:43.235 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 00:33:43.236 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 00:33:43.236 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 00:34:18.493 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 00:34:18.493 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 00:34:18.493 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 00:34:18.495 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 00:34:18.498 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 00:34:18.498 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 00:34:18.498 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 00:34:18.498 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 00:34:18.498 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 00:34:35.309 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 00:34:55.665 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 00:35:10.718 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK blind required=18701 cached=17704 missing=997
+2026-10-03 00:35:17.281 | INFO     | __main__:_refresh:188 - jev progress=400/997 cost=$0.0219
+2026-10-03 00:35:23.410 | INFO     | __main__:_refresh:188 - jev progress=800/997 cost=$0.0438
+2026-10-03 00:35:26.480 | INFO     | __main__:_refresh:188 - jev progress=997/997 cost=$0.0548
+2026-10-03 00:35:41.171 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 00:35:41.195 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 00:35:41.221 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 00:35:41.420 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 00:35:41.694 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 00:35:41.699 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 00:35:41.699 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 00:35:41.700 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 00:35:41.701 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 00:36:13.818 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 00:36:13.818 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 00:36:13.818 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 00:36:13.820 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 00:36:13.823 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 00:36:13.823 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 00:36:13.823 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 00:36:13.823 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 00:36:13.823 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 00:36:30.349 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 00:36:49.059 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 00:37:03.158 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK audit required=18701 cached=0 missing=18701
+2026-10-03 00:37:10.409 | INFO     | __main__:_refresh:188 - jev progress=400/18701 cost=$0.0118
+2026-10-03 00:37:16.537 | INFO     | __main__:_refresh:188 - jev progress=800/18701 cost=$0.0234
+2026-10-03 00:37:22.616 | INFO     | __main__:_refresh:188 - jev progress=1200/18701 cost=$0.0350
+2026-10-03 00:37:28.511 | INFO     | __main__:_refresh:188 - jev progress=1600/18701 cost=$0.0468
+2026-10-03 00:37:34.512 | INFO     | __main__:_refresh:188 - jev progress=2000/18701 cost=$0.0585
+2026-10-03 00:37:40.470 | INFO     | __main__:_refresh:188 - jev progress=2400/18701 cost=$0.0704
+2026-10-03 00:37:46.681 | INFO     | __main__:_refresh:188 - jev progress=2800/18701 cost=$0.0821
+2026-10-03 00:37:52.637 | INFO     | __main__:_refresh:188 - jev progress=3200/18701 cost=$0.0938
+2026-10-03 00:37:58.783 | INFO     | __main__:_refresh:188 - jev progress=3600/18701 cost=$0.1055
+2026-10-03 00:38:04.905 | INFO     | __main__:_refresh:188 - jev progress=4000/18701 cost=$0.1172
+2026-10-03 00:38:10.961 | INFO     | __main__:_refresh:188 - jev progress=4400/18701 cost=$0.1289
+2026-10-03 00:38:16.944 | INFO     | __main__:_refresh:188 - jev progress=4800/18701 cost=$0.1405
+2026-10-03 00:38:23.005 | INFO     | __main__:_refresh:188 - jev progress=5200/18701 cost=$0.1522
+2026-10-03 00:38:29.004 | INFO     | __main__:_refresh:188 - jev progress=5600/18701 cost=$0.1640
+2026-10-03 00:38:35.440 | INFO     | __main__:_refresh:188 - jev progress=6000/18701 cost=$0.1756
+2026-10-03 00:38:41.681 | INFO     | __main__:_refresh:188 - jev progress=6400/18701 cost=$0.1873
+2026-10-03 00:38:47.956 | INFO     | __main__:_refresh:188 - jev progress=6800/18701 cost=$0.1990
+2026-10-03 00:38:53.932 | INFO     | __main__:_refresh:188 - jev progress=7200/18701 cost=$0.2105
+2026-10-03 00:39:00.131 | INFO     | __main__:_refresh:188 - jev progress=7600/18701 cost=$0.2223
+2026-10-03 00:39:06.084 | INFO     | __main__:_refresh:188 - jev progress=8000/18701 cost=$0.2341
+2026-10-03 00:39:12.180 | INFO     | __main__:_refresh:188 - jev progress=8400/18701 cost=$0.2458
+2026-10-03 00:39:18.146 | INFO     | __main__:_refresh:188 - jev progress=8800/18701 cost=$0.2576
+2026-10-03 00:39:24.138 | INFO     | __main__:_refresh:188 - jev progress=9200/18701 cost=$0.2703
+2026-10-03 00:39:30.141 | INFO     | __main__:_refresh:188 - jev progress=9600/18701 cost=$0.2820
+2026-10-03 00:39:36.192 | INFO     | __main__:_refresh:188 - jev progress=10000/18701 cost=$0.2937
+2026-10-03 00:39:42.394 | INFO     | __main__:_refresh:188 - jev progress=10400/18701 cost=$0.3053
+2026-10-03 00:39:48.539 | INFO     | __main__:_refresh:188 - jev progress=10800/18701 cost=$0.3177
+2026-10-03 00:39:54.717 | INFO     | __main__:_refresh:188 - jev progress=11200/18701 cost=$0.3298
+2026-10-03 00:40:01.034 | INFO     | __main__:_refresh:188 - jev progress=11600/18701 cost=$0.3415
+2026-10-03 00:40:07.155 | INFO     | __main__:_refresh:188 - jev progress=12000/18701 cost=$0.3532
+2026-10-03 00:40:13.361 | INFO     | __main__:_refresh:188 - jev progress=12400/18701 cost=$0.3649
+2026-10-03 00:40:19.472 | INFO     | __main__:_refresh:188 - jev progress=12800/18701 cost=$0.3767
+2026-10-03 00:40:25.492 | INFO     | __main__:_refresh:188 - jev progress=13200/18701 cost=$0.3885
+2026-10-03 00:40:31.460 | INFO     | __main__:_refresh:188 - jev progress=13600/18701 cost=$0.4006
+2026-10-03 00:40:37.428 | INFO     | __main__:_refresh:188 - jev progress=14000/18701 cost=$0.4124
+2026-10-03 00:40:46.351 | INFO     | __main__:_refresh:188 - jev progress=14400/18701 cost=$0.4242
+2026-10-03 00:40:53.714 | INFO     | __main__:_refresh:188 - jev progress=14800/18701 cost=$0.4359
+2026-10-03 00:40:59.785 | INFO     | __main__:_refresh:188 - jev progress=15200/18701 cost=$0.4476
+2026-10-03 00:41:05.727 | INFO     | __main__:_refresh:188 - jev progress=15600/18701 cost=$0.4593
+2026-10-03 00:41:11.825 | INFO     | __main__:_refresh:188 - jev progress=16000/18701 cost=$0.4717
+2026-10-03 00:41:17.858 | INFO     | __main__:_refresh:188 - jev progress=16400/18701 cost=$0.4839
+2026-10-03 00:41:23.927 | INFO     | __main__:_refresh:188 - jev progress=16800/18701 cost=$0.4957
+2026-10-03 00:41:29.858 | INFO     | __main__:_refresh:188 - jev progress=17200/18701 cost=$0.5074
+2026-10-03 00:41:35.739 | INFO     | __main__:_refresh:188 - jev progress=17600/18701 cost=$0.5191
+2026-10-03 00:41:41.602 | INFO     | __main__:_refresh:188 - jev progress=18000/18701 cost=$0.5307
+2026-10-03 00:41:47.634 | INFO     | __main__:_refresh:188 - jev progress=18400/18701 cost=$0.5424
+2026-10-03 00:41:52.254 | INFO     | __main__:_refresh:188 - jev progress=18701/18701 cost=$0.5521
+2026-10-03 00:41:52.682 | INFO     | __main__:main:252 - JUDGE_COMPLETE missing=0

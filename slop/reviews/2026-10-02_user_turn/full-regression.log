@@ -1,0 +1,3 @@
+NEW_METHODS ['prompting_engineered_scale', 'prompting_scale']
+CI_SHIFT (bootstrap RNG order; only methods after prompting_engineered_scale in iteration order): [('query_steer', 0.0077), ('random', 0.0213), ('sink_split', 0.0197), ('sink_split_resid', 0.0052), ('spherical', 0.0154), ('sspace', 0.0123), ('sspace_ablate', 0.0144), ('sspace_pca', 0.0084), ('sspace_pool', 0.0106), ('sspace_scale', 0.0162), ('topk_clusters', 0.0173), ('value_gram', 0.0206), ('vjp_resid', 0.0168), ('vjp_value', 0.0387)]
+FULL_BENCHMARK_REGRESSION_PASS: scores, selections, N, rejected, seeds and all existing points identical; user-turn walks excluded; added 80 prompt-sweep points
