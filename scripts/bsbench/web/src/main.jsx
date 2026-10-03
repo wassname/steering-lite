@@ -166,7 +166,7 @@ function App() {
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.false_pushback != null) && <section id="discrimination">
       <h2>−C: discernment or contrarianism?</h2>
-      <p>Every BS-bench question has a sound-premise twin: the same question with the made-up part replaced by a real concept. A steer that only makes the model disagree will also reject the twins. Each −C sweep is plotted as pushback gained on the nonsense questions (x) against false pushback gained on the sound twins (y). Real discernment moves right and stays near zero.</p>
+      <p>Every BS-bench question has a sound-premise twin: the same question with the made-up part replaced by a real concept. A steer that only makes the model disagree will also reject the twins. Each −C sweep is plotted as pushback gained on the nonsense questions (x) against false pushback gained on the sound twins (y). Real discernment moves right and stays near zero; doses above the dotted limit line are not scored.</p>
       <a href="discrimination.html"><img src="discrimination.png" alt="Pushback gained on nonsense questions against false pushback gained on sound twins, per -C sweep" style={{ width: '100%' }} /></a>
     </section>}
     {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">

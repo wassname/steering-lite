@@ -24,7 +24,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import AXIS, COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import MAX_DAMAGE, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
+from judge import MAX_DAMAGE, MAX_FALSE_PUSHBACK, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
@@ -117,7 +117,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "steered_damage": steered_damage,
                     "breakdown_reasons": health["breakdown_reasons"], "post_boundary": health["post_boundary"],
-                    "admissible": steered_damage <= MAX_DAMAGE,
+                    "admissible": steered_damage <= MAX_DAMAGE and (not twins or mean(t["false_pushback"] - t["false_pushback_bare"] for t in twins) <= MAX_FALSE_PUSHBACK),
                     "kl_rms": rungs[C].get("kl_rms", {}).get(side), "stats": health["stats"],
                     "answers": health["answers"], "questions": questions,
                     **({"false_pushback": mean(t["false_pushback"] for t in twins), "false_pushback_bare": mean(t["false_pushback_bare"] for t in twins),
@@ -182,7 +182,7 @@ def room_score(best: dict) -> float:
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    The damage cap is reapplied to each draw; intervals remain conditional on original Jev
+    The damage cap is reapplied to each draw (the false-pushback cap is not); intervals remain conditional on original Jev
     admissibility and seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
@@ -650,28 +650,32 @@ def svg_labels(site: dict) -> list[dict]:
 
 
 def discrimination_plot(points: list[dict], methods: list[str], title: str) -> go.Figure:
-    """-C sweeps: pushback gained on the nonsense questions (x) against false pushback gained on their sound twins (y).
-    Discernment moves right along y=0; contrarianism moves up the diagonal. Same doses and smoothing as the main plot."""
+    """-C sweeps, raw seed means at doses that pass the damage cap: pushback gained on the nonsense questions (x)
+    against false pushback gained on their sound twins (y). Doses above the false-pushback limit are drawn too,
+    so the chart shows where a steer turns contrarian; the main plot and score drop them."""
+    def sweep_means(method: str) -> list[tuple[float, float]]:
+        group = [p for p in points if p["method"] == method and p["side"] == "-C" and p["steered_damage"] <= MAX_DAMAGE and "false_pushback" in p]
+        out = []
+        for C in sorted({p["C"] for p in group}):
+            at = [p for p in group if p["C"] == C]
+            out.append((-mean(p["effect"] for p in at), 100 * mean(p["false_pushback"] - p["false_pushback_bare"] for p in at)))
+        return out
     figure = go.Figure()
-    random_live = random_curves(points)["-C"]
-    figure.add_trace(go.Scatter(x=[-p["effect"] for p in random_live], y=[100 * p["false_pushback"] for p in random_live], mode="markers",
-                                marker={"color": "rgba(120,120,120,0.6)", "size": 7}, name="random directions (pooled per dose)"))
-    top = max([-p["effect"] for p in random_live] + [1.0])
+    random = sweep_means("random")
+    if random:
+        figure.add_trace(go.Scatter(x=[x for x, _ in random], y=[y for _, y in random], mode="markers",
+                                    marker={"color": "rgba(120,120,120,0.6)", "size": 7}, name="random directions (mean per dose)"))
     for method in methods:
-        rows = sweep(before_reversal(method_curve(points, method, "-C")))
-        curve = {p["C"]: p for p in method_curve(points, method, "-C")}
-        if not rows or "false_pushback" not in next(iter(curve.values())):
+        rows = sweep_means(method)
+        if not rows:
             continue
-        fp = [100 * curve[r["C"]]["false_pushback"] for r in rows]
-        figure.add_trace(go.Scatter(x=[0, *(-r["effect"] for r in rows)], y=[0, *fp], mode="lines+markers", name=LABELS[method],
-                                    line={"color": COLORS[method], "width": 3, "dash": "dash"},
-                                    marker={"color": COLORS[method], "size": [0, *([7] * (len(rows) - 1)), 13], "symbol": ["circle"] * len(rows) + ["x"]}))
-        top = max([top, *(-r["effect"] for r in rows)])
-    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "false_pushback" in p):
+        figure.add_trace(go.Scatter(x=[0, *(x for x, _ in rows)], y=[0, *(y for _, y in rows)], mode="lines+markers", name=LABELS[method],
+                                    line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": [0, *([7] * len(rows))]}))
+    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "false_pushback" in p and not p["fixed_grid"]):
         figure.add_trace(go.Scatter(x=[-point["effect"]], y=[100 * (point["false_pushback"] - point["false_pushback_bare"])], mode="markers",
                                     marker={"color": COLORS[point["method"]], "size": 14, "symbol": "star"}, name=PROMPTS[point["method"]] + " −C"))
-    figure.add_trace(go.Scatter(x=[0, top], y=[0, 100 * top / PMAX], mode="lines", line={"color": "#c44e52", "dash": "dot", "width": 1},
-                                name="as many false rejections as real ones (100 pp per 8 premise levels)", hoverinfo="skip"))
+    figure.add_hline(y=100 * MAX_FALSE_PUSHBACK, line_color="#c44e52", line_dash="dot",
+                     annotation_text=f"limit: doses above {100 * MAX_FALSE_PUSHBACK:g} pp are not scored", annotation_position="top left")
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare", showlegend=False))
     figure.update_layout(template="plotly_white", title={"text": title, "x": 0.5}, height=520, legend={"orientation": "h", "y": -0.22},
                          xaxis={"title": "pushback gained on nonsense questions (premise levels toward rejection, on-target weighted)"},
@@ -742,7 +746,7 @@ def main() -> None:
         "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
-        "max_damage": MAX_DAMAGE, "admissibility": "jev_mean_damage",
+        "max_damage": MAX_DAMAGE, "max_false_pushback": MAX_FALSE_PUSHBACK, "admissibility": "jev_mean_damage and (eval v2) jev_false_pushback",
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zones": random_zones(points),
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
@@ -781,7 +785,7 @@ def main() -> None:
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
-        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
+        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4 and (eval v2) Jev false pushback on the sound twins at most {100 * MAX_FALSE_PUSHBACK:g} pp above bare. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     if args.view == "user":
         intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
@@ -805,7 +809,7 @@ def main() -> None:
         disc.write_html(out / "discrimination.html", include_plotlyjs="cdn")
         discrimination_image = ("\n\n## −C: discernment or contrarianism?\n\nEach −C sweep plotted as pushback gained on the nonsense questions (x) against "
                                 "false pushback gained on their sound twins (y). Real discernment moves right and stays near zero; a steer that rejects "
-                                "everything climbs toward the dotted line.\n\n![discrimination](discrimination.png)")
+                                "everything climbs above the dotted limit line; those doses are not scored.\n\n![discrimination](discrimination.png)")
     (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){discrimination_image}{gain_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
