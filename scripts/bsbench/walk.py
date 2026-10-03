@@ -69,12 +69,9 @@ PROMPT_METHODS = {
     "prompting_engineered": ENGINEERED,
 }
 PROMPT_SWEEPS = {"prompting_scale": "prompting", "prompting_engineered_scale": "prompting_engineered"}
-BASE_PROMPT_GAINS = (0.0, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0)
-PROMPT_GAINS = {
-    "prompting_scale": tuple(sorted((*BASE_PROMPT_GAINS, *(2.0**i for i in range(-10, -3)),
-                                    0.09375, 0.375, 0.75, *(i / 4 for i in range(5, 16) if i != 8), 6.0, 12.0))),
-    "prompting_engineered_scale": BASE_PROMPT_GAINS,
-}
+# wassname 2026-10-03: "only ramp from 0 to 1 gain? with a min of 5% ... lets use log spacing from ~ to 1": quarter-octaves 2^-4.5..1.
+# Above 1 the scaled embeddings stop being read (full +C: gain 3 +2.94, gain 4 -0.47 vs gain 1 +3.50).
+PROMPT_GAINS = {name: tuple(2.0 ** (k / 4) for k in range(-18, 1)) for name in ("prompting_scale", "prompting_engineered_scale")}
 METHODS = (*CONFIGS, *PROMPT_METHODS, *PROMPT_SWEEPS)
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
 OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown

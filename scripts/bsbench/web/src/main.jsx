@@ -39,27 +39,22 @@ function Plot({ data, visible, selected, onSelect }) {
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: abrasive / candid, right: sycophantic)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis damage (lower is better)</text>
-      {data.zones.map(zone => <path key={zone.percentile} className="zone" data-percentile={zone.percentile}
-        d={'M' + zone.path.map(([a, b]) => `${x(a)},${y(b)}`).join('L') + 'Z'} fill={`rgba(150,150,150,${zone.opacity})`} />)}
+      {data.zones.map(zone => zone.percentile === 50
+        ? <path key={zone.percentile} className="zone median" data-percentile={zone.percentile} fill="none" stroke="rgba(120,120,120,0.8)" strokeWidth="1.5"
+            d={'M' + zone.path.slice(0, zone.path.length / 2).map(([a, b]) => `${x(a)},${y(b)}`).join('L')} />
+        : <path key={zone.percentile} className="zone" data-percentile={zone.percentile}
+            d={'M' + zone.path.map(([a, b]) => `${x(a)},${y(b)}`).join('L') + 'Z'} fill={`rgba(150,150,150,${zone.opacity})`} />)}
       {curves.filter(c => c.points.length).map(c => {
-        const end = c.points.at(-1);
         return <g key={c.method + c.side}>
           <path className="curve-line" d={c.path.map(([a, b], i) => a === null ? '' : `${i === 0 || c.path[i - 1][0] === null ? 'M' : 'L'}${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
-          {c.tested.filter(p => !c.points.some(q => q.C === p.C)).map(p => <circle key={`sample${p.C}`} cx={x(p.effect)} cy={y(p.off_axis)} r="2.5" fill={data.colors[c.method]} fillOpacity="0.4" className="sample"
-            onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)}
-            onClick={() => onSelect(data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C))} />)}
-          {c.points.map(p => {
+          {c.points.map((p, i) => {
             const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C);
             const isSel = selected && full && pointId(full) === pointId(selected);
-            const isEnd = p === end;
-            return isEnd
-              ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={data.colors[c.method]} strokeWidth="3.5"
-                  className="mark end" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />
-              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 4} fill={data.colors[c.method]} fillOpacity={1} stroke={isSel ? '#000' : 'none'}
-                  className="mark" onPointerEnter={() => setHover({ ...p, method: c.method, side: c.side })} onPointerLeave={() => setHover(null)} onClick={() => full && onSelect(full)} />;
+            const events = { onPointerEnter: () => setHover({ ...p, method: c.method, side: c.side }), onPointerLeave: () => setHover(null), onClick: () => full && onSelect(full) };
+            return i === c.points.length - 1
+              ? <path key={p.C} d="M-6,-6L6,6M-6,6L6,-6" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} stroke={data.colors[c.method]} strokeWidth="3.5" className="mark end" {...events} />
+              : <circle key={p.C} cx={x(p.effect)} cy={y(p.off_axis)} r={isSel ? 7 : 3.5} fill={data.colors[c.method]} stroke={isSel ? '#000' : 'none'} className="mark" {...events} />;
           })}
-          {(() => { const b = data.summary.find(r => r.method === c.method)?.best[c.side];
-            return b && <circle cx={x(b.effect)} cy={y(b.off_axis)} r="10" fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" className="best" />; })()}
           {curveLabel(c.method, c.side, x(c.path.at(-1)[0]), y(c.path.at(-1)[1]))}
         </g>;
       })}
@@ -72,7 +67,7 @@ function Plot({ data, visible, selected, onSelect }) {
     </svg>
     {hover && <aside className="tooltip" style={{ left: `${(x(hover.effect) / W) * 100}%`, top: `${(y(hover.off_axis) / H) * 100}%` }}>
       <strong>{hover.method} {hover.side} {data.points.some(p => p.method === hover.method && p.fixed_grid) ? 'gain' : 'C'}={hover.C.toPrecision(3)}</strong>
-      <span>on-axis {fmt(hover.effect)}, off-axis {hover.off_axis.toFixed(2)}</span><span>click to open its answers</span>
+      <span>on-axis {fmt(hover.raw_effect ?? hover.effect)}, off-axis {(hover.raw_off_axis ?? hover.off_axis).toFixed(2)}{hover.raw_effect != null ? ' (measured; the dot is smoothed)' : ''}</span><span>click to open its answers</span>
     </aside>}
   </div>;
 }
@@ -184,9 +179,9 @@ function App() {
       <p>Each colour is one method. Existing vector walks used mechanical checks to choose tested dose ranges; only Jev ratings decide which measured points appear here.
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right is more sycophantic, left is more candid.
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
-        The line joins each method's best trade-offs (solid dots), ordered by effect, not dose. Faint dots show other passing doses. Gaps larger than {data.plot_gap} premise-score point between line supports are not interpolated. The cross (×) marks its last tested strength that passes the checks; it does not force the curve to return to that point. The ring marks the strength used for the score, even if the effect is near zero or in the wrong direction. Checks use cohort means; individual retained answers can still be badly damaged. Other strengths are in the answer explorer below.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts that pass the same checks, for example "Answer as someone who is sycophantic".
-        The grey regions use random seeds admissible in both signs at each dose. Light to dark: p90 targets the 10th–90th percentiles, p75 the 25th–75th, and p50 is the median, each filled to zero change. Bounds use discrete observed ranks: with few samples, p90 can be min–max (for example, OLMo's three directions give six signed values). Eligible counts vary by dose; see the table below. They share median damage and are smoothed in damage order. Measured percentile supports are unchanged. These are reference envelopes, not confidence intervals or regions containing 90%, 75% and 50% of samples. A median or percentile interval can be entirely on one side even if some random points are on the other; opposite intervention signs need not give opposite behavioral effects.</p>
+        Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. Coherence uses the mean over questions; individual retained answers can still be badly damaged.
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
+        The grey region is what random directions do at the same doses (both signs, only directions still coherent at both): the outer band holds the middle 80% of their effects, the inner band the middle 50%, and the grey line is the median. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
         <table className="random-reference"><thead><tr><th>C</th><th>directions</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>

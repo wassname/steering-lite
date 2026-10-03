@@ -29,7 +29,6 @@ from judge import MAX_DAMAGE, MODEL, PREMISE, audit_request, aware_request, blin
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
 N_BOOT = 1000
-MAX_PLOT_GAP = 1.0  # Display-only limit in premise-score units; does not filter doses. PI/OpenAI
 PMAX = len(PREMISE) - 1  # top premise level (8)
 COLORS = {
     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
@@ -348,7 +347,7 @@ def place_labels(
 
 
 def random_zones(points: list[dict]) -> list[dict]:
-    """Pooled-sign percentiles, zero-filled; common Chaikin weights preserve nesting. PI/OpenAI."""
+    """Pooled-sign percentiles of random effects per dose, at the median damage; Chaikin-smoothed. PI/OpenAI."""
     random_points = [point for point in points if point["method"] == "random"]
     seeds = sorted({point["seed"] for point in random_points})
     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
@@ -374,7 +373,7 @@ def random_zones(points: list[dict]) -> list[dict]:
             zone["positive_counts"].append(sum(effect > 0 for effect in effects))
             zone["mean_effect"].append(mean(effects))
     for zone in zones:
-        edge = [(row[1], min(0.0, row[2]), max(0.0, row[3])) for row in sorted(zone["bounds"], key=lambda row: row[1])]
+        edge = [(row[1], row[2], row[3]) for row in sorted(zone["bounds"], key=lambda row: row[1])]
         for _ in range(3):
             edge = [edge[0]] + [tuple(w * a + (1 - w) * b for a, b in zip(left, right, strict=True))
                                for left, right in zip(edge, edge[1:]) for w in (.75, .25)] + [edge[-1]]
@@ -385,44 +384,38 @@ def random_zones(points: list[dict]) -> list[dict]:
 PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
 
 
-def frontier(curve: list[dict], *, include_endpoint: bool = True) -> list[dict]:
-    """Pareto points in effect order, optionally followed by the last-dose reference cross. PI/OpenAI."""
-    if not curve:
-        return []
-    end = curve[-1] if include_endpoint else None
-    kept = [
-        p for p in curve
-        if p is not end and not any(q is not p and directed(q) >= directed(p) and q["off_axis"] < p["off_axis"] for q in curve)
-    ]
-    return sorted(kept, key=directed) + ([end] if end is not None else [])
+def sweep(curve: list[dict]) -> list[dict]:
+    """Passing doses in dose order, median-filtered over neighbouring doses as in the reference
+    (docs/vendor/vjp-steering/src/vjp_steering/results.py::plot): log-C half-window 0.15, else the 5 nearest
+    rungs; then at most 16 points kept. Returns C, smoothed effect/off_axis, and the raw values. PI/OpenAI."""
+    points = sorted(curve, key=lambda p: p["C"])
+    out = [{"C": p["C"], "effect": p["effect"], "off_axis": p["off_axis"], "raw_effect": p["effect"], "raw_off_axis": p["off_axis"]} for p in points]
+    if len(points) >= 5:
+        log_c = [math.log(p["C"]) if p["C"] > 0 else -math.inf for p in points]
+        for i, row in enumerate(out):
+            window = [points[j] for j, lc in enumerate(log_c) if abs(lc - log_c[i]) <= 0.15]
+            if len(window) < 3:
+                window = points[max(0, i - 2):i + 3]
+            row["effect"] = median(p["effect"] for p in window)
+            row["off_axis"] = median(p["off_axis"] for p in window)
+    if len(out) > 16:
+        out = [out[i] for i in sorted({round(i * (len(out) - 1) / 15) for i in range(16)} | {len(out) - 1})]
+    return out
 
 
-def smooth_path(support: list[dict], side: str, n: int = 40) -> list[list[float | None]]:
-    """Shape-preserving cubic through Pareto supports; last-dose crosses never force a return. PI/OpenAI."""
-    support = frontier(support, include_endpoint=False)
-    fixed_grid = support[0]["fixed_grid"]
-    sign = 1.0 if side == "+C" else -1.0
-    ts, ys = ([directed(support[0])], [support[0]["off_axis"]]) if fixed_grid else ([0.0], [0.0])
-    rest = support[1:] if fixed_grid else support
-    for p in rest:
-        if directed(p) > ts[-1]:
-            ts.append(directed(p)); ys.append(p["off_axis"])
-    if len(ts) < 2:
-        return [[sign * ts[0], ys[0]]]
-    h = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
-    d = [(ys[i + 1] - ys[i]) / h[i] for i in range(len(h))]
-    m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i]) for i in range(1, len(d))] + [d[-1]]
+def sweep_path(rows: list[dict], fixed_grid: bool, n: int = 12) -> list[list[float]]:
+    """Catmull-Rom spline from bare (walks; a prompt gain grid starts at its first gain) through the sweep in dose order."""
+    knots = ([] if fixed_grid else [(0.0, 0.0)]) + [(r["effect"], r["off_axis"]) for r in rows]
+    if len(knots) < 2:
+        return [list(knots[0])]
+    padded = [knots[0], *knots, knots[-1]]
     path = []
-    for i in range(len(h)):
-        if h[i] > MAX_PLOT_GAP:
-            path.extend([[sign * ts[i], ys[i]], [None, None]])
-            continue
+    for i in range(1, len(padded) - 2):
+        p0, p1, p2, p3 = padded[i - 1:i + 3]
         for k in range(n):
-            u = k / n
-            h00, h10, h01, h11 = 2 * u**3 - 3 * u**2 + 1, u**3 - 2 * u**2 + u, -2 * u**3 + 3 * u**2, u**3 - u**2
-            y = h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
-            path.append([sign * (ts[i] + u * h[i]), y])
-    path.append([sign * ts[-1], ys[-1]])
+            t = k / n
+            path.append([0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t**2 + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t**3) for d in (0, 1)])
+    path.append(list(knots[-1]))
     return path
 
 
@@ -437,10 +430,12 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
     margin = {"l": 75, "r": 10, "t": 40, "b": 150}
     for zone in zones:
+        median_line = zone["percentile"] == 50  # lo = hi: a line, not an area
+        half = zone["path"][:len(zone["path"]) // 2]
         figure.add_trace(go.Scatter(
-            x=[p[0] for p in zone["path"]], y=[p[1] for p in zone["path"]],
-            name=f"random p{zone['percentile']}", mode="lines", fill="toself",
-            fillcolor=f"rgba(150,150,150,{zone['opacity']})", line={"width": 0},
+            x=[p[0] for p in (half if median_line else zone["path"])], y=[p[1] for p in (half if median_line else zone["path"])],
+            name=f"random p{zone['percentile']}", mode="lines", fill=None if median_line else "toself",
+            fillcolor=f"rgba(150,150,150,{zone['opacity']})", line={"width": 1.5 if median_line else 0, "color": "rgba(120,120,120,0.8)"},
             hoverinfo="skip", showlegend=False,
         ))
     obstacles = [(0.0, 0.0)]
@@ -448,34 +443,21 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     for (method, side), curve in curves.items():
         if not curve:
             continue
-        path = smooth_path(frontier(curve), side)
+        rows = sweep(curve)
+        path = sweep_path(rows, curve[0]["fixed_grid"])
         dash = "solid" if side == "+C" else "dash"
         figure.add_trace(go.Scatter(
             x=[q[0] for q in path], y=[q[1] for q in path], mode="lines",
             line={"color": COLORS[method], "width": 3, "dash": dash}, hoverinfo="skip", showlegend=False,
         ))
-        support = frontier(curve)
-        other = [p for p in curve if p["C"] not in {q["C"] for q in support}]
         figure.add_trace(go.Scatter(
-            x=[p["effect"] for p in other], y=[p["off_axis"] for p in other], mode="markers",
-            marker={"color": COLORS[method], "size": 5, "opacity": .4}, name="passing",
-            text=[f"{side} C={p['C']:.6g}" for p in other],
+            x=[r["effect"] for r in rows], y=[r["off_axis"] for r in rows], mode="markers", name="sweep",
+            marker={"color": COLORS[method], "size": [7] * (len(rows) - 1) + [13], "symbol": ["circle"] * (len(rows) - 1) + ["x"]},
+            text=[f"{side} C={r['C']:.3g}" for r in rows],
             hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
         ))
-        figure.add_trace(go.Scatter(
-            x=[p["effect"] for p in support], y=[p["off_axis"] for p in support], mode="markers", name="frontier",
-            marker={"color": COLORS[method], "size": [8] * (len(support) - 1) + [13], "symbol": ["circle"] * (len(support) - 1) + ["x"]},
-            text=[f"{side} C={p['C']:.3g}" for p in support],
-            hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
-        ))
-        if best.get((method, side)) is not None:  # dose that sets the score: ring
-            b = best[method, side]
-            figure.add_trace(go.Scatter(
-                x=[b["effect"]], y=[b["off_axis"]], mode="markers", hoverinfo="skip", showlegend=False,
-                marker={"color": COLORS[method], "size": 22, "symbol": "circle-open", "line": {"width": 3}},  # open symbols draw in marker.color
-            ))
-        obstacles.extend((q[0], q[1]) for q in path[::4] if q[0] is not None)
-        obstacles.extend((p["effect"], p["off_axis"]) for p in curve)
+        obstacles.extend((q[0], q[1]) for q in path[::4])
+        obstacles.extend((r["effect"], r["off_axis"]) for r in rows)
         labels.append({"x": path[-1][0], "y": path[-1][1], "text": f"{LABELS[method]} {side}", "color": COLORS[method]})
     for point in prompting:
         figure.add_trace(go.Scatter(
@@ -496,7 +478,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"faint dot = other passing dose · solid dot = Pareto point · ring = score-setting dose<br>× = last passing dose · ★ = prompt baseline · gaps >{MAX_PLOT_GAP:g} premise point are not interpolated<br>random: {len({p['seed'] for p in points if p['method'] == 'random'})} directions, both signs; p90/p75 target 10–90%/25–75%; p50 = median<br>discrete ranks; small samples can span min–max; smoothed, zero-filled; not confidence/coverage regions; may be asymmetric")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last dose the judge rates coherent · ★ = plain prompt<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
@@ -680,7 +662,7 @@ def main() -> None:
         shown = ["prompting_scale", "prompting_engineered_scale", "mean_diff"]
         assert set(shown) <= set(methods), "prompt view needs both prompt sweeps and mean_diff"
     site = {
-        "view": args.view, "shown": shown, "plot_gap": MAX_PLOT_GAP,
+        "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
         "max_damage": MAX_DAMAGE, "admissibility": "jev_mean_damage",
@@ -689,9 +671,9 @@ def main() -> None:
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
         "curves": [{
             "method": m, "side": side,
-            "points": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in frontier(method_curve(points, m, side))],
+            "points": sweep(method_curve(points, m, side)),
             "tested": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)],
-            "path": smooth_path(frontier(method_curve(points, m, side)), side) if method_curve(points, m, side) else [],
+            "path": sweep_path(sweep(method_curve(points, m, side)), method_curve(points, m, side)[0]["fixed_grid"]) if method_curve(points, m, side) else [],
         } for m in methods for side in ("+C", "-C")],
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "score_room": row["score_room"], "ci_room": row["ci_room"],
@@ -748,8 +730,8 @@ def main() -> None:
     )
     figure.write_image(out / f"plot.png", width=1064, height=590, scale=2)
     # marker count drawn in the PNG, compared with the React page by web/uat.py
-    frontier_marks = sum(len(trace.x) for trace in figure.data if trace.name == "frontier")
-    (out / f"plot_marks.json").write_text(json.dumps({"frontier_marks": frontier_marks, "passing_marks": sum(len(t.x) for t in figure.data if t.name == "passing"), "methods": shown}) + "\n")
+    sweep_marks = sum(len(trace.x) for trace in figure.data if trace.name == "sweep")
+    (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown}) + "\n")
     print(table)
     print(f"wrote {out}/points.json ({len(points)} points), index.md, plot.html, plot.png")
 

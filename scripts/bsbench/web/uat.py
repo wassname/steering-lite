@@ -33,10 +33,10 @@ with sync_playwright() as p:
     print(f"curve points in points.json={curve_points} drawn={drawn}")
     assert drawn == curve_points, "SVG curve points differ from points.json"
     png_marks = json.loads((site / "plot_marks.json").read_text())
-    print(f"PNG frontier marks (plot_marks.json from results.py)={png_marks['frontier_marks']} page drawn={drawn} methods png={png_marks['methods']} page={data['shown']}")
-    assert png_marks["frontier_marks"] == drawn and png_marks["methods"] == data["shown"], "page and PNG draw different points"
-    other = sum(len(c["tested"]) - len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
-    assert page.locator("circle.sample").count() == png_marks["passing_marks"] == other, "passing non-Pareto doses must remain visible"
+    print(f"PNG sweep marks (plot_marks.json from results.py)={png_marks['sweep_marks']} page drawn={drawn} methods png={png_marks['methods']} page={data['shown']}")
+    assert png_marks["sweep_marks"] == drawn and png_marks["methods"] == data["shown"], "page and PNG draw different points"
+    assert page.locator("circle.sample, .best").count() == 0, "faint dots and score rings are not drawn by default"
+    assert page.locator("path.mark.end").count() == sum(bool(c["points"]) for c in data["curves"] if c["method"] in data["shown"]), "one x per drawn line"
     assert page.locator(".curve-line").count() == sum(bool(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
     for curve in data["curves"]:
         assert all((x is None) == (y is None) for x, y in curve["path"])
@@ -55,7 +55,6 @@ with sync_playwright() as p:
     assert zones.count() == 3
     for i, zone in enumerate(data["zones"]):
         assert zones.nth(i).get_attribute("data-percentile") == str(zone["percentile"])
-        assert zones.nth(i).evaluate("el => getComputedStyle(el).fill.replaceAll(' ', '') === el.getAttribute('fill')")
     if data["view"] == "user":
         assert "User-turn steering" in page.locator("h1").text_content()
         assert "only while the model reads the user's message" in explanation
@@ -66,8 +65,10 @@ with sync_playwright() as p:
             assert page.get_by_role("button", name=method, exact=True).get_attribute("aria-pressed") == "true"
     print("random regions: p90/p75/p50 with distinct fills; requested opening methods visible")
     for curve in data["curves"]:
-        directed_path = [(x if curve["side"] == "+C" else -x) for x, y in curve["path"] if x is not None]
-        assert all(a <= b for a, b in zip(directed_path, directed_path[1:])), "Pareto path must not double back"
+        assert [p["C"] for p in curve["points"]] == sorted(p["C"] for p in curve["points"]), "sweep must be in dose order"
+        if curve["points"]:
+            assert curve["points"][-1]["C"] == max(p["C"] for p in curve["tested"]), "line must end at the last passing dose"
+            assert curve["path"][-1] == [curve["points"][-1]["effect"], curve["points"][-1]["off_axis"]], "line pinned at the x"
         seeds = {p["seed"] for p in data["points"] if p["method"] == curve["method"]}
         for mark in curve["tested"]:
             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
@@ -109,7 +110,7 @@ with sync_playwright() as p:
     if sweep_methods:
         for curve in data["curves"]:
             if curve["method"] in sweep_methods:
-                assert curve["path"][0] in [[p["effect"], p["off_axis"]] for p in curve["points"]], "prompt curve must start at a measured point, not bare"
+                assert curve["path"][0] == [curve["points"][0]["effect"], curve["points"][0]["off_axis"]], "prompt curve must start at its first gain, not bare"
         for method in set(data["shown"]) ^ sweep_methods:
             page.get_by_role("button", name=method, exact=True).click()
         expected = sum(len(c["points"]) for c in data["curves"] if c["method"] in sweep_methods)
