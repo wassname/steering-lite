@@ -474,7 +474,7 @@ def sweep_path(rows: list[dict], fixed_grid: bool, n: int = 12) -> list[list[flo
 def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
-    prompting = [point for point in points if point["method"] in PROMPTS and point["admissible"]]
+    prompting = [point for point in points if point["method"] in PROMPTS]  # baselines stay visible; open star = fails the judge's limits
     random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
     shown = [point for curve in curves.values() for point in curve] + random_live + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
@@ -514,10 +514,11 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     for point in prompting:
         figure.add_trace(go.Scatter(
             x=[point["effect"]], y=[point["off_axis"]], mode="markers",
-            marker={"color": COLORS[point["method"]], "size": 13, "symbol": "star"}, hoverinfo="skip", showlegend=False,
+            marker={"color": COLORS[point["method"]], "size": 13, "symbol": "star" if point["admissible"] else "star-open", "line": {"width": 2, "color": COLORS[point["method"]]}},
+            hoverinfo="skip", showlegend=False,
         ))
         obstacles.append((point["effect"], point["off_axis"]))
-        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}", "color": COLORS[point["method"]]})
+        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}" + ("" if point["admissible"] else " (fails limits)"), "color": COLORS[point["method"]]})
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333333", "size": 11, "symbol": "diamond"}, hoverinfo="skip", showlegend=False))
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
@@ -530,12 +531,12 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[0]}", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt<br>× = last dose that passes the judge's limits (coherence, and false pushback on sound twins), or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt (open ☆ = fails the judge's limits)<br>× = last dose that passes the judge's limits (coherence, and false pushback on sound twins), or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "Jev on-axis change: premise level (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
-        yaxis={"title": "off-axis damage (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "Jev on-axis change: premise level, 0–8 scale (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        yaxis={"title": "off-axis damage, 0–4 scale (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
 
