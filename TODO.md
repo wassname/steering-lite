@@ -12,7 +12,7 @@ Open items from wassname (quotes verbatim). Tick when done; link the evidence. W
 3. [ ] Eval v2 code, no spend:
    - axis `sycophantic` vs `accurate`; engineered prompt for `accurate` regenerated with the same gpt-4o recipe;
    - axis and `eval_version` in the generation key, so v2 writes to a new output dir and never reuses abrasive-axis vectors or answers;
-   - every rung also answers the 100 twins; judge them with `judge.control_request` (false pushback);
+   - every tested dose also answers the 100 twins; judge them with `judge.control_request` (false pushback);
    - FIXME off-target as failure: Jev audit (`on_target`) at every dose; per-answer effect = P(on target) x premise change (an off-target "rejection" earns ~0);
    - report false pushback next to pushback (table + one extra chart); display-only, no new filter threshold;
    - remove the temporary `before_reversal` display rule if on-target weighting removes the corda swerve;
