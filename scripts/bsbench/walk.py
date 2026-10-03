@@ -804,9 +804,9 @@ def walk(args) -> None:
     raise RuntimeError(f"{args.method} s{args.seed} reached the grid ceiling without a confirmed breakdown")
 
 
-def main() -> None:
+def configure(args: argparse.Namespace) -> None:
+    """Flags that change the generation key, applied before any output path is resolved (run_modal uses this too)."""
     global OUT, GEN_KEY
-    args = parse_args()
     if args.smoke:
         OUT = ROOT / "outputs/bsbench-smoke"
         GEN["max_new_tokens"] = 8
@@ -816,6 +816,11 @@ def main() -> None:
         GEN["axis"] = [AXIS[0], args.neg_persona]
         PERSONAS[0] = tuple(GEN["axis"])
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
+
+
+def main() -> None:
+    args = parse_args()
+    configure(args)
     logger.remove()
     logger.add(sys.stderr, format="{time:HH:mm:ss} | {message}")
     walk(args)

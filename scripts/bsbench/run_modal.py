@@ -62,6 +62,7 @@ def cached_on_volume(argv: list[str]) -> bool:
     import walk  # local import: needs the repo venv (torch, transformers)
 
     args = walk.parse_args(argv)
+    walk.configure(args)
     if args.smoke or args.probe:
         return False
     if args.profile or args.vjp_check or args.vjp_split:
