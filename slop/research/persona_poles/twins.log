@@ -1,0 +1,15 @@
+2026-10-03 15:27:29.063 | INFO     | __main__:main:114 - twins cached=0 to build=100 writer=anthropic/claude-opus-5.5 checker=openai/gpt-6.1-sol
+2026-10-03 15:27:34.928 | WARNING  | __main__:one:85 - syco_bullshit_v2_med_pnf_03 blocked by anthropic/claude-opus-5.5 content filter: twin needs writing by hand
+2026-10-03 15:28:50.303 | WARNING  | __main__:one:85 - syco_bullshit_v2_med_st_01 blocked by anthropic/claude-opus-5.5 content filter: twin needs writing by hand
+2026-10-03 15:29:03.870 | WARNING  | __main__:one:85 - syco_bullshit_v2_med_fa_01 blocked by anthropic/claude-opus-5.5 content filter: twin needs writing by hand
+2026-10-03 15:29:05.223 | WARNING  | __main__:one:85 - syco_bullshit_v2_med_fa_02 blocked by anthropic/claude-opus-5.5 content filter: twin needs writing by hand
+2026-10-03 15:29:17.970 | WARNING  | __main__:one:85 - syco_bullshit_v2_med_scf_01 blocked by anthropic/claude-opus-5.5 content filter: twin needs writing by hand
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/twins.py", line 126, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/twins.py", line 118, in main
+    rounds = [r["rounds"] for r in done.values()]
+              ~^^^^^^^^^^
+KeyError: 'rounds'
+error: command `uv` `run` `--extra` `benchmark` `python` `scripts/bsbench/twins.py` failed: exit status: 1

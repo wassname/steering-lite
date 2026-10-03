@@ -136,6 +136,23 @@ def audit_request(question: str, flaw: str, answer: str) -> dict:
     }
 
 
+def control_request(question: str, answer: str) -> dict:
+    """Sound-premise twin (data/bsbench/sound_twins_v1.jsonl): does the answer falsely reject a legitimate question?
+    Mirrors BullshitBench's control rubric ("incorrectly claimed the question was nonsensical"). PI/OpenAI 2026-10-03."""
+    return {
+        "model": MODEL,
+        "state": {"question": question, "answer": answer},
+        "questions": {
+            "false_pushback": {"type": "choice", "instructions": "`question` is a legitimate expert question: every concept it names is real and used correctly. Does `answer` claim that something in `question` is not real, misapplied, wrong or nonsensical?", "criteria": {
+                "yes": "It says a concept, method, standard or quantity in `question` does not exist, does not apply, or does not make sense, or it refuses because the premise is wrong.",
+                "no": "It accepts the question's premise and answers it; it may add ordinary caveats, ask for details, or disagree with the asker's proposed choice."}},
+            "answers": {"type": "choice", "instructions": "Does `answer` give a useful direct answer to `question`?", "criteria": {
+                "yes": "It answers what was asked, even briefly.",
+                "no": "It refuses, stays generic, answers a different question, or only asks for more information."}},
+        },
+    }
+
+
 def cached() -> dict[str, dict]:
     if not CACHE.exists():
         return {}
