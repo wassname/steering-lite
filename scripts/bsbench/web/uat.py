@@ -46,8 +46,11 @@ with sync_playwright() as p:
         assert drawn_label.evaluate("el => { const b = el.getBBox(); return b.x >= 70 && b.x+b.width <= 980 && b.y >= 30 && b.y+b.height <= 510; }")
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
-    assert data["admissibility"] == "jev_mean_damage"
-    assert all(p["admissible"] == (p["steered_damage"] <= data["max_damage"]) for p in data["points"]), "mechanical diagnostics must not reject Jev-passing points"
+    assert data["admissibility"] == "jev_mean_damage and (eval v2) jev_false_pushback"
+    passes = lambda p: p["steered_damage"] <= data["max_damage"] and ("false_pushback" not in p or p["false_pushback"] - p["false_pushback_bare"] <= data["max_false_pushback"])
+    assert all(p["admissible"] == passes(p) for p in data["points"]), "only Jev limits decide admissibility; mechanical diagnostics must not reject points"
+    if any("false_pushback" in p for p in data["points"]):
+        assert page.locator("#discrimination img").count() == 1, "eval v2 pages show the false-pushback chart"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
     assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"
@@ -73,7 +76,7 @@ with sync_playwright() as p:
         for mark in curve["tested"]:
             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
             assert {p["seed"] for p in at} == seeds and all(p["admissible"] for p in at), "curve includes a rejected dose"
-    prompt_count = sum(p["method"] in ("prompting", "prompting_engineered") and p["admissible"] for p in data["points"])
+    prompt_count = sum(p["method"] in ("prompting", "prompting_engineered") for p in data["points"])  # failing prompts drawn as open stars
     assert page.locator(".prompt-baseline").count() == prompt_count, "swept prompts must not appear as baseline stars"
     assert page.locator(".prompt-baseline path").evaluate_all("els => els.every(el => { const t = el.transform.baseVal.consolidate().matrix; return t.e >= 0 && t.e <= 1000 && t.f >= 0 && t.f <= 560; })"), "prompt baseline outside SVG view"
     gain_image = page.locator('img[src="prompt_gains.png"]')

@@ -640,7 +640,7 @@ def audit_table(rows: list[dict]) -> str:
 def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
-    prompts = [p for p in site["points"] if p["method"] in PROMPTS and p["admissible"]]
+    prompts = [p for p in site["points"] if p["method"] in PROMPTS]
     shown = [p for c in curves for p in c["tested"]] + prompts
     zones = [p for zone in site["zones"] for p in zone["path"]]
     x_max = 1.08 * max([abs(p["effect"]) for p in shown] + [abs(p[0]) for p in zones] + [.5])
@@ -648,7 +648,7 @@ def svg_labels(site: dict) -> list[dict]:
     labels = [{"method": c["method"], "side": c["side"], "x": c["path"][-1][0], "y": c["path"][-1][1],
                "text": f"{LABELS[c['method']]} {c['side']}", "color": site["colors"][c["method"]]} for c in curves]
     labels += [{"method": p["method"], "side": p["side"], "x": p["effect"], "y": p["off_axis"],
-                "text": f"{PROMPTS[p['method']]} {p['side']}", "color": site["colors"][p["method"]]} for p in prompts]
+                "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (fails limits)"), "color": site["colors"][p["method"]]} for p in prompts]
     obstacles = [(0., 0.)] + [(p["effect"], p["off_axis"]) for p in shown]
     placed = place_labels(labels, (-x_max, x_max), (y_max, -.05), obstacles=obstacles,
                           fig_w=1000, fig_h=560, margin={"l": 70, "r": 20, "t": 30, "b": 50},

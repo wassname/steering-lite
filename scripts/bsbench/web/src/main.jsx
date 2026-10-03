@@ -13,7 +13,7 @@ const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
-  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method) && p.admissible);
+  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method));  // open star = fails the judge's limits
   const shown = [...curves.flatMap(c => c.tested), ...prompts];
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
@@ -60,7 +60,7 @@ function Plot({ data, visible, selected, onSelect }) {
       })}
       {prompts.map(p => <g key={pointId(p)} className="mark prompt-baseline" onClick={() => onSelect(p)}
         onPointerEnter={() => setHover(p)} onPointerLeave={() => setHover(null)}>
-        <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={data.colors[p.method]} />
+        <path d="M0,-8 L2.4,-2.5 8,-2.5 3.5,1 5,7 0,3.5 -5,7 -3.5,1 -8,-2.5 -2.4,-2.5Z" transform={`translate(${x(p.effect)} ${y(p.off_axis)})`} fill={p.admissible ? data.colors[p.method] : '#fff'} stroke={data.colors[p.method]} strokeWidth={p.admissible ? 0 : 2} />
         {curveLabel(p.method, p.side, x(p.effect), y(p.off_axis))}
       </g>)}
       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
@@ -186,7 +186,7 @@ function App() {
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right accepts the made-up premise more (sycophantic), left rejects it more (skeptical).
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
         Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare, which so far has meant answers drifting off the question (a judged check will replace this). A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. Coherence uses the mean over questions; individual retained answers can still be badly damaged.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic"; an open star failed the judge's limits (damage, or false pushback on the sound twins).
         The grey region is what random directions do at the same doses (both signs, only directions still coherent at both): the outer band holds the middle 80% of their effects, the inner band the middle 50%, and the grey line is the median. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
