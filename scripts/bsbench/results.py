@@ -147,19 +147,21 @@ def shown_axis(points: list[dict]) -> list[str]:
     return list(axes.pop())
 
 
-def method_curve(points: list[dict], method: str, side: str) -> list[dict]:
-    """Seed-mean points at each C where every seed of this method is admissible (reference `_means`)."""
+def method_curve(points: list[dict], method: str, side: str, *, candidates: bool = False) -> list[dict]:
+    """Seed-mean points at each C where every seed of this method is admissible (reference `_means`).
+    candidates: every dose all seeds reached, admissible or not; the bootstrap re-decides admissibility per draw."""
     seeds = {point["seed"] for point in points if point["method"] == method}
     curve = []
     for C in sorted({point["C"] for point in points if point["method"] == method and point["side"] == side}):
         at = [point for point in points if point["method"] == method and point["side"] == side and point["C"] == C]
-        if {point["seed"] for point in at if point["admissible"]} != seeds:
+        if {point["seed"] for point in at if candidates or point["admissible"]} != seeds:
             continue
         questions = [q | {"seed": point["seed"]} for point in at for q in point["questions"]]
         curve.append({
             "method": method, "side": side, "C": C, "admissible": True, "fixed_grid": at[0]["fixed_grid"],
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
             "room": room(questions, side), "questions": questions, **false_pushback(at),
+            "twins": [t | {"seed": point["seed"]} for point in at for t in point.get("twins", [])],
         })
     return curve
 
@@ -189,17 +191,23 @@ def room_score(best: dict) -> float:
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    The damage cap is reapplied to each draw (the false-pushback cap is not); intervals remain conditional on original Jev
-    admissibility and seed coverage. — PI/OpenAI"""
+    Both Jev limits are re-decided in each draw: damage on the drawn questions, false pushback on their twins (same
+    scenarios, so bench and twin are resampled together). Curves come in as candidates (all doses), so a dose that
+    failed on the full set can pass in a draw and vice versa. Intervals remain conditional on seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
-        by = {}
+        by, twins_by = {}, {}
         for q in point["questions"]:
             by.setdefault((q["seed"], q["scenario"]), []).append(q)
+        for t in point.get("twins", []):
+            twins_by.setdefault((t["seed"], t["scenario"]), []).append(t)
         chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
-        if not chosen:  # random: a drawn seed may not be admissible at this dose
+        if not chosen:  # random: a drawn seed may not have reached this dose
             continue
         if mean(q["steered_damage"] for q in chosen) > MAX_DAMAGE:
+            continue
+        twins = [t for seed in seeds for scenario in scenarios for t in twins_by.get((seed, scenario), [])]
+        if twins and mean(t["false_pushback"] - t["false_pushback_bare"] for t in twins) > MAX_FALSE_PUSHBACK:
             continue
         out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen), "room": room(chosen, point["side"])})
     return out
@@ -225,26 +233,29 @@ def bootstrap(side_curves: dict[str, list[dict]], scenarios: list[str], seeds: l
     return low(scores), high(scores), empty, low(room_scores), high(room_scores)
 
 
-def random_curves(points: list[dict]) -> dict[str, list[dict]]:
-    """Random is scored like a method whose seeds are pooled at each C (reference `_summary`)."""
+def random_curves(points: list[dict], *, candidates: bool = False) -> dict[str, list[dict]]:
+    """Random is scored like a method whose seeds are pooled at each C (reference `_summary`).
+    The admissible population changes with C; report how many seeds a scored dose rests on (`seeds_at`)."""
     out = {}
     for side in ("+C", "-C"):
         group = [point for point in points if point["method"] == "random" and point["side"] == side]
         out[side] = []
         for C in sorted({point["C"] for point in group}):
-            live = [point for point in group if point["C"] == C and point["admissible"]]
+            live = [point for point in group if point["C"] == C and (candidates or point["admissible"])]
             if live:
                 questions = [q | {"seed": point["seed"]} for point in live for q in point["questions"]]
                 out[side].append({
                     "C": C, "side": side, "admissible": True,
                     "effect": mean(point["effect"] for point in live), "off_axis": mean(point["off_axis"] for point in live),
                     "room": room(questions, side), "questions": questions, **false_pushback(live),
+                    "twins": [t | {"seed": point["seed"]} for point in live for t in point.get("twins", [])],
+                    "seeds_at": len(live),
                 })
     return out
 
 
-def curves_for(points: list[dict], method: str) -> dict[str, list[dict]]:
-    return random_curves(points) if method == "random" else {side: method_curve(points, method, side) for side in ("+C", "-C")}
+def curves_for(points: list[dict], method: str, *, candidates: bool = False) -> dict[str, list[dict]]:
+    return random_curves(points, candidates=candidates) if method == "random" else {side: method_curve(points, method, side, candidates=candidates) for side in ("+C", "-C")}
 
 
 def choose(points: list[dict]) -> dict[str, tuple[dict, dict, dict]]:
@@ -263,7 +274,7 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
         score, _ = pareto_score(curves)
         group = [point for point in points if point["method"] == method]
         seeds = sorted({point["seed"] for point in group})
-        low, high, empty, room_low, room_high = bootstrap(curves, scenarios, seeds, rng) if not math.isnan(score) else (float("nan"),) * 5
+        low, high, empty, room_low, room_high = bootstrap(curves_for(points, method, candidates=True), scenarios, seeds, rng) if not math.isnan(score) else (float("nan"),) * 5
         rows.append({
             "method": method, "score": score, "ci": (low, high), "ci_empty": empty, "best": best, "strongest": strongest,
             "score_room": room_score(best), "ci_room": (room_low, room_high),

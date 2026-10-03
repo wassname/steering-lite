@@ -83,37 +83,38 @@ Eval v2 changes three things from the results further down (v1):
 - **Limits.** A dose counts only if mean Jev damage is ≤ 1.5 of 4 and false pushback on the twins is at most 5 pp above bare. Without the second limit, the score picked steers that reject everything.
 - **Axis.** −C is now *skeptical* (v1: abrasive). Each answer's premise change is weighted by Jev's probability that it answers the question asked. The pole came from a [mean_diff screen](slop/reviews/2026-10-03_eval_v2/pole_screen.md) of skeptical, abrasive, candid and accurate.
 
-One seed per method (random: 5 directions per mode). "−C pushback" is the premise change toward rejection at the scored −C dose, in levels of the 0–8 scale. "user turn" adds the vector only while the model reads the user's message. Prompts act only on the prompt, so their rows are the same in both columns.
+One seed per method (random: 5 directions per mode, but its scored −C dose rests on 1 of the 5, because the others fail a limit there). Brackets are 90% bootstrap intervals over questions and seeds, with the dose and both limits re-decided in each draw; where the 5 pp limit binds, small resamples flip which dose passes, so intervals are wide and "−∞" means some draws had no passing dose. "−C pushback" is the premise change toward rejection at the scored −C dose, in levels of the 0–8 scale. "user turn" adds the vector only while the model reads the user's message. Prompts act only on the prompt, so their rows are the same in both columns.
 
 | method | everywhere score↑ | −C pushback, false pushback | user-turn score↑ | −C pushback, false pushback |
 | --- | ---: | ---: | ---: | ---: |
-| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.79 [+0.46, +1.17] | +1.04, +5 pp | +0.44 [+0.11, +0.80] | +0.68, +5 pp |
-| [vjp_value](src/steering_lite/variants/vjp_value.py) | +0.66 [+0.32, +0.98] | +0.88, +4 pp | +0.54 [+0.19, +0.87] | +0.81, +5 pp |
-| [linear_act](src/steering_lite/variants/linear_act.py) | +0.62 [+0.33, +0.89] | +0.87, +5 pp | +0.34 [+0.06, +0.51] | +0.68, +2 pp |
-| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.52 [+0.23, +0.85] | +0.78, +4 pp | +0.11 [-0.05, +0.33] | +0.27, +0 pp |
-| [chars](src/steering_lite/variants/chars.py) | +0.35 [+0.09, +0.64] | +0.57, +1 pp | +0.12 [-0.02, +0.29] | +0.35, -0 pp |
-| *random* | +0.23 [-0.19, +0.43] | +0.35, +0 pp | -0.01 [-0.39, +0.23] | +0.13, +1 pp |
-| prompting_scale | +0.20 [-0.98, +0.35] | +0.41, +1 pp | +0.20 [-0.98, +0.35] | +0.41, +1 pp |
-| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | +0.01 [-0.17, +0.31] | +0.71, +4 pp | -0.25 [-0.48, -0.01] | +0.68, +2 pp |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.79 [-0.01, +1.11] | +1.04, +5 pp | +0.44 [-0.06, +0.83] | +0.68, +5 pp |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | +0.66 [+0.19, +1.03] | +0.88, +4 pp | +0.54 [−∞, +0.86] | +0.81, +5 pp |
+| [linear_act](src/steering_lite/variants/linear_act.py) | +0.62 [+0.20, +0.87] | +0.87, +5 pp | +0.34 [+0.06, +0.51] | +0.68, +2 pp |
+| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.52 [+0.21, +0.85] | +0.78, +4 pp | +0.11 [-0.05, +0.33] | +0.27, +0 pp |
+| [chars](src/steering_lite/variants/chars.py) | +0.35 [+0.12, +0.71] | +0.57, +1 pp | +0.12 [-0.02, +0.29] | +0.35, -0 pp |
+| *random* | +0.23 [-0.19, +0.43] | +0.35, +0 pp | -0.01 [-0.37, +0.24] | +0.13, +1 pp |
+| prompting_scale | +0.20 [-0.94, +0.36] | +0.41, +1 pp | +0.20 [-0.94, +0.36] | +0.41, +1 pp |
+| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | +0.01 [-0.17, +0.31] | +0.71, +4 pp | -0.25 [−∞, -0.01] | +0.68, +2 pp |
 | prompting_engineered_scale | -0.60 [-1.01, -0.23] | +0.88, +3 pp | -0.60 [-1.01, -0.23] | +0.88, +3 pp |
-| [corda_pca](src/steering_lite/variants/corda_pca.py) | -0.76 [-1.06, -0.56] | -0.62, -1 pp | -1.06 [-1.40, -0.83] | -0.89, -1 pp |
+| [corda_pca](src/steering_lite/variants/corda_pca.py) | -0.76 [-1.06, -0.56] | -0.62, -1 pp | -1.06 [-1.56, -0.76] | -0.89, -1 pp |
 | *prompting* | — | — | — | — |
 | *prompting_engineered* | — | — | — | — |
 
-The plain and engineered prompts have no score: their −C prompts reject nonsense strongly (1.70 and 1.92 levels) but add +26 and +17 pp of false pushback, so they fail the limit. corda_pca moves the wrong way on both sides with this axis (it scored +0.26 on v1).
+The plain and engineered prompts have no score: their −C prompts reject nonsense strongly (1.70 and 1.92 levels) but add +26 and +17 pp of false pushback, and their +C prompts exceed the damage limit. The engineered prompt *gain sweep* does pass on −C (0.88 levels at gain 0.053, +3 pp), close to the best vectors; its low score comes from its +C side. corda_pca moves the wrong way on both sides with this axis (it scored +0.26 on v1).
 
 ![Eval v2, steering everywhere, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_v2_everywhere.png)
 
-The second chart shows each −C sweep as pushback gained on the nonsense questions against false pushback gained on the twins. All methods follow roughly one curve: beyond about one premise level of pushback, false pushback rises steeply.
+The second chart shows each −C sweep as pushback gained on the nonsense questions against false pushback gained on the twins. For every method false pushback rises steeply beyond about one premise level of pushback, but the methods differ there: at about 1.3 levels vjp_value adds +7 pp, vjp_resid, chars and linear_act +14 to +16 pp.
 
 ![Eval v2, −C discernment against false pushback](assets/bsbench_qwen3.5-4b_v2_discrimination.png)
 
 What this suggests (one seed, one model, so treat as provisional):
 
-- With the false-pushback limit, steering everywhere scores higher than steering only the user turn for every vector method tested (point estimates; the intervals overlap for vjp_value). This reverses the v1 user-turn result, which rested on doses that also rejected sound questions.
-- The 5 pp limit decides most −C doses. With a different trade-off rule (for example a net score) the engineered prompt would compare differently.
+- With the false-pushback limit, steering everywhere scores higher than steering only the user turn for every vector method tested, but only as point estimates: the intervals overlap for six of the seven. Without the limit, the user-turn steers reach large −C effects only at doses that also reject sound questions (vjp_resid: +63 pp false pushback at its uncapped best dose), which is what the v1 user-turn result rested on.
+- On −C alone, the best vector (vjp_resid everywhere) and the best prompt sweep under the limit are close: a paired bootstrap of the net −C score difference is +0.16 [−0.22, +0.56] (fresh-eyes review). We do not claim steering beats prompting on −C.
+- The skeptical pole was picked on the same 100 questions and mean_diff walk that the table reports, so the mean_diff row confirms the screen rather than replicating it.
 
-Notes: [manual read](slop/reviews/2026-10-03_eval_v2/main_read.md), [pilot read](slop/reviews/2026-10-03_eval_v2/pilot_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v2-everywhere/index.html`, `v2-user/index.html`.
+Notes: [fresh-eyes review](slop/reviews/2026-10-04_fresh_eyes/review.md), [manual read](slop/reviews/2026-10-03_eval_v2/main_read.md), [pilot read](slop/reviews/2026-10-03_eval_v2/pilot_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v2-everywhere/index.html`, `v2-user/index.html`.
 
 ### Eval v1: abrasive axis, no control set
 

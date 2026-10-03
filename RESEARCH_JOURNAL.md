@@ -346,7 +346,7 @@ Observations:
 | vjp_resid, user turn, −C = accurate, no cap | 1.54 at C=0.79 | +36 pp | `outputs/bsbench/results/v2-pilot-user/points.json` |
 | same, with cap (≤ +5 pp) | 0.40 at C=0.40 | +5 pp | same |
 | vjp_resid, everywhere, accurate | 0.80 at C=0.157 | +3 pp | `v2-pilot-everywhere` |
-| mean_diff, everywhere, accurate | 0.02 (wrong way above C=0.1: +0.45 at C=0.63) | +0..3 pp | `v2-pilot-everywhere` |
+| mean_diff, everywhere, accurate | −0.02, i.e. toward acceptance (+0.45 at C=0.63) | +0..3 pp | `v2-pilot-everywhere` |
 | mean_diff, everywhere, skeptical | 0.78 at C=0.5 | +4 pp | `v2-pole-skeptical` |
 | mean_diff, everywhere, abrasive | 0.56 at C=0.315 | +4 pp | `v2-pole-abrasive` |
 | mean_diff, everywhere, candid | 0.40 at C=0.63 | +4 pp | `v2-pole-candid` |
@@ -362,3 +362,16 @@ Interpretation:
 Independent replication (mpc session, PI/OpenAI, 2026-10-03, their VJP-delta vector on Qwen3.5-4B, same twins and `control_request`): Jev false pushback BASE 0.02; all-token −0.177 0.11 (+9 pp); user turn −0.70 0.49 (+47 pp); user turn + decaying dose after it 0.66 (+64 pp). Source: `/workspace/2026/mfv/flow-heal-eval-mpc/runs/20261001_mpc_kl_budget_left/twins/jev/false_pushback.md`. Same direction as here: user-turn −C gains are mostly the contrarian template.
 
 Next: main run on the skeptical axis (7 methods × everywhere/user turn, 5 random directions per mode, prompt baselines), then manual read and blind plot check.
+
+## 2026-10-04 -- Eval v2 main run: fresh-eyes corrections
+
+Main run on the skeptical axis is in README "Eval v2" (tables generated from `outputs/bsbench/results/v2-{everywhere,user}/index.md`). A fresh-eyes review by PI/Sol (`slop/reviews/2026-10-04_fresh_eyes/review.md`) checked all 100 README table numbers against points.json (no mismatch) and the bench/twin alignment at all 938 points (no mismatch). Corrections made from it (PI/OpenAI):
+
+- Sign: accurate mean_diff −C pushback at its best dose is −0.02 (slightly toward acceptance), not +0.02. Fixed above and in `pole_screen.md`.
+- Bootstrap: the false-pushback limit was fixed at its full-set decision. Now both limits are re-decided in each draw over all doses, with bench questions and their twins resampled together (`results.py::resample`). vjp_resid everywhere: [+0.46, +1.17] → [−0.01, +1.11]; vjp_value user turn now has draws with no passing −C dose (−∞). Point scores unchanged.
+- Random −C reference: its scored −C dose rests on 1 of 5 directions in both views (the others fail a limit at that dose). Stated in README; not changed in the scoring.
+- Claims narrowed: everywhere > user turn holds only as point estimates (intervals overlap for six of seven methods); on −C alone, best vector vs best prompt sweep under the cap is +0.16 [−0.22, +0.56] (Sol's paired bootstrap at fixed doses), so no "steering beats prompting" claim; the skeptical pole was selected on the same data the mean_diff row reports.
+- Sol's calibrated probabilities: user-turn gains mostly contrarianism ~80%; skeptical better than accurate for vector methods ~70% in general, ~90% for these two methods on 4B; best vector beats best prompt sweep on −C ~65%.
+- Sol's twin read (10 random twins at vjp_resid's scored dose): 9 of 10 Jev false-pushback ratings look right; one (med_tce_01, 0.72) is disputed, worth 0.62 pp of the +4.84 pp. Two answers with low false pushback contain factual errors (Epic Systems holding reversed; Apdex threshold direction), which this rubric does not measure.
+
+Next (TODO.md Later): held-out questions for pole and dose selection; more seeds; a discernment-focused prompt baseline; corda_pca sign check.
