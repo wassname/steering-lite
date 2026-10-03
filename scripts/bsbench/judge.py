@@ -193,8 +193,9 @@ async def _refresh(todo: dict[str, dict]) -> None:
             for attempt in range(6):
                 try:
                     response = await client.post(URL, json=request, headers=headers, timeout=60)
-                except httpx.TimeoutException:
-                    logger.warning("jev timeout attempt={}/6", attempt + 1)
+                except httpx.TransportError as error:  # timeouts and dropped connections (ReadError killed a 17k-cell run)
+                    logger.warning("jev {} attempt={}/6", type(error).__name__, attempt + 1)
+                    await asyncio.sleep(5 * 2**attempt)
                     continue
                 if response.status_code in (408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 529):  # 52x gateway, 529 overloaded
                     logger.warning("jev {} attempt={}/6", response.status_code, attempt + 1)
