@@ -3,6 +3,7 @@
 From vjp-steering 7f0782a `scripts/judge.py` (the judge-independent part).
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -14,6 +15,15 @@ REPORT_SEEDS = {"dev": range(1), "full": range(3)}
 RANDOM_SEEDS = {"dev": range(32), "full": range(11)}  # denser dev reference; published full unchanged. PI/OpenAI
 USER_RANDOM_SEEDS = {"dev": range(32), "full": range(50)}  # random-user: reference for user-positions steering
 PROMPT_WALKS = ("prompting", "prompting_engineered", "prompting_scale", "prompting_engineered_scale")
+# Eval v2 (2026-10-03): -C persona `accurate` (v1 `abrasive` was contrarian on sound questions,
+# slop/research/persona_poles/results.md); every rung also answers the sound-premise twins (control set).
+EVAL_VERSION = 2
+AXIS = ("sycophantic", "accurate")  # (+C persona, -C persona)
+TWINS = ROOT / "data/bsbench/sound_twins_v1.jsonl"
+# everything that defines an answer is in its cache key; change one and all answers regenerate in a new output dir
+GEN = {"suffix": " Answer in 2 short sentences.", "enable_thinking": False, "do_sample": False, "max_new_tokens": 512,
+       "axis": list(AXIS), "eval_version": EVAL_VERSION, "twins": TWINS.name}
+GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
 
 
 def load_cohort() -> dict[str, dict]:
@@ -22,10 +32,18 @@ def load_cohort() -> dict[str, dict]:
     return {row["scenario"]: row for row in rows}
 
 
+def load_twins() -> dict[str, dict]:
+    """Sound-premise twin of each BS-bench question, keyed by the original scenario; all 100 are usable."""
+    rows = [json.loads(line) for line in TWINS.open()]
+    assert len(rows) == 100 and all(r["usable"] for r in rows)
+    return {r["scenario"]: {"scenario": r["scenario"], "prompt": r["question"]} for r in rows}
+
+
 def default_model_dir(model: str = "Qwen/Qwen3.5-4B") -> Path:
-    dirs = [path for path in (ROOT / "outputs/bsbench").glob(f"{model.replace('/', '--')}-g*") if (path / "walks").is_dir()]
-    assert len(dirs) == 1, f"expected one output dir for {model}, found {dirs}"
-    return dirs[0]
+    """The current eval version's output dir; earlier versions live in other -g<key> dirs (pass --model-dir)."""
+    path = ROOT / "outputs/bsbench" / f"{model.replace('/', '--')}-g{GEN_KEY}"
+    assert (path / "walks").is_dir(), f"no walks for {model} at eval v{EVAL_VERSION} ({path})"
+    return path
 
 
 def walk_certificates(model_dir: Path, cohort: str, view: str = "benchmark") -> list[dict]:
@@ -57,21 +75,28 @@ def read_answers(path: Path) -> dict[str, dict]:
 
 
 def demo_rows(model_dir: Path, certificate: dict) -> list[dict]:
-    """One row per (rung, side, question): the bare and steered answers."""
+    """One row per (rung, side, question): the bare and steered answers. From eval v2 also one row per sound twin
+    (set="twin", flaw=None); v1 certificates have no twins."""
     cohort = load_cohort()
     scenarios = list(cohort)[COHORTS[certificate["cohort"]]]
+    twin_set = certificate.get("eval_version", 1) >= 2  # v1 certificates predate the field and the twins
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
+    twins = load_twins() if twin_set else {}
+    bare_twins = read_answers(model_dir / "answers_twins/bare/bare.jsonl") if twin_set else {}
     rows = []
     for rung in certificate["rungs"]:
         for side in ("+C", "-C"):
             steered = read_answers(model_dir / rung[side]["answers"])
+            steered_twins = read_answers(model_dir / rung[side]["twin_answers"]) if twin_set else {}
             for scenario in scenarios:
                 assert bare[scenario]["prompt"] == steered[scenario]["prompt"] == cohort[scenario]["prompt"]
-                rows.append({
-                    "method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side,
-                    "vignette": scenario, "prompt": cohort[scenario]["prompt"], "flaw": cohort[scenario]["nonsensical_element"],
-                    "bare": bare[scenario]["text"], "steered": steered[scenario]["text"],
-                })
+                common = {"method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side, "vignette": scenario}
+                rows.append({**common, "set": "bench", "prompt": cohort[scenario]["prompt"], "flaw": cohort[scenario]["nonsensical_element"],
+                             "bare": bare[scenario]["text"], "steered": steered[scenario]["text"]})
+                if twin_set:
+                    assert bare_twins[scenario]["prompt"] == steered_twins[scenario]["prompt"] == twins[scenario]["prompt"]
+                    rows.append({**common, "set": "twin", "prompt": twins[scenario]["prompt"], "flaw": None,
+                                 "bare": bare_twins[scenario]["text"], "steered": steered_twins[scenario]["text"]})
     return rows
 
 

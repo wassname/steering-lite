@@ -1,21 +1,39 @@
 # TODO
 
-Open items from wassname, 2026-10-03 (quotes verbatim). Tick when done; link the evidence.
+Open items from wassname (quotes verbatim). Tick when done; link the evidence. Work top to bottom.
 
-- [ ] Research: monotonic prompt-strength dials. > "please have a subagent (sol 6.1) do a search for ways people dial prompts up and down monotonically. pormpt prefix. look in sterrabiltiy for ideas too https://github.com/generative-computing/steerability/" Includes classifier-free guidance on logits as the known candidate. Output: `slop/research/2026-10-03_prompt_dials.md`.
-- [/] Prompt gain grid: > "so for prompting can we onlyh ramp from 0 to 1 gain? with a min of 5%?" > "lets use log spacing from ~ to 1 then". Done in walk.py: quarter-octaves 2^-4.5..1 (19 gains). Running on Modal (full, then dev, sequentially: shared answer cache).
-- [ ] Opposite of sycophancy that is not refusal. > "have you got any ideas for what's opposite to sycophancy but distinct from refusal?? maybe ask /oracle pnael for diverse opinions" Context: BullshitBench grades "Clear pushback / Partial challenge / Accepted nonsense" and removes refusals from the denominator.
-- [ ] Maybe rename the -C persona (abrasive). > "we might also want to change abrasive -> something else? what does https://github.com/petergpt/bullshit-benchmark use" Answer: they score "clear pushback"; no opposite axis ("it does not measure how often models incorrectly reject valid questions").
-- [ ] FIXME: count off-target answers as failure, not rejection. > "not responsing to question is a form of failure that I haden't considered! need to add ... this will mean bumping the eval version and redoing. metadata shoulsd have eval verison" Plan: Jev on_target per answer at every dose, weight premise effect by P(on target) or add it to the rubric; add `eval_version` to points.json and walk/judge metadata; re-judge.
-- [ ] FIXME blind check: > "I showed the graph to a model blind and it totally misunderstood!!! not good we need to improve and iterate untill it's self evident to a blind agent." Show the PNG to fresh agents with no spec/code; iterate until they recover the message in the spec.
-- [ ] Eval v2 rubric (with the FIXME above): separate incoherence (the stop) from side effects (the y axis); maybe report BullshitBench's three categories (clear pushback / partial challenge / accepted) alongside; flag prompt/role leaks (echoing the persona instruction, role tags, <think>) as a judged check, not only the regex diagnostic.
-- [ ] Terms: x = behaviour change, y = side effects, stop = coherence/fluency. wassname: > "the generative paper uses the term fluency? should I ahve the terms I use to normalise? or emphasis it's a behaviur itnervention? should I inot seeprate incoherence/fluency from side effects?"
-- [x] Faint dots: moot, lines now pass through every passing dose (whole sweep).
-- [ ] Plot purpose agreed and written down: `slop/specs/20261003_bsbench_plot_purpose.md` (draft, needs wassname's edit).
-- [ ] Plot: lines show the whole sweep, bare to last coherent dose (x), not only Pareto points. > "it's mean to describe the sweep from start to end, and the best tradeof is visually obvious as a pareto front"
-- [ ] Random contours: zero-fill makes a weird edge at 0. > "the only problem is there's a weird effect at 0 because we will to zero. maybe we should not have done that?"
-- [ ] query_steer user-turn walk not exhausted (still Jev-coherent at C=4096). Rerun with more rungs, about $1-2.
-- [ ] Sound-premise control for user-turn -C (contrarian rejection?), about $1-2.
-- [ ] Temporary display rule `results.before_reversal` (stop a line before its effect swings back past bare). Remove once eval v2 judges on-target at every dose. Trigger: corda_pca +C user turn, C=64 effect -2.72 still Jev-coherent; answers reject the premise but drift to questions not asked ("what it should be equal to", "Newtons or Pascals", "revenue").
-- [ ] Prompt gain dial is set by the first RMSNorm: instruction-token embedding RMS is about 0.013, eps 1e-6, so RMSNorm cancels the gain above about sqrt(eps)/0.013 = 0.077 and shrinks it below (fraction of normal layer-0 input: g=0.0625 0.63, 0.088 0.75, 0.125 0.85). This is the switch seen at 0.06-0.09. A real dial would scale after the first norm, or use CFG.
-- [ ] When eval v2 judge/rubric is final: send `mpc` (intercom, /workspace/2026/mfv/flow-heal-eval-mpc, branch mpc-steer) the commit/path of the judge code, how to run it on a generations.jsonl with a BASE column, and the new axis name. Their failure modes match ours: rejections that invent facts ("physician's license to expire after only about 4.6 years", effect -5.35) and off-target safety refusals counted as rejections. Also tell `lucid24`.
+## Now: eval v2, the "accurate" axis and the control set (approved 2026-10-03)
+
+> "yes switch, and add control set. looking forward to new graph. spend naother $50 or wharever you need."
+> "after the first run make sure to check generations manually as per ml-debug ko"
+
+1. [x] Pick the opposite pole. `accurate` is the only persona that raised pushback on nonsense without raising false pushback on sound questions (net +7 [+3, +13]; `pushes back` -11). Evidence: `slop/research/persona_poles/results.md`. Oracle panel: `slop/research/2026-10-03_oracle_opposite_of_sycophancy.md`.
+2. [x] Control set: 100 sound-premise twins, `data/bsbench/sound_twins_v1.jsonl` (writer Opus 5.5, checker GPT-6.1-Sol, all 100 read by hand, 8 hand-written or fixed).
+3. [ ] Eval v2 code, no spend:
+   - axis `sycophantic` vs `accurate`; engineered prompt for `accurate` regenerated with the same gpt-4o recipe;
+   - axis and `eval_version` in the generation key, so v2 writes to a new output dir and never reuses abrasive-axis vectors or answers;
+   - every rung also answers the 100 twins; judge them with `judge.control_request` (false pushback);
+   - FIXME off-target as failure: Jev audit (`on_target`) at every dose; per-answer effect = P(on target) x premise change (an off-target "rejection" earns ~0);
+   - report false pushback next to pushback (table + one extra chart); display-only, no new filter threshold;
+   - remove the temporary `before_reversal` display rule if on-target weighting removes the corda swerve;
+   - smoke tests (`just check`).
+4. [ ] First run, small: mean_diff + vjp_resid, user turn and everywhere, 4B full. Then check generations by hand per ml-debug (read answers at low / best / last dose for both sets, quote them), before anything else runs.
+5. [ ] Main run (budget about $50): mean_diff, vjp_resid, vjp_value, sspace_scale, corda_pca, chars, linear_act; user turn and everywhere; random reference; prompt + engineered prompt + both gain sweeps. 4B full.
+6. [ ] Pull, Jev judge, build reports, browser UAT, look at the PNGs.
+7. [ ] Blind check: show the new plot to fresh agents with no spec or code; iterate until they recover the message in `slop/specs/20261003_bsbench_plot_purpose.md`.
+8. [ ] Fresh-eyes review, results.md, journal entry, commit.
+9. [ ] Send `mpc` and `lucid24` the judge code path, how to run it on a generations.jsonl with a BASE column, and the axis name.
+
+## Later
+
+- [ ] Research: monotonic prompt-strength dials (classifier-free guidance on logits is the known candidate). > "please have a subagent (sol 6.1) do a search for ways people dial prompts up and down monotonically" Output: `slop/research/2026-10-03_prompt_dials.md`. Sol run queued in the oracle chain.
+- [ ] Prompt gain dial is set by the first RMSNorm: instruction-token embedding RMS is about 0.013, eps 1e-6, so RMSNorm cancels the gain above about sqrt(eps)/0.013 = 0.077 (fraction of normal layer-0 input: g=0.0625 0.63, 0.088 0.75, 0.125 0.85). A real dial would scale after the first norm, or use CFG.
+- [ ] Eval v2 follow-ups: separate incoherence (where a line stops) from side effects (y axis) with small yes/no Jev checks (makes sense, loops, role or prompt leak, off topic); terms on the plot. > "should I inot seeprate incoherence/fluency from side effects?"
+- [ ] query_steer user-turn walk not exhausted (still Jev-coherent at C=4096).
+- [ ] Ramp variant of user-turn steering: answer tokens ramp 0 to 1 over 32 tokens (wassname's idea, `~/.agents/skills/steering-concepts/references/token_position_steering.md`).
+
+## Done
+
+- [x] Plot spec agreed: `slop/specs/20261003_bsbench_plot_purpose.md`; lines show the whole sweep pinned at the x; rings and faint dots removed; random bands not zero-filled (commit a087934).
+- [x] Prompt gain grid 2^-4.5..1 (log spaced), full + dev walked and judged.
+- [x] BullshitBench rubric checked: clear pushback / partial / accepted; v2 has no controls.

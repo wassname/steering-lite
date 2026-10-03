@@ -162,11 +162,19 @@ def cached() -> dict[str, dict]:
 
 
 def aware_requests(rows: list[dict]) -> dict[str, dict]:
+    """Every answer the scores need: BS-bench answers get the aware rubric and (eval v2) the on-target audit;
+    sound-twin answers get the control rubric."""
     out = {}
     for row in rows:
         for text in (row["bare"], row["steered"]):
-            request = aware_request(row["prompt"], row["flaw"], text)
-            out[key(request)] = request
+            if row.get("set") == "twin":
+                requests = [control_request(row["prompt"], text)]
+            elif row.get("set") == "bench":  # eval v2 rows; v1 rows have no "set" and get only the aware rubric
+                requests = [aware_request(row["prompt"], row["flaw"], text), audit_request(row["prompt"], row["flaw"], text)]
+            else:
+                requests = [aware_request(row["prompt"], row["flaw"], text)]
+            for request in requests:
+                out[key(request)] = request
     return out
 
 
@@ -251,13 +259,14 @@ def main() -> None:
     parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
     parser.add_argument("--refresh", action="store_true", help="call the API for missing cells (else only report them)")
     parser.add_argument("--model", default="Qwen/Qwen3.5-4B", help="steered model whose walks to judge")
+    parser.add_argument("--model-dir", type=Path, help="output dir to judge (default: the current eval version's dir for --model)")
     parser.add_argument("--prompt-check", type=Path, help="score a saved prompt-identity diagnostic instead of benchmark walks")
     parser.add_argument("--audit", action="store_true", help="also rate on_target/fabricates at the blind-table doses (audit_request)")
     args = parser.parse_args()
     if args.prompt_check:
         judge_prompt_check(args.prompt_check, args.refresh)
         return
-    model_dir = default_model_dir(args.model)
+    model_dir = args.model_dir or default_model_dir(args.model)
     missing = refresh(aware_requests(manifest(model_dir, args.cohort)), "aware", args.refresh)
     if missing and not args.refresh:
         return
