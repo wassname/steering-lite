@@ -2,7 +2,25 @@
 
 Open items from wassname (quotes verbatim). Tick when done; link the evidence. Work top to bottom.
 
-## Now: eval v2, the "accurate" axis and the control set (approved 2026-10-03)
+## Now: cost and design fixes (wassname 2026-10-04)
+
+> "rm threshold and fix plt"
+> "you messed that one up. or else everything need to be batched to fill up gpu FIXME"
+> "well why don't you fix? use an image with it in? I'm sure there is one? FIXM"
+> "while validating we don't need to do all, baseline, random, and best will do"
+> "I'm leaning towards "just bs bench" just pushback vs sycoiphancy and close to that"
+
+- [/] Remove the 5 pp false-pushback threshold (added without approval); regenerate plots (needs blind judge refresh for new best doses).
+- [ ] FIXME GPU: 4B bf16 on an L40S ($1.95/h). Use L4 ($0.80/h) or fill the GPU with bigger batches (64-128).
+- [ ] FIXME image: transformers says "The fast path is not available because one of the required library is not installed" (likely causal-conv1d); build the Modal image with it and confirm the warning is gone.
+- [ ] max_new_tokens 512 -> 160 (healthy answers: median 47-57 words, max 93 words, about 125 tokens).
+- [ ] Twins only at each method's chosen dose, not every dose (halves generation).
+- [ ] Validation runs: baseline (mean_diff), random, best (vjp_resid) only.
+- [ ] Oracle: how to cut Modal cost for small-model dose walks.
+- [ ] Decide with wassname: plain BS-bench axis (pushback vs sycophancy), twins as a check only.
+- [ ] Twins were read by hand and checked by GPT-6.1-Sol, not verified with web search; verify with search.
+
+## Earlier: eval v2, the "accurate" axis and the control set (approved 2026-10-03)
 
 > "yes switch, and add control set. looking forward to new graph. spend naother $50 or wharever you need."
 > "after the first run make sure to check generations manually as per ml-debug ko"
