@@ -23,7 +23,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from data import AXIS, COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
+from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
 from judge import MAX_DAMAGE, MAX_FALSE_PUSHBACK, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
 
 
@@ -113,6 +113,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                 steered_damage = mean(q["steered_damage"] for q in questions)
                 points.append({
                     "method": certificate["method"], "seed": certificate["seed"], "C": C, "side": side,
+                    "axis": certificate["gen"].get("axis", ["sycophantic", "abrasive"]),  # v1 walks predate the axis field
                     "fixed_grid": certificate.get("sweep_kind") == "prompt_embeddings",
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "steered_damage": steered_damage,
@@ -138,6 +139,12 @@ def room(questions: list[dict], side: str) -> float:
 def side_best(points: list[dict], key) -> dict | None:
     live = [point for point in points if point["admissible"]]
     return max(live, key=key) if live else None
+
+
+def shown_axis(points: list[dict]) -> list[str]:
+    axes = {tuple(p["axis"]) for p in points}
+    assert len(axes) == 1, f"one report mixes persona axes {axes}"
+    return list(axes.pop())
 
 
 def method_curve(points: list[dict], method: str, side: str) -> list[dict]:
@@ -519,11 +526,11 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
         figure.add_annotation(**annotation)
-    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text=f"clean steer -> {AXIS[1]}", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text=f"clean steer -> {AXIS[0]}", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[1]}", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[0]}", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last dose the judge rates coherent (or before the effect reverses past bare) · ★ = plain prompt<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt<br>× = last dose that passes the judge's limits (coherence, and false pushback on sound twins), or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
