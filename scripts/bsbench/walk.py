@@ -109,6 +109,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_resid from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+    parser.add_argument("--neg-persona", help="pole screen: replace the -C persona (vector methods only; new output dir via the generation key)")
     parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
     args = parser.parse_args(argv)
     extraction = (("--layers", "layers"), ("--target-layer", "target_layer"), ("--n-pairs", "n_pairs"), ("--max-length", "max_length"), ("--no-think", "no_think"))
@@ -809,6 +810,11 @@ def main() -> None:
     if args.smoke:
         OUT = ROOT / "outputs/bsbench-smoke"
         GEN["max_new_tokens"] = 8
+        GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
+    if args.neg_persona:
+        assert args.method not in PROMPT_METHODS and args.method not in PROMPT_SWEEPS, "prompt texts are fixed at import; screen vector methods only"
+        GEN["axis"] = [AXIS[0], args.neg_persona]
+        PERSONAS[0] = tuple(GEN["axis"])
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
     logger.remove()
     logger.add(sys.stderr, format="{time:HH:mm:ss} | {message}")
