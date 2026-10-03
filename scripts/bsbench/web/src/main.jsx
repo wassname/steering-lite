@@ -181,9 +181,9 @@ function App() {
     <section className="intro">
       <p>We compare prompting and steering on a language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
         Each question rests on a made-up premise, such as the thermal conductivity of a CI pipeline. A good answer points out the made-up part.
-        Steering one way (+C) should make the model go along with the premise (sycophantic). Steering the other way (−C) should make it point out the problem (accurate), without rejecting sound questions.</p>
+        Steering one way (+C) should make the model go along with the premise (sycophantic). Steering the other way (−C) should make it point out the problem (skeptical), without rejecting sound questions.</p>
       <p>Each colour is one method. Existing vector walks used mechanical checks to choose tested dose ranges; only Jev ratings decide which measured points appear here.
-        Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right accepts the made-up premise more (sycophantic), left rejects it more (accurate).
+        Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right accepts the made-up premise more (sycophantic), left rejects it more (skeptical).
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
         Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare, which so far has meant answers drifting off the question (a judged check will replace this). A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. Coherence uses the mean over questions; individual retained answers can still be badly damaged.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic".
