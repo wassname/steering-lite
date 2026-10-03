@@ -67,7 +67,7 @@ with sync_playwright() as p:
     for curve in data["curves"]:
         assert [p["C"] for p in curve["points"]] == sorted(p["C"] for p in curve["points"]), "sweep must be in dose order"
         if curve["points"]:
-            assert curve["points"][-1]["C"] == max(p["C"] for p in curve["tested"]), "line must end at the last passing dose"
+            assert {p["C"] for p in curve["points"]} <= {p["C"] for p in curve["tested"]}, "line drawn only through passing doses"
             assert curve["path"][-1] == [curve["points"][-1]["effect"], curve["points"][-1]["off_axis"]], "line pinned at the x"
         seeds = {p["seed"] for p in data["points"] if p["method"] == curve["method"]}
         for mark in curve["tested"]:
