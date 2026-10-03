@@ -29,4 +29,4 @@ Observation from the discrimination chart: every learned method and the prompt s
 ## Inference
 
 - corda_pca: the per-layer sign rule (align top PC with the mean persona difference, `sspace_pca._pca_direction`) gave the right behaviour with the abrasive pole (v1 score +0.26) and the reversed behaviour with skeptical. Same code, only the pole changed, so a code bug is unlikely (~20%). More likely the top PC of the skeptical−sycophantic differences is weakly aligned with the mean difference, so its behavioural sign is not set by the contrast. Not checked: |cos(PC1, mean diff)| per layer.
-- With the twin cap, steering methods beat the prompt baselines on −C because the skeptical prompt is contrarian. This depends on the 5 pp cap; with a net score the engineered prompt (1.92 pushback, +17 pp) would compare differently.
+- Under the cap the plain and engineered *prompts* fail on −C (contrarian), but the engineered prompt *gain sweep* passes at 0.88 levels, close to the best vectors. Corrected after the fresh-eyes review: no general 'steering beats prompting' claim (best vector − best prompt sweep on −C: +0.16 [−0.22, +0.56]).
