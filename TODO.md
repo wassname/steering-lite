@@ -17,7 +17,11 @@ Open items from wassname (quotes verbatim). Tick when done; link the evidence. W
    - report false pushback next to pushback (table + one extra chart); display-only, no new filter threshold;
    - remove the temporary `before_reversal` display rule if on-target weighting removes the corda swerve;
    - smoke tests (`just check`).
-4. [ ] First run, small: mean_diff + vjp_resid, user turn and everywhere, 4B full. Then check generations by hand per ml-debug (read answers at low / best / last dose for both sets, quote them), before anything else runs.
+3b. [ ] Overnight decisions (wassname 2026-10-03: "don't know, gtg, please make use of the night and time"). Written by PI/OpenAI BEFORE seeing the pole-screen results:
+   - false pushback becomes an admissibility limit like the damage cap: a dose counts only if Jev false pushback on twins rises <= 5 pp over bare (both sides). Pilot showed the score picking vjp_resid user -C at C=0.79 with +36 pp. wassname can switch to a net score later; every point keeps its FP so nothing is lost.
+   - pole rule: from the mean_diff screen (accurate, candid, skeptical, abrasive), pick the pole with the largest mean_diff -C pushback at a dose with damage <= 1.5 and FP <= 5 pp. Tie or all ~0: keep accurate (prompt-screen winner) and report mean_diff failing.
+   - if the pole changes, the engineered prompt is regenerated with the same gpt-4o recipe and the prompt baselines are rerun on it.
+4. [x] First run, small: mean_diff + vjp_resid, user turn and everywhere, 4B full. Then check generations by hand per ml-debug (read answers at low / best / last dose for both sets, quote them), before anything else runs. Evidence: `slop/reviews/2026-10-03_eval_v2/pilot_read.md` (mean_diff -C with accurate goes the wrong way; vjp_resid user -C picks a contrarian dose).
 5. [ ] Main run (budget about $50): mean_diff, vjp_resid, vjp_value, sspace_scale, corda_pca, chars, linear_act; user turn and everywhere; random reference; prompt + engineered prompt + both gain sweeps. 4B full.
 6. [ ] Pull, Jev judge, build reports, browser UAT, look at the PNGs.
 7. [ ] Blind check: show the new plot to fresh agents with no spec or code; iterate until they recover the message in `slop/specs/20261003_bsbench_plot_purpose.md`.
