@@ -359,4 +359,6 @@ Interpretation:
 - A pole chosen by prompting a 9B model (accurate) does not transfer to activation vectors on 4B. As a vector, "accurate − sycophantic" seems to encode a confident, informative tone (likely, ~60%). Pole now `skeptical` by the rule fixed in TODO.md 3b before the results. Skeptical vs abrasive (0.78 vs 0.56) is one seed and probably within seed noise.
 - Decision (PI/OpenAI, overnight, wassname undecided): false pushback is an admissibility cap (≤ +5 pp over bare), like the damage cap, not a second objective. Each point keeps its false-pushback value, so a net score can be computed later.
 
+Independent replication (mpc session, PI/OpenAI, 2026-10-03, their VJP-delta vector on Qwen3.5-4B, same twins and `control_request`): Jev false pushback BASE 0.02; all-token −0.177 0.11 (+9 pp); user turn −0.70 0.49 (+47 pp); user turn + decaying dose after it 0.66 (+64 pp). Source: `/workspace/2026/mfv/flow-heal-eval-mpc/runs/20261001_mpc_kl_budget_left/twins/jev/false_pushback.md`. Same direction as here: user-turn −C gains are mostly the contrarian template.
+
 Next: main run on the skeptical axis (7 methods × everywhere/user turn, 5 random directions per mode, prompt baselines), then manual read and blind plot check.
