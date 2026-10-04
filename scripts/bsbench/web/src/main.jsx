@@ -14,10 +14,10 @@ function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
   const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method));  // open star = fails the judge's limits
-  const shown = [...curves.flatMap(c => c.tested), ...prompts];
+  const shown = [...curves.flatMap(c => c.points), ...prompts];  // axes fit what is drawn (lines end at their x)
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
-  const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.3);
+  const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.05);  // floor only for empty views; off-axis is a probability rise, usually < 0.2
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
@@ -35,7 +35,7 @@ function Plot({ data, visible, selected, onSelect }) {
       <text className="label" x={W - M.r} y={18} textAnchor="end">random: {data.random_seeds.length} directions · both signs</text>
       <g className="grid">
         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
-        {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>; })}
+        {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(2)}</text></g>; })}
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: pushes back on the nonsense, right: goes along with it)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis: rise in P(steering failure) (lower is better)</text>

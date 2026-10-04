@@ -447,8 +447,8 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
     prompting = [point for point in points if point["method"] in PROMPTS]  # baselines stay visible; open star = fails the judge's limits
-    random_live = [point for point in points if point["method"] == "random" and point["admissible"]]
-    shown = [point for curve in curves.values() for point in curve] + random_live + prompting
+    # axes fit what is drawn: each line up to its x, the prompt stars, the grey band (random points are not drawn)
+    shown = [point for curve in curves.values() for point in sweep(before_reversal(curve))] + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
@@ -594,7 +594,7 @@ def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
     prompts = [p for p in site["points"] if p["method"] in PROMPTS]
-    shown = [p for c in curves for p in c["tested"]] + prompts
+    shown = [p for c in curves for p in c["points"]] + prompts
     zones = [p for zone in site["zones"] for p in zone["path"]]
     x_max = 1.08 * max([abs(p["effect"]) for p in shown] + [abs(p[0]) for p in zones] + [.5])
     y_max = 1.08 * max([p["off_axis"] for p in shown] + [p[1] for p in zones] + [.3])

@@ -98,7 +98,7 @@ The score is the BullshitBench score gained toward each side minus the rise in f
 What this shows (one seed, one model, so treat as provisional):
 
 - Going along with nonsense (+C) is easy and not specific: random directions reach +0.64, close to the methods' +0.67–0.68. Degrading the model makes it accept nonsense whichever way it is pushed.
-- Pushing back (−C) is where methods differ from random: mean_diff +0.46, vjp_resid +0.30, random +0.01. The plain prompt is strongest there (+0.74) but weakest on +C (+0.37), because the 4B often ignores "accept every question's premise".
+- Pushing back (−C) is where methods differ from random: mean_diff +0.46, vjp_resid +0.30, random +0.01. The plain prompt is strongest there (+0.74) but weakest on +C (+0.37), because the 4B often ignores "accept every question's premise". A re-grade of 39 questions by Claude Sonnet 4.6, one of BullshitBench's own judges, with its own prompt, gives the same order with slightly larger −C gains (prompt +0.92, mean_diff +0.59, vjp_resid +0.31; agreement with Jev r = 0.93), so the left side is not a Jev artefact ([re-grade](slop/reviews/2026-10-04_eval_v3/regrade_sonnet.md)).
 - vjp_resid's −C side has no gradual breakdown: the dose after its best is already incoherent.
 
 Notes: [manual read](slop/reviews/2026-10-04_eval_v3/validation_read.md), [journal](RESEARCH_JOURNAL.md). Interactive page: `outputs/bsbench/results/v3-4b/index.html`.
