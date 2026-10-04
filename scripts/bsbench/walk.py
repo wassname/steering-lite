@@ -53,6 +53,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COHORT = ROOT / "data/bsbench/bullshit_bench_v2.jsonl"
 OUT = ROOT / "outputs/bsbench"
 RUN_ID = uuid.uuid4().hex
+PAIR_ENTRIES = [None]  # None = steering_lite's generic suffix file; --pairs swaps in a data file
 PERSONAS = [AXIS]  # (+C, -C) persona sentences (data.py AXES); --axis swaps them
 PERSONA_TEMPLATE = "{persona}"  # personas are whole sentences, e.g. "Answer as someone who is credulous."
 # AxBench-style engineered prompts, as adapted in AntiPaSTO nbs/eval_baseline_prompting_engineered.py
@@ -103,6 +104,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_resid from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+    parser.add_argument("--pairs", choices=("generic", "bsbench_v1"), default="generic", help="extraction data: generic suffix file, or persona pairs on BullshitBench v1 nonsense questions (data/bsbench/persona_pairs_bsbench_v1.json; new output dir via the generation key)")
     parser.add_argument("--axis", choices=tuple(AXES), help="persona screen: use this persona pair instead of data.AXIS (new output dir via the generation key)")
     parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
     args = parser.parse_args(argv)
@@ -161,7 +163,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
 def extract_vector(args, model, tokenizer, layers) -> Vector:
     path = model_dir(args.model) / "vectors" / f"{args.vector_name}_s{args.seed}.safetensors"
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0],
         template=PERSONA_TEMPLATE, seed=args.seed,
     )
     target_layer = args.target_layer if args.method in ("vjp_resid", "vjp_value") else None
@@ -326,7 +328,7 @@ def profile(args, model, tokenizer, path: Path) -> None:
     contrast is relative to the residual at that depth. cos_final = cos(contrast_l, contrast at the last layer).
     A ratio that peaks and then falls toward the output marks where the model suppresses the persona contrast."""
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0], template=PERSONA_TEMPLATE, seed=args.seed,
     )
     layers = tuple(range(len(model.model.layers)))
     pos = record_activations(model, tokenizer, positive, layers, batch_size=args.extract_batch_size, max_length=args.max_length)
@@ -357,7 +359,7 @@ def vjp_check(args, model, tokenizer, vector: Vector, c0: float, rows: list[dict
     from steering_lite.variants.vjp_resid import _activations, _encode
     target = getattr(vector.cfg, "target_layer", None) or args.target_layer or len(model.model.layers) - 3
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=32, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
+        tokenizer, n_pairs=32, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0], template=PERSONA_TEMPLATE, seed=20_000 + args.seed,
     )
     base = {"persona_neg": negative, "bench": generation_inputs(tokenizer, rows)[:32]}
 
@@ -401,7 +403,7 @@ def vjp_split(args, model, tokenizer, layers: tuple[int, ...], path: Path) -> No
     from steering_lite.variants.vjp_resid import _class_mean_vjp, _target_mean
 
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=args.seed,
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0], template=PERSONA_TEMPLATE, seed=args.seed,
     )
     model.requires_grad_(False)
     target = len(model.model.layers) - 3 if args.target_layer is None else args.target_layer
@@ -446,7 +448,7 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
     if path.exists():
         return json.loads(path.read_text())
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=16, thinking=not args.no_think, persona_pairs=PERSONAS, template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
+        tokenizer, n_pairs=16, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0], template=PERSONA_TEMPLATE, seed=10_000 + args.seed,
     )
     kls = {"base": [], "+C": [], "-C": []}
     moves = {"+C": [], "-C": []}  # sum_v (p_steered - p_neg) (log p_pos - log p_neg): mass moved toward tokens the positive persona prefers
@@ -664,6 +666,11 @@ def configure(args: argparse.Namespace) -> None:
     if args.smoke:
         OUT = ROOT / "outputs/bsbench-smoke"
         GEN["max_new_tokens"] = 8
+        GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
+    if args.pairs != "generic":
+        assert args.method not in PROMPT_METHODS, "prompt methods use no extraction pairs"
+        GEN["pairs"] = args.pairs
+        PAIR_ENTRIES[0] = json.loads((ROOT / f"data/bsbench/persona_pairs_{args.pairs}.json").read_text())
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
     if args.axis:
         GEN["axis"] = list(AXES[args.axis])

@@ -56,11 +56,13 @@ def make_persona_pairs(
     persona_pairs: list[tuple[str, str]] | None = None,
     template: str = PROMPT_TEMPLATE,
     seed: int = 42,
+    entries: list[dict] | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Build matched positive and negative persona prompts from shared suffixes."""
+    """Build matched positive and negative persona prompts from shared suffixes.
+    entries: [{"user_msg", "suffix"}] to use instead of the packaged generic suffix file."""
     rng = random.Random(seed)
     persona_pairs = PERSONA_PAIRS_AUTHORITY if persona_pairs is None else persona_pairs
-    entries = load_suffixes(thinking=thinking)
+    entries = load_suffixes(thinking=thinking) if entries is None else entries
     sampled = rng.sample(entries, min(n_pairs, len(entries)))
 
     pos_texts: list[str] = []
