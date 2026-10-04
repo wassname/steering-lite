@@ -188,7 +188,7 @@ def refresh(wanted: dict[str, dict], label: str, run: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cohort", choices=("dev", "full"), default="dev")
+    parser.add_argument("--cohort", choices=("dev", "full", "heldout"), default="dev")
     parser.add_argument("--refresh", action="store_true", help="call the API for missing cells (else only report them)")
     parser.add_argument("--model", default="Qwen/Qwen3.5-4B", help="steered model whose walks to judge")
     parser.add_argument("--model-dir", type=Path, help="output dir to judge (default: the current eval version's dir for --model)")

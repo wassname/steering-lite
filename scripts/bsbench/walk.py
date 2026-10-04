@@ -50,7 +50,6 @@ from data import AXES, AXIS, AXIS_NAME, EVAL_VERSION, GEN
 
 
 ROOT = Path(__file__).resolve().parents[2]
-COHORT = ROOT / "data/bsbench/bullshit_bench_v2.jsonl"
 OUT = ROOT / "outputs/bsbench"
 RUN_ID = uuid.uuid4().hex
 PERSONAS = [AXIS]  # (+C, -C) persona sentences (data.py AXES); --axis swaps them
@@ -72,7 +71,7 @@ PROMPT_METHODS = {
     **({"prompting_engineered": ENGINEERED[AXIS_NAME]} if AXIS_NAME in ENGINEERED else {}),
 }
 METHODS = (*CONFIGS, *PROMPT_METHODS)
-COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
+COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "heldout": slice(0, 55), "ood": None}  # heldout: BullshitBench v1 (data.COHORT_FILES)
 OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown
 GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
 CALIB = {"T": 50, "do_sample": True, "seed": 0}  # RMS-KL probe on steering-lite's default prompts
@@ -136,9 +135,8 @@ def model_dir(model: str) -> Path:
 def read_cohort(cohort: str) -> list[dict[str, str]]:
     if cohort == "ood":
         return [json.loads(line) for line in OOD.open()]
-    rows = [json.loads(line) for line in COHORT.open()]
-    assert len(rows) == 100 and len({row["scenario"] for row in rows}) == 100
-    return rows[COHORTS[cohort]]
+    from data import load_cohort
+    return list(load_cohort(cohort).values())[COHORTS[cohort]]
 
 
 def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:

@@ -625,9 +625,9 @@ def main() -> None:
     for method in uncoloured:
         COLORS[method] = spare.pop(0)
         LABELS[method] = method
-    scenarios = list(load_cohort())[COHORTS[args.cohort]]
+    scenarios = list(load_cohort(args.cohort))[COHORTS[args.cohort]]
     rows = summary(points, scenarios)
-    cohort_rows = load_cohort()
+    cohort_rows = load_cohort(args.cohort)
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     # tagged variants (<method>-<tag>, e.g. vjp_resid-t47) are diagnostics: in the table, not in the default plot view
