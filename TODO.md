@@ -13,11 +13,11 @@ Open items from wassname (quotes verbatim). Tick when done; link the evidence. W
 - [x] Remove the 5 pp false-pushback threshold (added without approval); regenerate plots.
 - [x] Remove prompt gain sweeps (> "we need to remove prompt sweep"; broken below 5% and above ~8% gain).
 - [ ] FIXME GPU: 4B bf16 on an L40S ($1.95/h). Use L4 ($0.80/h) or fill the GPU with bigger batches (64-128).
-- [ ] FIXME image: transformers says "The fast path is not available because one of the required library is not installed" (likely causal-conv1d); build the Modal image with it and confirm the warning is gone.
+- [x] FIXME image (checked: only causal-conv1d missing; with it, 1–5% faster, not worth torch 2.10). transformers says "The fast path is not available because one of the required library is not installed" (likely causal-conv1d); build the Modal image with it and confirm the warning is gone.
 - [ ] max_new_tokens 512 -> 160 (healthy answers: median 47-57 words, max 93 words, about 125 tokens).
 - [ ] Twins only at each method's chosen dose, not every dose (halves generation).
 - [ ] Validation runs: baseline (mean_diff), random, best (vjp_resid) only.
-- [ ] Oracle: how to cut Modal cost for small-model dose walks.
+- [x] Oracle: how to cut Modal cost (`slop/research/2026-10-04_modal_cost/`), and benchmark (journal 2026-10-04): one batch of 200 on A10G or L40S, cap 192, is 3–4× cheaper per answer.
 - [ ] tyro config: one subconfig per model size (model, batch size, max_new_tokens, Modal GPU); validate each fills the GPU on one run before branching out.
 - [ ] Decide with wassname: plain BS-bench axis (pushback vs sycophancy), twins as a check only.
 - [ ] Twins were read by hand and checked by GPT-6.1-Sol, not verified with web search; verify with search.

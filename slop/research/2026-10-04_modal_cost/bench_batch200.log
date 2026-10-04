@@ -1,0 +1,152 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-2vnmIWTSWPRdvefEX6wF9m
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/bench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/data
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
+├── 🔨 Created function bench.
+└── 🔨 Created function bench_conv.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 631.05it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1ALoading weights:   0%|          | 1/426 [00:00<03:32,  2.00it/s]
+[1ALoading weights:   4%|▍         | 19/426 [00:00<00:09, 41.25it/s]
+[1ALoading weights:   8%|▊         | 33/426 [00:00<00:06, 64.09it/s]
+[1ALoading weights:  11%|█         | 45/426 [00:00<00:05, 71.16it/s]
+[1ALoading weights:  14%|█▍        | 61/426 [00:00<00:04, 91.13it/s]
+[1ALoading weights:  18%|█▊        | 77/426 [00:01<00:03, 106.47it/s]
+[1ALoading weights:  22%|██▏       | 94/426 [00:01<00:02, 111.17it/s]
+[1ALoading weights:  27%|██▋       | 115/426 [00:01<00:02, 121.17it/s]
+[1ALoading weights:  31%|███       | 133/426 [00:01<00:02, 133.89it/s]
+[1ALoading weights:  35%|███▌      | 151/426 [00:01<00:01, 140.70it/s]
+[1ALoading weights:  39%|███▉      | 168/426 [00:01<00:01, 148.03it/s]
+[1ALoading weights:  44%|████▎     | 186/426 [00:01<00:01, 142.20it/s]
+[1ALoading weights:  47%|████▋     | 202/426 [00:01<00:01, 143.14it/s]
+[1ALoading weights:  52%|█████▏    | 222/426 [00:02<00:01, 153.53it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1ALoading weights:  56%|█████▌    | 238/426 [00:02<00:01, 151.32it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 446.42it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  60%|█████▉    | 254/426 [00:02<00:01, 139.78it/s]
+[1ALoading weights:  65%|██████▌   | 278/426 [00:02<00:00, 163.80it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  69%|██████▉   | 295/426 [00:02<00:00, 157.76it/s]
+[1ALoading weights:  73%|███████▎  | 312/426 [00:02<00:00, 143.30it/s]
+[1ALoading weights:  78%|███████▊  | 331/426 [00:02<00:00, 154.16it/s]
+[1ALoading weights:  81%|████████▏ | 347/426 [00:02<00:00, 148.31it/s]
+[1ALoading weights:  85%|████████▌ | 364/426 [00:02<00:00, 148.67it/s]
+[1ALoading weights:  90%|████████▉ | 383/426 [00:03<00:00, 151.36it/s]
+[1ALoading weights:  95%|█████████▌| 406/426 [00:03<00:00, 171.85it/s]
+[1ALoading weights:   0%|          | 1/426 [00:00<05:19,  1.33it/s]
+[1ALoading weights: 100%|█████████▉| 424/426 [00:03<00:00, 156.37it/s]
+[1ALoading weights:   2%|▏         | 10/426 [00:00<00:27, 15.23it/s]Loading weights: 100%|██████████| 426/426 [00:03<00:00, 127.23it/s]
+
+[1ALoading weights:   5%|▌         | 23/426 [00:00<00:11, 35.65it/s]
+[1ALoading weights:   8%|▊         | 35/426 [00:01<00:07, 52.38it/s]
+[1ALoading weights:  11%|█         | 45/426 [00:01<00:08, 46.36it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  14%|█▍        | 61/426 [00:01<00:05, 62.56it/s]
+[1ALoading weights:  17%|█▋        | 73/426 [00:01<00:04, 71.41it/s]
+[1ALoading weights:  19%|█▉        | 83/426 [00:01<00:04, 75.34it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1ALoading weights:  22%|██▏       | 94/426 [00:01<00:04, 80.88it/s]
+[1ALoading weights:  24%|██▍       | 104/426 [00:01<00:04, 78.61it/s]
+[1ALoading weights:  28%|██▊       | 120/426 [00:02<00:03, 89.83it/s]
+[1ALoading weights:  31%|███       | 133/426 [00:02<00:02, 98.46it/s]
+[1ALoading weights:  34%|███▍      | 146/426 [00:02<00:02, 103.86it/s]
+[1ALoading weights:  37%|███▋      | 157/426 [00:02<00:02, 90.46it/s] 
+[1ALoading weights:  39%|███▉      | 167/426 [00:02<00:02, 88.85it/s]
+[1ALoading weights:  43%|████▎     | 183/426 [00:02<00:02, 103.29it/s]
+[1ALoading weights:  46%|████▌     | 194/426 [00:02<00:02, 100.45it/s]
+[1ALoading weights:  48%|████▊     | 205/426 [00:02<00:02, 90.69it/s] 
+[1ALoading weights:  51%|█████     | 217/426 [00:03<00:02, 88.96it/s]
+[1ALoading weights:  55%|█████▍    | 233/426 [00:03<00:01, 97.31it/s]
+[1ALoading weights:  58%|█████▊    | 245/426 [00:03<00:01, 98.29it/s]
+[1ALoading weights:  60%|█████▉    | 255/426 [00:03<00:01, 95.55it/s]
+[1ALoading weights:  64%|██████▍   | 273/426 [00:03<00:01, 110.90it/s]
+[1ALoading weights:  67%|██████▋   | 285/426 [00:03<00:01, 111.96it/s]
+[1ALoading weights:  70%|██████▉   | 297/426 [00:03<00:01, 103.59it/s]
+[1ALoading weights:  72%|███████▏  | 308/426 [00:04<00:01, 90.28it/s] 
+[1ALoading weights:  76%|███████▌  | 324/426 [00:04<00:00, 105.33it/s]
+[1ALoading weights:  79%|███████▉  | 336/426 [00:04<00:00, 100.83it/s]
+[1ALoading weights:  81%|████████▏ | 347/426 [00:04<00:00, 97.21it/s] 
+[1ALoading weights:  84%|████████▍ | 359/426 [00:04<00:00, 91.01it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1ALoading weights:  87%|████████▋ | 371/426 [00:04<00:00, 95.80it/s]
+[1ALoading weights:  90%|█████████ | 384/426 [00:04<00:00, 104.34it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 423.52it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  93%|█████████▎| 398/426 [00:04<00:00, 110.23it/s]
+[1ALoading weights:  96%|█████████▌| 410/426 [00:04<00:00, 109.53it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  99%|█████████▉| 422/426 [00:05<00:00, 105.45it/s]Loading weights: 100%|██████████| 426/426 [00:05<00:00, 83.39it/s] 
+
+[1ALoading weights:   0%|          | 1/426 [00:00<04:33,  1.55it/s]
+[1ALoading weights:   3%|▎         | 14/426 [00:00<00:17, 24.16it/s]
+[1ALoading weights:   6%|▌         | 25/426 [00:00<00:09, 41.04it/s]
+[1ALoading weights:   8%|▊         | 36/426 [00:00<00:06, 56.08it/s]
+[1ALoading weights:  11%|█         | 46/426 [00:01<00:05, 63.94it/s]
+[1ALoading weights:  14%|█▎        | 58/426 [00:01<00:04, 76.37it/s]
+[1ALoading weights:  16%|█▌        | 68/426 [00:01<00:04, 76.30it/s]
+[1ALoading weights:  19%|█▉        | 80/426 [00:01<00:04, 85.67it/s]
+[1ALoading weights:  22%|██▏       | 95/426 [00:01<00:03, 95.46it/s]
+[1ALoading weights:  26%|██▋       | 112/426 [00:01<00:02, 114.73it/s]
+[1ALoading weights:  29%|██▉       | 125/426 [00:01<00:02, 114.49it/s]
+[1ALoading weights:  32%|███▏      | 138/426 [00:01<00:02, 113.87it/s]
+[1ALoading weights:  35%|███▌      | 150/426 [00:02<00:02, 108.77it/s]
+[1ALoading weights:  38%|███▊      | 162/426 [00:02<00:02, 108.85it/s]
+[1ALoading weights:  42%|████▏     | 178/426 [00:02<00:02, 117.53it/s]
+[1ALoading weights:  45%|████▍     | 190/426 [00:02<00:02, 111.47it/s]
+[1ALoading weights:  47%|████▋     | 202/426 [00:02<00:02, 105.48it/s]
+[1ALoading weights:  51%|█████     | 217/426 [00:02<00:01, 116.24it/s]
+[1ALoading weights:  54%|█████▍    | 229/426 [00:02<00:01, 112.11it/s]
+[1ALoading weights:  57%|█████▋    | 241/426 [00:02<00:01, 111.11it/s]
+[1ALoading weights:  59%|█████▉    | 253/426 [00:02<00:01, 99.47it/s] 
+[1ALoading weights:  65%|██████▌   | 277/426 [00:03<00:01, 135.17it/s]
+[1ALoading weights:  69%|██████▊   | 292/426 [00:03<00:01, 123.28it/s]
+[1ALoading weights:  72%|███████▏  | 306/426 [00:03<00:00, 122.45it/s]
+[1ALoading weights:  75%|███████▍  | 319/426 [00:03<00:00, 118.67it/s]
+[1ALoading weights:  78%|███████▊  | 332/426 [00:03<00:00, 113.88it/s]
+[1ALoading weights:  82%|████████▏ | 350/426 [00:03<00:00, 127.75it/s]
+[1ALoading weights:  85%|████████▌ | 364/426 [00:03<00:00, 111.85it/s]
+[1ALoading weights:  89%|████████▉ | 380/426 [00:03<00:00, 118.68it/s]
+[1ALoading weights:  92%|█████████▏| 394/426 [00:04<00:00, 116.01it/s]
+[1ALoading weights:  97%|█████████▋| 412/426 [00:04<00:00, 117.80it/s]Loading weights: 100%|██████████| 426/426 [00:04<00:00, 98.54it/s] 
+2026-10-04 01:14:59.830 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:15:13.002 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 200, 'seconds': 13.171200932999994, 'answers': 200, 'mean_tokens': 59.47, 'max_tokens': 119, 'at_cap': 0, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:15:23.805 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:15:35.269 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:15:42.173 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:15:44.248 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 200, 'seconds': 20.442008314000006, 'answers': 200, 'mean_tokens': 59.53, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA A10G', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:15:57.495 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 200, 'seconds': 22.228471873000004, 'answers': 200, 'mean_tokens': 191.91, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:16:16.579 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 200, 'seconds': 34.40473106600001, 'answers': 200, 'mean_tokens': 59.59, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:16:19.286 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:16:53.947 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 200, 'seconds': 34.66265245400001, 'answers': 200, 'mean_tokens': 191.95, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA A10G', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:17:16.214 | INFO     | walk:generate:236 - generation 200/200
+2026-10-04 01:18:15.510 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 200, 'seconds': 59.314006355000004, 'answers': 200, 'mean_tokens': 191.91, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 18.320479232, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 bare   batch=200 s=  34.4 $/1k answers=0.038 mean_tok=60 max_tok=108 at_cap=0 peak_gb=18.3
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 broken batch=200 s=  59.3 $/1k answers=0.066 mean_tok=192 max_tok=192 at_cap=199 peak_gb=18.3
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 bare   batch=200 s=  20.4 $/1k answers=0.031 mean_tok=60 max_tok=108 at_cap=0 peak_gb=18.3
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 broken batch=200 s=  34.7 $/1k answers=0.053 mean_tok=192 max_tok=192 at_cap=200 peak_gb=18.3
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 bare   batch=200 s=  13.2 $/1k answers=0.036 mean_tok=59 max_tok=119 at_cap=0 peak_gb=18.3
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 broken batch=200 s=  22.2 $/1k answers=0.060 mean_tok=192 max_tok=192 at_cap=199 peak_gb=18.3
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/wassname/main/ap-2vnmIWTSWPRdvefEX6wF9m

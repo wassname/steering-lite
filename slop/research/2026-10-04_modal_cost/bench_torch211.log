@@ -1,0 +1,513 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-s14IYyIxQv3CqVqctZaTce
+Building image im-Sv5bJqlhlmMJmhaVEouI9T
+Building image im-Mc7SgiuLVbHjgfmYJlvpem
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONUNBUFFERED=1
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONPATH=/repo/src:/repo/scripts/bsbench
+Getting image source signatures
+Copying blob sha256:dcd00f4c468462b2a68c19a552a5b67c3fd23b41967f8622f7f1620cad1d105d
+Copying blob sha256:f3f7502ac07c10bd911c63b27afb9b3f5902b8554ccbe381bde627178ad1915b
+Saving image...
+Image saved, took 608.26ms
+
+Built image im-Mc7SgiuLVbHjgfmYJlvpem in 1.55s
+
+
+Copying config sha256:2832daefdfaee215fd647b8bc850821ece2a4c4f7703a11895c6d4631ef0858e
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M426TX4EG0KY4RFFNZAS1Y8B/registry-unpackW7JDH3
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode accelerate==1.13.0 beartype==0.22.9 einops==0.8.2 fla-core==0.5.2 flash-linear-attention==0.5.2 https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu13torch2.10cxx11abiTRUE-cp313-cp313-linux_x86_64.whl jaxtyping==0.3.9 loguru==0.7.3 numpy==2.4.4 safetensors==0.7.0 tabulate==0.10.0 torch==2.10.0 tqdm==4.67.3 transformers==5.12.1
+Using Python 3.13.0 environment at: /usr/local
+Resolved 64 packages in 9.61s
+Downloading nvidia-cufft-cu12 (184.2MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cudnn-cu12 (674.0MiB)
+Downloading nvidia-cublas-cu12 (566.8MiB)
+Downloading nvidia-nccl-cu12 (307.4MiB)
+Downloading triton (179.6MiB)
+Downloading nvidia-cusparse-cu12 (274.9MiB)
+Downloading nvidia-cusolver-cu12 (255.1MiB)
+Downloading nvidia-cusparselt-cu12 (273.9MiB)
+Downloading nvidia-curand-cu12 (60.7MiB)
+Downloading nvidia-cuda-nvrtc-cu12 (84.0MiB)
+Downloading nvidia-nvjitlink-cu12 (37.4MiB)
+Downloading transformers (10.6MiB)
+Downloading torch (873.2MiB)
+Downloading nvidia-nvshmem-cu12 (132.7MiB)
+Downloading numpy (15.9MiB)
+Downloading cuda-bindings (11.4MiB)
+Downloading hf-xet (4.3MiB)
+Downloading beartype (1.3MiB)
+Downloading tokenizers (3.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufile-cu12 (1.1MiB)
+Downloading pygments (1.2MiB)
+Downloading nvidia-cuda-cupti-cu12 (9.8MiB)
+Downloading causal-conv1d (197.3MiB)
+ Downloaded nvidia-cufile-cu12
+ Downloaded pygments
+ Downloaded tokenizers
+ Downloaded beartype
+ Downloaded networkx
+ Downloaded hf-xet
+ Downloaded nvidia-cuda-cupti-cu12
+ Downloaded cuda-bindings
+ Downloaded sympy
+ Downloaded transformers
+ Downloaded numpy
+ Downloaded nvidia-nvjitlink-cu12
+ Downloaded nvidia-curand-cu12
+ Downloaded nvidia-cuda-nvrtc-cu12
+ Downloaded causal-conv1d
+ Downloaded nvidia-nvshmem-cu12
+ Downloaded nvidia-cufft-cu12
+ Downloaded triton
+ Downloaded nvidia-cusolver-cu12
+ Downloaded nvidia-cusparse-cu12
+ Downloaded nvidia-cusparselt-cu12
+ Downloaded nvidia-nccl-cu12
+ Downloaded nvidia-cublas-cu12
+ Downloaded nvidia-cudnn-cu12
+ Downloaded torch
+Prepared 61 packages in 9.75s
+Installed 61 packages in 1.03s
+Bytecode compiled 9807 files in 2.21s
+ + accelerate==1.13.0
+ + annotated-doc==0.0.5
+ + anyio==4.14.2
+ + beartype==0.22.9
+ + causal-conv1d==1.7.0+cu13torch2.10cxx11abitrue (from https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu13torch2.10cxx11abiTRUE-cp313-cp313-linux_x86_64.whl)
+ + click==8.5.0
+ + cuda-bindings==12.9.4
+ + cuda-pathfinder==1.8.3
+ + einops==0.8.2
+ + filelock==4.0.10
+ + fla-core==0.5.2
+ + flash-linear-attention==0.5.2
+ + fsspec==2026.9.0
+ + h11==0.16.0
+ + hf-xet==1.6.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + huggingface-hub==1.33.0
+ + jaxtyping==0.3.9
+ + jinja2==3.1.6
+ + loguru==0.7.3
+ + markdown-it-py==4.2.0
+ + markupsafe==3.0.4
+ + mdurl==0.1.2
+ + mpmath==1.3.0
+ + networkx==3.7
+ + ninja==1.13.2
+ + numpy==2.4.4
+ + nvidia-cublas-cu12==12.8.4.1
+ + nvidia-cuda-cupti-cu12==12.8.90
+ + nvidia-cuda-nvrtc-cu12==12.8.93
+ + nvidia-cuda-runtime-cu12==12.8.90
+ + nvidia-cudnn-cu12==9.10.2.21
+ + nvidia-cufft-cu12==11.3.3.83
+ + nvidia-cufile-cu12==1.13.1.3
+ + nvidia-curand-cu12==10.3.9.90
+ + nvidia-cusolver-cu12==11.7.3.90
+ + nvidia-cusparse-cu12==12.5.8.93
+ + nvidia-cusparselt-cu12==0.7.1
+ + nvidia-nccl-cu12==2.27.5
+ + nvidia-nvjitlink-cu12==12.8.93
+ + nvidia-nvshmem-cu12==3.4.5
+ + nvidia-nvtx-cu12==12.8.90
+ + packaging==26.3
+ + psutil==7.2.2
+ + pygments==2.21.0
+ + pyyaml==6.0.3
+ + regex==2026.9.29
+ + rich==15.0.0
+ + safetensors==0.7.0
+ + setuptools==84.0.0
+ + shellingham==1.5.4
+ + sympy==1.14.0
+ + tabulate==0.10.0
+ + tokenizers==0.22.2
+ + torch==2.10.0
+ + tqdm==4.67.3
+ + transformers==5.12.1
+ + triton==3.6.0
+ + typer==0.27.2
+ + wadler-lindig==0.1.7
+Saving image...
+Image saved, took 3.72s
+
+Built image im-Sv5bJqlhlmMJmhaVEouI9T in 30.29s
+
+
+Building image im-Jo2k00E7lZRzO91jNp9fG0
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONUNBUFFERED=1
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONPATH=/repo/src:/repo/scripts/bsbench
+Saving image...
+Image saved, took 961.41ms
+
+Built image im-Jo2k00E7lZRzO91jNp9fG0 in 2.10s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/bench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/data
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
+├── 🔨 Created function bench.
+└── 🔨 Created function bench_conv.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 740.06it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 535.71it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 1/426 [00:01<13:00,  1.84s/it]
+[1ALoading weights:   5%|▍         | 21/426 [00:01<00:27, 14.93it/s]
+[1ALoading weights:   8%|▊         | 33/426 [00:02<00:15, 24.69it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 508.40it/s]
+
+[1ALoading weights:  11%|█         | 45/426 [00:02<00:10, 35.73it/s][transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:  14%|█▍        | 59/426 [00:02<00:07, 50.50it/s]
+[1ALoading weights:  19%|█▉        | 80/426 [00:02<00:04, 74.89it/s]
+[1ALoading weights:  22%|██▏       | 95/426 [00:02<00:03, 87.85it/s]
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:  27%|██▋       | 115/426 [00:02<00:02, 110.74it/s]
+[1ALoading weights:  31%|███       | 132/426 [00:02<00:02, 122.85it/s]
+[1ALoading weights:  35%|███▍      | 148/426 [00:02<00:02, 130.21it/s]
+[1ALoading weights:  39%|███▉      | 168/426 [00:02<00:01, 142.13it/s]
+[1ALoading weights:  43%|████▎     | 185/426 [00:03<00:01, 148.81it/s]
+[1ALoading weights:  47%|████▋     | 202/426 [00:03<00:01, 145.25it/s]
+[1ALoading weights:   0%|          | 1/426 [00:00<04:30,  1.57it/s]
+[1ALoading weights:  52%|█████▏    | 221/426 [00:03<00:01, 154.14it/s]
+[1ALoading weights:   3%|▎         | 13/426 [00:00<00:18, 22.30it/s]
+[1ALoading weights:   7%|▋         | 28/426 [00:00<00:08, 46.29it/s]
+[1ALoading weights:  56%|█████▋    | 240/426 [00:03<00:01, 161.29it/s]
+[1ALoading weights:   9%|▉         | 40/426 [00:00<00:06, 60.49it/s]
+[1ALoading weights:  61%|██████    | 258/426 [00:03<00:01, 161.80it/s]
+[1ALoading weights:  67%|██████▋   | 286/426 [00:03<00:00, 192.99it/s]
+[1ALoading weights:  12%|█▏        | 50/426 [00:01<00:06, 61.22it/s]
+[1ALoading weights:  15%|█▌        | 65/426 [00:01<00:04, 80.24it/s]
+[1ALoading weights:   0%|          | 1/426 [00:02<18:03,  2.55s/it]
+[1ALoading weights:  72%|███████▏  | 306/426 [00:03<00:00, 181.53it/s]
+[1ALoading weights:  19%|█▊        | 79/426 [00:01<00:03, 93.22it/s]
+[1ALoading weights:   4%|▍         | 17/426 [00:02<00:46,  8.86it/s]
+[1ALoading weights:  77%|███████▋  | 326/426 [00:03<00:00, 183.09it/s]
+[1ALoading weights:  81%|████████  | 345/426 [00:03<00:00, 176.54it/s]
+[1ALoading weights:   7%|▋         | 28/426 [00:02<00:25, 15.90it/s]
+[1ALoading weights:  21%|██▏       | 91/426 [00:01<00:03, 96.63it/s]
+[1ALoading weights:   9%|▉         | 40/426 [00:02<00:15, 25.29it/s]
+[1ALoading weights:  85%|████████▌ | 363/426 [00:04<00:00, 169.74it/s]
+[1ALoading weights:  24%|██▍       | 103/426 [00:01<00:03, 95.31it/s]
+[1ALoading weights:  28%|██▊       | 119/426 [00:01<00:02, 111.37it/s]
+[1ALoading weights:  12%|█▏        | 51/426 [00:03<00:11, 33.39it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1ALoading weights:  90%|█████████ | 384/426 [00:04<00:00, 179.95it/s]
+[1ALoading weights:  31%|███       | 133/426 [00:01<00:02, 117.64it/s]
+[1ALoading weights:  15%|█▌        | 66/426 [00:03<00:07, 47.56it/s]
+[1ALoading weights:  96%|█████████▌| 408/426 [00:04<00:00, 194.10it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:04<00:00, 98.79it/s] 
+
+[1ALoading weights:  35%|███▍      | 147/426 [00:01<00:02, 118.72it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1ALoading weights:  38%|███▊      | 160/426 [00:02<00:02, 115.60it/s]
+[1ALoading weights:  19%|█▉        | 81/426 [00:03<00:05, 63.36it/s]
+[1ALoading weights:  41%|████      | 173/426 [00:02<00:02, 112.89it/s]
+[1ALoading weights:  22%|██▏       | 95/426 [00:03<00:04, 76.50it/s]
+[1ALoading weights:  27%|██▋       | 113/426 [00:03<00:03, 97.33it/s]
+[1ALoading weights:  30%|███       | 129/426 [00:03<00:02, 111.26it/s]
+[1ALoading weights:  45%|████▍     | 190/426 [00:02<00:01, 127.99it/s]
+[1ALoading weights:  34%|███▍      | 144/426 [00:03<00:02, 118.10it/s]
+[1ALoading weights:  48%|████▊     | 204/426 [00:02<00:01, 121.07it/s]
+[1ALoading weights:  37%|███▋      | 159/426 [00:03<00:02, 117.54it/s]
+[1ALoading weights:  52%|█████▏    | 221/426 [00:02<00:01, 130.08it/s]
+[1ALoading weights:  42%|████▏     | 178/426 [00:03<00:01, 133.41it/s]
+[1ALoading weights:  55%|█████▌    | 236/426 [00:02<00:01, 131.34it/s]
+[1ALoading weights:  59%|█████▊    | 250/426 [00:02<00:01, 131.96it/s]
+[1ALoading weights:  46%|████▌     | 195/426 [00:04<00:01, 133.49it/s]
+[1ALoading weights:  49%|████▉     | 210/426 [00:04<00:01, 132.06it/s]
+[1ALoading weights:  62%|██████▏   | 264/426 [00:02<00:01, 124.36it/s]
+[1ALoading weights:  54%|█████▍    | 230/426 [00:04<00:01, 147.49it/s]
+[1ALoading weights:  65%|██████▌   | 279/426 [00:02<00:01, 130.28it/s]
+[1ALoading weights:  58%|█████▊    | 246/426 [00:04<00:01, 150.83it/s]
+[1ALoading weights:  69%|██████▉   | 293/426 [00:03<00:01, 130.24it/s]
+[1ALoading weights:  62%|██████▏   | 262/426 [00:04<00:01, 145.14it/s]
+[1ALoading weights:  72%|███████▏  | 307/426 [00:03<00:00, 129.64it/s]
+[1ALoading weights:  65%|██████▌   | 279/426 [00:04<00:00, 151.10it/s]
+[1ALoading weights:  75%|███████▌  | 321/426 [00:03<00:00, 130.23it/s]
+[1ALoading weights:  70%|██████▉   | 297/426 [00:04<00:00, 159.09it/s]
+[1ALoading weights:  79%|███████▉  | 338/426 [00:03<00:00, 137.34it/s]
+[1ALoading weights:  83%|████████▎ | 353/426 [00:03<00:00, 139.23it/s]
+[1ALoading weights:  74%|███████▎  | 314/426 [00:04<00:00, 145.37it/s]
+[1ALoading weights:  78%|███████▊  | 332/426 [00:04<00:00, 148.18it/s]
+[1ALoading weights:  86%|████████▌ | 367/426 [00:03<00:00, 125.53it/s]
+[1ALoading weights:  82%|████████▏ | 351/426 [00:05<00:00, 159.03it/s]
+[1ALoading weights:  90%|████████▉ | 382/426 [00:03<00:00, 127.12it/s]
+[1ALoading weights:  86%|████████▋ | 368/426 [00:05<00:00, 149.11it/s]
+[1ALoading weights:  95%|█████████▍| 403/426 [00:03<00:00, 140.16it/s]
+[1ALoading weights:  90%|█████████ | 385/426 [00:05<00:00, 152.32it/s]
+[1ALoading weights:  98%|█████████▊| 418/426 [00:04<00:00, 127.62it/s]
+[1ALoading weights:  96%|█████████▌| 408/426 [00:05<00:00, 171.00it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:04<00:00, 105.57it/s]
+
+[1ALoading weights: 100%|██████████| 426/426 [00:05<00:00, 168.17it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:05<00:00, 77.87it/s] 
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 454.20it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 1/426 [00:03<23:15,  3.28s/it]
+[1ALoading weights:   3%|▎         | 13/426 [00:03<01:18,  5.27it/s]
+[1ALoading weights:   6%|▌         | 26/426 [00:03<00:32, 12.24it/s]
+[1ALoading weights:   8%|▊         | 36/426 [00:03<00:20, 18.69it/s]
+[1ALoading weights:  11%|█         | 46/426 [00:03<00:14, 25.87it/s]
+[1ALoading weights:  13%|█▎        | 57/426 [00:03<00:10, 35.55it/s]
+[1ALoading weights:  16%|█▌        | 67/426 [00:03<00:08, 42.59it/s]
+[1ALoading weights:  19%|█▉        | 81/426 [00:04<00:06, 56.78it/s]
+[1ALoading weights:  22%|██▏       | 94/426 [00:04<00:04, 69.53it/s]
+[1ALoading weights:  25%|██▍       | 105/426 [00:04<00:04, 74.60it/s]
+[1ALoading weights:  28%|██▊       | 118/426 [00:04<00:03, 82.11it/s]
+[1ALoading weights:  31%|███       | 132/426 [00:04<00:03, 92.12it/s]
+[1ALoading weights:  34%|███▍      | 144/426 [00:04<00:02, 96.29it/s]
+[1ALoading weights:  36%|███▋      | 155/426 [00:04<00:02, 90.84it/s]
+[1ALoading weights:  40%|███▉      | 169/426 [00:04<00:02, 100.92it/s]
+[1ALoading weights:  43%|████▎     | 184/426 [00:05<00:02, 110.70it/s]
+[1ALoading weights:  46%|████▌     | 197/426 [00:05<00:02, 111.95it/s]
+[1ALoading weights:  49%|████▉     | 209/426 [00:05<00:02, 95.64it/s] 
+[1ALoading weights:  52%|█████▏    | 222/426 [00:05<00:01, 103.91it/s]
+[1ALoading weights:  55%|█████▌    | 235/426 [00:05<00:01, 109.54it/s]
+[1ALoading weights:  58%|█████▊    | 247/426 [00:05<00:01, 112.17it/s]
+[1ALoading weights:  61%|██████    | 259/426 [00:05<00:01, 99.01it/s] 
+[1ALoading weights:  65%|██████▌   | 278/426 [00:05<00:01, 108.73it/s]
+[1ALoading weights:  69%|██████▉   | 293/426 [00:06<00:01, 112.98it/s]
+[1ALoading weights:  72%|███████▏  | 307/426 [00:06<00:01, 111.66it/s]
+[1ALoading weights:  75%|███████▍  | 319/426 [00:06<00:00, 112.80it/s]
+[1ALoading weights:  78%|███████▊  | 331/426 [00:06<00:00, 106.96it/s]
+[1ALoading weights:  81%|████████  | 346/426 [00:06<00:00, 111.89it/s]
+[1ALoading weights:  85%|████████▍ | 360/426 [00:06<00:00, 117.45it/s]
+[1ALoading weights:  88%|████████▊ | 376/426 [00:06<00:00, 127.67it/s]
+[1ALoading weights:  91%|█████████▏| 389/426 [00:06<00:00, 123.98it/s]
+[1ALoading weights:  95%|█████████▍| 404/426 [00:06<00:00, 127.74it/s]
+[1ALoading weights:  98%|█████████▊| 417/426 [00:07<00:00, 110.24it/s]Loading weights: 100%|██████████| 426/426 [00:07<00:00, 59.69it/s] 
+2026-10-04 01:02:30.036 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:02:33.658 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:02:34.079 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:02:37.331 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:02:38.352 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:02:40.986 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:02:42.704 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:02:43.650 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:02:44.844 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:02:46.836 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:02:47.397 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:02:48.525 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:02:51.063 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:02:52.195 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:02:53.311 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:02:54.931 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:02:56.368 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:02:56.618 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:02:58.927 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:03:00.242 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:03:03.752 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:03:07.098 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:03:07.087 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:03:08.701 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 32, 'seconds': 38.664625186, 'answers': 200, 'mean_tokens': 59.425, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 10.003854848, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:03:09.389 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 32, 'seconds': 35.730142938, 'answers': 200, 'mean_tokens': 59.34, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 10.003854848, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:03:13.961 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:03:21.388 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:03:21.922 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 32, 'seconds': 38.27193772, 'answers': 200, 'mean_tokens': 59.68, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 10.003854848, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:03:26.446 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:03:27.250 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:03:29.173 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:03:30.355 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:03:33.408 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:03:39.079 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:03:42.437 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:03:45.895 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:03:47.454 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:03:51.655 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:03:56.183 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:03:59.734 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:04:01.546 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:04:02.725 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 35.47481373800001, 'answers': 200, 'mean_tokens': 58.965, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 11.587638272, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:04:03.646 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 32, 'seconds': 63.40389609900001, 'answers': 200, 'mean_tokens': 59.895, 'max_tokens': 117, 'at_cap': 0, 'peak_gb': 10.003857408, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:04:04.808 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 38.362678654999996, 'answers': 200, 'mean_tokens': 59.51, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 11.587639808, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:04:06.211 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:04:11.701 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:04:14.818 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 32.38021073799999, 'answers': 200, 'mean_tokens': 59.645, 'max_tokens': 117, 'at_cap': 0, 'peak_gb': 11.587640832, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:04:26.728 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:04:27.660 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:04:31.630 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:04:35.663 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:04:36.701 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:04:37.935 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:04:41.462 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:04:42.615 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:04:55.217 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 27.55697792800001, 'answers': 200, 'mean_tokens': 60.31, 'max_tokens': 122, 'at_cap': 0, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:04:59.214 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 32.484765253000006, 'answers': 200, 'mean_tokens': 59.22, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:05:02.862 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 27.198688464000014, 'answers': 200, 'mean_tokens': 59.615, 'max_tokens': 119, 'at_cap': 0, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:05:04.237 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:05:09.324 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:05:11.633 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:05:12.706 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:13.271 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:05:19.343 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:05:20.236 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:05:22.172 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:05:26.871 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:05:28.875 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:05:29.501 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:05:31.243 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:05:31.999 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 60.36888172799999, 'answers': 200, 'mean_tokens': 59.585, 'max_tokens': 113, 'at_cap': 0, 'peak_gb': 11.587651584, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:05:37.500 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:05:39.774 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:05:40.304 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:46.201 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:49.721 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:05:50.031 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:55.014 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:06:00.259 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:06:00.505 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:06:04.007 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:06:08.525 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:06:09.708 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 32, 'seconds': 65.47244078299997, 'answers': 200, 'mean_tokens': 191.92, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 10.00387584, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:06:10.948 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:06:12.500 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 32, 'seconds': 60.86864242599998, 'answers': 200, 'mean_tokens': 191.895, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 10.00387584, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:06:19.570 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 32, 'seconds': 70.24755392599997, 'answers': 200, 'mean_tokens': 191.93, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 10.00387584, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:06:20.525 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:06:21.746 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:06:27.566 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:06:30.730 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:06:30.864 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:06:33.513 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:06:40.082 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:06:41.076 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:06:47.344 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:06:49.393 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:06:51.718 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:06:57.917 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 36.17232169000005, 'answers': 200, 'mean_tokens': 191.915, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:06:59.645 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 51.11968825500003, 'answers': 200, 'mean_tokens': 59.365, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:07:00.350 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 39.82652398800002, 'answers': 200, 'mean_tokens': 191.92, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:07:01.599 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:07:09.334 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:07:15.975 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:07:16.197 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:07:17.085 | INFO     | walk:generate:236 - generation 32/32
+2026-10-04 01:07:20.584 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:07:25.008 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 51.49540213, 'answers': 200, 'mean_tokens': 191.925, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:07:30.157 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 20.825245736, 'answers': 200, 'mean_tokens': 191.92, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA A100-SXM4-40GB', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:07:31.509 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:07:34.419 | INFO     | walk:generate:236 - generation 32/200
+2026-10-04 01:07:43.060 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 27.08543270499996, 'answers': 200, 'mean_tokens': 191.91, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 14.317341184, 'gpu': 'NVIDIA L40S', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:07:47.132 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:07:51.951 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:08:09.088 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:08:09.770 | INFO     | walk:generate:236 - generation 96/200
+2026-10-04 01:08:24.791 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 37.65992592099997, 'answers': 200, 'mean_tokens': 191.91, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 14.31462144, 'gpu': 'NVIDIA A10', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:08:27.709 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:08:45.886 | INFO     | walk:generate:236 - generation 160/200
+2026-10-04 01:09:04.168 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:09:18.887 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 32, 'seconds': 121.80401658, 'answers': 200, 'mean_tokens': 191.925, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 10.00387584, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:09:43.708 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:10:08.510 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:10:33.934 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:10:59.968 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:11:14.816 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 91.10915153899998, 'answers': 200, 'mean_tokens': 191.915, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+2026-10-04 01:11:54.973 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:12:34.814 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:13:02.970 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 67.99889593299997, 'answers': 200, 'mean_tokens': 191.93, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 14.31462144, 'gpu': 'NVIDIA L4', 'conv_kernel': False, 'torch': '2.11.0+cu130'}
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 bare   batch= 32 s=  63.4 $/1k answers=0.070 mean_tok=60 max_tok=117 at_cap=0 peak_gb=10.0
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 bare   batch= 64 s=  60.4 $/1k answers=0.067 mean_tok=60 max_tok=113 at_cap=0 peak_gb=11.6
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 bare   batch=128 s=  51.1 $/1k answers=0.057 mean_tok=59 max_tok=108 at_cap=0 peak_gb=14.3
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 broken batch= 32 s= 121.8 $/1k answers=0.135 mean_tok=192 max_tok=192 at_cap=199 peak_gb=10.0
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 broken batch= 64 s=  91.1 $/1k answers=0.101 mean_tok=192 max_tok=192 at_cap=199 peak_gb=11.6
+BENCH gpu=L4 conv=False torch=2.11.0+cu130 broken batch=128 s=  68.0 $/1k answers=0.076 mean_tok=192 max_tok=192 at_cap=199 peak_gb=14.3
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 bare   batch= 32 s=  38.7 $/1k answers=0.059 mean_tok=59 max_tok=108 at_cap=0 peak_gb=10.0
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 bare   batch= 64 s=  35.5 $/1k answers=0.054 mean_tok=59 max_tok=108 at_cap=0 peak_gb=11.6
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 bare   batch=128 s=  32.5 $/1k answers=0.050 mean_tok=59 max_tok=108 at_cap=0 peak_gb=14.3
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 broken batch= 32 s=  70.2 $/1k answers=0.107 mean_tok=192 max_tok=192 at_cap=199 peak_gb=10.0
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 broken batch= 64 s=  51.5 $/1k answers=0.079 mean_tok=192 max_tok=192 at_cap=199 peak_gb=11.6
+BENCH gpu=A10G conv=False torch=2.11.0+cu130 broken batch=128 s=  37.7 $/1k answers=0.058 mean_tok=192 max_tok=192 at_cap=199 peak_gb=14.3
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 bare   batch= 32 s=  35.7 $/1k answers=0.097 mean_tok=59 max_tok=108 at_cap=0 peak_gb=10.0
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 bare   batch= 64 s=  38.4 $/1k answers=0.104 mean_tok=60 max_tok=108 at_cap=0 peak_gb=11.6
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 bare   batch=128 s=  27.6 $/1k answers=0.075 mean_tok=60 max_tok=122 at_cap=0 peak_gb=14.3
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 broken batch= 32 s=  65.5 $/1k answers=0.177 mean_tok=192 max_tok=192 at_cap=199 peak_gb=10.0
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 broken batch= 64 s=  39.8 $/1k answers=0.108 mean_tok=192 max_tok=192 at_cap=200 peak_gb=11.6
+BENCH gpu=L40S conv=False torch=2.11.0+cu130 broken batch=128 s=  27.1 $/1k answers=0.073 mean_tok=192 max_tok=192 at_cap=200 peak_gb=14.3
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 bare   batch= 32 s=  38.3 $/1k answers=0.112 mean_tok=60 max_tok=108 at_cap=0 peak_gb=10.0
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 bare   batch= 64 s=  32.4 $/1k answers=0.094 mean_tok=60 max_tok=117 at_cap=0 peak_gb=11.6
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 bare   batch=128 s=  27.2 $/1k answers=0.079 mean_tok=60 max_tok=119 at_cap=0 peak_gb=14.3
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 broken batch= 32 s=  60.9 $/1k answers=0.178 mean_tok=192 max_tok=192 at_cap=199 peak_gb=10.0
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 broken batch= 64 s=  36.2 $/1k answers=0.106 mean_tok=192 max_tok=192 at_cap=199 peak_gb=11.6
+BENCH gpu=A100-40GB conv=False torch=2.11.0+cu130 broken batch=128 s=  20.8 $/1k answers=0.061 mean_tok=192 max_tok=192 at_cap=199 peak_gb=14.3
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/wassname/main/ap-s14IYyIxQv3CqVqctZaTce

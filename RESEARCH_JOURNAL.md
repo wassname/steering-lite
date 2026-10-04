@@ -409,3 +409,23 @@ Confounder check (wassname: could the twins differ in style?): 20 random pairs, 
 - Plot x-axis now named in BS-bench terms: pushes back on the nonsense ↔ goes along with it.
 
 **Open (wassname leaning):** plain BS-bench, no check questions, pushback vs sycophancy, faithful to the benchmark, because the eval should work on small models.
+
+## 2026-10-04 -- Modal throughput benchmark: batch size, not GPU or kernel, sets the cost
+
+Author PI/OpenAI. Script `scripts/bsbench/bench_modal.py`, logs `slop/research/2026-10-04_modal_cost/bench_*.log`. One dose = 200 prompts (100 bench + 100 twins) on Qwen3.5-4B, bf16, greedy, `max_new_tokens` 192, timed after a warm-up batch. "bare" = unsteered (healthy, mean 60 tokens, max 108–122); "broken" = mean_diff −C at C=1.26 (all answers hit the 192 cap). Single run per cell.
+
+| GPU ($/h) | batch | bare s | bare $/1k answers | broken s | broken $/1k answers | peak GB |
+|---|---|---|---|---|---|---|
+| L4 (0.80) | 32 | 63.4 | 0.070 | 121.8 | 0.135 | 10.0 |
+| L4 | 200 | 34.4 | 0.038 | 59.3 | 0.066 | 18.3 |
+| A10G (1.10) | 32 | 38.7 | 0.059 | 70.2 | 0.107 | 10.0 |
+| A10G | 128 | 32.5 | 0.050 | 37.7 | 0.058 | 14.3 |
+| A10G | 200 | 20.4 | **0.031** | 34.7 | **0.053** | 18.3 |
+| L40S (1.95) | 32 | 35.7 | 0.097 | 65.5 | 0.177 | 10.0 |
+| L40S | 200 | 13.2 | 0.036 | 22.2 | 0.060 | 18.3 |
+| A100-40GB (2.10) | 128 | 27.2 | 0.079 | 20.8 | 0.061 | 14.3 |
+
+- Old setting (L40S, batch 32, cap 512): about 115 s per dose for 400 answers, about $0.156 per 1k answers. New best (A10G or L40S, one batch of 200, cap 192): $0.031–0.060 per 1k, about 3–4× cheaper. Dropping twins except at the chosen dose halves it again.
+- Time barely falls from batch 32 to 128 and then halves at 200, and peak memory is only 18 GB at 200: decoding is per-step overhead bound, not GPU bound. So fill the batch first; GPU choice matters less.
+- causal-conv1d kernel (torch 2.10 + cu130 wheel, `causal_conv1d_fn` present): L40S batch 128 bare 26.2 s vs 27.6 s without, L4 50.7 vs 51.1. About 1–5%, within noise. Confirmed in-image: the flash-linear-attention delta-rule kernels were already used; only the short convolution was missing. Not worth pinning torch 2.10.
+- Oracles (Sol, Astra; `slop/research/2026-10-04_modal_cost/answer_*.md`) predicted both: "missing convolution kernels do not disable working FLA kernels" (Sol).

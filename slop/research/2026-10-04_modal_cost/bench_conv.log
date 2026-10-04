@@ -1,0 +1,327 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-Quk60YTLhXPCfrHemIcReQ
+Building image im-4urarPXiWIaFOZyIhjioZy
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+Getting image source signatures
+Copying blob sha256:f3f7502ac07c10bd911c63b27afb9b3f5902b8554ccbe381bde627178ad1915b
+Copying blob sha256:dcd00f4c468462b2a68c19a552a5b67c3fd23b41967f8622f7f1620cad1d105d
+Copying config sha256:2832daefdfaee215fd647b8bc850821ece2a4c4f7703a11895c6d4631ef0858e
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M426YPQ603PM40XXSZDNMERB/registry-unpackAp9QZE
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode --index-url https://download.pytorch.org/whl/cu130 torch==2.10.0
+Using Python 3.13.0 environment at: /usr/local
+Resolved 28 packages in 390ms
+Downloading sympy (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading cuda-bindings (11.4MiB)
+Downloading setuptools (1.2MiB)
+Downloading triton (179.6MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cudnn-cu13 (335.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading torch (612.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+ Downloaded nvidia-cufile
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded sympy
+ Downloaded cuda-bindings
+ Downloaded nvidia-cuda-cupti
+ Downloaded triton
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-nvjitlink
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded torch
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cublas
+Prepared 27 packages in 12.73s
+Installed 27 packages in 1.29s
+Bytecode compiled 5008 files in 1.79s
+ + cuda-bindings==13.0.3
+ + cuda-pathfinder==1.6.0
+ + filelock==3.32.3
+ + fsspec==2026.7.0
+ + jinja2==3.1.6
+ + markupsafe==3.0.3
+ + mpmath==1.3.0
+ + networkx==3.6.1
+ + nvidia-cublas==13.1.0.3
+ + nvidia-cuda-cupti==13.0.85
+ + nvidia-cuda-nvrtc==13.0.88
+ + nvidia-cuda-runtime==13.0.96
+ + nvidia-cudnn-cu13==9.15.1.9
+ + nvidia-cufft==12.0.0.61
+ + nvidia-cufile==1.15.1.6
+ + nvidia-curand==10.4.0.35
+ + nvidia-cusolver==12.0.4.66
+ + nvidia-cusparse==12.6.3.3
+ + nvidia-cusparselt-cu13==0.8.0
+ + nvidia-nccl-cu13==2.28.9
+ + nvidia-nvjitlink==13.0.88
+ + nvidia-nvshmem-cu13==3.4.5
+ + nvidia-nvtx==13.0.85
+ + setuptools==78.1.0
+ + sympy==1.14.0
+ + torch==2.10.0+cu130
+ + triton==3.6.0
+Saving image...
+Image saved, took 2.34s
+
+Built image im-4urarPXiWIaFOZyIhjioZy in 20.96s
+
+
+Building image im-pgfe9wlgpsYDly4qkf4qtO
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: COPY --from=ghcr.io/astral-sh/uv:latest /uv /.uv/uv
+Getting image source signatures
+Copying blob sha256:dcd00f4c468462b2a68c19a552a5b67c3fd23b41967f8622f7f1620cad1d105d
+Copying blob sha256:f3f7502ac07c10bd911c63b27afb9b3f5902b8554ccbe381bde627178ad1915b
+Copying config sha256:2832daefdfaee215fd647b8bc850821ece2a4c4f7703a11895c6d4631ef0858e
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M426ZCW68BV6N7E0M2507HGB/registry-unpackUzDS0x
+
+=> Step 2: RUN /.uv/uv pip install --python $(command -v python) --compile-bytecode accelerate==1.13.0 beartype==0.22.9 einops==0.8.2 fla-core==0.5.2 flash-linear-attention==0.5.2 https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu13torch2.10cxx11abiTRUE-cp313-cp313-linux_x86_64.whl jaxtyping==0.3.9 loguru==0.7.3 numpy==2.4.4 safetensors==0.7.0 tabulate==0.10.0 tqdm==4.67.3 transformers==5.12.1
+Using Python 3.13.0 environment at: /usr/local
+Resolved 64 packages in 2.64s
+Downloading transformers (10.6MiB)
+Downloading numpy (15.9MiB)
+Downloading hf-xet (4.3MiB)
+Downloading tokenizers (3.1MiB)
+Downloading beartype (1.3MiB)
+Downloading pygments (1.2MiB)
+Downloading causal-conv1d (197.3MiB)
+ Downloaded tokenizers
+ Downloaded pygments
+ Downloaded hf-xet
+ Downloaded beartype
+ Downloaded numpy
+ Downloaded transformers
+ Downloaded causal-conv1d
+Prepared 34 packages in 1.89s
+Installed 34 packages in 282ms
+Bytecode compiled 4877 files in 1.11s
+ + accelerate==1.13.0
+ + annotated-doc==0.0.5
+ + anyio==4.14.2
+ + beartype==0.22.9
+ + causal-conv1d==1.7.0+cu13torch2.10cxx11abitrue (from https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu13torch2.10cxx11abiTRUE-cp313-cp313-linux_x86_64.whl)
+ + click==8.5.0
+ + einops==0.8.2
+ + fla-core==0.5.2
+ + flash-linear-attention==0.5.2
+ + h11==0.16.0
+ + hf-xet==1.6.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + huggingface-hub==1.33.0
+ + jaxtyping==0.3.9
+ + loguru==0.7.3
+ + markdown-it-py==4.2.0
+ + mdurl==0.1.2
+ + ninja==1.13.2
+ + numpy==2.4.4
+ + packaging==26.3
+ + psutil==7.2.2
+ + pygments==2.21.0
+ + pyyaml==6.0.3
+ + regex==2026.9.29
+ + rich==15.0.0
+ + safetensors==0.7.0
+ + shellingham==1.5.4
+ + tabulate==0.10.0
+ + tokenizers==0.22.2
+ + tqdm==4.67.3
+ + transformers==5.12.1
+ + typer==0.27.2
+ + wadler-lindig==0.1.7
+Saving image...
+Image saved, took 3.82s
+
+Built image im-pgfe9wlgpsYDly4qkf4qtO in 12.09s
+
+
+Building image im-wo6FSZQwT9MXgKAZHBtiPv
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONUNBUFFERED=1
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONPATH=/repo/src:/repo/scripts/bsbench
+Saving image...
+Image saved, took 2.47s
+
+Built image im-wo6FSZQwT9MXgKAZHBtiPv in 3.70s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/bench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/data
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
+├── 🔨 Created function bench.
+└── 🔨 Created function bench_conv.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 415.92it/s]
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 432.60it/s]
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 1/426 [00:02<16:03,  2.27s/it]
+[1ALoading weights:   3%|▎         | 13/426 [00:02<00:55,  7.47it/s]
+[1ALoading weights:   6%|▋         | 27/426 [00:02<00:22, 17.66it/s]
+[1ALoading weights:   0%|          | 1/426 [00:00<05:13,  1.36it/s]
+[1ALoading weights:   9%|▉         | 40/426 [00:02<00:13, 27.82it/s]
+[1ALoading weights:   3%|▎         | 12/426 [00:00<00:23, 17.89it/s]
+[1ALoading weights:  12%|█▏        | 50/426 [00:02<00:10, 36.17it/s]
+[1ALoading weights:   5%|▌         | 23/426 [00:01<00:12, 32.25it/s]
+[1ALoading weights:  15%|█▌        | 65/426 [00:02<00:07, 50.53it/s]
+[1ALoading weights:   8%|▊         | 36/426 [00:01<00:08, 48.03it/s]
+[1ALoading weights:  19%|█▊        | 79/426 [00:02<00:05, 64.13it/s]
+[1ALoading weights:  23%|██▎       | 99/426 [00:03<00:03, 86.09it/s]
+[1ALoading weights:  10%|█         | 44/426 [00:01<00:07, 49.60it/s]
+[1ALoading weights:  28%|██▊       | 118/426 [00:03<00:02, 103.78it/s]
+[1ALoading weights:  12%|█▏        | 51/426 [00:01<00:07, 50.71it/s]
+[1ALoading weights:  31%|███▏      | 134/426 [00:03<00:02, 114.45it/s]
+[1ALoading weights:  15%|█▍        | 62/426 [00:01<00:05, 63.02it/s]
+[1ALoading weights:  35%|███▍      | 149/426 [00:03<00:02, 121.29it/s]
+[1ALoading weights:  18%|█▊        | 76/426 [00:01<00:04, 78.02it/s]
+[1ALoading weights:  40%|███▉      | 169/426 [00:03<00:01, 136.36it/s]
+[1ALoading weights:  21%|██        | 89/426 [00:01<00:03, 87.91it/s]
+[1ALoading weights:  44%|████▎     | 186/426 [00:03<00:01, 142.49it/s]
+[1ALoading weights:  23%|██▎       | 99/426 [00:01<00:04, 79.49it/s]
+[1ALoading weights:  47%|████▋     | 202/426 [00:03<00:01, 137.40it/s]
+[1ALoading weights:  27%|██▋       | 113/426 [00:02<00:03, 89.34it/s]
+[1ALoading weights:  52%|█████▏    | 221/426 [00:03<00:01, 143.71it/s]
+[1ALoading weights:  29%|██▉       | 125/426 [00:02<00:03, 93.09it/s]
+[1ALoading weights:  56%|█████▌    | 239/426 [00:04<00:01, 142.30it/s]
+[1ALoading weights:  33%|███▎      | 142/426 [00:02<00:02, 106.78it/s]
+[1ALoading weights:  60%|█████▉    | 254/426 [00:04<00:01, 143.51it/s]
+[1ALoading weights:  65%|██████▌   | 278/426 [00:04<00:00, 163.36it/s]
+[1ALoading weights:  36%|███▌      | 154/426 [00:02<00:02, 92.39it/s] 
+[1ALoading weights:  69%|██████▉   | 295/426 [00:04<00:00, 154.89it/s]
+[1ALoading weights:  40%|████      | 171/426 [00:02<00:02, 107.00it/s]
+[1ALoading weights:  43%|████▎     | 183/426 [00:02<00:02, 105.75it/s]
+[1ALoading weights:  73%|███████▎  | 311/426 [00:04<00:00, 138.88it/s]
+[1ALoading weights:  46%|████▌     | 195/426 [00:02<00:02, 108.72it/s]
+[1ALoading weights:  78%|███████▊  | 331/426 [00:04<00:00, 153.95it/s]
+[1ALoading weights:  81%|████████▏ | 347/426 [00:04<00:00, 152.79it/s]
+[1ALoading weights:  49%|████▊     | 207/426 [00:02<00:02, 97.48it/s] 
+[1ALoading weights:  85%|████████▌ | 363/426 [00:04<00:00, 152.77it/s]
+[1ALoading weights:  53%|█████▎    | 224/426 [00:03<00:01, 110.45it/s]
+[1ALoading weights:  90%|████████▉ | 382/426 [00:04<00:00, 158.26it/s]
+[1ALoading weights:  56%|█████▌    | 237/426 [00:03<00:01, 114.93it/s]
+[1ALoading weights:  95%|█████████▍| 403/426 [00:05<00:00, 170.51it/s]
+[1ALoading weights:  58%|█████▊    | 249/426 [00:03<00:01, 113.51it/s]
+[1ALoading weights:  99%|█████████▉| 421/426 [00:05<00:00, 159.83it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:05<00:00, 82.33it/s] 
+
+[1ALoading weights:  61%|██████▏   | 261/426 [00:03<00:01, 100.81it/s]
+[1ALoading weights:  65%|██████▌   | 278/426 [00:03<00:01, 114.07it/s]
+[1ALoading weights:  69%|██████▊   | 292/426 [00:03<00:01, 117.56it/s]
+[1ALoading weights:  72%|███████▏  | 305/426 [00:03<00:01, 115.16it/s]
+[1ALoading weights:  74%|███████▍  | 317/426 [00:03<00:01, 103.88it/s]
+[1ALoading weights:  77%|███████▋  | 330/426 [00:04<00:00, 102.17it/s]
+[1ALoading weights:  81%|████████  | 345/426 [00:04<00:00, 113.08it/s]
+[1ALoading weights:  84%|████████▍ | 358/426 [00:04<00:00, 107.20it/s]
+[1ALoading weights:  88%|████████▊ | 373/426 [00:04<00:00, 115.23it/s]
+[1ALoading weights:  90%|█████████ | 385/426 [00:04<00:00, 111.68it/s]
+[1ALoading weights:  95%|█████████▍| 403/426 [00:04<00:00, 127.17it/s]
+[1ALoading weights:  98%|█████████▊| 416/426 [00:04<00:00, 111.93it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:04<00:00, 88.31it/s] 
+2026-10-04 01:04:49.688 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:04:53.755 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:05:06.146 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:05:11.544 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:16.667 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:05:16.802 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:05:30.352 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 40.664714597, 'answers': 200, 'mean_tokens': 59.47, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 11.587639808, 'gpu': 'NVIDIA L40S', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:05:44.320 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:05:51.402 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:05:57.883 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:05:58.045 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:06:16.158 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 64, 'seconds': 70.011848185, 'answers': 200, 'mean_tokens': 59.625, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 11.587638784, 'gpu': 'NVIDIA L4', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:06:17.574 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 26.171432547999984, 'answers': 200, 'mean_tokens': 59.415, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 14.316603904, 'gpu': 'NVIDIA L40S', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:06:28.049 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:06:38.425 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:06:48.867 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:06:53.219 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:06:59.629 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:07:08.466 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 40.41803606300002, 'answers': 200, 'mean_tokens': 191.93, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA L40S', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:07:11.809 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:07:24.119 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:07:39.726 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:07:43.913 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'bare', 'batch': 128, 'seconds': 50.693091495000004, 'answers': 200, 'mean_tokens': 59.62, 'max_tokens': 108, 'at_cap': 0, 'peak_gb': 14.316603904, 'gpu': 'NVIDIA L4', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:07:51.198 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 27.080404337000004, 'answers': 200, 'mean_tokens': 191.925, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 14.316603904, 'gpu': 'NVIDIA L40S', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:08:08.271 | INFO     | walk:generate:236 - generation 64/64
+2026-10-04 01:08:32.488 | INFO     | walk:generate:236 - generation 64/200
+2026-10-04 01:08:57.227 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:09:22.633 | INFO     | walk:generate:236 - generation 192/200
+2026-10-04 01:09:37.367 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 64, 'seconds': 89.09736079300001, 'answers': 200, 'mean_tokens': 191.93, 'max_tokens': 192, 'at_cap': 200, 'peak_gb': 11.587690496, 'gpu': 'NVIDIA L4', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+2026-10-04 01:10:16.466 | INFO     | walk:generate:236 - generation 128/128
+2026-10-04 01:10:55.497 | INFO     | walk:generate:236 - generation 128/200
+2026-10-04 01:11:22.956 | INFO     | walk:generate:236 - generation 200/200
+{'condition': 'broken', 'batch': 128, 'seconds': 66.49275591600002, 'answers': 200, 'mean_tokens': 191.93, 'max_tokens': 192, 'at_cap': 199, 'peak_gb': 14.31544064, 'gpu': 'NVIDIA L4', 'conv_kernel': True, 'torch': '2.10.0+cu130'}
+BENCH gpu=L4 conv=True torch=2.10.0+cu130 bare   batch= 64 s=  70.0 $/1k answers=0.078 mean_tok=60 max_tok=108 at_cap=0 peak_gb=11.6
+BENCH gpu=L4 conv=True torch=2.10.0+cu130 bare   batch=128 s=  50.7 $/1k answers=0.056 mean_tok=60 max_tok=108 at_cap=0 peak_gb=14.3
+BENCH gpu=L4 conv=True torch=2.10.0+cu130 broken batch= 64 s=  89.1 $/1k answers=0.099 mean_tok=192 max_tok=192 at_cap=200 peak_gb=11.6
+BENCH gpu=L4 conv=True torch=2.10.0+cu130 broken batch=128 s=  66.5 $/1k answers=0.074 mean_tok=192 max_tok=192 at_cap=199 peak_gb=14.3
+BENCH gpu=L40S conv=True torch=2.10.0+cu130 bare   batch= 64 s=  40.7 $/1k answers=0.110 mean_tok=59 max_tok=108 at_cap=0 peak_gb=11.6
+BENCH gpu=L40S conv=True torch=2.10.0+cu130 bare   batch=128 s=  26.2 $/1k answers=0.071 mean_tok=59 max_tok=108 at_cap=0 peak_gb=14.3
+BENCH gpu=L40S conv=True torch=2.10.0+cu130 broken batch= 64 s=  40.4 $/1k answers=0.109 mean_tok=192 max_tok=192 at_cap=200 peak_gb=11.6
+BENCH gpu=L40S conv=True torch=2.10.0+cu130 broken batch=128 s=  27.1 $/1k answers=0.073 mean_tok=192 max_tok=192 at_cap=200 peak_gb=14.3
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/wassname/main/ap-Quk60YTLhXPCfrHemIcReQ

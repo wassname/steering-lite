@@ -103,6 +103,22 @@ def main(methods: str = "mean_diff,pca,vjp_resid", seeds: str = "0", cohort: str
         raise SystemExit(f"{len(failed)} of {len(handles)} walks FAILED: {', '.join(failed)}")
 
 
+@app.function(gpu=os.environ.get("BSBENCH_GPU", "L40S"), timeout=600)
+def kernels() -> dict:
+    """Which Qwen3.5 linear-attention kernels transformers found (it warns if any one is missing)."""
+    import torch
+    from transformers.models.qwen3_5 import modeling_qwen3_5 as m
+    names = ("causal_conv1d_fn", "causal_conv1d_update", "chunk_gated_delta_rule", "fused_recurrent_gated_delta_rule")
+    return {"torch": torch.__version__, "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(),
+            "is_fast_path_available": getattr(m, "is_fast_path_available", None), **{n: repr(getattr(m, n, "MISSING")) for n in names}}
+
+
+@app.local_entrypoint()
+def check_kernels():
+    for key, value in kernels.remote().items():
+        print(f"KERNEL {key} = {value}")
+
+
 @app.local_entrypoint()
 def smoke():
     """Same image, mounts and Volume as the real fan-out, real Qwen3.5-4B, 8-token answers, 2 rungs."""
