@@ -80,15 +80,21 @@ def demo_rows(model_dir: Path, certificate: dict) -> list[dict]:
     cohort = load_cohort()
     scenarios = list(cohort)[COHORTS[certificate["cohort"]]]
     bare = read_answers(model_dir / "answers/bare/bare.jsonl")
+    bare_controls = read_answers(model_dir / "answers_controls/bare/bare.jsonl") if certificate.get("controls") else {}
     rows = []
     for side, rungs in certificate["sides"].items():
         for rung in rungs:
             steered = read_answers(model_dir / rung["answers"])
+            controls = read_answers(model_dir / rung["control_answers"]) if "control_answers" in rung else {}
             for scenario in scenarios:
                 assert bare[scenario]["prompt"] == steered[scenario]["prompt"] == cohort[scenario]["prompt"]
-                rows.append({"method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side, "vignette": scenario,
-                             "prompt": cohort[scenario]["prompt"], "flaw": cohort[scenario]["nonsensical_element"],
+                common = {"method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side, "vignette": scenario}
+                rows.append({**common, "set": "bench", "prompt": cohort[scenario]["prompt"], "flaw": cohort[scenario]["nonsensical_element"],
                              "bare": bare[scenario]["text"], "steered": steered[scenario]["text"]})
+                if controls:  # legitimate control question (BullshitBench's control rubric); reported, not scored
+                    assert bare_controls[scenario]["prompt"] == controls[scenario]["prompt"]
+                    rows.append({**common, "set": "control", "prompt": controls[scenario]["prompt"], "flaw": None,
+                                 "bare": bare_controls[scenario]["text"], "steered": controls[scenario]["text"]})
     return rows
 
 

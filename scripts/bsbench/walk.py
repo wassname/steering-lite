@@ -104,6 +104,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vjp-split", action="store_true", help="only extract vjp_resid from two halves of the persona pairs and compare them (is the vector signal or rounding noise?); writes vjp_split/<name>_s<seed>.json")
     parser.add_argument("--no-think", action="store_true", help="extraction pairs without the '<think>' prefix on the suffix (models without a thinking mode read it as literal text); use with --tag")
     parser.add_argument("--tag", help="variant name: files and results use <method>-<tag>, so a changed setting never reuses the default run's cache")
+    parser.add_argument("--controls", action="store_true", help="also answer the 100 control questions (data/bsbench/sound_twins_v1.jsonl, legitimate twins of the BS-bench questions) at every dose; reported, not scored")
     parser.add_argument("--pairs", choices=("generic", "bsbench_v1"), default="generic", help="extraction data: generic suffix file, or persona pairs on BullshitBench v1 nonsense questions (data/bsbench/persona_pairs_bsbench_v1.json; new output dir via the generation key)")
     parser.add_argument("--axis", choices=tuple(AXES), help="persona screen: use this persona pair instead of data.AXIS (new output dir via the generation key)")
     parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
@@ -244,10 +245,16 @@ def generate_batch(model, tokenizer, batch):
     return output
 
 
-def answer_path(model: str, method: str, seed: int, side: str, coefficient: float) -> Path:
+def answer_path(model: str, method: str, seed: int, side: str, coefficient: float, controls: bool = False) -> Path:
     name = "bare.jsonl" if side == "bare" else f"{side}_C{coefficient:.10g}.jsonl"
     folder = "bare" if side == "bare" else f"{method}_s{seed}"
-    return model_dir(model) / "answers" / folder / name
+    return model_dir(model) / ("answers_controls" if controls else "answers") / folder / name
+
+
+def read_controls(cohort: str) -> list[dict[str, str]]:
+    """Legitimate control questions, one per BS-bench question (same scenario id), in read_cohort order."""
+    controls = {r["scenario"]: {"scenario": r["scenario"], "prompt": r["question"]} for r in map(json.loads, (ROOT / "data/bsbench/sound_twins_v1.jsonl").open())}
+    return [controls[row["scenario"]] for row in read_cohort(cohort)]
 
 
 def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, steer_spans: list[str] | None = None) -> list[str]:
@@ -518,7 +525,7 @@ def check_user_positions(model, tokenizer, rows, vector: Vector, coefficient: fl
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
     return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
-            and certificate.get("kl_target", args.kl_target) == args.kl_target)
+            and certificate.get("kl_target", args.kl_target) == args.kl_target and certificate.get("controls", False) >= args.controls)
 
 
 def walk(args) -> None:
@@ -557,12 +564,16 @@ def walk(args) -> None:
     bare = cached_answers(model, tokenizer, rows, answer_path(args.model, "bare", 0, "bare", 0), prompts, args.batch_size, _Null)
     stats, reasons = health(tokenizer, bare)
     logger.info("SHOULD: bare is healthy (no reasons). side=bare stats={} breakdown={}", stats, reasons)
+    control_rows = read_controls(args.cohort) if args.controls else []
+    control_prompts = generation_inputs(tokenizer, control_rows)
+    if control_rows:
+        cached_answers(model, tokenizer, control_rows, answer_path(args.model, "bare", 0, "bare", 0, controls=True), control_prompts, args.batch_size, _Null)
 
     def certificate(**fields) -> None:
         certificate_path.parent.mkdir(parents=True, exist_ok=True)
         certificate_path.write_text(json.dumps({
             "schema": "bsbench_walk_v4", "eval_version": EVAL_VERSION, "method": args.name, "seed": args.seed,
-            "cohort": args.cohort, "model": args.model, "preset": args.preset, "gen": GEN, **fields,
+            "cohort": args.cohort, "model": args.model, "preset": args.preset, "gen": GEN, "controls": args.controls, **fields,
             "timing": {"load_s": timing["load_s"], "total_s": time.monotonic() - timing["start"],
                        "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
         }, indent=2) + "\n")
@@ -574,6 +585,10 @@ def walk(args) -> None:
             answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null)
             side_stats, side_reasons = health(tokenizer, answers)
             sides[side] = [{"coefficient": 1.0, "breakdown_reasons": side_reasons, "stats": side_stats, "answers": str(path.relative_to(root)), "instruction": instruction}]
+            if control_rows:
+                control_path = answer_path(args.model, args.name, args.seed, side, 1.0, controls=True)
+                cached_answers(model, tokenizer, control_rows, control_path, generation_inputs(tokenizer, control_rows, instruction), args.batch_size, _Null)
+                sides[side][0]["control_answers"] = str(control_path.relative_to(root))
         certificate(status="COMPLETE", sides=sides)
         logger.info("WALK_COMPLETE {} certificate={}", args.method, certificate_path)
         return
@@ -607,6 +622,7 @@ def walk(args) -> None:
 
     user = args.positions == "user"
     spans = user_spans(rows) if user else None
+    control_spans = user_spans(control_rows) if user and control_rows else None
     if user:
         check_user_positions(model, tokenizer, rows, vector, GRID[start["+C"]])
     state = {side: {"streak": 0, "boundary": None, "done": False} for side in ("+C", "-C")}
@@ -635,6 +651,10 @@ def walk(args) -> None:
             path = answer_path(args.model, args.name, args.seed, side, coefficient)
             answers = cached_answers(model, tokenizer, rows, path, prompts, args.batch_size,
                                      lambda: vector(model, C=sign * coefficient), steer_spans=spans)
+            control_path = answer_path(args.model, args.name, args.seed, side, coefficient, controls=True)
+            if control_rows:
+                cached_answers(model, tokenizer, control_rows, control_path, control_prompts, args.batch_size,
+                               lambda: vector(model, C=sign * coefficient), steer_spans=control_spans)
             kl_rms = None if user else rung_kl(args, model, tokenizer, vector, sign * coefficient)  # calibration-prompt KL measures steering everywhere
             side_stats, side_reasons = health(tokenizer, answers)
             logger.info(
@@ -650,6 +670,7 @@ def walk(args) -> None:
                 "grid_index": grid_index, "coefficient": coefficient, "kl_rms": kl_rms, "breakdown_reasons": side_reasons,
                 "post_boundary": state[side]["boundary"] is not None and step > state[side]["boundary"],
                 "stats": side_stats, "answers": str(path.relative_to(root)), "seconds": time.monotonic() - started,
+                **({"control_answers": str(control_path.relative_to(root))} if control_rows else {}),
             })
             state[side]["done"] = state[side]["boundary"] is not None and step >= state[side]["boundary"] + 1  # one dose past the boundary
         done = all(state[side]["done"] for side in state)

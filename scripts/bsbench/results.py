@@ -25,7 +25,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import FAILURES, MAX_FAILURE, MODEL, blind_request, bsb_request, cached, key, p_fail
+from judge import FAILURES, MAX_FAILURE, MODEL, blind_request, bsb_request, cached, control_request, key, p_fail
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
@@ -75,7 +75,13 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
         for side, rungs in certificate["sides"].items():
             for rung in rungs:
                 questions = []
-                for row in (r for r in rows if r["side"] == side and r["C"] == rung["coefficient"]):
+                at = [r for r in rows if r["side"] == side and r["C"] == rung["coefficient"]]
+                controls = []  # legitimate control questions (BullshitBench's control rubric): reported, not scored
+                for row in (r for r in at if r["set"] == "control"):
+                    rating = [have.get(key(control_request(row["prompt"], text))) for text in (row["steered"], row["bare"])]
+                    assert all(rating), f"no Jev control rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
+                    controls.append([r["control"]["probabilities"]["claims_nonsense"] for r in rating])
+                for row in (r for r in at if r["set"] == "bench"):
                     b = have.get(key(bsb_request(row["prompt"], row["flaw"], row["bare"])))
                     st = have.get(key(bsb_request(row["prompt"], row["flaw"], row["steered"])))
                     assert b and st, f"no Jev rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
@@ -98,6 +104,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                     "breakdown_reasons": rung["breakdown_reasons"], "post_boundary": rung.get("post_boundary", False),
                     "admissible": steered_fail <= MAX_FAILURE,
                     "kl_rms": rung.get("kl_rms"), "stats": rung["stats"], "answers": rung["answers"], "questions": questions,
+                    **({"control_claims": mean(c[0] for c in controls), "control_claims_bare": mean(c[1] for c in controls)} if controls else {}),
                 })
     return points
 
@@ -256,7 +263,7 @@ def _blind_targets(model_dir: Path, cohort: str, view: str) -> dict[str, dict]:
     points = build_points(model_dir, cohort, set(), view)
     if not points:
         return {}
-    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort, view) for r in demo_rows(model_dir, c)}
+    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort, view) for r in demo_rows(model_dir, c) if r["set"] == "bench"}
     out = {}
     for method, (_, best, strongest) in choose(points).items():
         for side in ("+C", "-C"):
@@ -520,8 +527,9 @@ def _fmt_side(point: dict | None) -> list[str]:
 
 
 def tables(rows: list[dict]) -> str:
-    head = "| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
-    lines = [head, "|" + "---|" * 15]
+    head = "| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C control: calls a legitimate question nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
+    lines = [head, "|" + "---|" * 16]
+    control = lambda p: "—" if p is None or "control_claims" not in p else f"{p['control_claims']:.0%} ({p['control_claims_bare']:.0%})"
     bound = lambda v: "−∞" if v == -math.inf else f"{v:+.2f}"
     for row in rows:
         name = f"*{row['method']}*" if row["method"] in ("random", *PROMPTS) else row["method"]
@@ -530,7 +538,7 @@ def tables(rows: list[dict]) -> str:
         score_room = "—" if math.isnan(row["score_room"]) else f"{row['score_room']:+.2f}"
         ci_room = "—" if math.isnan(row["ci_room"][0]) else f"[{bound(row['ci_room'][0])}, {bound(row['ci_room'][1])}]"
         empty = "—" if math.isnan(row["ci_empty"]) else f"{row['ci_empty']:.0%}"
-        lines.append("| " + " | ".join([name, score, ci, score_room, ci_room, empty, *_fmt_side(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
+        lines.append("| " + " | ".join([name, score, ci, score_room, ci_room, empty, *_fmt_side(row["best"]["-C"]), control(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
                                          str(row["seeds"]), str(row["N"]), str(row["rejected"])]) + " |")
     return "\n".join(lines) + (
         f"\n\nOn-axis ÷ room: on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side "
@@ -649,7 +657,7 @@ def main() -> None:
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "score_room": row["score_room"], "ci_room": row["ci_room"],
             "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
-            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis")} for side, p in row["best"].items()},
+            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis", "control_claims", "control_claims_bare") if k in p} for side, p in row["best"].items()},
         } for row in rows],
         "blind": [{"method": row["method"], "side": side, "dose": dose, **blind_summary(row[dose][side], side)}
                   for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],

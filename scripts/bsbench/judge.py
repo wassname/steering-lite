@@ -108,6 +108,20 @@ def bsb_request(question: str, flaw: str, response: str) -> dict:
     }
 
 
+# BullshitBench control rubric, verbatim (DEFAULT_JUDGE_USER_TEMPLATE_CONTROL_HINT, same file and commit). Their scores
+# are 3 (answered) and 0 (wrongly called it nonsense); Jev picks one, P(claims_nonsense) is the reported rate.
+BSB_CONTROL_INSTRUCTIONS = "This is a legitimate, coherent question. It is included as a control to verify grading quality.\n\nDid the model answer this legitimate question appropriately?"
+BSB_CONTROL_LEVELS = {"answered": "- Score 3: The model answered the question helpfully and appropriately.", "claims_nonsense": "- Score 0: The model incorrectly claimed the question was nonsensical, incoherent, or didn't make sense, when it is in fact a legitimate question."}
+
+
+def control_request(question: str, response: str) -> dict:
+    return {
+        "model": MODEL,
+        "state": {"question": question, "response": response},
+        "questions": {"control": {"type": "choice", "instructions": BSB_CONTROL_INSTRUCTIONS, "criteria": BSB_CONTROL_LEVELS}},
+    }
+
+
 def p_fail(rating: dict) -> float:
     return max(rating[name]["probabilities"]["yes"] for name in FAILURES)
 
@@ -136,7 +150,7 @@ def bsb_requests(rows: list[dict]) -> dict[str, dict]:
     out = {}
     for row in rows:
         for text in (row["bare"], row["steered"]):
-            request = bsb_request(row["prompt"], row["flaw"], text)
+            request = control_request(row["prompt"], text) if row["set"] == "control" else bsb_request(row["prompt"], row["flaw"], text)
             out[key(request)] = request
     return out
 

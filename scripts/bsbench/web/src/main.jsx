@@ -74,12 +74,13 @@ function Plot({ data, visible, selected, onSelect }) {
 
 function Summary({ data }) {
   return <table className="summary">
-    <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>on-axis ÷ room↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
+    <thead><tr><th>method</th><th>score↑</th><th>90% CI</th><th>on-axis ÷ room↑</th><th>90% CI</th><th>−C on↑</th><th>−C off↓</th><th>−C C</th><th>−C control: calls a legitimate question nonsense (bare)</th><th>+C on↑</th><th>+C off↓</th><th>+C C</th><th>seeds</th><th>N</th><th>rejected</th></tr></thead>
     <tbody>{data.summary.map(r => <tr key={r.method}>
       <td className={r.method === 'random' || r.method.startsWith('prompting') ? 'control' : ''}><span className="swatch" style={{ background: data.colors[r.method] }} />{r.method}</td>
       <td><strong>{fmt(r.score)}</strong></td><td>{r.ci[0] == null ? '—' : `[${fmt(r.ci[0])}, ${fmt(r.ci[1])}]`}</td>
       <td>{fmt(r.score_room)}</td><td>{r.ci_room[0] == null ? '—' : `[${fmt(r.ci_room[0])}, ${fmt(r.ci_room[1])}]`}</td>
-      {['-C', '+C'].flatMap(side => { const b = r.best[side]; return b ? [<td key={side + 'e'}>{fmt(side === '+C' ? b.effect : -b.effect)}</td>, <td key={side + 'o'}>{b.off_axis.toFixed(2)}</td>, <td key={side + 'c'}>{b.C.toPrecision(3)}</td>] : [<td key={side + 'e'}>—</td>, <td key={side + 'o'}>—</td>, <td key={side + 'c'}>—</td>]; })}
+      {['-C', '+C'].flatMap(side => { const b = r.best[side]; const cells = b ? [<td key={side + 'e'}>{fmt(side === '+C' ? b.effect : -b.effect)}</td>, <td key={side + 'o'}>{b.off_axis.toFixed(2)}</td>, <td key={side + 'c'}>{b.C.toPrecision(3)}</td>] : [<td key={side + 'e'}>—</td>, <td key={side + 'o'}>—</td>, <td key={side + 'c'}>—</td>];
+        return side === '-C' ? [...cells, <td key="ctl">{b?.control_claims == null ? '—' : `${Math.round(100 * b.control_claims)}% (${Math.round(100 * b.control_claims_bare)}%)`}</td>] : cells; })}
       <td>{r.seeds}</td><td>{r.N}</td><td>{r.rejected}</td>
     </tr>)}</tbody>
   </table>;
