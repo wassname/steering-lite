@@ -35,7 +35,7 @@ done = {(r["condition"], r["scenario"]): r for r in map(json.loads, OUT.open())}
 
 async def grade(client, condition, scenario, text):
     q = questions[scenario]
-    body = {"model": JUDGE, "temperature": 0, "response_format": {"type": "json_object"}, "messages": [
+    body = {"model": JUDGE, "temperature": 0, "max_tokens": 400, "response_format": {"type": "json_object"}, "messages": [
         {"role": "system", "content": BSB_SYSTEM},
         {"role": "user", "content": TEMPLATE.format(question=q["prompt"], nonsensical_element=q["nonsensical_element"], response=text)}]}
     for attempt in range(5):

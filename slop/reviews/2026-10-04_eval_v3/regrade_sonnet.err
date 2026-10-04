@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/../../slop/reviews/2026-10-04_eval_v3/regrade_sonnet.py", line 84, in <module>
+    asyncio.run(main())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/../../slop/reviews/2026-10-04_eval_v3/regrade_sonnet.py", line 66, in main
+    await asyncio.gather(*(run(c, s) for c, s in todo))
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/../../slop/reviews/2026-10-04_eval_v3/regrade_sonnet.py", line 62, in run
+    row = await grade(client, c, s, answers[c][s]["text"])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/../../slop/reviews/2026-10-04_eval_v3/regrade_sonnet.py", line 52, in grade
+    raise RuntimeError(f"{condition} {scenario} failed")
+RuntimeError: bare syco_bullshit_v2_leg_tce_01 failed

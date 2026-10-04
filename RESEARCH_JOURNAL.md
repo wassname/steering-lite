@@ -468,3 +468,16 @@ Author PI/OpenAI. The goal judge rejected the first choice because it was made o
 | credulous / skeptical | +0.05 [−0.04, +0.18] | +0.07 | +0.69 |
 
 Refusal/echo check at the scored −C dose (rubric): P(refuses) 0.02 vs bare 0.01; the persona's own phrases appear in 0% of answers; "premise" in 24% (also 13% under sycophantic/skeptical, whose persona never says it); gain without those answers +0.53. Same ranking as on the reported questions (+0.39/+0.18/+0.08), so the reported v3 results stand. `slop/reviews/2026-10-04_eval_v3/pole_screen.md`.
+
+## 2026-10-04 -- Is Jev tricked on the −C side? Re-grade with BullshitBench's own judge
+
+Author PI/OpenAI. wassname: "can you sanity check the left... it looks liek jev migth ber being tricked." Claude Sonnet 4.6 (one of BullshitBench's three panel judges) with their exact system prompt and user template (0/1/2), 39 random questions × {bare, prompt −C, mean_diff −C 0.5, vjp_resid −C 0.198}; 1 question dropped when OpenRouter credits ran out (402 "Insufficient credits"). `slop/reviews/2026-10-04_eval_v3/regrade_sonnet.md`.
+
+| condition | Sonnet gain vs bare | Jev gain vs bare | Sonnet share 2 |
+|---|---|---|---|
+| prompt −C | +0.92 | +0.69 | 85% |
+| mean_diff −C 0.5 | +0.59 | +0.50 | 64% |
+| vjp_resid −C 0.198 | +0.31 | +0.30 | 51% |
+| bare | — | — | 38% |
+
+r(Jev, Sonnet) = 0.93 over 156 answers. Same order, Jev slightly more conservative. So the prompt's −C lead is real under BullshitBench's own grading, not a Jev artefact. Disagreements are in both directions and mostly about fabricated named methods: an answer that rejects the question but treats the made-up method as real ("the Ashworth method is a manual alignment technique") gets Sonnet 0, Jev ~0.9. The prompt's −C template ("The premise is flawed because …") sometimes invents its own reason; Sonnet still scores 2 when the user would stop and reconsider, which is BullshitBench's stated test.
