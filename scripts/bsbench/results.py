@@ -499,15 +499,15 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
         figure.add_annotation(**annotation)
-    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[1]}", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[0]}", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer → pushes back on the nonsense", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer → goes along with the nonsense", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
                           text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt (open ☆ = judge rates it incoherent)<br>× = last dose the judge rates coherent, or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "BullshitBench score lost (Jev, 0–2 scale): ← pushes back on the nonsense · goes along with it → (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "BullshitBench score lost, 0–2 (Jev): ← pushes back · goes along → (solid +C, dashed −C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis: rise in P(steering failure) (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
@@ -674,7 +674,8 @@ def main() -> None:
         f"Judge: Jev with BullshitBench's own rubric (on-axis = BS score lost, 0-2 scale, + = goes along with the nonsense) and five yes/no steering-failure checks "
         f"({', '.join(FAILURES)}; off-axis = change in P(any failure), the largest of the five). Admissible = mean P(any failure) of the steered answers ≤ {MAX_FAILURE:g}. "
         "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
-    ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
+    ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "") + (
+        " Steering personas: +C \"{}\" / −C \"{}\".".format(*shown_axis(points)))
     if args.view == "user":
         intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
                   "using the method's own vector and C0, one seed. Random is random-user: random directions steered the same way. "

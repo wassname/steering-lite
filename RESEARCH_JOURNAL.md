@@ -429,3 +429,30 @@ Author PI/OpenAI. Script `scripts/bsbench/bench_modal.py`, logs `slop/research/2
 - Time barely falls from batch 32 to 128 and then halves at 200, and peak memory is only 18 GB at 200: decoding is per-step overhead bound, not GPU bound. So fill the batch first; GPU choice matters less.
 - causal-conv1d kernel (torch 2.10 + cu130 wheel, `causal_conv1d_fn` present): L40S batch 128 bare 26.2 s vs 27.6 s without, L4 50.7 vs 51.1. About 1–5%, within noise. Confirmed in-image: the flash-linear-attention delta-rule kernels were already used; only the short convolution was missing. Not worth pinning torch 2.10.
 - Oracles (Sol, Astra; `slop/research/2026-10-04_modal_cost/answer_*.md`) predicted both: "missing convolution kernels do not disable working FLA kernels" (Sol).
+
+## 2026-10-04 -- Eval v3: plain BullshitBench, its own rubric, per-side doses; 4B validation run
+
+Author PI/OpenAI. Goals file `.pi/goals/d54358-v1.md`. wassname: "so you know what I mean by plain bs-bench"; "we should use theirs but we can be a little better"; per-side doses "this was always meant to be how it is. so this is a FIX".
+
+Setup: Qwen3.5-4B, 100 BS-bench v2 questions, preset qwen3.5-4b (A10G, batch 200, max_new_tokens 192), seed 0, random 5 directions. Judge: BullshitBench's rubric verbatim (petergpt/bullshit-benchmark @ 6f6e28b4) read by Jev as an expected 0–2 score, plus five yes/no steering-failure checks (coherent while mean P(any) ≤ 0.5). Each side calibrates its own C0 and walks its own grid. No control questions. Commits 4e65fc7 (pipeline), 2a54a02 (axis).
+
+Persona pair, two screens:
+- Prompt screen (wassname's persona-steering-template-library validator, qwen3.5-9b, BS-bench v1 = 55 questions disjoint from v2): credulous/skeptical axis Δ 4.83, sycophantic/skeptical 4.50, rubric-mirror 4.06 (strongest −C +1.39, least off-axis 4.8, no enthusiasm/warmth), approval/truth 2.99, sycophantic/abrasive (v1) 2.40 with −C −0.21 (abrasive does not detect nonsense better than baseline). `slop/research/2026-10-04_persona_axes/results.md`.
+- 4B mean_diff vector screen (v3 judge): rubric +0.39 [+0.28, +0.51], sycophantic +0.18, credulous +0.08. `slop/reviews/2026-10-04_eval_v3/pole_screen.md`. Chosen: rubric mirror. The 9B prompt ranking did not transfer to 4B vectors (credulous first on 9B prompts, last on 4B vectors).
+
+Validation (`outputs/bsbench/results/v3-4b/`):
+
+| method | score [90% CI] | −C pushback gained | +C toward accepting |
+|---|---|---|---|
+| mean_diff | +0.39 [+0.28, +0.51] | +0.46 | +0.68 |
+| plain prompt | +0.38 [+0.27, +0.50] | +0.74 | +0.37 |
+| vjp_resid | +0.30 [+0.20, +0.43] | +0.30 | +0.67 |
+| random (5) | +0.01 [−0.04, +0.07] | +0.01 | +0.64 |
+
+Observations: random −C goes toward accepting, not pushback ("To calculate the resulting beat frequency, identify the sector where…", random s0 −C C=2, +0.39). vjp_resid −C collapses one dose after its best (P(fail) 0.16 → 0.87). The prompt's +C often ignores the instruction ("does not possess a measurable tensile strength…"). Failure checks over 8,900 screen answers: off_topic/repeats/incoherent r 0.67–0.84, each also fires alone (83/23/31 answers); role_leak and refuses_or_moralizes nearly independent. `slop/reviews/2026-10-04_eval_v3/{validation_read,judge_check}.md`.
+
+Interpretation (likely, ~75%): on this model +C is generic damage, so the eval separates methods only on −C. One seed per method, so the mean_diff vs prompt vs vjp_resid order is not established; the persona was selected on the same 100 questions the mean_diff row reports.
+
+Cost: GPU for the screens and validation about $5 (walks 360–1,600 s each on A10G); Jev about $1.
+
+Next: more seeds; vjp_value and the other methods only after this is reviewed.

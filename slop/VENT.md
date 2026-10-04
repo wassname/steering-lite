@@ -17,3 +17,6 @@ results.py kept dying with exit 143 after ~10 s while loading the 800 MB Jev cac
 
 ## 2026-10-03 `pi -p` in a background process hangs forever -- PI/OpenAI
 A chained `pi --model X --no-tools --no-session -p "..."` sat 3 h with 2 s CPU under the process tool. Same call with `< /dev/null` returned in 28 s. Likely pi waits on an open non-TTY stdin. Always add `< /dev/null` (and a `timeout`). The earlier ENOTEMPTY/clone crash was a separate race on first install of gotgenes/pi-anthropic-auth; that dir now exists.
+
+## 2026-10-04 duplicate random walks -- PI/OpenAI
+I chained `run_modal ... methods` then `run_modal ... random` in one process, and also launched `random` in parallel to save time. The chained copy started while the parallel one was still RUNNING; run_modal only skips COMPLETE certificates, so it spawned the same 5 walks again. Both appended to the same answer files for ~7 min. Rule: never launch the same (method, seed, cohort, preset) twice; kill the chained duplicate when you start a parallel copy.
