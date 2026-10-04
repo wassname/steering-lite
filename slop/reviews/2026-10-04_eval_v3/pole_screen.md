@@ -19,3 +19,12 @@ Quotes (rubric axis):
 - −C 0.63, fin_mm_02: "The premise is flawed because "destructive interference" and "beat frequency" are concepts from physics, not finance. ... **Corrected Answer:** The premise is flawed b[ecause]" — a template starts here.
 
 Decision: data.AXIS_NAME = "rubric". Caveats: one seed; the screen and the reported mean_diff row use the same walk and questions (selection on the reported data; the 9B prompt screen used disjoint BS-bench v1 questions and ranked E second, C first). The −C persona's words ("premise") reappear in −C answers at higher doses; role_leak does not flag reused vocabulary.
+
+## Held-out re-selection (after the goal judge rejected selection on the reported questions)
+
+Written by PI/OpenAI 2026-10-04 14:35, BEFORE the held-out numbers exist. Same mean_diff vectors and per-side C0 (cached; only the questions change), `--cohort heldout` = BullshitBench v1, 55 questions, none in the reported v2 set (`data/bsbench/bullshit_bench_v1.jsonl`, from petergpt/bullshit-benchmark @ 6f6e28b4 questions.json).
+
+Rule: the chosen axis is the one with the highest held-out score (same score as the report: min over sides of on-axis − off-axis at each side's best coherent dose), provided its −C gain is not a refusal or echo artifact:
+- refusal: at the scored −C dose, mean P(refuses_or_moralizes) rises by less than the BS-score gain would need to be explained by refusals (checked by reading the answers that gained most), and
+- persona echo: the −C persona's distinctive phrases ("as someone who", "explains why", "doesn't make sense") are not what carries the gain (rate in −C answers vs bare, and the BS gain on answers without them).
+If the top axis fails a check, take the next. The v2 (reported) numbers are not used for the choice.
