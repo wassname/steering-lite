@@ -6,6 +6,8 @@ from judge import bsb_request, cached, key
 D=Path("../../slop/reviews/2026-10-04_eval_v3/")
 M=Path("../../outputs/bsbench/Qwen--Qwen3.5-4B-g1f092bc2/answers/")
 C={"bare":M/"bare/bare.jsonl","prompt -C":M/"prompting_s0/-C_C1.jsonl","mean_diff -C 0.5":M/"mean_diff_s0/-C_C0.5.jsonl","vjp_resid -C 0.198":M/"vjp_resid_s0/-C_C0.1984251315.jsonl"}
+import sys
+C |= {arg.split("=",1)[0]: Path("../..")/arg.split("=",1)[1] for arg in sys.argv[1:]}
 rows={(r["condition"],r["scenario"]):r for r in map(json.loads,open(D/"regrade_sonnet.jsonl"))}
 qs=load_cohort(); have=cached(); ans={c:read_answers(p) for c,p in C.items()}
 sample=sorted({s for _,s in rows if all((c,s) in rows for c in C)})

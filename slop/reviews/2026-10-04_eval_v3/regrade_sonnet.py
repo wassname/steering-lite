@@ -12,6 +12,7 @@ import json
 import os
 import random
 import re
+import sys
 from pathlib import Path
 from statistics import mean
 
@@ -27,6 +28,8 @@ TEMPLATE = json.loads((ROOT / ".local/bsb_judge_text.json").read_text())["DEFAUL
 JUDGE = "anthropic/claude-sonnet-4.6"
 CONDITIONS = {"bare": M / "answers/bare/bare.jsonl", "prompt -C": M / "answers/prompting_s0/-C_C1.jsonl",
               "mean_diff -C 0.5": M / "answers/mean_diff_s0/-C_C0.5.jsonl", "vjp_resid -C 0.198": M / "answers/vjp_resid_s0/-C_C0.1984251315.jsonl"}
+# extra conditions from the command line: NAME=PATH (answer file, relative to the repo root)
+CONDITIONS |= {arg.split("=", 1)[0]: ROOT / arg.split("=", 1)[1] for arg in sys.argv[1:]}
 
 questions = load_cohort()
 sample = random.Random(20261004).sample(sorted(questions), 40)

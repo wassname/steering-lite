@@ -144,6 +144,7 @@ def method_curve(points: list[dict], method: str, side: str, *, candidates: bool
             "method": method, "side": side, "C": C, "admissible": True,
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
             "room": room(questions, side), "questions": questions,
+            **({"control_claims": mean(p["control_claims"] for p in at), "control_claims_bare": mean(p["control_claims_bare"] for p in at)} if "control_claims" in at[0] else {}),
         })
     return curve
 
@@ -598,6 +599,32 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figure:
+    """-C sweeps, seed means at coherent doses: BullshitBench pushback gained (x) against the share of legitimate control
+    questions the answers call nonsense (y). Detection moves right and stays low; contrarianism climbs. Reading aid only."""
+    figure = go.Figure()
+    bare = None
+    for method in methods:
+        rows = []
+        for C in sorted({p["C"] for p in points if p["method"] == method and p["side"] == "-C"}):
+            at = [p for p in points if p["method"] == method and p["side"] == "-C" and p["C"] == C and p["admissible"] and "control_claims" in p]
+            if at:
+                rows.append((-mean(p["effect"] for p in at), 100 * mean(p["control_claims"] for p in at), C))
+                bare = 100 * mean(p["control_claims_bare"] for p in at)
+        if rows:
+            figure.add_trace(go.Scatter(x=[0, *(r[0] for r in rows)], y=[bare, *(r[1] for r in rows)], mode="lines+markers", name=LABELS[method],
+                                        text=[""] + [f"C={r[2]:.3g}" for r in rows], line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": 7}))
+    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "control_claims" in p):
+        figure.add_trace(go.Scatter(x=[-point["effect"]], y=[100 * point["control_claims"]], mode="markers", name=PROMPTS[point["method"]] + " −C",
+                                    marker={"color": COLORS[point["method"]], "size": 15, "symbol": "star"}))
+        bare = 100 * point["control_claims_bare"]
+    figure.add_trace(go.Scatter(x=[0], y=[bare], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare"))
+    figure.update_layout(template="plotly_white", title={"text": title, "x": 0.5}, height=520, legend={"orientation": "h", "y": -0.22}, margin={"b": 140},
+                         xaxis={"title": "pushback gained on the nonsense questions (BullshitBench score, 0–2)"},
+                         yaxis={"title": "legitimate control questions called nonsense (%)", "rangemode": "tozero"})
+    return figure
+
+
 def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
@@ -688,7 +715,15 @@ def main() -> None:
         intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
                   "using the method's own vector and C0, one seed. Random is random-user: random directions steered the same way. "
                   "Plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
-    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
+    control_image = ""
+    if any("control_claims" in p for p in points):
+        ctl = control_plot(points, shown, f"−C: detection or contrarianism? {model} ({args.cohort}), 100 legitimate control questions")
+        ctl.write_image(out / "controls.png", width=1064, height=560, scale=2)
+        ctl.write_html(out / "controls.html", include_plotlyjs="cdn")
+        control_image = ("\n\n## −C: detection or contrarianism?\n\nEach −C sweep at its coherent doses: pushback gained on the nonsense questions (x) against "
+                         "the share of legitimate control questions the answers call nonsense, judged with BullshitBench's control rubric (y). "
+                         "Detection moves right and stays low; contrarianism climbs. Reported, not scored.\n\n![controls](controls.png)")
+    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){control_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>steering-lite bsbench</title>"

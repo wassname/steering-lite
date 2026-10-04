@@ -152,6 +152,11 @@ function App() {
     <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
+    {data.points.some(p => p.control_claims != null) && <section id="controls">
+      <h2>−C: detection or contrarianism?</h2>
+      <p>Each BS-bench question has a legitimate control question (the made-up part replaced by a real concept). Each −C sweep is plotted as pushback gained on the nonsense questions (x) against the share of control questions the answers call nonsense, judged with BullshitBench's control rubric (y). Detection moves right and stays low; contrarianism climbs. Reported, not scored.</p>
+      <a href="controls.html"><img src="controls.png" alt="Pushback gained on nonsense questions against legitimate control questions called nonsense, per -C sweep" style={{ width: '100%' }} /></a>
+    </section>}
     <section className="intro">
       <p>We compare prompting and steering on a language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
         Each question rests on a made-up premise, such as the thermal conductivity of a CI pipeline. A good answer points out the made-up part.
