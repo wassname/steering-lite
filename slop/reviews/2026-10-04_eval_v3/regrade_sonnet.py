@@ -28,7 +28,7 @@ JUDGE = "anthropic/claude-sonnet-4.6"
 CONDITIONS = {"bare": M / "answers/bare/bare.jsonl", "prompt -C": M / "answers/prompting_s0/-C_C1.jsonl",
               "mean_diff -C 0.5": M / "answers/mean_diff_s0/-C_C0.5.jsonl", "vjp_resid -C 0.198": M / "answers/vjp_resid_s0/-C_C0.1984251315.jsonl"}
 
-questions = load_cohort("full")
+questions = load_cohort()
 sample = random.Random(20261004).sample(sorted(questions), 40)
 done = {(r["condition"], r["scenario"]): r for r in map(json.loads, OUT.open())} if OUT.exists() else {}
 
