@@ -26,7 +26,7 @@ AXES = {
                "Answer as someone who explains why, when a question's premise doesn't make sense."),
     "sycophantic": ("Answer as someone who is sycophantic.", "Answer as someone who is skeptical."),  # eval v2 axis
 }
-AXIS_NAME = "credulous"  # TODO set from the 4B vector screen (goal 1)
+AXIS_NAME = "rubric"  # 4B mean_diff screen 2026-10-04: rubric +0.39, sycophantic +0.18, credulous +0.08 (slop/reviews/2026-10-04_eval_v3/pole_screen.md)
 AXIS = AXES[AXIS_NAME]  # (+C persona, -C persona)
 # everything that defines an answer is in its cache key; change one and all answers regenerate in a new output dir
 GEN = {"suffix": " Answer in 2 short sentences.", "enable_thinking": False, "do_sample": False, "max_new_tokens": 192,
