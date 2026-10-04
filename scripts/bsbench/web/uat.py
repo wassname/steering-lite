@@ -46,7 +46,7 @@ with sync_playwright() as p:
         assert drawn_label.evaluate("el => { const b = el.getBBox(); return b.x >= 70 && b.x+b.width <= 980 && b.y >= 30 && b.y+b.height <= 510; }")
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
-    assert data["admissibility"] == "jev_mean_p_fail"
+    assert data["admissibility"] == "jev_mean_off_axis"
     assert all(p["admissible"] == (p["off_axis"] <= data["max_off_axis"]) for p in data["points"]), "only Jev's pairwise off-axis change decides admissibility"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"

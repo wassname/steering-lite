@@ -535,3 +535,46 @@ Per dose, vjp_resid −C: +0.49 at 9%, +0.58 at 13%, +0.67 at 20% false rejectio
 Interpretation (one seed per method): on the 9B, steering beats prompting on both sides. On +C the model resists the instruction (where the plot spec expected steering to win); on −C the prompt's pushback comes with about half of legitimate questions rejected, vjp_resid's with a fifth or less. mean_diff is weak on the 9B −C side.
 
 Spend tonight ≈ $14 (GPU ≈ $10, Jev ≈ $2.5, Sonnet ≈ $1.5) of $30.
+
+## 2026-10-05 -- Judge v4: rate the change from bare directly
+
+Author PI/OpenAI. wassname on the v3 plots ("prmpt off axis -0.02 how does it have negative damage???", "something doesn't make sense it's a complete break from prev results"): "there should be no cleaner only change from base style"; "we dont rate A then B then calc B-A. we rate B-A directly to reducen oise"; on the 0–2 x axis: "we can be more nuanced. and that would be good".
+
+**What v3 got wrong** (PI's change, not agreed): off-axis was P(fail)(steered) − P(fail)(bare), signed, so a prompt that removed a few bare "I do not have access to your data" declines scored −0.02; and the five failure checks only see breakage, so graded drift was invisible (4B vjp_resid −C C=0.198: P(fail) unchanged at 0.054 while the v2 graded damage question rose 0.30 → 0.51). v2 had used `abs(damage(steered) − damage(bare))` per question.
+
+**Judge v4** (`scripts/bsbench/judge.py` `pair_request`): one Jev request per (bare A, steered B), both orders, averaged.
+- premise_change: 7 levels anchored on BullshitBench's 0/1/2 rubric (their system prompt and levels included verbatim), read −3..+3, + = goes along more.
+- off_axis: 0 none .. 4 broken, "how much does B differ from A in everything else", with vjp-steering's CONFOUNDS list verbatim. ≥ 0 by construction. Line end: mean off_axis ≤ 1.5 (AGENTS.md's 1.5/4).
+- BullshitBench's own per-answer 0–2 score, the five failure checks and the control questions stay as reported columns.
+
+Pilot (`slop/reviews/2026-10-05_judge_v4/pilot.tsv`, 9B, 30 q): bare vs itself premise −0.02, off 0.00; off-axis order-symmetric (0.99/1.01, 1.17/1.23, 1.04/1.02); premise has a ~0.2 order bias toward "B pushes back", hence both orders. Cost: 86k pair ratings, $7.0.
+
+| v4, premise change at best dose (off-axis) | −C | +C | score [90% CI] | −C control questions called nonsense (bare) |
+|---|---|---|---|---|
+| **4B, generic pairs** | | | | |
+| prompt | +1.59 (1.03) | +0.86 (0.92) | −0.06 [−0.26, +0.14] | 39% (4%) |
+| mean_diff | +0.88 (0.97) | +1.47 (1.12) | −0.08 [−0.25, +0.09] | 11% |
+| vjp_resid | +0.74 (1.18) | +1.35 (1.30) | −0.45 [−0.56, −0.26] | 4% |
+| random (5) | +0.00 (0.57) | +1.37 (1.33) | −0.57 | — |
+| **4B, nonsense-question pairs** | | | | |
+| vjp_resid | +1.82 (1.23) | +1.43 (1.01) | +0.42 [+0.23, +0.52] | 27% (4%) |
+| mean_diff | +1.47 (1.33) | +1.38 (1.08) | +0.14 [−0.05, +0.26] | 38% |
+| prompt | +1.62 (1.03) | +0.84 (0.93) | −0.09 [−0.28, +0.11] | 40% |
+| **9B, nonsense-question pairs** | | | | |
+| vjp_resid | +1.30 (1.03) | +1.89 (1.14) | +0.26 [+0.11, +0.45] | 13% (3%) |
+| prompt | +1.44 (1.03) | +0.47 (0.85) | −0.38 [−0.59, −0.15] | 49% |
+| mean_diff | +0.41 (0.79) | +1.89 (1.27) | −0.38 [−0.47, −0.23] | 5% |
+| random (3) | −0.04 (0.48) | +0.64 (1.16) | −0.52 | — |
+
+Score = weaker side of (premise change toward target − off-axis); off-axis now costs every method about 1, so scores sit lower than v3's and are not comparable with them.
+
+**Checks on the off-axis rating** (admissible doses, answers with P(fail) < 0.1):
+- floor: steered answers with the same premise handling (|premise| < 0.3) get off 0.62 (9B) / 0.64 (4B); answers whose first 200 characters equal bare get 0.34 / 0.44. So "small" differences in wording cost about 0.5.
+- leak: off-axis rises with the size of the premise flip, 0.62 → 1.26 (9B) for |premise| ≥ 2. The tax is the same across methods at full flips (prompt 1.22, vjp_resid 1.31, random 1.22–1.30), so it compresses the plot but does not favour a method. Part is genuine (a refusal-plus-explanation has a different format from an answer) and part is likely the judge counting the flip itself; not separated.
+- high-off-axis pairs read as real changes: 9B vjp_resid −C 0.397, off 2.17: "I cannot answer this question because you have not provided the code…" (a lack-of-data refusal); prompt −C, off 1.89: "Your premise is flawed because … renders your entire monitoring strategy" (accusatory register).
+
+Fresh-eyes read of the 9B plot (GPT-6.1-Sol, `fresh_eyes_9b.md`): VJP-resid beats mean difference on both sides; "on the left, the plain prompt goes farther with less off-axis change than either marked endpoint. On the right, steering … outperforms the plain prompt"; both beat the random band.
+
+**Interpretation** (one seed per method): the v3 picture holds in shape. On −C the prompt's premise change is matched by vjp_resid with nonsense pairs (4B +1.82 vs +1.62; 9B +1.30 vs +1.44) at similar off-axis, but the prompt rejects 39–49% of legitimate control questions vs 13–27%. On +C the 9B ignores the prompt (+0.47) while the vectors reach +1.89. The prompt's off-axis is now about 1.0 on both sides, not ≈0.
+
+Spend tonight ≈ $21 of $30.

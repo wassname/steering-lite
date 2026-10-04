@@ -103,7 +103,11 @@ What this shows (one seed, one model, so treat as provisional):
 
 **Follow-up, 2026-10-05 (provisional, needs wassname's review).** The vectors above are extracted from persona pairs on generic prompts ("Tell me a story."), which contain no nonsense premise. Extracting them on the 55 BullshitBench v1 questions instead (none in the v2 eval set; `walk.py --pairs bsbench_v1`) raises −C pushback from +0.30 to +0.90 (vjp_resid) and +0.46 to +0.75 (mean_diff), past the prompt's +0.74. 100 legitimate control questions, judged with BullshitBench's control rubric, show part of every −C gain is rejecting legitimate questions (unsteered 4%; prompt 39%; vjp_resid 17% at +0.81 pushback; mean_diff 72% at +0.75). On Qwen3.5-9B with the same setup, vjp_resid scores +0.66 vs the prompt's +0.21: the 9B resists the "accept every premise" prompt on +C, and the prompt's −C pushback rejects 49% of legitimate questions vs vjp_resid's 9–20%.
 
-![4B, −C pushback vs legitimate questions called nonsense](slop/reviews/2026-10-05_nonsense_pairs/combined_controls.png)
+**Judge v4, 2026-10-05 (provisional).** The v3 off-axis (rise in P(steering failure)) could go negative and missed graded side effects. Jev now rates each steered answer against the bare answer directly, in both orders: premise change −3..+3 on levels anchored to BullshitBench's 0/1/2 rubric, and off-axis change 0–4 (everything except the premise; never negative). Lines end at mean off-axis ≤ 1.5. Pages: `outputs/bsbench/results/v4-4b/`, `v4-4b-nonsense-pairs/`, `v4-9b-nonsense-pairs/`; numbers in the [journal](RESEARCH_JOURNAL.md) entry "Judge v4".
+
+![9B, judge v4](assets/bsbench_qwen3.5-9b_v4.png)
+
+![4B, −C pushback vs legitimate questions called nonsense](slop/reviews/2026-10-05_judge_v4/combined_controls.png)
 
 Notes: [manual read](slop/reviews/2026-10-04_eval_v3/validation_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v3-4b/index.html`, `v3-4b-nonsense-pairs/`, `v3-9b-nonsense-pairs/`.
 
