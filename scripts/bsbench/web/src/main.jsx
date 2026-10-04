@@ -37,7 +37,7 @@ function Plot({ data, visible, selected, onSelect }) {
         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
         {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>; })}
       </g>
-      <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: rejects the premise, right: accepts it)</text>
+      <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">judge on-axis change (left: pushes back on the nonsense, right: goes along with it)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis damage (lower is better)</text>
       {data.zones.map(zone => zone.percentile === 50
         ? <path key={zone.percentile} className="zone median" data-percentile={zone.percentile} fill="none" stroke="rgba(120,120,120,0.8)" strokeWidth="1.5"
@@ -66,20 +66,10 @@ function Plot({ data, visible, selected, onSelect }) {
       <path d="M0,-7 7,0 0,7 -7,0Z" transform={`translate(${x(0)} ${y(0)})`} fill="#333" /><text x={x(0) + 10} y={y(0) - 6} className="label">bare</text>
     </svg>
     {hover && <aside className="tooltip" style={{ left: `${(x(hover.effect) / W) * 100}%`, top: `${(y(hover.off_axis) / H) * 100}%` }}>
-      <strong>{hover.method} {hover.side} {data.points.some(p => p.method === hover.method && p.fixed_grid) ? 'gain' : 'C'}={hover.C.toPrecision(3)}</strong>
+      <strong>{hover.method} {hover.side} C={hover.C.toPrecision(3)}</strong>
       <span>on-axis {fmt(hover.raw_effect ?? hover.effect)}, off-axis {(hover.raw_off_axis ?? hover.off_axis).toFixed(2)}{hover.raw_effect != null ? ' (measured; the dot is smoothed)' : ''}</span><span>click to open its answers</span>
     </aside>}
   </div>;
-}
-
-function GainStatus({ data }) {
-  return <table className="gain-status"><thead><tr><th>prompt / side</th><th>passing gains</th><th>excluded gains</th></tr></thead><tbody>
-    {data.curves.filter(c => data.points.some(p => p.method === c.method && p.fixed_grid)).map(c => {
-      const tested = [...new Set(data.points.filter(p => p.method === c.method && p.side === c.side).map(p => p.C))].sort((a, b) => a - b);
-      const passing = new Set(c.tested.map(p => p.C));
-      return <tr key={c.method + c.side}><td>{c.method} {c.side}</td><td style={{ whiteSpace: 'normal' }}>{tested.filter(g => passing.has(g)).join(', ')}</td><td style={{ whiteSpace: 'normal' }}>{tested.filter(g => !passing.has(g)).join(', ') || 'none'}</td></tr>;
-    })}
-  </tbody></table>;
 }
 
 function Summary({ data }) {
@@ -157,26 +147,15 @@ function App() {
   }, []);
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
-    <h1>{{ prompt: 'Prompt embedding sweeps on Bullshit Bench v2', user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
-    {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Prompt sweeps and plain prompts also act only on the prompt.</p>}
-    <p className="lede">{data.view === 'prompt'
-      ? <>Both prompt sweeps are shown below, with mean difference and shaded random references. The multiplier scales instruction embeddings only; +C and −C select different personas. Low-gain responses can be similar across personas; scores do not establish instruction-specific steering. <a href="#prompt-gains">See the gain sweep, with rejected doses filtered out.</a></>
-      : <>How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods and any prompt embedding sweeps.</>} Click a name to add or hide it.</p>
+    <h1>{{ user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
+    {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Plain prompts also act only on the prompt.</p>}
+    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.false_pushback != null) && <section id="discrimination">
       <h2>−C: discernment or contrarianism?</h2>
-      <p>Every BS-bench question has a sound-premise twin: the same question with the made-up part replaced by a real concept. A steer that only makes the model disagree will also reject the twins. Each −C sweep is plotted as pushback gained on the nonsense questions (x) against false pushback gained on the sound twins (y). Real discernment moves right and stays near zero; doses above the dotted limit line are not scored.</p>
+      <p>Every BS-bench question has a sound-premise twin: the same question with the made-up part replaced by a real concept. A steer that only makes the model disagree will also reject the twins. Each −C sweep is plotted as pushback gained on the nonsense questions (x) against false pushback gained on the sound twins (y). Real discernment moves right and stays near zero.</p>
       <a href="discrimination.html"><img src="discrimination.png" alt="Pushback gained on nonsense questions against false pushback gained on sound twins, per -C sweep" style={{ width: '100%' }} /></a>
-    </section>}
-    {data.points.some(p => p.fixed_grid) && <section id="prompt-gains">
-      <h2>Prompt gain sweep — admissible doses</h2>
-      <p>Same rule as the other methods: only mean Jev steered damage ≤ 1.5 of 4 determines coherence. Mechanical checks and walk boundaries are calibration diagnostics, not coherence filters. In this gain chart, gaps are rejected tested gains. A passing dose can still contain damaged answers. The main plot uses absolute damage change; the cutoff uses mean steered damage. The table lists all passing gains, including those not on the Pareto line.</p>
-      <GainStatus data={data} />
-      <a href="prompt_gains.html"><img src="prompt_gains.png" alt="Premise change and damage at admissible prompt embedding gains; gaps at rejected doses" style={{ width: '100%' }} /></a>
-      <details><summary>Diagnostic: all tested gains, including rejected doses</summary>
-        <a href="prompt_gains_all.html"><img src="prompt_gains_all.png" alt="Diagnostic including rejected prompt gains, marked with crosses" style={{ width: '100%' }} /></a>
-      </details>
     </section>}
     <section className="intro">
       <p>We compare prompting and steering on a language model ({data.model_dir.split('-g')[0].replace('--', '/')}) and ask it {data.questions.length} questions from Bullshit Bench v2.
@@ -186,7 +165,7 @@ function App() {
         Left to right is how far the judge (Jev, a rating model) says the answers moved on the premise, in levels of a 0–8 scale: right accepts the made-up premise more (sycophantic), left rejects it more (skeptical).
         Up and down is the change in damage on a 0–4 scale, such as rambling, vague filler or going off topic; higher on the page is better.
         Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare, which so far has meant answers drifting off the question (a judged check will replace this). A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. Coherence uses the mean over questions; individual retained answers can still be badly damaged.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic"; an open star failed the judge's limits (damage, or false pushback on the sound twins).
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts, for example "Answer as someone who is sycophantic"; an open star is rated incoherent by the judge.
         The grey region is what random directions do at the same doses (both signs, only directions still coherent at both): the outer band holds the middle 80% of their effects, the inner band the middle 50%, and the grey line is the median. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
@@ -194,9 +173,6 @@ function App() {
           {data.zones[0].bounds.slice(1).map((b, j) => { const i = j + 1; const z = data.zones[0]; return <tr key={i}><td>{z.doses[i].toPrecision(3)}</td><td>{z.seed_counts[i]}</td><td>{z.negative_counts[i]}</td><td>{z.positive_counts[i]}</td><td>{fmt(b[0])}</td><td>{fmt(z.mean_effect[i])}</td></tr>; })}
         </tbody></table>
       </details>
-      {data.points.some(p => p.fixed_grid) && <>
-        <p>Prompt embedding sweeps use a fixed grid of gains, with Jev judging each gain independently. Their endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. Gain 1 is ordinary prompting; gain 0 leaves zero-valued embeddings and their positions. Historical prompting stars can differ from gain 1 because of cross-process variation.</p>
-      </>}
     </section>
     <h2>Best strength per method</h2>
     <p className="lede">For each side we pick the strength with the best on-axis gain minus {data.off_weight}× damage, then score the method by its weaker side. The 90% range comes from resampling seeds and questions. On-axis ÷ room is the on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side (8 − bare level for +C, bare level for −C), weaker side; damage is handled by the dose choice and the 1.5 cap, not in this number.</p>

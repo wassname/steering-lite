@@ -41,7 +41,7 @@ from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
 from steering_lite.extract import record_activations
 from steering_lite.positions import only_tokens
-from steering_lite.prompting import instruction_mask, scaled_prompt_embeddings, span_mask
+from steering_lite.prompting import span_mask
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils.import_utils import is_flash_linear_attention_available
 
@@ -71,11 +71,7 @@ PROMPT_METHODS = {
     "prompting": {side: PERSONA_TEMPLATE.format(persona=persona) for side, persona in zip(("+C", "-C"), PERSONAS[0])},
     "prompting_engineered": ENGINEERED,
 }
-PROMPT_SWEEPS = {"prompting_scale": "prompting", "prompting_engineered_scale": "prompting_engineered"}
-# wassname 2026-10-03: "only ramp from 0 to 1 gain? with a min of 5% ... lets use log spacing from ~ to 1": quarter-octaves 2^-4.5..1.
-# Above 1 the scaled embeddings stop being read (full +C: gain 3 +2.94, gain 4 -0.47 vs gain 1 +3.50).
-PROMPT_GAINS = {name: tuple(2.0 ** (k / 4) for k in range(-18, 1)) for name in ("prompting_scale", "prompting_engineered_scale")}
-METHODS = (*CONFIGS, *PROMPT_METHODS, *PROMPT_SWEEPS)
+METHODS = (*CONFIGS, *PROMPT_METHODS)
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100), "ood": None}
 OOD = ROOT / "data/ood/alpaca_eval_8.jsonl"  # AlpacaEval indices 0,100,..,700: held-out check of C0 vs breakdown
 GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
@@ -222,35 +218,28 @@ def user_spans(rows: list[dict[str, str]]) -> list[str]:
 
 
 @torch.inference_mode()
-def generate(model, tokenizer, prompts: list[str], batch_size: int, scaled_instruction: tuple[str, float] | None = None, steer_spans: list[str] | None = None) -> list[str]:
+def generate(model, tokenizer, prompts: list[str], batch_size: int, steer_spans: list[str] | None = None) -> list[str]:
     """steer_spans: steer only these prompt tokens (one span per prompt); the attached vector must be active."""
     answers = []
     tokenizer.padding_side = "left"
-    assert scaled_instruction is None or steer_spans is None
     for start in range(0, len(prompts), batch_size):
         texts = prompts[start : start + batch_size]
         batch = tokenizer(
-            texts, return_tensors="pt", padding=True, add_special_tokens=False,
-            return_offsets_mapping=scaled_instruction is not None or steer_spans is not None,
+            texts, return_tensors="pt", padding=True, add_special_tokens=False, return_offsets_mapping=steer_spans is not None,
         ).to(next(model.parameters()).device)
         context = _Null()
-        if scaled_instruction is not None:
-            instruction, gain = scaled_instruction
-            mask = instruction_mask(batch["input_ids"], batch.pop("offset_mapping"), texts, instruction, tokenizer)
-            context = scaled_prompt_embeddings(model, batch["input_ids"], mask, gain)
         if steer_spans is not None:
             context = only_tokens(span_mask(batch["input_ids"], batch.pop("offset_mapping"), texts, steer_spans[start : start + batch_size], tokenizer))
-        with context as embeddings:
-            output = generate_batch(model, tokenizer, batch, embeddings)
+        with context:
+            output = generate_batch(model, tokenizer, batch)
         answers.extend(tokenizer.batch_decode(output[:, batch["input_ids"].shape[1] :], skip_special_tokens=True))
         logger.info("generation {}/{}", min(start + batch_size, len(prompts)), len(prompts))
     return [answer.strip() for answer in answers]
 
 
-def generate_batch(model, tokenizer, batch, embeddings=None):
-    extra = {} if embeddings is None else {"inputs_embeds": embeddings, "use_cache": True}
+def generate_batch(model, tokenizer, batch):
     output = model.generate(
-        **batch, **extra, do_sample=GEN["do_sample"], temperature=None, top_p=None, top_k=None,
+        **batch, do_sample=GEN["do_sample"], temperature=None, top_p=None, top_k=None,
         pad_token_id=tokenizer.eos_token_id, max_new_tokens=GEN["max_new_tokens"],
     )
     n = batch["input_ids"].shape[1]
@@ -264,7 +253,7 @@ def answer_path(model: str, method: str, seed: int, side: str, coefficient: floa
     return model_dir(model) / ("answers_twins" if twins else "answers") / folder / name
 
 
-def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, scaled_instruction: tuple[str, float] | None = None, steer_spans: list[str] | None = None) -> list[str]:
+def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch_size: int, steer, steer_spans: list[str] | None = None) -> list[str]:
     """Answers for `rows`, generating only questions missing from `path`. `steer` is a context manager."""
     done = {}
     if path.exists():
@@ -273,7 +262,7 @@ def cached_answers(model, tokenizer, rows, path: Path, prompts: list[str], batch
     logger.info("answers {} cached={} missing={}", path.relative_to(OUT), len(rows) - len(missing), len(missing))
     if missing:
         with steer():
-            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size, scaled_instruction,
+            texts = generate(model, tokenizer, [prompts[index] for index in missing], batch_size,
                              None if steer_spans is None else [steer_spans[index] for index in missing])
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as file:
@@ -508,106 +497,6 @@ def sign_probe(args, model, tokenizer, vector: Vector, coefficient: float, path:
 
 
 @torch.inference_mode()
-def check_prompt_embeddings(model, tokenizer, rows, instruction):
-    """Exercise prefill, padding, identity and cached decoding on the loaded model. PI/OpenAI."""
-    tokenizer.padding_side = "left"
-    prompts = generation_inputs(tokenizer, rows[:3], instruction)
-    batch = tokenizer(prompts, padding=True, return_tensors="pt", return_offsets_mapping=True, add_special_tokens=False).to(next(model.parameters()).device)
-    mask = instruction_mask(batch["input_ids"], batch.pop("offset_mapping"), prompts, instruction, tokenizer)
-    assert not (mask & ~batch["attention_mask"].bool()).any()
-    assert (mask.sum(1) == mask.sum(1)[0]).all()
-    versions = {n: (p.data_ptr(), p._version) for n, p in model.named_parameters()}
-    reference = model(**batch, use_cache=False).logits
-    assert torch.equal(reference, model(**batch, use_cache=False).logits), "ordinary forwards are nondeterministic; identity check cannot isolate embedding scaling"
-    reference_ids = generate_batch(model, tokenizer, batch)
-    original = model.get_input_embeddings()(batch["input_ids"])
-    with scaled_prompt_embeddings(model, batch["input_ids"], mask, 1.0) as embeddings:
-        logits = model(inputs_embeds=embeddings, attention_mask=batch["attention_mask"], use_cache=False).logits
-        assert torch.equal(reference, logits), "gain-one logits differ from ordinary prompting"
-        assert torch.equal(reference_ids, generate_batch(model, tokenizer, batch, embeddings)), "gain-one greedy ids differ"
-    with scaled_prompt_embeddings(model, batch["input_ids"], mask, 4.0) as embeddings:
-        assert torch.equal(embeddings[~mask], original[~mask]), "scaled a token outside the instruction"
-        assert torch.equal(embeddings[mask], 4 * original[mask])
-        first_inputs = model.prepare_inputs_for_generation(batch["input_ids"], inputs_embeds=embeddings, attention_mask=batch["attention_mask"], use_cache=True, is_first_iteration=True)
-        first = model(**first_inputs)
-        delta = (first.logits - reference).abs().max().item()
-        assert math.isfinite(delta) and delta > 0, "gain-four changed no logits"
-        token = first.logits[:, -1].argmax(-1, keepdim=True)
-        decode_inputs = model.prepare_inputs_for_generation(
-            torch.cat([batch["input_ids"], token], dim=1), inputs_embeds=embeddings,
-            attention_mask=torch.cat([batch["attention_mask"], torch.ones_like(token)], dim=1),
-            past_key_values=first.past_key_values, next_sequence_length=1, use_cache=True, is_first_iteration=False,
-        )
-        assert "inputs_embeds" not in decode_inputs and torch.equal(decode_inputs["input_ids"], token), "decode reused prompt embeddings"
-        model(**decode_inputs)
-    assert versions == {n: (p.data_ptr(), p._version) for n, p in model.named_parameters()}, "model parameters changed"
-    logger.info("PROMPT_SCALE_CHECK_PASS model={} C1_logits=exact C1_greedy_ids=exact outside_mask=unchanged decode=unscaled C4_max_logit_delta={:.6g} mask_tokens={}\n=== scaled span ===\n{}\n=== formatted input ===\n{}\n=== end ===", type(model).__name__, delta, mask.sum(1).tolist(), tokenizer.decode(batch["input_ids"][0, mask[0]]), prompts[0])
-
-
-def prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing):
-    """Finite gain sweep; health is checked per dose and the final gain is not a breakdown boundary. PI/OpenAI."""
-    baseline = PROMPT_SWEEPS[args.method]
-    instructions = PROMPT_METHODS[baseline]
-    check_prompt_embeddings(model, tokenizer, rows, instructions["+C"])
-    identity = {}
-    for side, instruction in instructions.items():
-        prompts = generation_inputs(tokenizer, rows, instruction)
-        historical = cached_answers(model, tokenizer, rows, answer_path(args.model, baseline, args.seed, side, 1.0), prompts, args.batch_size, _Null)
-        # identity on identical batches in one process: batch composition alone changes bf16 greedy answers
-        # (full cohort 2026-10-02: the cache's 80 missing questions batched differently gave 44/100 mismatches)
-        expected = generate(model, tokenizer, prompts, args.batch_size)
-        fresh_scaled = generate(model, tokenizer, prompts, args.batch_size, (instruction, 1.0))
-        observed = cached_answers(model, tokenizer, rows, answer_path(args.model, args.name, args.seed, side, 1.0), prompts, args.batch_size, _Null, (instruction, 1.0))
-        diagnostic = root / "prompt_checks" / f"{args.name}_s{args.seed}_{args.cohort}_{side}.json"
-        diagnostic.parent.mkdir(parents=True, exist_ok=True)
-        diagnostic.write_text(json.dumps([
-            {"scenario": row["scenario"], "prompt": prompt, "historical": old, "fresh": new, "fresh_scaled_C1": same, "scaled_C1": scaled}
-            for row, prompt, old, new, same, scaled in zip(rows, prompts, historical, expected, fresh_scaled, observed, strict=True)
-        ], indent=2) + "\n")
-        assert fresh_scaled == expected, f"{side}: gain-one answers differ from ordinary prompting on identical batches; see {diagnostic}"
-        identity[side] = {"answers": len(rows), "exact": True, "batches": "identical, one process",
-                          "historical_mismatches": sum(a != b for a, b in zip(historical, observed, strict=True)),
-                          "cached_C1_mismatches": sum(a != b for a, b in zip(expected, observed, strict=True)),
-                          "diagnostic": str(diagnostic.relative_to(root))}
-        logger.info("PROMPT_C1_IDENTITY_PASS side={} check={}", side, identity[side])
-    timing["setup_s"] = time.monotonic() - timing["start"] - timing["load_s"]
-    gains = PROMPT_GAINS[args.method]
-    gains = gains[:args.max_rungs] if args.smoke else gains
-    twin_rows = read_twins(args.cohort)
-    rungs = []
-    for gain in gains:
-        started = time.monotonic()
-        rung = {"grid_index": None, "coefficient": gain}
-        for side, instruction in instructions.items():
-            path = answer_path(args.model, args.name, args.seed, side, gain)
-            answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null, (instruction, gain))
-            twin_path = answer_path(args.model, args.name, args.seed, side, gain, twins=True)
-            cached_answers(model, tokenizer, twin_rows, twin_path, generation_inputs(tokenizer, twin_rows, instruction), args.batch_size, _Null, (instruction, gain))
-            stats, reasons = health(tokenizer, answers)
-            scenarios = {row["scenario"] for row in rows}
-            answer_runs = sorted({record.get("run_id", "unrecorded") for record in map(json.loads, path.open()) if record["scenario"] in scenarios})
-            rung[side] = {"breakdown_reasons": reasons, "post_boundary": False, "stats": stats, "answers": str(path.relative_to(root)),
-                          "twin_answers": str(twin_path.relative_to(root)), "answer_runs": answer_runs}
-            logger.info("SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this dose is unhealthy (later doses still tested). method={} C={} side={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===", args.name, gain, side, stats, reasons, answers[0])
-        rung["seconds"] = time.monotonic() - started
-        rungs.append(rung)
-        done = len(rungs) == len(gains)
-        certificate_path.parent.mkdir(parents=True, exist_ok=True)
-        certificate_path.write_text(json.dumps({
-            "schema": "bsbench_walk_v3", "status": "COMPLETE" if done else "RUNNING", "eval_version": EVAL_VERSION,
-            "method": args.name, "seed": args.seed, "cohort": args.cohort, "model": args.model,
-            "gen": GEN, "sweep_kind": "prompt_embeddings", "prompt_gains": list(gains),
-            "instructions": instructions, "identity": identity, "run_id": RUN_ID,
-            "scaled_span": "tokens overlapping instruction, including merged separator whitespace",
-            "stop_reason": "fixed_grid" if done else None,
-            "boundary_confirmed": False, "rungs": rungs,
-            "timing": {"load_s": timing["load_s"], "setup_s": timing["setup_s"], "total_s": time.monotonic() - timing["start"],
-                       "gpu": torch.cuda.get_device_name(next(model.parameters()).device) if next(model.parameters()).is_cuda else "cpu"},
-        }, indent=2) + "\n")
-    logger.info("{} method={} rungs={} fixed_grid=True boundary_confirmed=False certificate={}", "SMOKE_PASS" if args.smoke else "WALK_COMPLETE", args.name, len(rungs), certificate_path)
-
-
-@torch.inference_mode()
 def check_user_positions(model, tokenizer, rows, vector: Vector, coefficient: float) -> None:
     """User-positions steering on the loaded model: an empty mask is bare, tokens before the user span are
     unchanged, the span changes logits, and decode steps are unsteered. PI/OpenAI."""
@@ -639,8 +528,6 @@ def check_user_positions(model, tokenizer, rows, vector: Vector, coefficient: fl
 
 def walk_done(certificate: dict, args) -> bool:
     """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
-    if args.method in PROMPT_SWEEPS:
-        return certificate["status"] == "COMPLETE" and certificate["prompt_gains"] == list(PROMPT_GAINS[args.method])
     return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
             and certificate.get("kl_target", args.kl_target) == args.kl_target)
 
@@ -686,9 +573,6 @@ def walk(args) -> None:
     stats, reasons = health(tokenizer, bare)
     logger.info("SHOULD: bare is healthy (no reasons). side=bare stats={} breakdown={}", stats, reasons)
 
-    if args.method in PROMPT_SWEEPS:
-        prompt_sweep(args, model, tokenizer, rows, root, certificate_path, timing)
-        return
 
     if args.method in PROMPT_METHODS:
         rung = {"grid_index": None, "coefficient": 1.0}
@@ -812,7 +696,7 @@ def configure(args: argparse.Namespace) -> None:
         GEN["max_new_tokens"] = 8
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
     if args.neg_persona:
-        assert args.method not in PROMPT_METHODS and args.method not in PROMPT_SWEEPS, "prompt texts are fixed at import; screen vector methods only"
+        assert args.method not in PROMPT_METHODS, "prompt texts are fixed at import; screen vector methods only"
         GEN["axis"] = [AXIS[0], args.neg_persona]
         PERSONAS[0] = tuple(GEN["axis"])
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]

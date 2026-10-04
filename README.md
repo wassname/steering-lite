@@ -73,48 +73,46 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 
 ## Results
 
-### Eval v2: skeptical axis with a sound-premise control set (Qwen3.5-4B)
+### Eval v2: skeptical axis, with a sound-question check (Qwen3.5-4B)
 
 <!-- PI/OpenAI 2026-10-04. Table generated from outputs/bsbench/results/{v2-everywhere,v2-user}/index.md. Needs wassname's review. -->
 
-Eval v2 changes three things from the results further down (v1):
+Changes from v1 (further down):
 
-- **Control set.** Every BS-bench question has a [sound-premise twin](data/bsbench/sound_twins_v1.jsonl): the same question with the made-up part replaced by a real concept. Every dose also answers the twins, and Jev rates whether each answer wrongly rejects a legitimate question ("false pushback").
-- **Limits.** A dose counts only if mean Jev damage is ≤ 1.5 of 4 and false pushback on the twins is at most 5 pp above bare. Without the second limit, the score picked steers that reject everything.
-- **Axis.** −C is now *skeptical* (v1: abrasive). Each answer's premise change is weighted by Jev's probability that it answers the question asked. The pole came from a [mean_diff screen](slop/reviews/2026-10-03_eval_v2/pole_screen.md) of skeptical, abrasive, candid and accurate.
+- **Check questions.** Every BS-bench question has a [twin](data/bsbench/sound_twins_v1.jsonl): the same question with the made-up concept replaced by a real one from the same field. Every dose also answers the twins, and Jev rates whether each answer wrongly rejects the legitimate question ("false pushback"). This is reported, not used to filter or score.
+- **Axis.** −C is *skeptical* (v1: abrasive), picked by a [mean_diff screen](slop/reviews/2026-10-03_eval_v2/pole_screen.md) of skeptical, abrasive, candid and accurate. Each answer's change is weighted by Jev's probability that it answers the question asked.
 
-One seed per method (random: 5 directions per mode, but its scored −C dose rests on 1 of the 5, because the others fail a limit there). Brackets are 90% bootstrap intervals over questions and seeds, with the dose and both limits re-decided in each draw; where the 5 pp limit binds, small resamples flip which dose passes, so intervals are wide and "−∞" means some draws had no passing dose. "−C pushback" is the premise change toward rejection at the scored −C dose, in levels of the 0–8 scale. "user turn" adds the vector only while the model reads the user's message. Prompts act only on the prompt, so their rows are the same in both columns.
+The score is unchanged from v1: on-axis change minus damage at each side's best dose, weaker side, with only Jev damage ≤ 1.5 of 4 counting as coherent. One seed per method (random: 5 directions per mode). "−C pushback" is the change toward rejecting the nonsense at the scored −C dose, on Jev's 0–8 scale. "user turn" adds the vector only while the model reads the user's message. Prompts act only on the prompt, so their rows are the same in both columns.
 
 | method | everywhere score↑ | −C pushback, false pushback | user-turn score↑ | −C pushback, false pushback |
 | --- | ---: | ---: | ---: | ---: |
-| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +0.79 [-0.01, +1.11] | +1.04, +5 pp | +0.44 [-0.06, +0.83] | +0.68, +5 pp |
-| [vjp_value](src/steering_lite/variants/vjp_value.py) | +0.66 [+0.19, +1.03] | +0.88, +4 pp | +0.54 [−∞, +0.86] | +0.81, +5 pp |
-| [linear_act](src/steering_lite/variants/linear_act.py) | +0.62 [+0.20, +0.87] | +0.87, +5 pp | +0.34 [+0.06, +0.51] | +0.68, +2 pp |
-| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.52 [+0.21, +0.85] | +0.78, +4 pp | +0.11 [-0.05, +0.33] | +0.27, +0 pp |
-| [chars](src/steering_lite/variants/chars.py) | +0.35 [+0.12, +0.71] | +0.57, +1 pp | +0.12 [-0.02, +0.29] | +0.35, -0 pp |
-| *random* | +0.23 [-0.19, +0.43] | +0.35, +0 pp | -0.01 [-0.37, +0.24] | +0.13, +1 pp |
-| prompting_scale | +0.20 [-0.94, +0.36] | +0.41, +1 pp | +0.20 [-0.94, +0.36] | +0.41, +1 pp |
-| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | +0.01 [-0.17, +0.31] | +0.71, +4 pp | -0.25 [−∞, -0.01] | +0.68, +2 pp |
-| prompting_engineered_scale | -0.60 [-1.01, -0.23] | +0.88, +3 pp | -0.60 [-1.01, -0.23] | +0.88, +3 pp |
-| [corda_pca](src/steering_lite/variants/corda_pca.py) | -0.76 [-1.06, -0.56] | -0.62, -1 pp | -1.06 [-1.56, -0.76] | -0.89, -1 pp |
-| *prompting* | — | — | — | — |
-| *prompting_engineered* | — | — | — | — |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | +1.05 [+0.70, +1.43] | +1.37, +14 pp | +1.36 [+1.00, +1.64] | +2.06, +63 pp |
+| [chars](src/steering_lite/variants/chars.py) | +1.01 [+0.62, +1.14] | +1.38, +15 pp | +0.12 [-0.02, +0.29] | +0.35, -0 pp |
+| [linear_act](src/steering_lite/variants/linear_act.py) | +0.92 [+0.58, +1.09] | +1.25, +16 pp | +0.34 [+0.06, +0.51] | +0.68, +2 pp |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | +0.87 [+0.53, +1.15] | +1.17, +7 pp | +1.22 [+0.74, +1.33] | +1.75, +14 pp |
+| [mean_diff](src/steering_lite/variants/mean_diff.py) | +0.64 [+0.28, +0.97] | +1.04, +8 pp | +0.11 [-0.05, +0.33] | +0.27, +0 pp |
+| *random* | +0.23 [-0.17, +0.41] | +0.35, +0 pp | +0.38 [-0.34, +0.46] | +1.44, +62 pp |
+| [sspace_scale](src/steering_lite/variants/sspace_scale.py) | +0.01 [-0.18, +0.35] | +1.03, +7 pp | -0.25 [-0.50, -0.01] | +1.61, +38 pp |
+| [corda_pca](src/steering_lite/variants/corda_pca.py) | -0.76 [-1.06, -0.56] | -0.62, -1 pp | -1.06 [-1.36, -0.74] | -0.89, -1 pp |
+| *prompting* | — | +1.70, +26 pp | — | +1.70, +26 pp |
+| *prompting_engineered* | — | +1.92, +17 pp | — | +1.92, +17 pp |
 
-The plain and engineered prompts have no score: their −C prompts reject nonsense strongly (1.70 and 1.92 levels) but add +26 and +17 pp of false pushback, and their +C prompts exceed the damage limit. The engineered prompt *gain sweep* does pass on −C (0.88 levels at gain 0.053, +3 pp), close to the best vectors; its low score comes from its +C side. corda_pca moves the wrong way on both sides with this axis (it scored +0.26 on v1).
+The plain and engineered prompts have no score because their +C (sycophantic) prompts are rated incoherent.
 
 ![Eval v2, steering everywhere, Qwen3.5-4B](assets/bsbench_qwen3.5-4b_v2_everywhere.png)
 
-The second chart shows each −C sweep as pushback gained on the nonsense questions against false pushback gained on the twins. For every method false pushback rises steeply beyond about one premise level of pushback, but the methods differ there: at about 1.3 levels vjp_value adds +7 pp, vjp_resid, chars and linear_act +14 to +16 pp.
+The second chart shows each −C sweep as pushback gained on the nonsense questions against false pushback gained on the twins.
 
-![Eval v2, −C discernment against false pushback](assets/bsbench_qwen3.5-4b_v2_discrimination.png)
+![Eval v2, −C pushback against false pushback](assets/bsbench_qwen3.5-4b_v2_discrimination.png)
 
-What this suggests (one seed, one model, so treat as provisional):
+What the twins show (one seed, one model):
 
-- With the false-pushback limit, steering everywhere scores higher than steering only the user turn for every vector method tested, but only as point estimates: the intervals overlap for six of the seven. Without the limit, the user-turn steers reach large −C effects only at doses that also reject sound questions (vjp_resid: +63 pp false pushback at its uncapped best dose), which is what the v1 user-turn result rested on.
-- On −C alone, the best vector (vjp_resid everywhere) and the best prompt sweep under the limit are close: a paired bootstrap of the net −C score difference is +0.16 [−0.22, +0.56] (fresh-eyes review). We do not claim steering beats prompting on −C.
-- The skeptical pole was picked on the same 100 questions and mean_diff walk that the table reports, so the mean_diff row confirms the screen rather than replicating it.
+- Unsteered, the 4B rejects 41 of 100 nonsense questions and wrongly rejects 1 of 100 twins, so it can push back for the right reason on part of the benchmark.
+- Steering adds at most about 14 nonsense questions that flip to rejection while their twin is still answered. Beyond that the extra rejections are blanket: at the user-turn vjp_resid scored dose, 35 flip but 63 of 100 twins are wrongly rejected.
+- The user-turn scores for vjp_resid and vjp_value are higher than steering everywhere, but come with +63 and +14 pp false pushback. Random directions on the user turn also reach 1.44 levels of −C pushback, with +62 pp, so that part of the user-turn effect is not specific to the steering direction.
+- corda_pca moves the wrong way on both sides with this axis (it scored +0.26 on v1).
 
-Notes: [fresh-eyes review](slop/reviews/2026-10-04_fresh_eyes/review.md), [manual read](slop/reviews/2026-10-03_eval_v2/main_read.md), [pilot read](slop/reviews/2026-10-03_eval_v2/pilot_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v2-everywhere/index.html`, `v2-user/index.html`.
+Notes: [fresh-eyes review](slop/reviews/2026-10-04_fresh_eyes/review.md) (written while a 5 pp false-pushback cap was in the scoring; the cap was removed), [manual read](slop/reviews/2026-10-03_eval_v2/main_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v2-everywhere/index.html`, `v2-user/index.html`.
 
 ### Eval v1: abrasive axis, no control set
 

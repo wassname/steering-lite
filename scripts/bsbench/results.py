@@ -24,7 +24,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import MAX_DAMAGE, MAX_FALSE_PUSHBACK, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
+from judge import MAX_DAMAGE, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
@@ -34,7 +34,6 @@ COLORS = {
     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
     "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
     "query_steer": "#f0e442", "sink_split": "#000000", "sink_split_resid": "#b8860b",
-    "prompting_scale": "#6a3d9a", "prompting_engineered_scale": "#b15928",
 }
 # the other steering-lite methods: Tableau-20 colours not used above
 for _method, _color in zip(
@@ -47,7 +46,6 @@ TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring le
 LABELS = {
     "vjp_resid": "VJP-resid", "mean_diff": "mean difference", "pca": "PCA", "vjp_value": "VJP-value",
     "value_gram": "Value Gram", "prompting": "persona prompt", "prompting_engineered": "engineered prompt", "random": "random",
-    "prompting_scale": "prompt × gain", "prompting_engineered_scale": "eng. prompt × gain",
 }
 LABELS |= {method: method for method in COLORS if method not in LABELS}
 
@@ -58,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
     parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
-    parser.add_argument("--view", choices=("benchmark", "prompt", "user"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
+    parser.add_argument("--view", choices=("benchmark", "user"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
     return parser.parse_args()
 
 
@@ -114,11 +112,10 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                 points.append({
                     "method": certificate["method"], "seed": certificate["seed"], "C": C, "side": side,
                     "axis": certificate["gen"].get("axis", ["sycophantic", "abrasive"]),  # v1 walks predate the axis field
-                    "fixed_grid": certificate.get("sweep_kind") == "prompt_embeddings",
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "steered_damage": steered_damage,
                     "breakdown_reasons": health["breakdown_reasons"], "post_boundary": health["post_boundary"],
-                    "admissible": steered_damage <= MAX_DAMAGE and (not twins or mean(t["false_pushback"] - t["false_pushback_bare"] for t in twins) <= MAX_FALSE_PUSHBACK),
+                    "admissible": steered_damage <= MAX_DAMAGE,
                     "kl_rms": rungs[C].get("kl_rms", {}).get(side), "stats": health["stats"],
                     "answers": health["answers"], "questions": questions,
                     **({"false_pushback": mean(t["false_pushback"] for t in twins), "false_pushback_bare": mean(t["false_pushback_bare"] for t in twins),
@@ -158,7 +155,7 @@ def method_curve(points: list[dict], method: str, side: str, *, candidates: bool
             continue
         questions = [q | {"seed": point["seed"]} for point in at for q in point["questions"]]
         curve.append({
-            "method": method, "side": side, "C": C, "admissible": True, "fixed_grid": at[0]["fixed_grid"],
+            "method": method, "side": side, "C": C, "admissible": True,
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
             "room": room(questions, side), "questions": questions, **false_pushback(at),
             "twins": [t | {"seed": point["seed"]} for point in at for t in point.get("twins", [])],
@@ -191,23 +188,17 @@ def room_score(best: dict) -> float:
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    Both Jev limits are re-decided in each draw: damage on the drawn questions, false pushback on their twins (same
-    scenarios, so bench and twin are resampled together). Curves come in as candidates (all doses), so a dose that
-    failed on the full set can pass in a draw and vice versa. Intervals remain conditional on seed coverage. — PI/OpenAI"""
+    The Jev damage cap is re-decided in each draw on the drawn questions. Curves come in as candidates (all doses), so a
+    dose that failed on the full set can pass in a draw and vice versa. Intervals remain conditional on seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
-        by, twins_by = {}, {}
+        by = {}
         for q in point["questions"]:
             by.setdefault((q["seed"], q["scenario"]), []).append(q)
-        for t in point.get("twins", []):
-            twins_by.setdefault((t["seed"], t["scenario"]), []).append(t)
         chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
         if not chosen:  # random: a drawn seed may not have reached this dose
             continue
         if mean(q["steered_damage"] for q in chosen) > MAX_DAMAGE:
-            continue
-        twins = [t for seed in seeds for scenario in scenarios for t in twins_by.get((seed, scenario), [])]
-        if twins and mean(t["false_pushback"] - t["false_pushback_bare"] for t in twins) > MAX_FALSE_PUSHBACK:
             continue
         out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen), "room": room(chosen, point["side"])})
     return out
@@ -466,9 +457,9 @@ def sweep(curve: list[dict]) -> list[dict]:
     return out
 
 
-def sweep_path(rows: list[dict], fixed_grid: bool, n: int = 12) -> list[list[float]]:
-    """Catmull-Rom spline from bare (walks; a prompt gain grid starts at its first gain) through the sweep in dose order."""
-    knots = ([] if fixed_grid else [(0.0, 0.0)]) + [(r["effect"], r["off_axis"]) for r in rows]
+def sweep_path(rows: list[dict], n: int = 12) -> list[list[float]]:
+    """Catmull-Rom spline from bare through the sweep in dose order."""
+    knots = [(0.0, 0.0)] + [(r["effect"], r["off_axis"]) for r in rows]
     if len(knots) < 2:
         return [list(knots[0])]
     padded = [knots[0], *knots, knots[-1]]
@@ -507,7 +498,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         if not curve:
             continue
         rows = sweep(before_reversal(curve))
-        path = sweep_path(rows, curve[0]["fixed_grid"])
+        path = sweep_path(rows)
         dash = "solid" if side == "+C" else "dash"
         figure.add_trace(go.Scatter(
             x=[q[0] for q in path], y=[q[1] for q in path], mode="lines",
@@ -529,7 +520,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             hoverinfo="skip", showlegend=False,
         ))
         obstacles.append((point["effect"], point["off_axis"]))
-        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}" + ("" if point["admissible"] else " (fails limits)"), "color": COLORS[point["method"]]})
+        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}" + ("" if point["admissible"] else " (incoherent)"), "color": COLORS[point["method"]]})
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333333", "size": 11, "symbol": "diamond"}, hoverinfo="skip", showlegend=False))
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
@@ -542,11 +533,11 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text=f"clean steer -> {shown_axis(points)[0]}", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt (open ☆ = fails the judge's limits)<br>× = last dose that passes the judge's limits (coherence, and false pushback on sound twins), or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt (open ☆ = judge rates it incoherent)<br>× = last dose the judge rates coherent, or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "Jev on-axis change: premise level, 0–8 scale (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "Jev on-axis change, 0–8 scale: ← pushes back on the nonsense · goes along with it → (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis damage, 0–4 scale (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
@@ -659,7 +650,7 @@ def svg_labels(site: dict) -> list[dict]:
     labels = [{"method": c["method"], "side": c["side"], "x": c["path"][-1][0], "y": c["path"][-1][1],
                "text": f"{LABELS[c['method']]} {c['side']}", "color": site["colors"][c["method"]]} for c in curves]
     labels += [{"method": p["method"], "side": p["side"], "x": p["effect"], "y": p["off_axis"],
-                "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (fails limits)"), "color": site["colors"][p["method"]]} for p in prompts]
+                "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (incoherent)"), "color": site["colors"][p["method"]]} for p in prompts]
     obstacles = [(0., 0.)] + [(p["effect"], p["off_axis"]) for p in shown]
     placed = place_labels(labels, (-x_max, x_max), (y_max, -.05), obstacles=obstacles,
                           fig_w=1000, fig_h=560, margin={"l": 70, "r": 20, "t": 30, "b": 50},
@@ -670,8 +661,7 @@ def svg_labels(site: dict) -> list[dict]:
 
 def discrimination_plot(points: list[dict], methods: list[str], title: str) -> go.Figure:
     """-C sweeps, raw seed means at doses that pass the damage cap: pushback gained on the nonsense questions (x)
-    against false pushback gained on their sound twins (y). Doses above the false-pushback limit are drawn too,
-    so the chart shows where a steer turns contrarian; the main plot and score drop them."""
+    against false pushback gained on their sound twins (y), so the chart shows where a steer turns contrarian."""
     def sweep_means(method: str) -> list[tuple[float, float]]:
         group = [p for p in points if p["method"] == method and p["side"] == "-C" and p["steered_damage"] <= MAX_DAMAGE and "false_pushback" in p]
         out = []
@@ -690,48 +680,13 @@ def discrimination_plot(points: list[dict], methods: list[str], title: str) -> g
             continue
         figure.add_trace(go.Scatter(x=[0, *(x for x, _ in rows)], y=[0, *(y for _, y in rows)], mode="lines+markers", name=LABELS[method],
                                     line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": [0, *([7] * len(rows))]}))
-    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "false_pushback" in p and not p["fixed_grid"]):
+    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "false_pushback" in p):
         figure.add_trace(go.Scatter(x=[-point["effect"]], y=[100 * (point["false_pushback"] - point["false_pushback_bare"])], mode="markers",
                                     marker={"color": COLORS[point["method"]], "size": 14, "symbol": "star"}, name=PROMPTS[point["method"]] + " −C"))
-    figure.add_hline(y=100 * MAX_FALSE_PUSHBACK, line_color="#c44e52", line_dash="dot",
-                     annotation_text=f"limit: doses above {100 * MAX_FALSE_PUSHBACK:g} pp are not scored", annotation_position="top left")
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare", showlegend=False))
     figure.update_layout(template="plotly_white", title={"text": title, "x": 0.5}, height=520, legend={"orientation": "h", "y": -0.22},
                          xaxis={"title": "pushback gained on nonsense questions (premise levels toward rejection, on-target weighted)"},
                          yaxis={"title": "false pushback gained on sound twins (pp)"}, margin={"b": 150})
-    return figure
-
-
-def prompt_gain_plot(points: list[dict], title: str, *, include_rejected: bool = False) -> go.Figure:
-    """Use the benchmark's admissible seed means; rejected doses appear only in diagnostics. PI/OpenAI."""
-    figure = make_subplots(rows=1, cols=2, subplot_titles=("Premise change from bare (− rejects, + accepts)", "Mean damage (0 clean → 4 broken)"))
-    methods = sorted({p["method"] for p in points if p["fixed_grid"]})
-    for method in methods:
-        for side in ("+C", "-C"):
-            doses = sorted({p["C"] for p in points if p["method"] == method})
-            groups = [[p for p in points if p["method"] == method and p["side"] == side and p["C"] == dose] for dose in doses]
-            accepted = {p["C"] for p in method_curve(points, method, side)}
-            for column, metric in enumerate(("effect", "steered_damage"), 1):
-                figure.add_trace(go.Scatter(
-                    x=[f"{dose:g}" for dose in doses],
-                    y=[mean(p[metric] for p in group) if include_rejected or dose in accepted else None
-                       for dose, group in zip(doses, groups, strict=True)], connectgaps=False,
-                    name=f"{LABELS[method]} {side}", legendgroup=f"{method}{side}", showlegend=column == 1,
-                    mode="lines+markers", line=dict(color=COLORS[method], dash="solid" if side == "+C" else "dash"),
-                    marker=dict(size=7, symbol=["circle" if dose in accepted else "x" for dose in doses]),
-                ), row=1, col=column)
-    figure.add_hline(y=0, line_color="#aaaaaa", line_width=1, row=1, col=1)
-    figure.add_hline(y=MAX_DAMAGE, line_color="#aaaaaa", line_dash="dot", row=1, col=2)
-    all_doses = sorted({p["C"] for p in points if p["fixed_grid"]})
-    figure.update_xaxes(type="category", categoryorder="array", categoryarray=[f"{dose:g}" for dose in all_doses],
-                        tickvals=[f"{dose:g}" for dose in all_doses], ticktext=[f"{dose:g}" for dose in all_doses],
-                        tickangle=-75, tickfont_size=9, title_text="Tested gain (categorical spacing)")
-    figure.update_yaxes(range=[0, 4], row=1, col=2)
-    figure.update_layout(template="plotly_white", title=dict(text=title, font_size=16),
-                        legend=dict(orientation="h", y=1.18, x=0), margin=dict(t=150, b=175, l=55, r=25))
-    note = "× fails admissibility." if include_rejected else "Rejected doses omitted; lines do not bridge failed gains."
-    figure.add_annotation(text=f"{note} Dotted line: damage cap. Gain 0 keeps positions; gain 1 is ordinary prompting.<br>Seed means; no intervals. ±C selects persona, not a negative gain. Endpoints do not confirm breakdown.",
-                          x=0, y=-0.39, xref="paper", yref="paper", xanchor="left", showarrow=False, font_size=12)
     return figure
 
 
@@ -757,15 +712,11 @@ def main() -> None:
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     # tagged variants (<method>-<tag>, e.g. vjp_resid-t47) are diagnostics: in the table, not in the default plot view
     shown = [row["method"] for row in rows if row["method"] in methods and "-" not in row["method"] and not math.isnan(row["score"])][:TOP_N_PLOT]
-    shown += [m for m in ("prompting_scale", "prompting_engineered_scale") if m in methods and m not in shown]
-    if args.view == "prompt":
-        shown = ["prompting_scale", "prompting_engineered_scale", "mean_diff"]
-        assert set(shown) <= set(methods), "prompt view needs both prompt sweeps and mean_diff"
     site = {
         "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
         "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
-        "max_damage": MAX_DAMAGE, "max_false_pushback": MAX_FALSE_PUSHBACK, "admissibility": "jev_mean_damage and (eval v2) jev_false_pushback",
+        "max_damage": MAX_DAMAGE, "admissibility": "jev_mean_damage",
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zones": random_zones(points),
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
@@ -773,7 +724,7 @@ def main() -> None:
             "method": m, "side": side,
             "points": sweep(before_reversal(method_curve(points, m, side))),
             "tested": [{k: p[k] for k in ("C", "effect", "off_axis")} for p in method_curve(points, m, side)],
-            "path": sweep_path(sweep(before_reversal(method_curve(points, m, side))), method_curve(points, m, side)[0]["fixed_grid"]) if method_curve(points, m, side) else [],
+            "path": sweep_path(sweep(before_reversal(method_curve(points, m, side)))) if method_curve(points, m, side) else [],
         } for m in methods for side in ("+C", "-C")],
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "score_room": row["score_room"], "ci_room": row["ci_room"],
@@ -787,7 +738,7 @@ def main() -> None:
     site["plot_labels"] = svg_labels(site)
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
-    heading = {"prompt": "Prompt embedding sweeps vs mean difference", "user": "User-turn steering on Bullshit Bench v2"}.get(args.view, "steering-lite on Bullshit Bench v2")
+    heading = {"user": "User-turn steering on Bullshit Bench v2"}.get(args.view, "steering-lite on Bullshit Bench v2")
     title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
@@ -804,23 +755,12 @@ def main() -> None:
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
-        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4 and (eval v2) Jev false pushback on the sound twins at most {100 * MAX_FALSE_PUSHBACK:g} pp above bare. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
+        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4. False pushback on the sound twins is reported, not filtered. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     if args.view == "user":
         intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
                   "using the method's own vector and C0, one seed. Random is random-user: random directions steered the same way. "
-                  "Prompt sweeps and plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
-    if any(p["fixed_grid"] for p in points):
-        intro += " Prompt embedding sweeps use a fixed gain grid; Jev judges each gain independently. Endpoints do not establish a breakdown boundary. Tokens overlapping the instruction are scaled, including any merged separator whitespace. C=1 is ordinary prompting; C=0 leaves zero-valued embeddings and their positions."
-    gain_image = ""
-    if any(p["fixed_grid"] for p in points):
-        gains = prompt_gain_plot(points, f"Prompt embedding gains: {model} ({args.cohort}, {len(scenarios)} questions)")
-        gains.write_image(out / "prompt_gains.png", width=1064, height=650, scale=2)
-        gains.write_html(out / "prompt_gains.html", include_plotlyjs="cdn")
-        diagnostic = prompt_gain_plot(points, f"Diagnostic — all tested prompt gains: {model}", include_rejected=True)
-        diagnostic.write_image(out / "prompt_gains_all.png", width=1064, height=650, scale=2)
-        diagnostic.write_html(out / "prompt_gains_all.html", include_plotlyjs="cdn")
-        gain_image = "\n\n![Admissible prompt gains](prompt_gains.png)\n\n[Diagnostic: all gains, including rejected doses](prompt_gains_all.html)"
+                  "Plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
     discrimination_image = ""
     if any("false_pushback" in p for p in points):
         disc = discrimination_plot(points, shown, f"−C: discernment or contrarianism? {model} ({args.cohort}), sound-premise twins")
@@ -828,8 +768,8 @@ def main() -> None:
         disc.write_html(out / "discrimination.html", include_plotlyjs="cdn")
         discrimination_image = ("\n\n## −C: discernment or contrarianism?\n\nEach −C sweep plotted as pushback gained on the nonsense questions (x) against "
                                 "false pushback gained on their sound twins (y). Real discernment moves right and stays near zero; a steer that rejects "
-                                "everything climbs above the dotted limit line; those doses are not scored.\n\n![discrimination](discrimination.png)")
-    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){discrimination_image}{gain_image}\n\n{table}\n")
+                                "everything climbs up the y axis.\n\n![discrimination](discrimination.png)")
+    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){discrimination_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>steering-lite bsbench</title>"

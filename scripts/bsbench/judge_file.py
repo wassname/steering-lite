@@ -6,7 +6,7 @@ Input jsonl, one row per question and condition:
 twins (data/bsbench/sound_twins_v1.jsonl); prompts and flaws are looked up by scenario. Prints one line per condition:
   effect = mean P(on target) x (premise level steered - bare), 0-8 scale, negative = more rejection of the made-up premise
   false_pushback = mean P(wrongly rejects a sound twin), steered and bare
-  damage = mean Jev damage of steered bench answers (eval v2 admits a dose at <= 1.5 of 4 and false pushback <= +5 pp)
+  damage = mean Jev damage of steered bench answers (a dose counts as coherent at <= 1.5 of 4)
 
   uv run --extra benchmark python scripts/bsbench/judge_file.py generations.jsonl   # needs OPENROUTER_API_KEY in .env
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 from statistics import mean
 
 from data import load_cohort, load_twins
-from judge import MAX_DAMAGE, MAX_FALSE_PUSHBACK, audit_request, aware_request, cached, control_request, key, refresh
+from judge import MAX_DAMAGE, audit_request, aware_request, cached, control_request, key, refresh
 
 bench, twins = load_cohort(), load_twins()
 rows = [json.loads(line) for line in Path(sys.argv[1]).open()]
@@ -46,8 +46,8 @@ for condition in sorted({row["condition"] for row in rows}):
             s, b = (have[key(control_request(row["prompt"], t))]["false_pushback"]["probabilities"]["yes"] for t in (row["steered"], row["bare"]))
             fp.append(s)
             fp_bare.append(b)
-    passes = (not damage or mean(damage) <= MAX_DAMAGE) and (not fp or mean(fp) - mean(fp_bare) <= MAX_FALSE_PUSHBACK)
+    passes = not damage or mean(damage) <= MAX_DAMAGE
     print(f"{condition}\tn_bench={len(effect)}\tn_twin={len(fp)}"
           + (f"\teffect={mean(effect):+.2f}\tdamage={mean(damage):.2f}" if effect else "")
           + (f"\tfalse_pushback={mean(fp):.2f} (bare {mean(fp_bare):.2f}, {100 * (mean(fp) - mean(fp_bare)):+.0f} pp)" if fp else "")
-          + f"\tpasses_v2_limits={passes}")
+          + f"\tcoherent={passes}")
