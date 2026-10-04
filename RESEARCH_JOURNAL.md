@@ -456,3 +456,15 @@ Interpretation (likely, ~75%): on this model +C is generic damage, so the eval s
 Cost: GPU for the screens and validation about $5 (walks 360–1,600 s each on A10G); Jev about $1.
 
 Next: more seeds; vjp_value and the other methods only after this is reviewed.
+
+## 2026-10-04 -- Persona pair re-chosen on held-out questions (same pick)
+
+Author PI/OpenAI. The goal judge rejected the first choice because it was made on the reported v2 questions. Re-run on BullshitBench v1 (55 questions, none in v2; `data/bsbench/bullshit_bench_v1.jsonl`, cohort `heldout`), same cached mean_diff vectors, selection rule committed before results (9f4301a).
+
+| axis | held-out score [90% CI] | −C pushback gained | +C toward accepting |
+|---|---|---|---|
+| rubric mirror | +0.49 [+0.32, +0.58] | +0.60 | +0.68 |
+| sycophantic / skeptical | +0.08 [−0.00, +0.24] | +0.11 | +0.63 |
+| credulous / skeptical | +0.05 [−0.04, +0.18] | +0.07 | +0.69 |
+
+Refusal/echo check at the scored −C dose (rubric): P(refuses) 0.02 vs bare 0.01; the persona's own phrases appear in 0% of answers; "premise" in 24% (also 13% under sycophantic/skeptical, whose persona never says it); gain without those answers +0.53. Same ranking as on the reported questions (+0.39/+0.18/+0.08), so the reported v3 results stand. `slop/reviews/2026-10-04_eval_v3/pole_screen.md`.
