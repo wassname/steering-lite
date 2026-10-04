@@ -101,7 +101,11 @@ What this shows (one seed, one model, so treat as provisional):
 - Pushing back (−C) is where methods differ from random: mean_diff +0.46, vjp_resid +0.30, random +0.01. The plain prompt is strongest there (+0.74) but weakest on +C (+0.37), because the 4B often ignores "accept every question's premise". A re-grade of 39 questions by Claude Sonnet 4.6, one of BullshitBench's own judges, with its own prompt, gives the same order with slightly larger −C gains (prompt +0.92, mean_diff +0.59, vjp_resid +0.31; agreement with Jev r = 0.93), so the left side is not a Jev artefact ([re-grade](slop/reviews/2026-10-04_eval_v3/regrade_sonnet.md)).
 - vjp_resid's −C side has no gradual breakdown: the dose after its best is already incoherent.
 
-Notes: [manual read](slop/reviews/2026-10-04_eval_v3/validation_read.md), [journal](RESEARCH_JOURNAL.md). Interactive page: `outputs/bsbench/results/v3-4b/index.html`.
+**Follow-up, 2026-10-05 (provisional, needs wassname's review).** The vectors above are extracted from persona pairs on generic prompts ("Tell me a story."), which contain no nonsense premise. Extracting them on the 55 BullshitBench v1 questions instead (none in the v2 eval set; `walk.py --pairs bsbench_v1`) raises −C pushback from +0.30 to +0.90 (vjp_resid) and +0.46 to +0.75 (mean_diff), past the prompt's +0.74. 100 legitimate control questions, judged with BullshitBench's control rubric, show part of every −C gain is rejecting legitimate questions (unsteered 4%; prompt 39%; vjp_resid 17% at +0.81 pushback; mean_diff 72% at +0.75). On Qwen3.5-9B with the same setup, vjp_resid scores +0.66 vs the prompt's +0.21: the 9B resists the "accept every premise" prompt on +C, and the prompt's −C pushback rejects 49% of legitimate questions vs vjp_resid's 9–20%.
+
+![4B, −C pushback vs legitimate questions called nonsense](slop/reviews/2026-10-05_nonsense_pairs/combined_controls.png)
+
+Notes: [manual read](slop/reviews/2026-10-04_eval_v3/validation_read.md), [journal](RESEARCH_JOURNAL.md). Interactive pages: `outputs/bsbench/results/v3-4b/index.html`, `v3-4b-nonsense-pairs/`, `v3-9b-nonsense-pairs/`.
 
 ### Eval v1: abrasive axis, our 0–8 premise rubric
 

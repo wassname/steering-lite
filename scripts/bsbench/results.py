@@ -632,7 +632,7 @@ def svg_labels(site: dict) -> list[dict]:
     shown = [p for c in curves for p in c["points"]] + prompts
     zones = [p for zone in site["zones"] for p in zone["path"]]
     x_max = 1.08 * max([abs(p["effect"]) for p in shown] + [abs(p[0]) for p in zones] + [.5])
-    y_max = 1.08 * max([p["off_axis"] for p in shown] + [p[1] for p in zones] + [.3])
+    y_max = 1.2 * max([p["off_axis"] for p in shown] + [p[1] for p in zones] + [.05])  # same as main.jsx
     labels = [{"method": c["method"], "side": c["side"], "x": c["path"][-1][0], "y": c["path"][-1][1],
                "text": f"{LABELS[c['method']]} {c['side']}", "color": site["colors"][c["method"]]} for c in curves]
     labels += [{"method": p["method"], "side": p["side"], "x": p["effect"], "y": p["off_axis"],

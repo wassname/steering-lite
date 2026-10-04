@@ -17,7 +17,7 @@ function Plot({ data, visible, selected, onSelect }) {
   const shown = [...curves.flatMap(c => c.points), ...prompts];  // axes fit what is drawn (lines end at their x)
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
-  const yMax = 1.08 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.05);  // floor only for empty views; off-axis is a probability rise, usually < 0.2
+  const yMax = 1.2 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.05);  // floor only for empty views; off-axis is a probability rise, usually < 0.2
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);

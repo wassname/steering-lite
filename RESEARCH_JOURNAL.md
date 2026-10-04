@@ -518,3 +518,20 @@ Flagged control answers read as real false rejections, e.g. vjp_resid nonsense p
 - +C saturates for every method and random (~+0.65): bare BS score is 0.73, so +C cannot lose more. On this 4B only −C separates methods.
 
 Spend tonight ≈ $7 (GPU ≈ $4, Jev ≈ $1.5, Sonnet ≈ $1.5) of $30.
+
+## 2026-10-05 -- Same test on Qwen3.5-9B
+
+Author PI/OpenAI, overnight. Preset qwen3.5-9b (A100-40GB, batch 200, benched first: 27.4 GB peak). Nonsense-question extraction pairs (suffixes are the 4B's answer starts, not the 9B's), controls at every dose, seed 0, random 3 directions. Report `outputs/bsbench/results/v3-9b-nonsense-pairs/`, chart `slop/reviews/2026-10-05_nonsense_pairs/combined_controls_9b.png`.
+
+| 9B | score [90% CI] | −C pushback | legitimate questions called nonsense (bare 3%) | +C toward accepting |
+|---|---|---|---|---|
+| vjp_resid | +0.66 [+0.55, +0.76] | +0.67 (C 0.5) | 20% | +0.91 |
+| mean_diff | +0.32 [+0.23, +0.43] | +0.34 (C 1.59) | 24% | +0.91 |
+| plain prompt | +0.21 [+0.10, +0.33] | +0.64 | 49% | +0.22 |
+| random (3) | −0.02 | −0.02 | — | +0.64 |
+
+Per dose, vjp_resid −C: +0.49 at 9%, +0.58 at 13%, +0.67 at 20% false rejections. Bare 9B BS score 0.97 (4B: 0.73), so +C has more room; vectors reach +0.91, random +0.64, the prompt +0.22: the 9B mostly ignores "accept every question's premise" ("The therapeutic alliance … does not have a tensile strength measured in megapascals"), while vjp_resid +C gives "a tensile strength of approximately 45 MPa".
+
+Interpretation (one seed per method): on the 9B, steering beats prompting on both sides. On +C the model resists the instruction (where the plot spec expected steering to win); on −C the prompt's pushback comes with about half of legitimate questions rejected, vjp_resid's with a fifth or less. mean_diff is weak on the 9B −C side.
+
+Spend tonight ≈ $14 (GPU ≈ $10, Jev ≈ $2.5, Sonnet ≈ $1.5) of $30.

@@ -23,4 +23,18 @@ fig.update_layout(template="plotly_white", height=560, title={"text": "Qwen3.5-4
                   legend={"orientation": "h", "y": -0.2}, margin={"b": 150})
 fig.write_image("slop/reviews/2026-10-05_nonsense_pairs/combined_controls.png", width=1064, height=600, scale=2)
 fig.write_html("slop/reviews/2026-10-05_nonsense_pairs/combined_controls.html", include_plotlyjs="cdn")
+# 9B, nonsense-question pairs only (no generic-pair 9B run)
+fig = go.Figure()
+for method, color in (("vjp_resid", "#0072b2"), ("mean_diff", "#d55e00")):
+    pts = sorted((p for p in json.load(open(f"{R}/v3-9b-nonsense-pairs/points.json"))["points"] if p["method"] == method and p["side"] == "-C" and p["admissible"]), key=lambda p: p["C"])
+    bare = 100 * mean(p["control_claims_bare"] for p in pts)
+    fig.add_trace(go.Scatter(x=[0] + [-p["effect"] for p in pts], y=[bare] + [100 * p["control_claims"] for p in pts], mode="lines+markers",
+                             name=("VJP-resid" if method == "vjp_resid" else "mean difference") + ", nonsense-question pairs", line={"color": color, "width": 3}, marker={"size": 7, "color": color}))
+prompt = next(p for p in json.load(open(f"{R}/v3-9b-nonsense-pairs/points.json"))["points"] if p["method"] == "prompting" and p["side"] == "-C")
+fig.add_trace(go.Scatter(x=[-prompt["effect"]], y=[100 * prompt["control_claims"]], mode="markers", name="plain prompt −C", marker={"color": "#6a3d9a", "size": 16, "symbol": "star"}))
+fig.add_trace(go.Scatter(x=[0], y=[100 * prompt["control_claims_bare"]], mode="markers", name="bare", marker={"color": "#333", "size": 11, "symbol": "diamond"}))
+fig.update_layout(template="plotly_white", height=560, title={"text": "Qwen3.5-9B, −C sweeps: pushback on nonsense vs rejecting legitimate questions", "x": 0.5},
+                  xaxis={"title": "pushback gained on 100 BullshitBench v2 questions (BullshitBench score, 0–2; Jev)"},
+                  yaxis={"title": "legitimate questions called nonsense (%)", "rangemode": "tozero"}, legend={"orientation": "h", "y": -0.2}, margin={"b": 150})
+fig.write_image("slop/reviews/2026-10-05_nonsense_pairs/combined_controls_9b.png", width=1064, height=600, scale=2)
 print("ok")
