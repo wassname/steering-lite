@@ -1,0 +1,9 @@
+2026-10-04 14:54:52.550 | INFO     | data:manifest:100 - manifest walks=1 rows=1705
+2026-10-04 14:55:17.356 | INFO     | __main__:refresh:183 - JUDGE_CACHE_CHECK bsb required=1583 cached=0 missing=1583
+2026-10-04 14:55:29.206 | INFO     | __main__:_refresh:177 - jev progress=400/1583 cost=$0.0273
+2026-10-04 14:55:35.569 | INFO     | __main__:_refresh:177 - jev progress=800/1583 cost=$0.0543
+2026-10-04 14:55:41.659 | INFO     | __main__:_refresh:177 - jev progress=1200/1583 cost=$0.0816
+2026-10-04 14:55:48.487 | INFO     | __main__:_refresh:177 - jev progress=1583/1583 cost=$0.1087
+2026-10-04 14:57:08.270 | INFO     | __main__:refresh:183 - JUDGE_CACHE_CHECK blind required=220 cached=0 missing=220
+2026-10-04 14:57:15.797 | INFO     | __main__:_refresh:177 - jev progress=220/220 cost=$0.0121
+2026-10-04 14:57:16.369 | INFO     | __main__:main:202 - JUDGE_COMPLETE missing=0
