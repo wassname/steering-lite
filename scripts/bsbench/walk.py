@@ -668,7 +668,7 @@ def configure(args: argparse.Namespace) -> None:
         GEN["max_new_tokens"] = 8
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
     if args.pairs != "generic":
-        assert args.method not in PROMPT_METHODS, "prompt methods use no extraction pairs"
+        # prompt methods and random ignore the pairs; they still run here so one report holds every method
         GEN["pairs"] = args.pairs
         PAIR_ENTRIES[0] = json.loads((ROOT / f"data/bsbench/persona_pairs_{args.pairs}.json").read_text())
         GEN_KEY = hashlib.sha256(json.dumps(GEN, sort_keys=True).encode()).hexdigest()[:8]
