@@ -2,11 +2,11 @@
 
 Adapted from vjp-steering 7f0782a `scripts/export.py` + `src/vjp_steering/results.py`, merged so one
 file writes the one data artifact (`points.json`) that the plot, the tables and the React page read.
-Jev's steering-failure checks alone determine admissibility (mean P(fail) <= judge.MAX_FAILURE); mechanical health
+Jev's pairwise off-axis change alone determines admissibility (mean <= judge.MAX_OFF_AXIS); mechanical health
 and boundary fields are diagnostics.
 The random zone and plot style follow the reference. PI/OpenAI.
-Changed: the judge is Jev (judge.py: BullshitBench's own rubric plus steering-failure checks, 1 call per answer)
-instead of the DeepSeek pairwise judge, so numbers are in Jev units and not comparable with the
+Changed: the judge is Jev (judge.py v4: pairwise change from the bare answer, both orders; BullshitBench's own
+per-answer score and failure checks reported) instead of the DeepSeek pairwise judge, so numbers are in Jev units and not comparable with the
 vjp-steering README. All steering-lite methods plus prompting points. The headline table picks, for each
 side, the admissible dose with the best on-axis - OFF_WEIGHT x off-axis, scores the method by the weaker
 side, and bootstraps seeds then questions (selection redone inside each resample).
@@ -25,7 +25,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import FAILURES, MAX_FAILURE, MODEL, blind_request, bsb_request, cached, control_request, key, p_fail
+from judge import FAILURES, MAX_OFF_AXIS, MODEL, blind_request, bsb_request, cached, control_request, key, p_fail, pair_change, pair_request
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
@@ -64,10 +64,11 @@ def parse_args() -> argparse.Namespace:
 def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "benchmark") -> list[dict]:
     """One point per (method, seed, side, C), with per-question Jev ratings kept for bootstrap and the explorer.
 
-    effect = bs(bare) - bs(steered): BullshitBench score lost, + = goes along with the nonsense (the plot's x axis;
-    -C working is negative). off_axis = P(fail)(steered) - P(fail)(bare), P(fail) = the largest of the steering-failure
-    checks (judge.FAILURES). A dose is coherent (admissible) while mean P(fail) of the steered answers <= MAX_FAILURE.
-    Blind ratings are attached where judged (blind table doses)."""
+    effect = Jev's direct rating of the steered answer's premise change vs bare, -3..+3, + = goes along with the
+    nonsense (the plot's x axis; -C working is negative). off_axis = Jev's direct rating of how much the steered answer
+    differs from bare in everything else, 0..4. Both are pair ratings averaged over A/B orders (judge.pair_change).
+    A dose is coherent (admissible) while mean off_axis <= MAX_OFF_AXIS. bs_effect = BullshitBench score lost (their
+    per-answer rubric, 0-2) and the failure checks are reported. Blind ratings are attached where judged."""
     have = cached()
     points = []
     for certificate in [c for c in walk_certificates(model_dir, cohort, view) if c["method"] not in exclude]:
@@ -84,25 +85,26 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
                 for row in (r for r in at if r["set"] == "bench"):
                     b = have.get(key(bsb_request(row["prompt"], row["flaw"], row["bare"])))
                     st = have.get(key(bsb_request(row["prompt"], row["flaw"], row["steered"])))
-                    assert b and st, f"no Jev rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
+                    ab = have.get(key(pair_request(row["prompt"], row["flaw"], row["bare"], row["steered"])))
+                    ba = have.get(key(pair_request(row["prompt"], row["flaw"], row["steered"], row["bare"])))
+                    assert b and st and ab and ba, f"no Jev rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
+                    effect, off_axis = pair_change(ab, ba)
                     questions.append({
                         "scenario": row["vignette"],
-                        "effect": b["bs_score"]["score"] - st["bs_score"]["score"],
-                        "off_axis": p_fail(st) - p_fail(b), "p_fail": p_fail(st),
+                        "effect": effect, "off_axis": off_axis, "bs_effect": b["bs_score"]["score"] - st["bs_score"]["score"], "p_fail": p_fail(st),
                         "failures": {name: st[name]["probabilities"]["yes"] for name in FAILURES},
                         "bare_bs": b["bs_score"]["score"],
-                        "evidence": f"BS score {b['bs_score']['score']:.2f} -> {st['bs_score']['score']:.2f}, P(fail) {p_fail(b):.2f} -> {p_fail(st):.2f}",
+                        "evidence": f"premise change {effect:+.2f}, off-axis {off_axis:.2f}, BS score {b['bs_score']['score']:.2f} -> {st['bs_score']['score']:.2f}, P(fail) {p_fail(b):.2f} -> {p_fail(st):.2f}",
                         "blind": have.get(key(blind_request(row["prompt"], row["bare"], row["steered"]))),
                         "text": row["steered"],
                     })
-                steered_fail = mean(q["p_fail"] for q in questions)
                 points.append({
                     "method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side,
                     "axis": certificate["gen"]["axis"],
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
-                    "p_fail": steered_fail, "failures": {name: mean(q["failures"][name] for q in questions) for name in FAILURES},
+                    "bs_effect": mean(q["bs_effect"] for q in questions), "p_fail": mean(q["p_fail"] for q in questions), "failures": {name: mean(q["failures"][name] for q in questions) for name in FAILURES},
                     "breakdown_reasons": rung["breakdown_reasons"], "post_boundary": rung.get("post_boundary", False),
-                    "admissible": steered_fail <= MAX_FAILURE,
+                    "admissible": mean(q["off_axis"] for q in questions) <= MAX_OFF_AXIS,
                     "kl_rms": rung.get("kl_rms"), "stats": rung["stats"], "answers": rung["answers"], "questions": questions,
                     **({"control_claims": mean(c[0] for c in controls), "control_claims_bare": mean(c[1] for c in controls)} if controls else {}),
                 })
@@ -142,7 +144,7 @@ def method_curve(points: list[dict], method: str, side: str, *, candidates: bool
         questions = [q | {"seed": point["seed"]} for point in at for q in point["questions"]]
         curve.append({
             "method": method, "side": side, "C": C, "admissible": True,
-            "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
+            "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at), "bs_effect": mean(point["bs_effect"] for point in at),
             "room": room(questions, side), "questions": questions,
             **({"control_claims": mean(p["control_claims"] for p in at), "control_claims_bare": mean(p["control_claims_bare"] for p in at)} if "control_claims" in at[0] else {}),
         })
@@ -158,16 +160,16 @@ def pareto_score(side_curves: dict[str, list[dict]]) -> tuple[float, dict]:
 
 
 def room_score(best: dict) -> float:
-    """On-axis ÷ room: on-axis at each side's Pareto-best point divided by that side's room, weaker side (nan if a side has none)."""
+    """BullshitBench score moved toward the side's target at each side's Pareto-best point, divided by that side's room, weaker side (nan if a side has none)."""
     if any(point is None for point in best.values()):
         return float("nan")
-    return min(directed(point) / point["room"] for point in best.values())
+    return min((point["bs_effect"] if point["side"] == "+C" else -point["bs_effect"]) / point["room"] for point in best.values())
 
 
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    The Jev failure limit (MAX_FAILURE) is re-decided in each draw on the drawn questions. Curves come in as candidates (all doses), so a
+    The Jev off-axis limit (MAX_OFF_AXIS) is re-decided in each draw on the drawn questions. Curves come in as candidates (all doses), so a
     dose that failed on the full set can pass in a draw and vice versa. Intervals remain conditional on seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
@@ -177,9 +179,10 @@ def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[
         chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
         if not chosen:  # random: a drawn seed may not have reached this dose
             continue
-        if mean(q["p_fail"] for q in chosen) > MAX_FAILURE:
+        if mean(q["off_axis"] for q in chosen) > MAX_OFF_AXIS:
             continue
-        out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen), "room": room(chosen, point["side"])})
+        out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen),
+                    "bs_effect": mean(q["bs_effect"] for q in chosen), "room": room(chosen, point["side"])})
     return out
 
 
@@ -216,7 +219,7 @@ def random_curves(points: list[dict], *, candidates: bool = False) -> dict[str, 
                 questions = [q | {"seed": point["seed"]} for point in live for q in point["questions"]]
                 out[side].append({
                     "C": C, "side": side, "admissible": True,
-                    "effect": mean(point["effect"] for point in live), "off_axis": mean(point["off_axis"] for point in live),
+                    "effect": mean(point["effect"] for point in live), "off_axis": mean(point["off_axis"] for point in live), "bs_effect": mean(point["bs_effect"] for point in live),
                     "room": room(questions, side), "questions": questions, "seeds_at": len(live),
                 })
     return out
@@ -515,8 +518,8 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "BullshitBench score lost, 0–2 (Jev): ← pushes back · goes along → (solid +C, dashed −C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
-        yaxis={"title": "off-axis: rise in P(steering failure) (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "premise change vs bare, −3..+3 (Jev, pairwise): ← pushes back · goes along → (solid +C, dashed −C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
 
@@ -528,7 +531,7 @@ def _fmt_side(point: dict | None) -> list[str]:
 
 
 def tables(rows: list[dict]) -> str:
-    head = "| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C control: calls a legitimate question nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
+    head = "| method | score↑ | 90% CI | BS score moved ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C control: calls a legitimate question nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
     lines = [head, "|" + "---|" * 16]
     control = lambda p: "—" if p is None or "control_claims" not in p else f"{p['control_claims']:.0%} ({p['control_claims_bare']:.0%})"
     bound = lambda v: "−∞" if v == -math.inf else f"{v:+.2f}"
@@ -542,8 +545,8 @@ def tables(rows: list[dict]) -> str:
         lines.append("| " + " | ".join([name, score, ci, score_room, ci_room, empty, *_fmt_side(row["best"]["-C"]), control(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
                                          str(row["seeds"]), str(row["N"]), str(row["rejected"])]) + " |")
     return "\n".join(lines) + (
-        f"\n\nOn-axis ÷ room: on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side "
-        f"(bare BS score for +C, {BS_MAX} − bare BS score for −C), weaker side; failures are handled by the dose choice and the {MAX_FAILURE:g} limit, not in this number.")
+        f"\n\nBS score moved ÷ room: BullshitBench's own per-answer score (0–2) moved toward the side's target at the Pareto-best dose, divided by how far the bare answers could still move "
+        f"(bare BS score for +C, {BS_MAX} − bare BS score for −C), weaker side; comparable with their leaderboard scale. Off-axis is handled by the dose choice and the {MAX_OFF_AXIS:g} limit, not in this number.")
 
 
 def _no_nan(value):
@@ -620,7 +623,7 @@ def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figur
         bare = 100 * point["control_claims_bare"]
     figure.add_trace(go.Scatter(x=[0], y=[bare], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare"))
     figure.update_layout(template="plotly_white", title={"text": title, "x": 0.5}, height=520, legend={"orientation": "h", "y": -0.22}, margin={"b": 140},
-                         xaxis={"title": "pushback gained on the nonsense questions (BullshitBench score, 0–2)"},
+                         xaxis={"title": "pushback gained on the nonsense questions (premise change vs bare, Jev pairwise)"},
                          yaxis={"title": "legitimate control questions called nonsense (%)", "rangemode": "tozero"})
     return figure
 
@@ -670,8 +673,8 @@ def main() -> None:
     site = {
         "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
-        "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (BullshitBench score 0-2, steering-failure checks)", "off_weight": OFF_WEIGHT,
-        "max_failure": MAX_FAILURE, "admissibility": "jev_mean_p_fail", "failures": list(FAILURES),
+        "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (pairwise vs bare: premise change -3..+3, off-axis change 0..4)", "off_weight": OFF_WEIGHT,
+        "max_off_axis": MAX_OFF_AXIS, "admissibility": "jev_mean_off_axis", "failures": list(FAILURES),
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zones": random_zones(points),
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
@@ -706,8 +709,9 @@ def main() -> None:
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
-        f"Judge: Jev with BullshitBench's own rubric (on-axis = BS score lost, 0-2 scale, + = goes along with the nonsense) and five yes/no steering-failure checks "
-        f"({', '.join(FAILURES)}; off-axis = change in P(any failure), the largest of the five). Admissible = mean P(any failure) of the steered answers ≤ {MAX_FAILURE:g}. "
+        "Judge: Jev rates each steered answer against the bare answer directly, in both A/B orders: on-axis = premise change, −3..+3 on levels anchored to BullshitBench's 0/1/2 rubric "
+        "(+ = goes along with the nonsense); off-axis = how much it differs from bare in everything else (vjp-steering confound list), 0–4, never negative. "
+        f"Admissible = mean off-axis ≤ {MAX_OFF_AXIS:g}. BullshitBench's own per-answer score is reported as 'BS score moved'. "
         "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "") + (
         " Steering personas: +C \"{}\" / −C \"{}\".".format(*shown_axis(points)))

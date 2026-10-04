@@ -1,0 +1,10 @@
+bare vs bare	n=30	effect=-0.02	off_axis=0.00	bs_lost=+0.00	p_fail=0.04
+mean_diff -C 2	n=30	effect=-1.30	off_axis=2.33	bs_lost=-0.52	p_fail=0.26
+prompt +C	n=30	effect=+0.49	off_axis=0.78	bs_lost=+0.21	p_fail=0.05
+prompt -C	n=30	effect=-1.67	off_axis=0.99	bs_lost=-0.65	p_fail=0.01
+prompt -C SWAPPED	n=30	effect=+1.23	off_axis=1.01	bs_lost=+0.65	p_fail=0.04
+vjp +C 0.315	n=30	effect=+1.93	off_axis=1.17	bs_lost=+0.89	p_fail=0.06
+vjp +C 0.315 SWAPPED	n=30	effect=-1.83	off_axis=1.23	bs_lost=-0.89	p_fail=0.04
+vjp -C 0.5	n=30	effect=-1.53	off_axis=1.04	bs_lost=-0.66	p_fail=0.05
+vjp -C 0.5 SWAPPED	n=30	effect=+1.13	off_axis=1.02	bs_lost=+0.66	p_fail=0.04
+vjp -C 1.0	n=30	effect=-1.75	off_axis=2.61	bs_lost=-0.68	p_fail=0.49

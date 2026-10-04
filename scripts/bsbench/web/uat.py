@@ -47,7 +47,7 @@ with sync_playwright() as p:
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
     assert data["admissibility"] == "jev_mean_p_fail"
-    assert all(p["admissible"] == (p["p_fail"] <= data["max_failure"]) for p in data["points"]), "only Jev's steering-failure checks decide admissibility"
+    assert all(p["admissible"] == (p["off_axis"] <= data["max_off_axis"]) for p in data["points"]), "only Jev's pairwise off-axis change decides admissibility"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
     assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"
