@@ -1,0 +1,44 @@
+2026-10-04 22:22:46.138 | INFO     | data:manifest:104 - manifest walks=8 rows=26100
+2026-10-04 22:23:07.075 | INFO     | __main__:refresh:197 - JUDGE_CACHE_CHECK bsb required=23670 cached=13979 missing=9691
+2026-10-04 22:23:16.394 | INFO     | __main__:_refresh:191 - jev progress=400/9691 cost=$0.0087
+2026-10-04 22:23:23.042 | INFO     | __main__:_refresh:191 - jev progress=800/9691 cost=$0.0174
+2026-10-04 22:23:30.209 | INFO     | __main__:_refresh:191 - jev progress=1200/9691 cost=$0.0263
+2026-10-04 22:23:36.233 | INFO     | __main__:_refresh:191 - jev progress=1600/9691 cost=$0.0378
+2026-10-04 22:23:42.346 | INFO     | __main__:_refresh:191 - jev progress=2000/9691 cost=$0.0464
+2026-10-04 22:23:48.339 | INFO     | __main__:_refresh:191 - jev progress=2400/9691 cost=$0.0552
+2026-10-04 22:23:54.193 | INFO     | __main__:_refresh:191 - jev progress=2800/9691 cost=$0.0656
+2026-10-04 22:24:00.145 | INFO     | __main__:_refresh:191 - jev progress=3200/9691 cost=$0.0846
+2026-10-04 22:24:06.300 | INFO     | __main__:_refresh:191 - jev progress=3600/9691 cost=$0.1128
+2026-10-04 22:24:12.504 | INFO     | __main__:_refresh:191 - jev progress=4000/9691 cost=$0.1415
+2026-10-04 22:24:18.757 | INFO     | __main__:_refresh:191 - jev progress=4400/9691 cost=$0.1696
+2026-10-04 22:24:25.053 | INFO     | __main__:_refresh:191 - jev progress=4800/9691 cost=$0.1981
+2026-10-04 22:24:31.250 | INFO     | __main__:_refresh:191 - jev progress=5200/9691 cost=$0.2269
+2026-10-04 22:24:37.327 | INFO     | __main__:_refresh:191 - jev progress=5600/9691 cost=$0.2552
+2026-10-04 22:24:43.356 | INFO     | __main__:_refresh:191 - jev progress=6000/9691 cost=$0.2836
+2026-10-04 22:24:49.686 | INFO     | __main__:_refresh:191 - jev progress=6400/9691 cost=$0.3123
+2026-10-04 22:24:56.733 | INFO     | __main__:_refresh:191 - jev progress=6800/9691 cost=$0.3409
+2026-10-04 22:25:03.004 | INFO     | __main__:_refresh:191 - jev progress=7200/9691 cost=$0.3677
+2026-10-04 22:25:09.223 | INFO     | __main__:_refresh:191 - jev progress=7600/9691 cost=$0.3763
+2026-10-04 22:25:15.250 | INFO     | __main__:_refresh:191 - jev progress=8000/9691 cost=$0.3847
+2026-10-04 22:25:21.258 | INFO     | __main__:_refresh:191 - jev progress=8400/9691 cost=$0.3932
+2026-10-04 22:25:27.252 | INFO     | __main__:_refresh:191 - jev progress=8800/9691 cost=$0.4020
+2026-10-04 22:25:33.215 | INFO     | __main__:_refresh:191 - jev progress=9200/9691 cost=$0.4111
+2026-10-04 22:25:39.081 | INFO     | __main__:_refresh:191 - jev progress=9600/9691 cost=$0.4215
+2026-10-04 22:25:40.518 | INFO     | __main__:_refresh:191 - jev progress=9691/9691 cost=$0.4239
+2026-10-04 22:26:44.890 | INFO     | __main__:refresh:197 - JUDGE_CACHE_CHECK blind required=1996 cached=1261 missing=735
+2026-10-04 22:27:02.122 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.123 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.123 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.124 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.126 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.127 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.127 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.128 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.128 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:02.130 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:17.993 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:17.994 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:17.999 | WARNING  | __main__:run:175 - jev 520 attempt=1/6
+2026-10-04 22:27:23.310 | INFO     | __main__:_refresh:191 - jev progress=400/735 cost=$0.0218
+2026-10-04 22:27:28.415 | INFO     | __main__:_refresh:191 - jev progress=735/735 cost=$0.0403
+2026-10-04 22:27:29.036 | INFO     | __main__:main:216 - JUDGE_COMPLETE missing=0

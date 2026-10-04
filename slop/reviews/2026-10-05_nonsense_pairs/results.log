@@ -1,0 +1,32 @@
+/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/results.py:721: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  ctl.write_image(out / "controls.png", width=1064, height=560, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/results.py:733: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"plot.png", width=1064, height=590, scale=2)
+| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C control: calls a legitimate question nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| vjp_resid | +0.66 | [+0.54, +0.76] | +0.70 | [+0.66, +0.73] | 0% | +0.90 | -0.01 | 0.25 | 27% (4%) | +0.66 | 0.01 | 0.198 | 1 | 25 | 3 |
+| mean_diff | +0.63 | [+0.51, +0.67] | +0.58 | [+0.48, +0.64] | 0% | +0.75 | 0.08 | 0.794 | 72% (4%) | +0.64 | 0.02 | 0.794 | 1 | 23 | 6 |
+| *prompting* | +0.37 | [+0.25, +0.48] | +0.49 | [+0.35, +0.58] | 0% | +0.75 | -0.04 | 1 | 40% (4%) | +0.35 | -0.01 | 1 | 1 | 2 | 0 |
+| *random* | +0.02 | [-0.03, +0.08] | +0.02 | [-0.02, +0.07] | 0% | +0.02 | 0.00 | 0.397 | — | +0.63 | 0.06 | 2 | 5 | 24 | 33 |
+
+On-axis ÷ room: on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side (bare BS score for +C, 2 − bare BS score for −C), weaker side; failures are handled by the dose choice and the 0.5 limit, not in this number.
+
+Blind judge (Jev, not told the target, method, dose or known flaw). Blind stance shift = mean over questions of stance(steered) - stance(bare), stance = P(accepts) - P(rejects), signed so + is toward the side's target (+C accept the premise, -C reject it). Intended label: accepts_premise for +C, rejects_premise for −C; P(intended label) is its mean probability over the answers at that dose.
+
+| method | side | Pareto-best C: blind stance shift↑ | P(intended label) | top labels (mean P) | strongest C: blind stance shift↑ | P(intended label) | top labels (mean P) |
+|---|---|---|---|---|---|---|---|
+| vjp_resid | -C | 0.25: +1.18 (n=100) | 63% | rejects_premise 63%, detailed 14%, concise 6% | 0.25: +1.18 (n=100) | 63% | rejects_premise 63%, detailed 14%, concise 6% |
+| vjp_resid | +C | 0.198: +0.99 (n=100) | 44% | accepts_premise 44%, concise 14%, fabricates 14% | 0.63: +0.94 (n=100) | 43% | accepts_premise 43%, fabricates 24%, concise 11% |
+| mean_diff | -C | 0.794: +1.12 (n=100) | 70% | rejects_premise 70%, dismissive 14%, less_technical 6% | 0.794: +1.12 (n=100) | 70% | rejects_premise 70%, dismissive 14%, less_technical 6% |
+| mean_diff | +C | 0.794: +0.99 (n=100) | 48% | accepts_premise 48%, different_advice 18%, fabricates 15% | 1.26: +0.98 (n=100) | 41% | accepts_premise 41%, fabricates 26%, different_advice 15% |
+| prompting | -C | 1: +1.05 (n=100) | 69% | rejects_premise 69%, concise 9%, less_technical 5% | 1: +1.05 (n=100) | 69% | rejects_premise 69%, concise 9%, less_technical 5% |
+| prompting | +C | 1: +0.57 (n=100) | 33% | accepts_premise 33%, different_advice 16%, concise 11% | 1: +0.57 (n=100) | 33% | accepts_premise 33%, different_advice 16%, concise 11% |
+| random | -C | 0.397: +0.04 (n=500) | 7% | concise 17%, different_advice 14%, detailed 13% | 0.397: +0.04 (n=500) | 7% | concise 17%, different_advice 14%, detailed 13% |
+| random | +C | 2: +0.89 (n=500) | 47% | accepts_premise 47%, different_advice 14%, fabricates 11% | 2.52: +0.73 (n=200) | 40% | accepts_premise 40%, fabricates 22%, less_technical 11% |
+wrote outputs/bsbench/results/v3-4b-nonsense-pairs/points.json (202 points), index.md, plot.html, plot.png

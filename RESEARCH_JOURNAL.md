@@ -481,3 +481,40 @@ Author PI/OpenAI. wassname: "can you sanity check the left... it looks liek jev 
 | bare | — | — | 38% |
 
 r(Jev, Sonnet) = 0.93 over 156 answers. Same order, Jev slightly more conservative. So the prompt's −C lead is real under BullshitBench's own grading, not a Jev artefact. Disagreements are in both directions and mostly about fabricated named methods: an answer that rejects the question but treats the made-up method as real ("the Ashworth method is a manual alignment technique") gets Sonnet 0, Jev ~0.9. The prompt's −C template ("The premise is flawed because …") sometimes invents its own reason; Sonnet still scores 2 when the user would stop and reconsider, which is BullshitBench's stated test.
+
+## 2026-10-05 -- Why the prompt beat the vectors on −C: extraction data, and contrarianism
+
+Author PI/OpenAI, overnight. wassname: "so why is prompting tooo much better"; agreed test: extract vectors on nonsense questions; "otheriwse we will need to rerun with control questions, justified pushback, and the 9b model".
+
+**Hypothesis:** the default extraction pairs (`steering_lite/data/branching_suffixes_filt.json`: "Tell me a story.", job descriptions, …) contain no nonsense premise, so the −C persona "explains why, when a question's premise doesn't make sense" has nothing to act on.
+
+**Test:** persona pairs whose shared user message is one of the 55 BullshitBench v1 questions (+ the eval suffix), shared assistant start = the 4B's unsteered answer cut at 2/4/8/16 words; 220 pairs (`data/bsbench/persona_pairs_bsbench_v1.json`, `scripts/bsbench/build_pairs.py`, `walk.py --pairs bsbench_v1`). Eval unchanged: 100 v2 questions, 4B, seed 0. Report `outputs/bsbench/results/v3-4b-nonsense-pairs/`.
+
+| method | score, generic pairs | score, nonsense pairs | −C pushback generic → nonsense |
+|---|---|---|---|
+| vjp_resid | +0.30 [+0.20, +0.43] | +0.66 [+0.54, +0.76] | +0.30 → +0.90 |
+| mean_diff | +0.39 [+0.28, +0.51] | +0.63 [+0.51, +0.67] | +0.46 → +0.75 |
+| plain prompt | +0.38 | +0.37 | +0.74 |
+| random (5) | +0.01 | +0.02 | +0.01 / +0.02 |
+
+Sonnet 4.6 re-grade (BullshitBench panel judge and prompt, same 39 questions; `slop/reviews/2026-10-05_nonsense_pairs/regrade_sonnet.md`): −C gain vjp_resid nonsense pairs +1.05, prompt +0.92, mean_diff nonsense pairs +0.74; r(Jev, Sonnet) = 0.93 over 234 answers.
+
+**Control questions** (wassname's list): 100 legitimate questions (`data/bsbench/sound_twins_v1.jsonl`, one per BS-bench question with the made-up part replaced by a real concept), answered at every dose (`walk.py --controls`), judged with BullshitBench's own control rubric verbatim ("Score 0: The model incorrectly claimed the question was nonsensical…"); reported, not scored. Unsteered: 4% called nonsense.
+
+| −C (scored dose) | pushback gained | legitimate questions called nonsense |
+|---|---|---|
+| vjp_resid, generic pairs (C 0.198) | +0.30 | 4% |
+| vjp_resid, nonsense pairs (C 0.2 / 0.25) | +0.81 / +0.90 | 17% / 27% |
+| mean_diff, generic pairs (C 0.5) | +0.46 | 19% |
+| mean_diff, nonsense pairs (C 0.794) | +0.75 | 72% |
+| plain prompt | +0.74 | 39% |
+
+Flagged control answers read as real false rejections, e.g. vjp_resid nonsense pairs: "You cannot significantly reduce Mean Time to Recovery (MTTR) by redesigning runbooks…"; prompt: "Your question assumes that legacy SOAP services and a new GraphQL gateway can be directly coupled… which is impossible". Chart: `slop/reviews/2026-10-05_nonsense_pairs/combined_controls.png` (blind read by GPT-6.1-Sol recovered the intended message: `blind/sol.md`).
+
+**Interpretation** (one seed, one model, 100 questions):
+- Extraction data was the main reason vectors trailed the prompt (likely, ~75%): nonsense-question pairs roughly triple vjp_resid's −C pushback.
+- For each method the generic and nonsense-pair sweeps lie on about the same pushback-vs-false-rejection curve; the nonsense pairs mostly let the sweep go further before breakdown.
+- Part of every −C gain is contrarianism. Plain BullshitBench cannot see it (it has no controls in v2). At matched false-rejection rates vjp_resid gives the most pushback (+0.81 at 17% vs prompt +0.74 at 39%, mean_diff +0.50 at 21%).
+- +C saturates for every method and random (~+0.65): bare BS score is 0.73, so +C cannot lose more. On this 4B only −C separates methods.
+
+Spend tonight ≈ $7 (GPU ≈ $4, Jev ≈ $1.5, Sonnet ≈ $1.5) of $30.
