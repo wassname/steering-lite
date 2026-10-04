@@ -21,4 +21,6 @@ Inherits conventions from sibling project `lora-lite`. Read [../lora-lite/AGENTS
 
 `scripts/bsbench/`: `walk.py` (dose walk) -> `judge.py` (Jev ratings) -> `results.py` (tables, plot, `points.json`). Results and their evidence go in `RESEARCH_JOURNAL.md`.
 
+Models run from presets in `scripts/bsbench/config.py` (model, dtype, Modal GPU, batch size). Before the first sweep on a new or changed preset, run `uv run --extra benchmark modal run scripts/bsbench/bench_modal.py::main --preset NAME` and record peak GB and seconds per dose in the preset's `measured` field. Fill the batch first: a 4B model at batch 32 on an L40S cost 3-5x more per answer than batch 200 on an A10G (journal 2026-10-04). A preset with an empty `measured` field has not been benched.
+
 Coherence for plots and scores comes only from Jev (mean damage ≤1.5/4). Mechanical checks are calibration diagnostics, not plot/scoring exclusions; a mechanical boundary does not make a judged point inadmissible. — PI/OpenAI, wassname clarification 2026-10-02.

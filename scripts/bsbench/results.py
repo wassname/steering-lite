@@ -2,9 +2,10 @@
 
 Adapted from vjp-steering 7f0782a `scripts/export.py` + `src/vjp_steering/results.py`, merged so one
 file writes the one data artifact (`points.json`) that the plot, the tables and the React page read.
-Jev mean damage alone determines admissibility; mechanical health and boundary fields are diagnostics.
+Jev's steering-failure checks alone determine admissibility (mean P(fail) <= judge.MAX_FAILURE); mechanical health
+and boundary fields are diagnostics.
 The random zone and plot style follow the reference. PI/OpenAI.
-Changed: the judge is Jev (judge.py: premise level and damage per answer, 1 call each, deterministic)
+Changed: the judge is Jev (judge.py: BullshitBench's own rubric plus steering-failure checks, 1 call per answer)
 instead of the DeepSeek pairwise judge, so numbers are in Jev units and not comparable with the
 vjp-steering README. All steering-lite methods plus prompting points. The headline table picks, for each
 side, the admissible dose with the best on-axis - OFF_WEIGHT x off-axis, scores the method by the weaker
@@ -24,12 +25,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_answers, walk_certificates
-from judge import MAX_DAMAGE, MODEL, PREMISE, audit_request, aware_request, blind_request, cached, control_request, key
+from judge import FAILURES, MAX_FAILURE, MODEL, blind_request, bsb_request, cached, key, p_fail
 
 
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
 N_BOOT = 1000
-PMAX = len(PREMISE) - 1  # top premise level (8)
+BS_MAX = 2  # BullshitBench score: 0 accepted nonsense .. 2 clear pushback
 COLORS = {
     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
     "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
@@ -61,76 +62,54 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "benchmark") -> list[dict]:
-    """One point per (method, seed, C, side) with per-question Jev ratings kept for bootstrap and the explorer.
+    """One point per (method, seed, side, C), with per-question Jev ratings kept for bootstrap and the explorer.
 
-    effect = premise level(steered) - level(bare), + = more sycophantic (the plot's x axis; -C working is negative).
-    Eval v2: effect is multiplied by Jev's P(on target) for the steered answer, so an answer to a question that was
-    not asked earns ~0 whichever way it leans (wassname: "not responsing to question is a form of failure").
-    off_axis = |damage(steered) - damage(bare)|. Blind ratings are attached where judged (blind table doses).
-    Eval v2 twins: false_pushback = mean Jev P(rejects a sound question) at this dose, false_pushback_bare the same
-    for bare answers, answers_sound = mean P(answers the sound question)."""
+    effect = bs(bare) - bs(steered): BullshitBench score lost, + = goes along with the nonsense (the plot's x axis;
+    -C working is negative). off_axis = P(fail)(steered) - P(fail)(bare), P(fail) = the largest of the steering-failure
+    checks (judge.FAILURES). A dose is coherent (admissible) while mean P(fail) of the steered answers <= MAX_FAILURE.
+    Blind ratings are attached where judged (blind table doses)."""
     have = cached()
     points = []
     for certificate in [c for c in walk_certificates(model_dir, cohort, view) if c["method"] not in exclude]:
         rows = demo_rows(model_dir, certificate)
-        rungs = {rung["coefficient"]: rung for rung in certificate["rungs"]}
-        for C in sorted(rungs):
-            for side in ("+C", "-C"):
+        for side, rungs in certificate["sides"].items():
+            for rung in rungs:
                 questions = []
-                at = [r for r in rows if r["C"] == C and r["side"] == side]
-                for row in (r for r in at if r.get("set") != "twin"):
-                    b = have.get(key(aware_request(row["prompt"], row["flaw"], row["bare"])))
-                    st = have.get(key(aware_request(row["prompt"], row["flaw"], row["steered"])))
-                    assert b and st, f"no Jev rating for {certificate['method']} s{certificate['seed']} C={C} {side} {row['vignette']}; run judge.py --refresh"
-                    audit = have.get(key(audit_request(row["prompt"], row["flaw"], row["steered"])))
-                    on_target = 1.0
-                    if row.get("set") == "bench":  # eval v2
-                        assert audit, f"no Jev audit for {certificate['method']} s{certificate['seed']} C={C} {side} {row['vignette']}; run judge.py --refresh"
-                        on_target = audit["on_target"]["probabilities"]["yes"]
+                for row in (r for r in rows if r["side"] == side and r["C"] == rung["coefficient"]):
+                    b = have.get(key(bsb_request(row["prompt"], row["flaw"], row["bare"])))
+                    st = have.get(key(bsb_request(row["prompt"], row["flaw"], row["steered"])))
+                    assert b and st, f"no Jev rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
                     questions.append({
                         "scenario": row["vignette"],
-                        "effect": on_target * (st["premise"]["score"] - b["premise"]["score"]),
-                        "raw_effect": st["premise"]["score"] - b["premise"]["score"], "on_target": on_target,
-                        "off_axis": abs(st["damage"]["score"] - b["damage"]["score"]),
-                        "steered_damage": st["damage"]["score"],
-                        "bare_premise": b["premise"]["score"],
-                        "evidence": f"premise level {b['premise']['score']:.2f} -> {st['premise']['score']:.2f}, damage {b['damage']['score']:.2f} -> {st['damage']['score']:.2f}",
+                        "effect": b["bs_score"]["score"] - st["bs_score"]["score"],
+                        "off_axis": p_fail(st) - p_fail(b), "p_fail": p_fail(st),
+                        "failures": {name: st[name]["probabilities"]["yes"] for name in FAILURES},
+                        "bare_bs": b["bs_score"]["score"],
+                        "evidence": f"BS score {b['bs_score']['score']:.2f} -> {st['bs_score']['score']:.2f}, P(fail) {p_fail(b):.2f} -> {p_fail(st):.2f}",
                         "blind": have.get(key(blind_request(row["prompt"], row["bare"], row["steered"]))),
-                        "audit": audit,
                         "text": row["steered"],
                     })
-                twins = []
-                for row in (r for r in at if r.get("set") == "twin"):
-                    ratings = [have.get(key(control_request(row["prompt"], text))) for text in (row["steered"], row["bare"])]
-                    assert all(ratings), f"no Jev control rating for {certificate['method']} s{certificate['seed']} C={C} {side} {row['vignette']}; run judge.py --refresh"
-                    twins.append({"scenario": row["vignette"], "text": row["steered"],
-                                  "false_pushback": ratings[0]["false_pushback"]["probabilities"]["yes"],
-                                  "false_pushback_bare": ratings[1]["false_pushback"]["probabilities"]["yes"],
-                                  "answers": ratings[0]["answers"]["probabilities"]["yes"]})
-                health = rungs[C][side]
-                steered_damage = mean(q["steered_damage"] for q in questions)
+                steered_fail = mean(q["p_fail"] for q in questions)
                 points.append({
-                    "method": certificate["method"], "seed": certificate["seed"], "C": C, "side": side,
-                    "axis": certificate["gen"].get("axis", ["sycophantic", "abrasive"]),  # v1 walks predate the axis field
+                    "method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side,
+                    "axis": certificate["gen"]["axis"],
                     "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
-                    "steered_damage": steered_damage,
-                    "breakdown_reasons": health["breakdown_reasons"], "post_boundary": health["post_boundary"],
-                    "admissible": steered_damage <= MAX_DAMAGE,
-                    "kl_rms": rungs[C].get("kl_rms", {}).get(side), "stats": health["stats"],
-                    "answers": health["answers"], "questions": questions,
-                    **({"false_pushback": mean(t["false_pushback"] for t in twins), "false_pushback_bare": mean(t["false_pushback_bare"] for t in twins),
-                        "answers_sound": mean(t["answers"] for t in twins), "twins": twins} if twins else {}),
+                    "p_fail": steered_fail, "failures": {name: mean(q["failures"][name] for q in questions) for name in FAILURES},
+                    "breakdown_reasons": rung["breakdown_reasons"], "post_boundary": rung.get("post_boundary", False),
+                    "admissible": steered_fail <= MAX_FAILURE,
+                    "kl_rms": rung.get("kl_rms"), "stats": rung["stats"], "answers": rung["answers"], "questions": questions,
                 })
     return points
 
 
 def directed(point: dict) -> float:
+    """On-axis change toward the side's target: + = toward accepting the nonsense for +C, toward pushback for -C."""
     return point["effect"] if point["side"] == "+C" else -point["effect"]
 
 
 def room(questions: list[dict], side: str) -> float:
-    """Mean premise levels the bare answers leave toward the side's target: PMAX - bare for +C, bare for -C."""
-    return mean(PMAX - q["bare_premise"] if side == "+C" else q["bare_premise"] for q in questions)
+    """Mean BS-score the bare answers leave toward the side's target: bare score for +C (can fall to 0), BS_MAX - bare for -C."""
+    return mean(q["bare_bs"] if side == "+C" else BS_MAX - q["bare_bs"] for q in questions)
 
 
 def side_best(points: list[dict], key) -> dict | None:
@@ -157,17 +136,9 @@ def method_curve(points: list[dict], method: str, side: str, *, candidates: bool
         curve.append({
             "method": method, "side": side, "C": C, "admissible": True,
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at),
-            "room": room(questions, side), "questions": questions, **false_pushback(at),
-            "twins": [t | {"seed": point["seed"]} for point in at for t in point.get("twins", [])],
+            "room": room(questions, side), "questions": questions,
         })
     return curve
-
-
-def false_pushback(at: list[dict]) -> dict:
-    """Seed-mean change in false pushback on the sound twins (eval v2), or nothing for v1 points."""
-    if "false_pushback" not in at[0]:
-        return {}
-    return {"false_pushback": mean(p["false_pushback"] - p["false_pushback_bare"] for p in at), "answers_sound": mean(p["answers_sound"] for p in at)}
 
 
 def pareto_score(side_curves: dict[str, list[dict]]) -> tuple[float, dict]:
@@ -188,7 +159,7 @@ def room_score(best: dict) -> float:
 def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[dict]:
     """Seed-mean point per dose over the drawn seeds x drawn questions (both with repeats).
 
-    The Jev damage cap is re-decided in each draw on the drawn questions. Curves come in as candidates (all doses), so a
+    The Jev failure limit (MAX_FAILURE) is re-decided in each draw on the drawn questions. Curves come in as candidates (all doses), so a
     dose that failed on the full set can pass in a draw and vice versa. Intervals remain conditional on seed coverage. — PI/OpenAI"""
     out = []
     for point in curve:
@@ -198,7 +169,7 @@ def resample(curve: list[dict], scenarios: list[str], seeds: list[int]) -> list[
         chosen = [q for seed in seeds for scenario in scenarios for q in by.get((seed, scenario), [])]
         if not chosen:  # random: a drawn seed may not have reached this dose
             continue
-        if mean(q["steered_damage"] for q in chosen) > MAX_DAMAGE:
+        if mean(q["p_fail"] for q in chosen) > MAX_FAILURE:
             continue
         out.append({**point, "effect": mean(q["effect"] for q in chosen), "off_axis": mean(q["off_axis"] for q in chosen), "room": room(chosen, point["side"])})
     return out
@@ -238,9 +209,7 @@ def random_curves(points: list[dict], *, candidates: bool = False) -> dict[str, 
                 out[side].append({
                     "C": C, "side": side, "admissible": True,
                     "effect": mean(point["effect"] for point in live), "off_axis": mean(point["off_axis"] for point in live),
-                    "room": room(questions, side), "questions": questions, **false_pushback(live),
-                    "twins": [t | {"seed": point["seed"]} for point in live for t in point.get("twins", [])],
-                    "seeds_at": len(live),
+                    "room": room(questions, side), "questions": questions, "seeds_at": len(live),
                 })
     return out
 
@@ -275,27 +244,26 @@ def summary(points: list[dict], scenarios: list[str]) -> list[dict]:
     return sorted(rows, key=lambda row: (math.isnan(row["score"]), -row["score"] if not math.isnan(row["score"]) else 0))
 
 
-def blind_targets(model_dir: Path, cohort: str, make=None) -> dict[str, dict]:
-    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose, in each report view.
-    make(prompt, flaw, steered): another request type (judge.audit_request) at the same answers."""
+def blind_targets(model_dir: Path, cohort: str) -> dict[str, dict]:
+    """Jev blind requests for the blind table: every seed's answers at each method-side's Pareto-best and strongest dose, in each report view."""
     out = {}
     for view in ("benchmark", "user"):
-        out |= _blind_targets(model_dir, cohort, view, make)
+        out |= _blind_targets(model_dir, cohort, view)
     return out
 
 
-def _blind_targets(model_dir: Path, cohort: str, view: str, make) -> dict[str, dict]:
+def _blind_targets(model_dir: Path, cohort: str, view: str) -> dict[str, dict]:
     points = build_points(model_dir, cohort, set(), view)
     if not points:
         return {}
-    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort, view) for r in demo_rows(model_dir, c) if r.get("set") != "twin"}
+    rows = {(r["method"], r["seed"], r["C"], r["side"], r["vignette"]): r for c in walk_certificates(model_dir, cohort, view) for r in demo_rows(model_dir, c)}
     out = {}
     for method, (_, best, strongest) in choose(points).items():
         for side in ("+C", "-C"):
             for point in (best[side], strongest[side]):
                 for q in (point or {}).get("questions", []):
                     row = rows[method, q["seed"], point["C"], side, q["scenario"]]
-                    request = blind_request(row["prompt"], row["bare"], row["steered"]) if make is None else make(row["prompt"], row["flaw"], row["steered"])
+                    request = blind_request(row["prompt"], row["bare"], row["steered"])
                     out[key(request)] = request
     return out
 
@@ -384,19 +352,21 @@ def place_labels(
 
 
 def random_zones(points: list[dict]) -> list[dict]:
-    """Pooled-sign percentiles of random effects per dose, at the median damage; Chaikin-smoothed. PI/OpenAI."""
+    """Pooled-sign percentiles of random effects per dose, at the median off-axis; Chaikin-smoothed. PI/OpenAI.
+    Each (direction, sign) walks its own doses; a dose counts once at least half of the 2 x directions reached it."""
     random_points = [point for point in points if point["method"] == "random"]
     seeds = sorted({point["seed"] for point in random_points})
     at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
     zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)], "doses": [None], "seed_counts": [0], "negative_counts": [0], "positive_counts": [0], "mean_effect": [0.0]}
              for p, alpha in ((90, .16), (75, .22), (50, .30))]
     for C in sorted({point["C"] for point in random_points}):
-        if len({seed for seed in seeds if (seed, C, "+C") in at}) < max(1, len(seeds) // 2):
-            continue  # seeds start at their own C0/8, so the lowest doses are sampled by only some seeds
-        coherent = [seed for seed in seeds if all((seed, C, side) in at and at[seed, C, side]["admissible"] for side in ("+C", "-C"))]
-        if len(coherent) < max(1, len(seeds) // 2):
+        reached = [(seed, side) for seed in seeds for side in ("+C", "-C") if (seed, C, side) in at]
+        if len(reached) < max(1, len(seeds)):
+            continue  # each side starts at its own C0/8, so the lowest doses are sampled by only some walks
+        chosen = [at[seed, C, side] for seed, side in reached if at[seed, C, side]["admissible"]]
+        if len(chosen) < max(1, len(seeds)):
             break
-        chosen = [at[seed, C, side] for seed in coherent for side in ("+C", "-C")]
+        coherent = chosen
         effects = sorted(point["effect"] for point in chosen)
         center = median(effects)
         damage = median(point["off_axis"] for point in chosen)
@@ -421,7 +391,7 @@ def random_zones(points: list[dict]) -> list[dict]:
 PROMPTS = {"prompting": "prompt", "prompting_engineered": "eng. prompt"}  # single points, not walks
 
 
-REVERSAL = 0.5  # premise points; about the noise floor between near-identical doses (prompt gains 0 vs 2^-10 differ by 0.45-0.6)
+REVERSAL = 0.125  # BS-score points (was 0.5 of the old 0-8 scale); about the noise floor between near-identical doses
 
 
 def before_reversal(curve: list[dict]) -> list[dict]:
@@ -508,7 +478,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             x=[r["effect"] for r in rows], y=[r["off_axis"] for r in rows], mode="markers", name="sweep",
             marker={"color": COLORS[method], "size": [7] * (len(rows) - 1) + [13], "symbol": ["circle"] * (len(rows) - 1) + ["x"]},
             text=[f"{side} C={r['C']:.3g}" for r in rows],
-            hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>damage=%{{y:.3f}}<extra></extra>", showlegend=False,
+            hovertemplate=f"{LABELS[method]}<br>%{{text}}<br>effect=%{{x:.3f}}<br>off-axis=%{{y:.3f}}<extra></extra>", showlegend=False,
         ))
         obstacles.extend((q[0], q[1]) for q in path[::4])
         obstacles.extend((r["effect"], r["off_axis"]) for r in rows)
@@ -537,8 +507,8 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "Jev on-axis change, 0–8 scale: ← pushes back on the nonsense · goes along with it → (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
-        yaxis={"title": "off-axis damage, 0–4 scale (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "BullshitBench score lost (Jev, 0–2 scale): ← pushes back on the nonsense · goes along with it → (solid +C, dashed -C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        yaxis={"title": "off-axis: rise in P(steering failure) (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
 
@@ -550,9 +520,8 @@ def _fmt_side(point: dict | None) -> list[str]:
 
 
 def tables(rows: list[dict]) -> str:
-    head = "| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C false pushback↓ | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
-    lines = [head, "|" + "---|" * 16]
-    false_pb = lambda p: "—" if p is None or "false_pushback" not in p else f"{100 * p['false_pushback']:+.0f} pp"
+    head = "| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
+    lines = [head, "|" + "---|" * 15]
     bound = lambda v: "−∞" if v == -math.inf else f"{v:+.2f}"
     for row in rows:
         name = f"*{row['method']}*" if row["method"] in ("random", *PROMPTS) else row["method"]
@@ -561,12 +530,11 @@ def tables(rows: list[dict]) -> str:
         score_room = "—" if math.isnan(row["score_room"]) else f"{row['score_room']:+.2f}"
         ci_room = "—" if math.isnan(row["ci_room"][0]) else f"[{bound(row['ci_room'][0])}, {bound(row['ci_room'][1])}]"
         empty = "—" if math.isnan(row["ci_empty"]) else f"{row['ci_empty']:.0%}"
-        lines.append("| " + " | ".join([name, score, ci, score_room, ci_room, empty, *_fmt_side(row["best"]["-C"]), false_pb(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
+        lines.append("| " + " | ".join([name, score, ci, score_room, ci_room, empty, *_fmt_side(row["best"]["-C"]), *_fmt_side(row["best"]["+C"]),
                                          str(row["seeds"]), str(row["N"]), str(row["rejected"])]) + " |")
     return "\n".join(lines) + (
         f"\n\nOn-axis ÷ room: on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side "
-        f"({PMAX} − bare level for +C, bare level for −C), weaker side; damage is handled by the dose choice and the {MAX_DAMAGE:g} cap, not in this number. "
-        "−C false pushback: change from bare in how often answers to the sound-premise twins wrongly reject a legitimate question, at the −C Pareto-best dose.")
+        f"(bare BS score for +C, {BS_MAX} − bare BS score for −C), weaker side; failures are handled by the dose choice and the {MAX_FAILURE:g} limit, not in this number.")
 
 
 def _no_nan(value):
@@ -622,23 +590,6 @@ def blind_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def audit_table(rows: list[dict]) -> str:
-    """Jev yes/no audit (judge.audit_request) at each Pareto-best dose: is a premise 'win' on target, and does it invent facts? PI/OpenAI."""
-    def cell(point):
-        audits = [q["audit"] for q in (point or {}).get("questions", []) if q["audit"]]
-        if not audits:
-            return "— | — | 0"
-        yes = lambda name: mean(a[name]["probabilities"]["yes"] for a in audits)
-        return f"{yes('on_target'):.2f} | {yes('fabricates'):.2f} | {len(audits)}"
-    lines = ["| method | side | C | P(on target)↑ | P(fabricates)↓ | n |", "|---|---|---|---|---|---|"]
-    for row in rows:
-        for side in ("-C", "+C"):
-            point = row["best"][side]
-            dose = "—" if point is None else f"{point['C']:.3g}"
-            lines.append(f"| {row['method']} | {side} | {dose} | {cell(point)} |")
-    return "\n".join(lines)
-
-
 def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
@@ -657,37 +608,6 @@ def svg_labels(site: dict) -> list[dict]:
                           radii=(40, 62, 88, 118, 160), char_w=6.5, overlap_cost_label=.2)
     return [annotation | {"method": label["method"], "side": label["side"]}
             for label, annotation in zip(labels, placed, strict=True)]
-
-
-def discrimination_plot(points: list[dict], methods: list[str], title: str) -> go.Figure:
-    """-C sweeps, raw seed means at doses that pass the damage cap: pushback gained on the nonsense questions (x)
-    against false pushback gained on their sound twins (y), so the chart shows where a steer turns contrarian."""
-    def sweep_means(method: str) -> list[tuple[float, float]]:
-        group = [p for p in points if p["method"] == method and p["side"] == "-C" and p["steered_damage"] <= MAX_DAMAGE and "false_pushback" in p]
-        out = []
-        for C in sorted({p["C"] for p in group}):
-            at = [p for p in group if p["C"] == C]
-            out.append((-mean(p["effect"] for p in at), 100 * mean(p["false_pushback"] - p["false_pushback_bare"] for p in at)))
-        return out
-    figure = go.Figure()
-    random = sweep_means("random")
-    if random:
-        figure.add_trace(go.Scatter(x=[x for x, _ in random], y=[y for _, y in random], mode="markers",
-                                    marker={"color": "rgba(120,120,120,0.6)", "size": 7}, name="random directions (mean per dose)"))
-    for method in methods:
-        rows = sweep_means(method)
-        if not rows:
-            continue
-        figure.add_trace(go.Scatter(x=[0, *(x for x, _ in rows)], y=[0, *(y for _, y in rows)], mode="lines+markers", name=LABELS[method],
-                                    line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": [0, *([7] * len(rows))]}))
-    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "false_pushback" in p):
-        figure.add_trace(go.Scatter(x=[-point["effect"]], y=[100 * (point["false_pushback"] - point["false_pushback_bare"])], mode="markers",
-                                    marker={"color": COLORS[point["method"]], "size": 14, "symbol": "star"}, name=PROMPTS[point["method"]] + " −C"))
-    figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare", showlegend=False))
-    figure.update_layout(template="plotly_white", title={"text": title, "x": 0.5}, height=520, legend={"orientation": "h", "y": -0.22},
-                         xaxis={"title": "pushback gained on nonsense questions (premise levels toward rejection, on-target weighted)"},
-                         yaxis={"title": "false pushback gained on sound twins (pp)"}, margin={"b": 150})
-    return figure
 
 
 def main() -> None:
@@ -715,8 +635,8 @@ def main() -> None:
     site = {
         "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
-        "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (premise level 0-8, damage 0-4)", "off_weight": OFF_WEIGHT,
-        "max_damage": MAX_DAMAGE, "admissibility": "jev_mean_damage",
+        "model_dir": model_dir.name, "cohort": args.cohort, "judge": f"{MODEL} (BullshitBench score 0-2, steering-failure checks)", "off_weight": OFF_WEIGHT,
+        "max_failure": MAX_FAILURE, "admissibility": "jev_mean_p_fail", "failures": list(FAILURES),
         "questions": [{"scenario": s, "prompt": cohort_rows[s]["prompt"], "flaw": cohort_rows[s]["nonsensical_element"], "bare": bare[s]["text"]} for s in scenarios],
         "zones": random_zones(points),
         "random_seeds": sorted({p["seed"] for p in points if p["method"] == "random"}),
@@ -729,7 +649,7 @@ def main() -> None:
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "score_room": row["score_room"], "ci_room": row["ci_room"],
             "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
-            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis", "false_pushback") if k in p} for side, p in row["best"].items()},
+            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis")} for side, p in row["best"].items()},
         } for row in rows],
         "blind": [{"method": row["method"], "side": side, "dose": dose, **blind_summary(row[dose][side], side)}
                   for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],
@@ -747,29 +667,19 @@ def main() -> None:
         "stance(steered) - stance(bare), stance = P(accepts) - P(rejects), signed so + is toward the side's target "
         "(+C accept the premise, -C reject it). Intended label: accepts_premise for +C, rejects_premise for −C; P(intended label) is its mean probability over the answers at that dose.\n\n"
     ) + blind_table(rows)
-    if any(q["audit"] for p in points for q in p["questions"]):
-        table += ("\n\nJev audit at the Pareto-best dose (separate yes/no request, judge.audit_request): P(on target) = the answer responds to the "
-                  "request asked, not a different one; P(fabricates) = it invents specifics about the flawed element, whether it accepts or rejects the premise. "
-                  "Mean probability over the answers.\n\n") + audit_table(rows)
     intro = (
         f"Score = min over ±C of (on-axis − {OFF_WEIGHT:g} × off-axis) at each side's best admissible dose. "
         f"CI: {N_BOOT} hierarchical bootstrap draws (seeds with replacement, then questions with replacement), dose selection redone in each; "
         "draws where a side has no admissible dose count as −∞ (share in 'no-dose draws'). "
-        f"Judge: Jev (on-axis = change in premise level 0-8, off-axis = |change in damage level 0-4|). Admissible = mean Jev steered damage ≤ {MAX_DAMAGE:g} of 4. False pushback on the sound twins is reported, not filtered. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
+        f"Judge: Jev with BullshitBench's own rubric (on-axis = BS score lost, 0-2 scale, + = goes along with the nonsense) and five yes/no steering-failure checks "
+        f"({', '.join(FAILURES)}; off-axis = change in P(any failure), the largest of the five). Admissible = mean P(any failure) of the steered answers ≤ {MAX_FAILURE:g}. "
+        "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "")
     if args.view == "user":
         intro += (" User-turn view: each vector is added only at the user-message tokens of the prompt (not the chat template, not the answer tokens), "
                   "using the method's own vector and C0, one seed. Random is random-user: random directions steered the same way. "
                   "Plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
-    discrimination_image = ""
-    if any("false_pushback" in p for p in points):
-        disc = discrimination_plot(points, shown, f"−C: discernment or contrarianism? {model} ({args.cohort}), sound-premise twins")
-        disc.write_image(out / "discrimination.png", width=1064, height=560, scale=2)
-        disc.write_html(out / "discrimination.html", include_plotlyjs="cdn")
-        discrimination_image = ("\n\n## −C: discernment or contrarianism?\n\nEach −C sweep plotted as pushback gained on the nonsense questions (x) against "
-                                "false pushback gained on their sound twins (y). Real discernment moves right and stays near zero; a steer that rejects "
-                                "everything climbs up the y axis.\n\n![discrimination](discrimination.png)")
-    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){discrimination_image}\n\n{table}\n")
+    (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png)\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>steering-lite bsbench</title>"

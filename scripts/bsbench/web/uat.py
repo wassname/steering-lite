@@ -46,10 +46,8 @@ with sync_playwright() as p:
         assert drawn_label.evaluate("el => { const b = el.getBBox(); return b.x >= 70 && b.x+b.width <= 980 && b.y >= 30 && b.y+b.height <= 510; }")
     assert f"random: {len(data['random_seeds'])} directions" in page.locator("svg").text_content()
     assert [z["percentile"] for z in data["zones"]] == [90, 75, 50]
-    assert data["admissibility"] == "jev_mean_damage"
-    assert all(p["admissible"] == (p["steered_damage"] <= data["max_damage"]) for p in data["points"]), "only Jev damage decides admissibility"
-    if any("false_pushback" in p for p in data["points"]):
-        assert page.locator("#discrimination img").count() == 1, "eval v2 pages show the false-pushback chart"
+    assert data["admissibility"] == "jev_mean_p_fail"
+    assert all(p["admissible"] == (p["p_fail"] <= data["max_failure"]) for p in data["points"]), "only Jev's steering-failure checks decide admissibility"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
     assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"

@@ -18,14 +18,13 @@ from pathlib import Path
 import modal
 
 REPO = Path(__file__).resolve().parents[2] if modal.is_local() else Path("/repo")  # container copy is /root/run_modal.py
-MODEL = "Qwen/Qwen3.5-4B"
 
 image = (
     modal.Image.debian_slim(python_version="3.13")
     .uv_pip_install(
         "torch==2.11.0", "transformers==5.12.1", "accelerate==1.13.0", "safetensors==0.7.0",
         "einops==0.8.2", "jaxtyping==0.3.9", "beartype==0.22.9", "loguru==0.7.3", "tabulate==0.10.0",
-        "tqdm==4.67.3", "numpy==2.4.4", "flash-linear-attention==0.5.2", "fla-core==0.5.2",
+        "tqdm==4.67.3", "numpy==2.4.4", "flash-linear-attention==0.5.2", "fla-core==0.5.2", "tyro==1.0.16",
     )
     .env({"PYTHONUNBUFFERED": "1", "HF_HOME": "/cache/hf", "PYTHONPATH": "/repo/src"})
     .add_local_dir(REPO / "src", "/repo/src")
@@ -36,8 +35,8 @@ app = modal.App("steering-lite-bsbench-v3", image=image)
 cache = modal.Volume.from_name("steering-lite-bsbench-v3", create_if_missing=True)
 
 
-@app.function(gpu=os.environ.get("BSBENCH_GPU", "L40S"), volumes={"/cache": cache}, timeout=6 * 60 * 60)
-def run(argv: list[str]) -> str:
+@app.function(volumes={"/cache": cache}, timeout=6 * 60 * 60)  # GPU comes from the walk's preset (config.py), set at spawn
+def run(argv: list[str], model: str) -> str:
     """One walk of scripts/bsbench/walk.py; outputs/bsbench and outputs/bsbench-smoke live on the Volume."""
     from huggingface_hub import snapshot_download
 
@@ -47,7 +46,7 @@ def run(argv: list[str]) -> str:
     for name in ("bsbench", "bsbench-smoke"):
         if not Path(f"/repo/outputs/{name}").exists():
             os.symlink(f"/cache/{name}", f"/repo/outputs/{name}")
-    snapshot_download(argv[argv.index("--model") + 1] if "--model" in argv else MODEL)
+    snapshot_download(model)
     cache.commit()
     try:
         subprocess.run([sys.executable, "scripts/bsbench/walk.py", *argv], cwd="/repo", check=True)
@@ -91,7 +90,12 @@ def main(methods: str = "mean_diff,pca,vjp_resid", seeds: str = "0", cohort: str
     todo = [job for job in jobs if not cached_on_volume(argvs[job])]
     for method, seed in sorted(set(jobs) - set(todo)):
         print(f"WALK_CACHED_LOCAL\t{method}\ts{seed}\tcohort={cohort} (certificate COMPLETE on the Volume; no container started)")
-    handles = {job: run.spawn(argvs[job]) for job in todo}
+    sys.path.insert(0, str(REPO / "scripts/bsbench"))
+    import walk
+    presets = {job: walk.parse_args(argvs[job]) for job in todo}
+    for job, args in presets.items():
+        print(f"PRESET\t{job[0]}\ts{job[1]}\t{args.preset} model={args.model} gpu={args.gpu} batch={args.batch_size}")
+    handles = {job: run.with_options(gpu=presets[job].gpu).spawn(argvs[job], presets[job].model) for job in todo}
     failed = []
     for (method, seed), handle in handles.items():
         try:
@@ -103,24 +107,11 @@ def main(methods: str = "mean_diff,pca,vjp_resid", seeds: str = "0", cohort: str
         raise SystemExit(f"{len(failed)} of {len(handles)} walks FAILED: {', '.join(failed)}")
 
 
-@app.function(gpu=os.environ.get("BSBENCH_GPU", "L40S"), timeout=600)
-def kernels() -> dict:
-    """Which Qwen3.5 linear-attention kernels transformers found (it warns if any one is missing)."""
-    import torch
-    from transformers.models.qwen3_5 import modeling_qwen3_5 as m
-    names = ("causal_conv1d_fn", "causal_conv1d_update", "chunk_gated_delta_rule", "fused_recurrent_gated_delta_rule")
-    return {"torch": torch.__version__, "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(),
-            "is_fast_path_available": getattr(m, "is_fast_path_available", None), **{n: repr(getattr(m, n, "MISSING")) for n in names}}
-
-
-@app.local_entrypoint()
-def check_kernels():
-    for key, value in kernels.remote().items():
-        print(f"KERNEL {key} = {value}")
-
-
 @app.local_entrypoint()
 def smoke():
     """Same image, mounts and Volume as the real fan-out, real Qwen3.5-4B, 8-token answers, 2 rungs."""
-    print(run.remote("vjp_value --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
-    print(run.remote("mean_diff --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split()))
+    sys.path.insert(0, str(REPO / "scripts/bsbench"))
+    from config import PRESETS
+    preset = PRESETS["qwen3.5-4b"]
+    for method in ("vjp_value", "mean_diff"):
+        print(run.with_options(gpu=preset.gpu).remote(f"{method} --seed 0 --cohort dev --smoke --n-pairs 8 --max-rungs 2".split(), preset.model))
