@@ -1,0 +1,127 @@
+✓ Initialized. View run at 
+https://modal.com/apps/wassname/main/ap-mvEpNQGe87vYnyDXW4HtYg
+Building image im-lwnczCAnuxzihJBQ13nDRt
+
+Using legacy Image Builder version. We suggest upgrading at https://modal.com/settings/image-config.
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PYTHONUNBUFFERED=1
+
+=> Step 2: ENV HF_HOME=/cache/hf
+
+=> Step 3: ENV PYTHONPATH=/repo/src:/repo/scripts/bsbench
+Saving image...
+Image saved, took 1.54s
+
+Built image im-lwnczCAnuxzihJBQ13nDRt in 2.36s
+
+
+✓ Created objects.
+├── 🔨 Created mount 
+│   /workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/bench_modal.py
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/data
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/src
+├── 🔨 Created mount /workspace/2026/lite/steering-lite-bsbench/scripts
+└── 🔨 Created function bench.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[1AFetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]
+[1AFetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]
+[1AFetching 4 files:  25%|██▌       | 1/4 [01:05<03:17, 65.76s/it]
+[1AFetching 4 files:  25%|██▌       | 1/4 [01:06<03:18, 66.06s/it]
+[1AFetching 4 files:  50%|█████     | 2/4 [01:12<01:02, 31.23s/it]
+[1AFetching 4 files:  50%|█████     | 2/4 [01:16<01:06, 33.25s/it]
+[1AFetching 4 files:  75%|███████▌  | 3/4 [01:14<00:17, 17.72s/it]
+[1AFetching 4 files: 100%|██████████| 4/4 [01:15<00:00, 11.08s/it]
+[1AFetching 4 files: 100%|██████████| 4/4 [01:15<00:00, 18.86s/it]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/427 [00:00<?, ?it/s]
+[1AFetching 4 files:  75%|███████▌  | 3/4 [01:17<00:18, 18.82s/it]
+[1ALoading weights:   0%|          | 1/427 [00:00<03:19,  2.14it/s]
+[1AFetching 4 files: 100%|██████████| 4/4 [01:18<00:00, 11.54s/it]
+[1AFetching 4 files: 100%|██████████| 4/4 [01:18<00:00, 19.57s/it]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/427 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 2/427 [00:00<03:32,  2.00it/s]
+[1ALoading weights:   3%|▎         | 13/427 [00:01<00:23, 17.29it/s]
+[1ALoading weights:   0%|          | 1/427 [00:00<02:01,  3.52it/s]
+[1ALoading weights:   6%|▌         | 26/427 [00:01<00:11, 36.28it/s]
+[1ALoading weights:   9%|▉         | 38/427 [00:01<00:07, 52.01it/s]
+[1ALoading weights:   0%|          | 2/427 [00:00<01:48,  3.90it/s]
+[1ALoading weights:  11%|█         | 48/427 [00:01<00:06, 54.81it/s]
+[1ALoading weights:   5%|▌         | 23/427 [00:00<00:07, 54.50it/s]
+[1ALoading weights:  16%|█▌        | 67/427 [00:01<00:04, 79.95it/s]
+[1ALoading weights:   9%|▉         | 38/427 [00:00<00:05, 74.73it/s]
+[1ALoading weights:  19%|█▉        | 81/427 [00:01<00:03, 90.80it/s]
+[1ALoading weights:  16%|█▌        | 67/427 [00:00<00:02, 129.41it/s]
+[1ALoading weights:  22%|██▏       | 94/427 [00:00<00:01, 167.07it/s]
+[1ALoading weights:  22%|██▏       | 95/427 [00:01<00:03, 98.04it/s]
+[1ALoading weights:  28%|██▊       | 119/427 [00:01<00:01, 183.33it/s]
+[1ALoading weights:  25%|██▌       | 107/427 [00:01<00:03, 94.45it/s]
+[1ALoading weights:  34%|███▍      | 146/427 [00:01<00:01, 205.83it/s]
+[1ALoading weights:  28%|██▊       | 121/427 [00:02<00:03, 101.92it/s]
+[1ALoading weights:  40%|███▉      | 169/427 [00:01<00:01, 212.61it/s]
+[1ALoading weights:  32%|███▏      | 135/427 [00:02<00:02, 106.51it/s]
+[1ALoading weights:  46%|████▌     | 195/427 [00:01<00:01, 225.34it/s]
+[1ALoading weights:  35%|███▍      | 148/427 [00:02<00:02, 108.40it/s]
+[1ALoading weights:  52%|█████▏    | 221/427 [00:01<00:00, 230.92it/s]
+[1ALoading weights:  39%|███▊      | 165/427 [00:02<00:02, 124.39it/s]
+[1ALoading weights:  42%|████▏     | 179/427 [00:02<00:01, 124.54it/s]
+[1ALoading weights:  45%|████▌     | 194/427 [00:02<00:01, 131.39it/s]
+[1ALoading weights:  57%|█████▋    | 245/427 [00:01<00:01, 116.50it/s]
+[1ALoading weights:  49%|████▊     | 208/427 [00:02<00:01, 110.44it/s]
+[1ALoading weights:  53%|█████▎    | 226/427 [00:02<00:01, 124.50it/s]
+[1ALoading weights:  56%|█████▌    | 240/427 [00:03<00:01, 126.67it/s]
+[1ALoading weights:  59%|█████▉    | 254/427 [00:03<00:01, 129.01it/s]
+[1ALoading weights:  63%|██████▎   | 268/427 [00:03<00:01, 124.24it/s]
+[1ALoading weights:  66%|██████▌   | 281/427 [00:03<00:01, 124.63it/s]
+[1ALoading weights:  62%|██████▏   | 264/427 [00:02<00:02, 71.66it/s] 
+[1ALoading weights:  69%|██████▊   | 293/427 [00:02<00:01, 97.02it/s]
+[1ALoading weights:  69%|██████▉   | 294/427 [00:03<00:01, 121.86it/s]
+[1ALoading weights:  73%|███████▎  | 312/427 [00:02<00:01, 109.08it/s]
+[1ALoading weights:  72%|███████▏  | 308/427 [00:03<00:00, 121.75it/s]
+[1ALoading weights:  81%|████████  | 345/427 [00:02<00:00, 145.98it/s]
+[1ALoading weights:  75%|███████▌  | 321/427 [00:03<00:00, 121.87it/s]
+[1ALoading weights:  86%|████████▌ | 368/427 [00:02<00:00, 157.11it/s]
+[1ALoading weights:  93%|█████████▎| 398/427 [00:03<00:00, 187.27it/s]
+[1ALoading weights:  78%|███████▊  | 334/427 [00:03<00:00, 119.35it/s]
+[1ALoading weights:  81%|████████  | 346/427 [00:03<00:00, 117.51it/s]
+[1ALoading weights:  99%|█████████▉| 422/427 [00:03<00:00, 192.09it/s]
+[1ALoading weights:  85%|████████▍ | 361/427 [00:04<00:00, 124.70it/s]
+[1ALoading weights: 100%|██████████| 427/427 [00:03<00:00, 135.35it/s]
+
+[1ALoading weights:  88%|████████▊ | 376/427 [00:04<00:00, 131.83it/s]
+[1ALoading weights:  91%|█████████▏| 390/427 [00:04<00:00, 127.79it/s]
+[1ALoading weights:  94%|█████████▍| 403/427 [00:04<00:00, 120.36it/s]
+[1ALoading weights:  97%|█████████▋| 416/427 [00:04<00:00, 117.75it/s]
+[1ALoading weights: 100%|██████████| 427/427 [00:04<00:00, 93.40it/s] 
+2026-10-04 13:25:05.035 | INFO     | walk:generate:233 - generation 100/100
+2026-10-04 13:25:12.029 | INFO     | walk:generate:233 - generation 100/200
+2026-10-04 13:25:14.940 | INFO     | walk:generate:233 - generation 100/100
+2026-10-04 13:25:19.025 | INFO     | walk:generate:233 - generation 200/200
+{'condition': 'bare', 'batch': 100, 'seconds': 14.021846881999977, 'answers': 200, 'mean_tokens': 61.73, 'max_tokens': 87, 'at_cap': 0, 'peak_gb': 22.649645056, 'total_gb': 47.695921152}
+2026-10-04 13:25:20.116 | INFO     | walk:generate:233 - generation 100/200
+2026-10-04 13:25:25.200 | INFO     | walk:generate:233 - generation 200/200
+{'condition': 'bare', 'batch': 100, 'seconds': 10.30094291399999, 'answers': 200, 'mean_tokens': 61.87, 'max_tokens': 87, 'at_cap': 0, 'peak_gb': 22.649645056, 'total_gb': 42.405855232}
+2026-10-04 13:25:43.748 | INFO     | walk:generate:233 - generation 200/200
+2026-10-04 13:25:47.380 | INFO     | walk:generate:233 - generation 200/200
+2026-10-04 13:25:55.133 | INFO     | walk:generate:233 - generation 200/200
+{'condition': 'bare', 'batch': 200, 'seconds': 7.795553203999987, 'answers': 200, 'mean_tokens': 61.2, 'max_tokens': 85, 'at_cap': 0, 'peak_gb': 27.37438976, 'total_gb': 42.405855232}
+2026-10-04 13:25:55.221 | INFO     | walk:generate:233 - generation 200/200
+BENCH preset=qwen3.5-9b gpu=L40S bare   batch=100 s=  14.0 $/1k answers=0.038 mean_tok=62 max_tok=87 at_cap=0 peak_gb=22.6 of 48
+BENCH preset=qwen3.5-9b gpu=L40S bare   batch=200 s=  11.5 $/1k answers=0.031 mean_tok=62 max_tok=89 at_cap=0 peak_gb=27.4 of 48
+{'condition': 'bare', 'batch': 200, 'seconds': 11.505819150000008, 'answers': 200, 'mean_tokens': 61.79, 'max_tokens': 89, 'at_cap': 0, 'peak_gb': 27.37438976, 'total_gb': 47.695921152}
+BENCH preset=qwen3.5-9b gpu=A100-40GB bare   batch=100 s=  10.3 $/1k answers=0.030 mean_tok=62 max_tok=87 at_cap=0 peak_gb=22.6 of 42
+BENCH preset=qwen3.5-9b gpu=A100-40GB bare   batch=200 s=   7.8 $/1k answers=0.023 mean_tok=61 max_tok=85 at_cap=0 peak_gb=27.4 of 42
+Stopping app - local entrypoint completed.
+Runner terminated.
+✓ App completed. View run at 
+https://modal.com/apps/wassname/main/ap-mvEpNQGe87vYnyDXW4HtYg

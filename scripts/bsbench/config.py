@@ -25,6 +25,10 @@ PRESETS = {
         model="Qwen/Qwen3.5-4B", gpu="A10G", batch_size=200,
         measured="2026-10-04 A10G batch 200: peak 18.3 GB of 24; 20.4 s healthy / 34.7 s broken per 200 answers",
     ),
+    "qwen3.5-9b": ModelPreset(
+        model="Qwen/Qwen3.5-9B", gpu="A100-40GB", batch_size=200,
+        measured="2026-10-04 A100-40GB batch 200: peak 27.4 GB of 42; 7.8 s healthy per 200 answers (L40S 11.5 s); broken not benched",
+    ),
     # TODO test and check peak mem: bf16 weights are about 54 GB; bench before the first sweep.
     "qwen3.5-27b": ModelPreset(model="Qwen/Qwen3.5-27B", gpu="H100", batch_size=64),
     # CPU smoke tests (`just smoke-bsbench`): tiny random model, not benched.
