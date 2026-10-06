@@ -370,30 +370,35 @@ def place_labels(
 
 
 def random_zones(points: list[dict]) -> list[dict]:
-    """Pooled-sign percentiles of random effects per dose, at the median off-axis; Chaikin-smoothed. PI/OpenAI.
-    Each (direction, sign) walks its own doses; a dose counts once at least half of the 2 x directions reached it."""
+    """Pooled-sign percentiles of random effects at each off-axis level; Chaikin-smoothed. PI/OpenAI.
+    Each (direction, sign) walk is a path from bare through its doses; at off-axis level y its effect is interpolated
+    where the path first reaches y. A level counts while at least half of the 2 x directions reach it, up to
+    MAX_OFF_AXIS (the coherence limit), so the band answers "at this off-axis cost, how far does a random direction move?"
+    (wassname 2026-10-06: the per-dose band ended in a flat cut at the last dose's median)."""
     random_points = [point for point in points if point["method"] == "random"]
-    seeds = sorted({point["seed"] for point in random_points})
-    at = {(point["seed"], point["C"], point["side"]): point for point in random_points}
-    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)], "doses": [None], "seed_counts": [0], "negative_counts": [0], "positive_counts": [0], "mean_effect": [0.0]}
+    walks = {}
+    for point in sorted(random_points, key=lambda p: p["C"]):
+        walks.setdefault((point["seed"], point["side"]), [(0.0, 0.0)]).append((point["off_axis"], point["effect"]))
+
+    def first_passage(path: list[tuple[float, float]], level: float) -> float | None:
+        for (off0, eff0), (off1, eff1) in zip(path, path[1:]):
+            if off0 <= level <= off1:
+                return eff0 if off1 == off0 else eff0 + (level - off0) / (off1 - off0) * (eff1 - eff0)
+        return None
+
+    zones = [{"percentile": p, "opacity": alpha, "bounds": [(0.0, 0.0, 0.0, 0.0)], "levels": [0.0], "seed_counts": [len(walks)], "negative_counts": [0], "positive_counts": [0], "mean_effect": [0.0]}
              for p, alpha in ((90, .16), (75, .22), (50, .30))]
-    for C in sorted({point["C"] for point in random_points}):
-        reached = [(seed, side) for seed in seeds for side in ("+C", "-C") if (seed, C, side) in at]
-        if len(reached) < max(1, len(seeds)):
-            continue  # each side starts at its own C0/8, so the lowest doses are sampled by only some walks
-        chosen = [at[seed, C, side] for seed, side in reached if at[seed, C, side]["admissible"]]
-        if len(chosen) < max(1, len(seeds)):
+    for level in [MAX_OFF_AXIS * k / 30 for k in range(1, 31)]:
+        effects = sorted(e for e in (first_passage(path, level) for path in walks.values()) if e is not None)
+        if len(effects) < max(1, len(walks) / 2):
             break
-        coherent = chosen
-        effects = sorted(point["effect"] for point in chosen)
         center = median(effects)
-        damage = median(point["off_axis"] for point in chosen)
         for zone in zones:
             tail = len(effects) * (100 - zone["percentile"]) // 100
             lo, hi = (center, center) if zone["percentile"] == 50 else (effects[tail], effects[-tail - 1])
-            zone["bounds"].append((center, damage, lo, hi))
-            zone["doses"].append(C)
-            zone["seed_counts"].append(len(coherent))
+            zone["bounds"].append((center, level, lo, hi))
+            zone["levels"].append(level)
+            zone["seed_counts"].append(len(effects))
             zone["negative_counts"].append(sum(effect < 0 for effect in effects))
             zone["positive_counts"].append(sum(effect > 0 for effect in effects))
             zone["mean_effect"].append(mean(effects))
@@ -542,7 +547,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer → goes along with the nonsense", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same off-axis level, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
