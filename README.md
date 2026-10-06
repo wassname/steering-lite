@@ -105,6 +105,13 @@ What this shows (one seed, one model, so treat as provisional):
 
 **Judge v4, 2026-10-05 (provisional).** The v3 off-axis (rise in P(steering failure)) could go negative and missed graded side effects. Jev now rates each steered answer against the bare answer directly, in both orders: premise change −3..+3 on levels anchored to BullshitBench's 0/1/2 rubric, and off-axis change 0–4 (everything except the premise; never negative). Lines end at mean off-axis ≤ 1.5. Pages: `outputs/bsbench/results/v4-4b/`, `v4-4b-nonsense-pairs/`, `v4-9b-nonsense-pairs/`; numbers in the [journal](RESEARCH_JOURNAL.md) entry "Judge v4".
 
+Current setup, one line each (2026-10-06):
+- Eval: all 100 BullshitBench v2 questions, each paired with one legitimate control question (the made-up part swapped for a real concept, `data/bsbench/sound_twins_v1.jsonl`).
+- Extraction: persona pairs on the 55 BullshitBench v1 questions, a separate set; a two-persona contrast carries too little information to overfit to them.
+- Vector seeds: seed 0 extracts from all pairs, seed s > 0 from a bootstrap resample of them, so the spread shows how much the vector depends on its examples.
+- Prompt seeds: answers are greedy, so prompt seed s appends s spaces to the persona prompt; the spread shows how much the prompt depends on trivial wording.
+- −C score: pushback on the nonsense minus 3 × the rise in legitimate questions called nonsense, so calling everything nonsense nets about 0.
+
 ![9B, judge v4](assets/bsbench_qwen3.5-9b_v4.png)
 
 ![4B, −C pushback vs legitimate questions called nonsense](slop/reviews/2026-10-05_judge_v4/combined_controls.png)
