@@ -1,0 +1,696 @@
+uv run --extra test --extra hf-test pytest -q tests/test_pipeline.py
+........FF.FFF.F...........FF......FFF.F...........................      [100%]
+=================================== FAILURES ===================================
+_________________________ test_pipeline[sspace_ablate] _________________________
+
+method = 'sspace_ablate'
+request = <FixtureRequest for <Function test_pipeline[sspace_ablate]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_sspace_ablate_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:246: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_405336176 = <class 'jaxtyping.Float[Tensor, 'n d_out']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405366816 = <class 'steering_lite.variants.sspace.SSpaceC'>
+__beartype_object_343610864 = <class 'torch.nn.modules.module.Module'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035924b00>
+__beartype_func = <function SSpace.extract at 0x71603591efc0>
+args = ({'layers.1.mlp.down_proj': tensor([[-1.6204e-04,  5.9856e-04,  5.9756e-04,  2.9231e-04,  6.3704e-04,
+          6.3163...target='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=2))
+kwargs = {'name_to_module': {'layers.1.mlp.down_proj': Linear(in_features=64, out_features=16, bias=False), 'layers.1.self_attn.o_proj': Linear(in_features=16, out_features=16, bias=False)}}
+__beartype_args_len = 3
+__beartype_pith_0 = SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=2)
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Function steering_lite.variants.sspace.SSpace.extract() parameter cfg="SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='ml...)" violates type hint <class 'steering_lite.variants.sspace.SSpaceC'>, as <class "steering_lite.variants.sspace_ablate.SSpaceAblateC"> "SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='ml...)" not instance of <class "steering_lite.variants.sspace.SSpaceC">.
+
+<@beartype(steering_lite.variants.sspace.SSpace.extract) at 0x71603591efc0>:92: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:04.535 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_________________________ test_pipeline[sspace_scale] __________________________
+
+method = 'sspace_scale'
+request = <FixtureRequest for <Function test_pipeline[sspace_scale]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_sspace_scale_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:246: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_405336176 = <class 'jaxtyping.Float[Tensor, 'n d_out']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405366816 = <class 'steering_lite.variants.sspace.SSpaceC'>
+__beartype_object_343610864 = <class 'torch.nn.modules.module.Module'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035924b00>
+__beartype_func = <function SSpace.extract at 0x71603591efc0>
+args = ({'layers.1.mlp.down_proj': tensor([[-1.6204e-04,  5.9856e-04,  5.9756e-04,  2.9231e-04,  6.3704e-04,
+          6.3163...l', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=2, clamp_max=4.0))
+kwargs = {'name_to_module': {'layers.1.mlp.down_proj': Linear(in_features=64, out_features=16, bias=False), 'layers.1.self_attn.o_proj': Linear(in_features=16, out_features=16, bias=False)}}
+__beartype_args_len = 3
+__beartype_pith_0 = SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=2, clamp_max=4.0)
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Function steering_lite.variants.sspace.SSpace.extract() parameter cfg="SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\...)" violates type hint <class 'steering_lite.variants.sspace.SSpaceC'>, as <class "steering_lite.variants.sspace_scale.SSpaceScaleC"> "SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\...)" not instance of <class "steering_lite.variants.sspace.SSpaceC">.
+
+<@beartype(steering_lite.variants.sspace.SSpace.extract) at 0x71603591efc0>:92: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:04.631 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+___________________________ test_pipeline[spherical] ___________________________
+
+method = 'spherical'
+request = <FixtureRequest for <Function test_pipeline[spherical]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_spherical_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405660064 = <class 'steering_lite.variants.spherical.SphericalC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x71603593d7c0>
+__beartype_func = <function Spherical.extract at 0x716035942f20>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...alC(method='spherical', layers=(1,), target='residual', target_submodule=None, coeff=0.1, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+         0.1028,  0.4179,  0.1581, -0.2008, -0.2053,  0.0442, -0.1141, -0.3844])}, 'stacked': {}}}
+__beartype_pith_1 = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.spherical.Spherical.extract() return {1: {'shared': {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.155...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+E       ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.spherical.Spherical.extract) at 0x716035942f20>:131: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:04.978 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_____________________ test_pipeline[directional_ablation] ______________________
+
+method = 'directional_ablation'
+request = <FixtureRequest for <Function test_pipeline[directional_ablation]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_directional_abla0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405541248 = <class 'steering_lite.variants.directional_ablation.DirectionalAblationC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035929900>
+__beartype_func = <function DirectionalAblation.extract at 0x716035943b00>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...'directional_ablation', layers=(1,), target='residual', target_submodule=None, coeff=2.0, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+         0.1028,  0.4179,  0.1581, -0.2008, -0.2053,  0.0442, -0.1141, -0.3844])}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.directional_ablation.DirectionalAblation.extract() return {1: {'shared': {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.155...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'v': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+E       ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.directional_ablation.DirectionalAblation.extract) at 0x716035943b00>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:05.065 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_____________________________ test_pipeline[chars] _____________________________
+
+method = 'chars', request = <FixtureRequest for <Function test_pipeline[chars]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_chars_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405782368 = <class 'steering_lite.variants.chars.CHaRSC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x71603594a180>
+__beartype_func = <function CHaRS.extract at 0x71603596cb80>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...ubmodule=None, coeff=2.0, dtype=torch.float32, seed=0, k=2, n_kmeans_iters=20, lambda_=0.1, n_sinkhorn=50, sigma=None))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'P': tensor([[0.1874, 0.5626],
+        [0.0626, 0.1874]]), 'a': tensor([[-0.0047,  0.0043,  0.0133, -0...  0.0067, -0.0020,  0.0310,  0.0045, -0.0107, -0.0115,  0.0081]]), 'p': tensor([0.7500, 0.2500]), ...}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.chars.CHaRS.extract() return {1: {'shared': {'a': tensor([[-0.0047,  0.0043,  0.0133, -0.0252,  0.0165,  0.0450, -0.01...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'a': tensor([[-0.0047,  0.0043,  0.0133, -0.0252,  0.0165,  0.0450, -0.0107,  0.0045,
+E       ...)} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.chars.CHaRS.extract) at 0x71603596cb80>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:05.120 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_______________________ test_pipeline[angular_steering] ________________________
+
+method = 'angular_steering'
+request = <FixtureRequest for <Function test_pipeline[angular_steering]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_pipeline_angular_steering0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+>       v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405733680 = <class 'steering_lite.variants.angular_steering.AngularSteeringC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035930040>
+__beartype_func = <function AngularSteering.extract at 0x71603596dda0>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...hod='angular_steering', layers=(1,), target='residual', target_submodule=None, coeff=0.1, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'b1': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+         0.1028,...6, -0.2524,  0.1051,
+         0.1568, -0.1250,  0.1935, -0.0334,  0.3282, -0.1000, -0.0141, -0.2460])}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.angular_steering.AngularSteering.extract() return {1: {'shared': {'b1': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.15...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'b1': tensor([-0.2947, -0.1197, -0.3487,  0.3229, -0.0574, -0.3978,  0.1552,  0.1790,
+E      ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.angular_steering.AngularSteering.extract) at 0x71603596dda0>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:05.382 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_______________________ test_multi_round[sspace_ablate] ________________________
+
+method = 'sspace_ablate'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_multi_round_sspace_ablate0')
+
+    @pytest.mark.parametrize("method", MULTI_OK)
+    def test_multi_round(method, tiny_model, tmp_path):
+        """Vector + Vector cats stacked, applies through hook, save/load round-trips."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       cfg, v1, v2 = _train_two(method, model, tok, multi=True)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:246: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_405336176 = <class 'jaxtyping.Float[Tensor, 'n d_out']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405366816 = <class 'steering_lite.variants.sspace.SSpaceC'>
+__beartype_object_343610864 = <class 'torch.nn.modules.module.Module'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035924b00>
+__beartype_func = <function SSpace.extract at 0x71603591efc0>
+args = ({'layers.1.mlp.down_proj': tensor([[-1.6204e-04,  5.9856e-04,  5.9756e-04,  2.9231e-04,  6.3704e-04,
+          6.3163...arget='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=-1))
+kwargs = {'name_to_module': {'layers.1.mlp.down_proj': Linear(in_features=64, out_features=16, bias=False), 'layers.1.self_attn.o_proj': Linear(in_features=16, out_features=16, bias=False)}}
+__beartype_args_len = 3
+__beartype_pith_0 = SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=-1)
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Function steering_lite.variants.sspace.SSpace.extract() parameter cfg="SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='ml...)" violates type hint <class 'steering_lite.variants.sspace.SSpaceC'>, as <class "steering_lite.variants.sspace_ablate.SSpaceAblateC"> "SSpaceAblateC(method='sspace_ablate', layers=(1,), target='residual', target_submodule='ml...)" not instance of <class "steering_lite.variants.sspace.SSpaceC">.
+
+<@beartype(steering_lite.variants.sspace.SSpace.extract) at 0x71603591efc0>:92: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.171 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+________________________ test_multi_round[sspace_scale] ________________________
+
+method = 'sspace_scale'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-5/test_multi_round_sspace_scale_0')
+
+    @pytest.mark.parametrize("method", MULTI_OK)
+    def test_multi_round(method, tiny_model, tmp_path):
+        """Vector + Vector cats stacked, applies through hook, save/load round-trips."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       cfg, v1, v2 = _train_two(method, model, tok, multi=True)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:246: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg, name_to_module=name_to_module)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_405336176 = <class 'jaxtyping.Float[Tensor, 'n d_out']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405366816 = <class 'steering_lite.variants.sspace.SSpaceC'>
+__beartype_object_343610864 = <class 'torch.nn.modules.module.Module'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035924b00>
+__beartype_func = <function SSpace.extract at 0x71603591efc0>
+args = ({'layers.1.mlp.down_proj': tensor([[-1.6204e-04,  5.9856e-04,  5.9756e-04,  2.9231e-04,  6.3704e-04,
+          6.3163...', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=-1, clamp_max=4.0))
+kwargs = {'name_to_module': {'layers.1.mlp.down_proj': Linear(in_features=64, out_features=16, bias=False), 'layers.1.self_attn.o_proj': Linear(in_features=16, out_features=16, bias=False)}}
+__beartype_args_len = 3
+__beartype_pith_0 = SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\\.down_proj|self_attn\\.o_proj', coeff=2.0, dtype=torch.float32, seed=0, r=-1, clamp_max=4.0)
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Function steering_lite.variants.sspace.SSpace.extract() parameter cfg="SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\...)" violates type hint <class 'steering_lite.variants.sspace.SSpaceC'>, as <class "steering_lite.variants.sspace_scale.SSpaceScaleC"> "SSpaceScaleC(method='sspace_scale', layers=(1,), target='residual', target_submodule='mlp\...)" not instance of <class "steering_lite.variants.sspace.SSpaceC">.
+
+<@beartype(steering_lite.variants.sspace.SSpace.extract) at 0x71603591efc0>:92: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.211 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+___________________ test_multi_round_natural_fail[spherical] ___________________
+
+method = 'spherical'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    @pytest.mark.parametrize("method", MULTI_FAIL)
+    def test_multi_round_natural_fail(method, tiny_model):
+        """Methods that keep per-contrast tensors in `shared` must raise on +."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       _cfg, v1, v2 = _train_two(method, model, tok)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405660064 = <class 'steering_lite.variants.spherical.SphericalC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x71603593d7c0>
+__beartype_func = <function Spherical.extract at 0x716035942f20>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...alC(method='spherical', layers=(1,), target='residual', target_submodule=None, coeff=0.1, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+         0.2006,  0.0927,  0.3245, -0.0932,  0.2267, -0.1151,  0.0053, -0.3788])}, 'stacked': {}}}
+__beartype_pith_1 = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.spherical.Spherical.extract() return {1: {'shared': {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.190...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+E       ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.spherical.Spherical.extract) at 0x716035942f20>:131: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.422 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_____________ test_multi_round_natural_fail[directional_ablation] ______________
+
+method = 'directional_ablation'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    @pytest.mark.parametrize("method", MULTI_FAIL)
+    def test_multi_round_natural_fail(method, tiny_model):
+        """Methods that keep per-contrast tensors in `shared` must raise on +."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       _cfg, v1, v2 = _train_two(method, model, tok)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405541248 = <class 'steering_lite.variants.directional_ablation.DirectionalAblationC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035929900>
+__beartype_func = <function DirectionalAblation.extract at 0x716035943b00>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...'directional_ablation', layers=(1,), target='residual', target_submodule=None, coeff=2.0, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+         0.2006,  0.0927,  0.3245, -0.0932,  0.2267, -0.1151,  0.0053, -0.3788])}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.directional_ablation.DirectionalAblation.extract() return {1: {'shared': {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.190...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'v': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+E       ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.directional_ablation.DirectionalAblation.extract) at 0x716035943b00>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.467 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_____________________ test_multi_round_natural_fail[chars] _____________________
+
+method = 'chars'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    @pytest.mark.parametrize("method", MULTI_FAIL)
+    def test_multi_round_natural_fail(method, tiny_model):
+        """Methods that keep per-contrast tensors in `shared` must raise on +."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       _cfg, v1, v2 = _train_two(method, model, tok)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405782368 = <class 'steering_lite.variants.chars.CHaRSC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x71603594a180>
+__beartype_func = <function CHaRS.extract at 0x71603596cb80>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...ubmodule=None, coeff=2.0, dtype=torch.float32, seed=0, k=2, n_kmeans_iters=20, lambda_=0.1, n_sinkhorn=50, sigma=None))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'P': tensor([[0.2497, 0.2503],
+        [0.2503, 0.2497]]), 'a': tensor([[-0.0032,  0.0084,  0.0115, -0...  0.0041, -0.0006,  0.0319,  0.0106, -0.0138, -0.0110,  0.0094]]), 'p': tensor([0.5000, 0.5000]), ...}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.chars.CHaRS.extract() return {1: {'shared': {'a': tensor([[-0.0032,  0.0084,  0.0115, -0.0253,  0.0156,  0.0436, -0.00...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'a': tensor([[-0.0032,  0.0084,  0.0115, -0.0253,  0.0156,  0.0436, -0.0094,  0.0033,
+E       ...)} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.chars.CHaRS.extract) at 0x71603596cb80>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.524 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+_______________ test_multi_round_natural_fail[angular_steering] ________________
+
+method = 'angular_steering'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    @pytest.mark.parametrize("method", MULTI_FAIL)
+    def test_multi_round_natural_fail(method, tiny_model):
+        """Methods that keep per-contrast tensors in `shared` must raise on +."""
+        model, tok = tiny_model
+        sl.detach(model)
+>       _cfg, v1, v2 = _train_two(method, model, tok)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_pipeline.py:178: in _train_two
+    v1 = sl.train(model, tok, POS[:2], NEG[:2], cfg, batch_size=2, max_length=64)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.attach.train) at 0x716035a542c0>:135: in train
+    ???
+src/steering_lite/attach.py:254: in train
+    extracted = method.extract(pos_acts, neg_acts, cfg)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_object_365278224 = <class 'jaxtyping.Float[Tensor, 'n d']'>
+__beartype_get_violation = <function get_func_pith_violation at 0x7160359ba0c0>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_405185760 = <class 'jaxtyping.Float[Tensor, 'm d']'>
+__beartype_object_405733680 = <class 'steering_lite.variants.angular_steering.AngularSteeringC'>
+__beartype_object_339922144 = <class 'torch.Tensor'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x716035930040>
+__beartype_func = <function AngularSteering.extract at 0x71603596dda0>
+args = ({1: tensor([[-0.0051,  0.0028,  0.0154, -0.0233,  0.0175,  0.0453, -0.0105,  0.0055,
+          0.0302,  0.0041, -0.00...hod='angular_steering', layers=(1,), target='residual', target_submodule=None, coeff=0.1, dtype=torch.float32, seed=0))
+kwargs = {}, __beartype_args_len = 3
+__beartype_pith_0 = {1: {'shared': {'b1': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+         0.2006,...7e-01,
+        -5.6842e-01, -1.3955e-01,  7.4995e-02,  5.6707e-02, -3.2378e-01,
+        -6.0509e-03])}, 'stacked': {}}}
+
+>   ???
+E   beartype.roar.BeartypeCallHintReturnViolation: Function steering_lite.variants.angular_steering.AngularSteering.extract() return {1: {'shared': {'b1': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.19...{}}} violates type hint dict[int, dict[str, torch.Tensor]], as dict key int 1 value dict key str 'shared' value dict {'b1': tensor([-0.3664, -0.4999,  0.2047,  0.2970,  0.2358, -0.0547, -0.1901,  0.1413,
+E      ...])} not instance of <class "torch.Tensor">.
+
+<@beartype(steering_lite.variants.angular_steering.AngularSteering.extract) at 0x71603596dda0>:132: BeartypeCallHintReturnViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:58:13.592 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+=============================== warnings summary ===============================
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: Function steering_lite.calibrate.calibrate_iso_kl() parameter "sign_probe" PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_pipeline.py::test_pipeline[sspace_ablate] - beartype.roar.B...
+FAILED tests/test_pipeline.py::test_pipeline[sspace_scale] - beartype.roar.Be...
+FAILED tests/test_pipeline.py::test_pipeline[spherical] - beartype.roar.Beart...
+FAILED tests/test_pipeline.py::test_pipeline[directional_ablation] - beartype...
+FAILED tests/test_pipeline.py::test_pipeline[chars] - beartype.roar.BeartypeC...
+FAILED tests/test_pipeline.py::test_pipeline[angular_steering] - beartype.roa...
+FAILED tests/test_pipeline.py::test_multi_round[sspace_ablate] - beartype.roa...
+FAILED tests/test_pipeline.py::test_multi_round[sspace_scale] - beartype.roar...
+FAILED tests/test_pipeline.py::test_multi_round_natural_fail[spherical] - bea...
+FAILED tests/test_pipeline.py::test_multi_round_natural_fail[directional_ablation]
+FAILED tests/test_pipeline.py::test_multi_round_natural_fail[chars] - beartyp...
+FAILED tests/test_pipeline.py::test_multi_round_natural_fail[angular_steering]
+12 failed, 55 passed, 2 warnings in 19.30s
+error: recipe `smoke` failed on line 11 with exit code 1

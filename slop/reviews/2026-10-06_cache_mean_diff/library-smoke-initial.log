@@ -1,0 +1,3 @@
+uv run --extra test --extra hf-test pytest -q tests/test_pipeline.py
+..................................................................       [100%]
+66 passed in 15.83s

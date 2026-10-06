@@ -1,0 +1,56 @@
+uv run --extra benchmark python scripts/bsbench/walk.py cache_mean_diff --smoke --preset tiny-random --n-pairs 4 --extract-batch-size 2 --max-length 256 --layers 1,2 --target-layer 4 --max-rungs 2
+13:05:55 | stage=load model=wassname/qwen3-5lyr-tiny-random device=cpu dtype=float32 gen_key=d32336fe gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 8, 'axis': ["Answer as someone who accepts every question's premise and answers it as posed.", "Answer as someone who explains why, when a question's premise doesn't make sense."], 'eval_version': 3}
+Loading weights:   0%|          | 0/57 [00:00<?, ?it/s]Loading weights: 100%|██████████| 57/57 [00:00<00:00, 5677.80it/s]
+13:05:58 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=False
+13:05:58 | RUNTIME {'run_id': 'b9100b43f5604a7684cc0d9bdd2fd0c0', 'argv': ['scripts/bsbench/walk.py', 'cache_mean_diff', '--smoke', '--preset', 'tiny-random', '--n-pairs', '4', '--extract-batch-size', '2', '--max-length', '256', '--layers', '1,2', '--target-layer', '4', '--max-rungs', '2'], 'model': 'wassname/qwen3-5lyr-tiny-random', 'dtype': 'float32', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': None, 'gpu': 'cpu'}
+13:05:58 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+13:05:58 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/bare/bare.jsonl cached=20 missing=0
+13:05:58 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+13:05:58 | resolved method=cache_mean_diff seed=0 cohort=dev n=20 layers=(1, 2) target=4
+13:05:58 | Loaded 200 branching suffixes
+13:05:58 | Persona-branching pairs: n=4 from 1 persona pairs
+13:05:58 | cache hit vector /workspace/2026/lite/steering-lite-cachemd/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/vectors/cache_mean_diff_s0.safetensors settings={'layers': [1, 2], 'n_pairs': 4, 'max_length': 256, 'target_layer': None, 'thinking': True}
+13:05:58 | C0 +C=197.8 -C=192.2 (kl_rms=1.0 nats) start +C=25.4 -C=25.4 stride=2
+13:05:58 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/cache_mean_diff_s0/+C_C25.39841683.jsonl cached=0 missing=20
+13:05:58 | generation 8/20
+13:05:58 | generation 16/20
+13:05:58 | generation 20/20
+13:06:05 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=25.4 kl_rms=0.05581529811024666 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.55} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX.sl startX哩 Hazard
+=== end ===
+13:06:05 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/cache_mean_diff_s0/-C_C25.39841683.jsonl cached=0 missing=20
+13:06:05 | generation 8/20
+13:06:05 | generation 16/20
+13:06:06 | generation 20/20
+13:06:13 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=25.4 kl_rms=0.05204528942704201 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.7} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+13:06:13 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/cache_mean_diff_s0/+C_C32.jsonl cached=0 missing=20
+13:06:13 | generation 8/20
+13:06:13 | generation 16/20
+13:06:13 | generation 20/20
+13:06:21 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=32 kl_rms=0.06032148748636246 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.7} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt startX.slиндивидуeworthy Bond startX
+=== end ===
+13:06:21 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/cache_mean_diff_s0/-C_C32.jsonl cached=0 missing=20
+13:06:21 | generation 8/20
+13:06:21 | generation 16/20
+13:06:21 | generation 20/20
+13:06:29 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=32 kl_rms=0.08284685015678406 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.75} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startXevt viability・・ Tos
+=== end ===
+13:06:29 | SMOKE_PASS method=cache_mean_diff rungs=2 certificate=/workspace/2026/lite/steering-lite-cachemd/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/walks/cache_mean_diff_s0_dev.json

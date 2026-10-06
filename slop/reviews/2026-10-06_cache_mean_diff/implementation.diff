@@ -1,0 +1,556 @@
+diff --git a/README.md b/README.md
+index 03e209d..e25efd8 100644
+--- a/README.md
++++ b/README.md
+@@ -198,6 +198,8 @@ Each implementation includes its own math and references in [the variants direct
+ 
+ The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
+ 
++[Cache mean difference](src/steering_lite/variants/cache_mean_diff.py) edits the final prompt token's value cache once after prefill. The prompt is unchanged, so steering starts at the second generated token. Use `CacheMeanDiffC` or `just smoke-bsbench cache_mean_diff`. <!-- PI/OpenAI -->
++
+ See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
+ 
+ ## Citation
+diff --git a/scripts/bsbench/walk.py b/scripts/bsbench/walk.py
+index a6f4652..97880f2 100644
+--- a/scripts/bsbench/walk.py
++++ b/scripts/bsbench/walk.py
+@@ -36,7 +36,7 @@ from pathlib import Path
+ import torch
+ from loguru import logger
+ from steering_lite import Vector
+-from steering_lite.config import _CONFIG_REGISTRY
++from steering_lite.config import REGISTRY, _CONFIG_REGISTRY
+ from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
+ from steering_lite.data import make_persona_pairs
+ from steering_lite.extract import record_activations
+@@ -109,6 +109,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+     parser.add_argument("--axis", choices=tuple(AXES), help="persona screen: use this persona pair instead of data.AXIS (new output dir via the generation key)")
+     parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
+     args = parser.parse_args(argv)
++    if args.method == "cache_mean_diff" and (args.probe or args.vjp_check):
++        parser.error("cache_mean_diff affects continuations; prefill-only sign/VJP probes do not measure it")
+     preset = PRESETS[args.preset]
+     args.model, args.dtype, args.device, args.gpu = preset.model, preset.dtype, preset.device, preset.gpu
+     args.batch_size = args.batch_size or preset.batch_size
+@@ -120,7 +122,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+     args.vector_name = args.method + (f"-{args.tag}" if args.tag else "")
+     args.name = args.vector_name + ("-user" if args.positions == "user" else "")
+     if args.positions == "user":
+-        assert args.method in CONFIGS and args.method not in ("sink_split", "sink_split_resid"), "user positions need a per-token steering method"
++        assert args.method in CONFIGS and args.method not in ("sink_split", "sink_split_resid", "cache_mean_diff"), "user positions need a per-token steering method"
+     return args
+ 
+ 
+@@ -149,7 +151,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
+         return tuple(int(layer) for layer in value.split(","))
+     n_layers = len(model.model.layers)
+     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
+-    if method in ("sink_split", "sink_split_resid"):
++    if method in ("sink_split", "sink_split_resid", "cache_mean_diff"):
+         # every full-attention layer except 0 (there pos and neg end in the same token, so v* = 0); the residual part of
+         # sink_split_resid picks its own layers (mean_diff's 20-80% default)
+         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
+@@ -615,10 +617,16 @@ def walk(args) -> None:
+                 c0["+C"], c0["-C"], args.kl_target, GRID[start["+C"]], GRID[start["-C"]], args.stride)
+ 
+     encoded = tokenizer(prompts[0], return_tensors="pt", add_special_tokens=False).to(args.device)
++    def check_logits():
++        method = REGISTRY[args.method]
++        if getattr(method, "prompt_cache_only", False):
++            return method.score_continuation(model, encoded.input_ids, encoded.input_ids[:, -2:])
++        return model(**encoded).logits
++
+     with torch.inference_mode():
+-        base_logits = model(**encoded).logits
++        base_logits = check_logits()
+         with vector(model, C=GRID[start["+C"]]):
+-            assert not torch.equal(base_logits, model(**encoded).logits), "steering changed no logits"
++            assert not torch.equal(base_logits, check_logits()), "steering changed no logits"
+ 
+     user = args.positions == "user"
+     spans = user_spans(rows) if user else None
+diff --git a/src/steering_lite/__init__.py b/src/steering_lite/__init__.py
+index 5b35d10..8d17195 100644
+--- a/src/steering_lite/__init__.py
++++ b/src/steering_lite/__init__.py
+@@ -28,6 +28,7 @@ from .variants.linear_act import LinearAcTC
+ from .variants.angular_steering import AngularSteeringC
+ from .variants.random import RandomC
+ from .variants.value_gram import ValueGramC
++from .variants.cache_mean_diff import CacheMeanDiffC
+ from .variants.vjp_resid import VjpResidC
+ from .variants.vjp_value import VjpValueC
+ from .variants.query_steer import QuerySteerC
+@@ -52,6 +53,7 @@ __all__ = [
+     "AngularSteeringC",
+     "RandomC",
+     "ValueGramC",
++    "CacheMeanDiffC",
+     "VjpResidC",
+     "VjpValueC",
+     "QuerySteerC",
+diff --git a/src/steering_lite/attach.py b/src/steering_lite/attach.py
+index 0ad0aab..b82b21f 100644
+--- a/src/steering_lite/attach.py
++++ b/src/steering_lite/attach.py
+@@ -18,9 +18,10 @@ Two hook paths, dispatched on `cfg.target_submodule`:
+ """
+ from __future__ import annotations
+ import json
++from typing import Protocol, runtime_checkable
++
+ import torch
+ from torch import nn
+-from torch.utils.hooks import RemovableHandle
+ 
+ from .config import SteeringConfig, REGISTRY
+ from .target import find_targets
+@@ -35,6 +36,11 @@ _SUB_KEY_PREFIX = "sub::"
+ _SUB_KEY_SEP = "::"
+ 
+ 
++@runtime_checkable
++class _Handle(Protocol):
++    def remove(self) -> None: ...
++
++
+ def _gather_split_state(mod) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+     shared, stacked = {}, {}
+     for k in dir(mod):
+@@ -86,7 +92,7 @@ def attach(
+     cfg: SteeringConfig,
+     shared,
+     stacked,
+-) -> list[RemovableHandle]:
++) -> list[_Handle]:
+     """Install per-target shared+stacked state and register forward hooks.
+ 
+     `shared` / `stacked`: dict[layer_key, dict[str, Tensor]]. layer_key is
+@@ -110,7 +116,7 @@ def attach(
+     if not targets:
+         raise RuntimeError("no target layers matched cfg")
+ 
+-    handles: list[RemovableHandle] = []
++    handles: list[_Handle] = []
+     attached_names: list[str] = []
+     for full_name, mod, li in targets:
+         key = full_name if requires_linear else li
+@@ -301,7 +307,7 @@ def save(model: nn.Module, path: str) -> None:
+     save_file(sd, path, metadata=metadata)
+ 
+ 
+-def load(model: nn.Module, path: str) -> list[RemovableHandle]:
++def load(model: nn.Module, path: str) -> list[_Handle]:
+     from safetensors.torch import load_file, safe_open
+     with safe_open(path, framework="pt", device="cpu") as f:
+         metadata = f.metadata()
+diff --git a/src/steering_lite/calibrate.py b/src/steering_lite/calibrate.py
+index 2d6f358..0603383 100644
+--- a/src/steering_lite/calibrate.py
++++ b/src/steering_lite/calibrate.py
+@@ -30,7 +30,7 @@ from torch import Tensor
+ from torch import nn
+ from tqdm.auto import tqdm
+ 
+-from .config import SteeringConfig
++from .config import REGISTRY, SteeringConfig
+ from .vector import Vector
+ 
+ 
+@@ -237,12 +237,17 @@ def measure_kl(
+         full = full_ids.unsqueeze(0)
+         n_p = pids.shape[0]
+ 
+-        logp_base = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
++        slc = slice(n_p - 1, n_p - 1 + n_gen)
++        logp_base = model(full).logits[0, slc].float().log_softmax(-1)
+         with v(model):
+-            logp_steer = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
++            method = REGISTRY[v.cfg.method]
++            if getattr(method, "prompt_cache_only", False):
++                logits = method.score_continuation(model, full[:, :n_p], gen.unsqueeze(0))[0]
++            else:
++                logits = model(full).logits[0, slc]
++            logp_steer = logits.float().log_softmax(-1)
+ 
+-        slc = slice(n_p - 1, n_p - 1 + n_gen)
+-        kls = _kl_per_pos(logp_steer[slc], logp_base[slc]).cpu()
++        kls = _kl_per_pos(logp_steer, logp_base).cpu()
+         all_kls.append(kls)
+         for i in range(n_gen):
+             per_t[i].append(float(kls[i]))
+diff --git a/src/steering_lite/config.py b/src/steering_lite/config.py
+index bb66807..d1dc2de 100644
+--- a/src/steering_lite/config.py
++++ b/src/steering_lite/config.py
+@@ -55,6 +55,8 @@ class SteeringConfig:
+         name = d["method"]
+         sub = _CONFIG_REGISTRY[name]
+         d["dtype"] = getattr(torch, d["dtype"])
++        if d["layers"] is not None:
++            d["layers"] = tuple(d["layers"])
+         return sub(**d)
+ 
+ 
+diff --git a/src/steering_lite/variants/__init__.py b/src/steering_lite/variants/__init__.py
+index 2211068..94d7a3f 100644
+--- a/src/steering_lite/variants/__init__.py
++++ b/src/steering_lite/variants/__init__.py
+@@ -2,5 +2,5 @@ from . import (
+     mean_diff, pca, topk_clusters, cosine_gated,
+     sspace, sspace_pca, corda_pca, sspace_ablate, sspace_scale, sspace_pool,
+     spherical, directional_ablation, chars, linear_act, angular_steering,
+-    random, value_gram, vjp_resid, vjp_value, query_steer, sink_split,
++    random, value_gram, vjp_resid, vjp_value, query_steer, sink_split, cache_mean_diff,
+ )  # noqa: F401
+diff --git a/src/steering_lite/variants/cache_mean_diff.py b/src/steering_lite/variants/cache_mean_diff.py
+new file mode 100644
+index 0000000..7f2b986
+--- /dev/null
++++ b/src/steering_lite/variants/cache_mean_diff.py
+@@ -0,0 +1,134 @@
++"""One-shot mean-difference steering of the final prompt token's value cache.
++
++Belitsky et al. 2025: https://arxiv.org/abs/2507.08799 (values-only setting).
++For each full-attention layer, extract c = mean(V_pos[last]) - mean(V_neg[last]).
++After the complete prompt forward, edit V_prompt[last] += coeff * c once.
++Later tokens attend to this edited memory; their incoming values are unchanged.
++
++Unlike the reference's offset-token generation, this variant keeps the prompt
++unchanged. The first output token is unsteered; the effect starts at token two.
++Calibration must score continuations with the edited prompt cache, not re-prefill
++prompt and answer together. Ordinary populated hybrid caches cannot be promoted.
++Implementation: PI/OpenAI.
++"""
++from dataclasses import dataclass
++
++import torch
++from jaxtyping import Bool, Float, Int
++from torch import Tensor
++
++from .. import positions
++from ..config import SteeringConfig, register, register_config
++from ..target import _get_blocks
++from .value_gram import DynamicLayer, SteeredDynamicCache, ValueGram, _require_dynamic_cache
++from .vjp_resid import _encode
++
++
++@register_config
++@dataclass
++class CacheMeanDiffC(SteeringConfig):
++    method: str = "cache_mean_diff"
++
++
++def _last_indices(mask: Bool[Tensor, "b s"]) -> Tensor:
++    assert mask.any(dim=1).all(), "cache_mean_diff needs a real prompt token in every row"
++    return torch.arange(mask.shape[1], device=mask.device).expand_as(mask).masked_fill(~mask, -1).max(-1).values
++
++
++class PromptValueCache(SteeredDynamicCache):
++    def __init__(self, **kwargs):
++        super().__init__(**kwargs)
++        self.edited = False
++
++    def _edit(self, values: Float[Tensor, "b h s d"], layer_idx: int) -> Float[Tensor, "b h s d"]:
++        return values
++
++    def edit_prompt(self, mask: Bool[Tensor, "b s"] | None = None) -> None:
++        if self.edited or not self._steering_lease.active:
++            return
++        assert positions.active() is None, "cache_mean_diff edits the final prompt token; it has no per-token form"
++        for layer_idx, directions in self._steering_directions.items():
++            layer = self.layers[layer_idx]
++            if type(layer) is not DynamicLayer:
++                raise TypeError(f"cache_mean_diff needs a full-attention DynamicLayer at {layer_idx}")
++            values = layer.values.clone()
++            rows = torch.arange(values.shape[0], device=values.device)
++            last = values.shape[2] - 1 if mask is None else _last_indices(mask.to(values.device))
++            values[rows, :, last, :] += self._steering_coeff * directions.to(values).sum(0)
++            layer.values = values
++        self.edited = True
++
++
++@register
++class CacheMeanDiff:
++    name = "cache_mean_diff"
++    extract_from_prompts = True
++    cache_intervention = True
++    prompt_cache_only = True
++
++    @staticmethod
++    @torch.no_grad()
++    def extract(model, tok, pos_prompts, neg_prompts, cfg, *, batch_size, max_length):
++        _require_dynamic_cache()
++        if not pos_prompts or len(pos_prompts) != len(neg_prompts):
++            raise ValueError("cache_mean_diff needs nonempty paired positive/negative prompts")
++        if cfg.layers is None:
++            blocks = _get_blocks(model)
++            types = getattr(model.config.get_text_config(), "layer_types", None)
++            cfg.layers = tuple(i for i in range(len(blocks)) if types is None or types[i] == "full_attention")
++        if not cfg.layers:
++            raise ValueError("cache_mean_diff needs at least one full-attention layer")
++        contrast = {}
++        for sign, prompts in ((1.0, pos_prompts), (-1.0, neg_prompts)):
++            for start in range(0, len(prompts), batch_size):
++                batch = _encode(model, tok, prompts[start:start + batch_size], max_length)
++                cache = model(**batch, use_cache=True).past_key_values
++                last = _last_indices(batch.attention_mask.bool())
++                rows = torch.arange(last.shape[0], device=last.device)
++                for layer_idx in cfg.layers:
++                    layer = cache.layers[layer_idx]
++                    if type(layer) is not DynamicLayer:
++                        raise TypeError(f"cache_mean_diff needs a full-attention DynamicLayer at {layer_idx}")
++                    delta = sign * layer.values[rows, :, last, :].float().sum(0).cpu() / len(prompts)
++                    if layer_idx not in contrast:
++                        contrast[layer_idx] = delta
++                    else:
++                        contrast[layer_idx] += delta
++        if not all(torch.isfinite(c).all() for c in contrast.values()) or not any(c.norm() > 0 for c in contrast.values()):
++            raise ValueError("cache_mean_diff extracted a non-finite or all-zero contrast")
++        return {layer: {"shared": {}, "stacked": {"c": c.unsqueeze(0)}} for layer, c in contrast.items()}
++
++    @staticmethod
++    def install(model, cfg, stacked):
++        handles = ValueGram.install(model, cfg, stacked, cache_type=PromptValueCache)
++
++        def finish_prefill(_module, args, kwargs, output):
++            cache = output.past_key_values
++            if type(cache) is not PromptValueCache:
++                raise TypeError("cache_mean_diff requires a returned PromptValueCache")
++            mask = kwargs.get("attention_mask")
++            if mask is not None:
++                assert mask.ndim == 2, "cache_mean_diff needs a 2-D attention mask"
++            cache.edit_prompt(None if mask is None else mask.bool())
++
++        handles.append(model.register_forward_hook(finish_prefill, with_kwargs=True))
++        return handles
++
++    @staticmethod
++    def score_continuation(
++        model,
++        prompt: Int[Tensor, "b s"],
++        generated: Int[Tensor, "b t"],
++    ) -> Float[Tensor, "b t v"]:
++        prefix = model(prompt, use_cache=True)
++        logits = prefix.logits[:, -1:]
++        if generated.shape[1] > 1:
++            continuation = model(
++                generated[:, :-1], past_key_values=prefix.past_key_values, use_cache=True,
++            )
++            logits = torch.cat([logits, continuation.logits], dim=1)
++        return logits
++
++    @staticmethod
++    def apply(_mod, _x, y, _shared, _stacked, _cfg):
++        return y
+diff --git a/src/steering_lite/variants/value_gram.py b/src/steering_lite/variants/value_gram.py
+index 4894432..8a21f74 100644
+--- a/src/steering_lite/variants/value_gram.py
++++ b/src/steering_lite/variants/value_gram.py
+@@ -291,7 +291,7 @@ class ValueGram:
+         return out
+ 
+     @staticmethod
+-    def install(model: nn.Module, cfg: ValueGramC, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
++    def install(model: nn.Module, cfg: SteeringConfig, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
+         decoder = getattr(model, "model", model)
+         if not hasattr(decoder, "layers"):
+             language_model = getattr(decoder, "language_model", None)
+diff --git a/tests/test_pipeline.py b/tests/test_pipeline.py
+index 9259d93..1ea4860 100644
+--- a/tests/test_pipeline.py
++++ b/tests/test_pipeline.py
+@@ -32,7 +32,7 @@ METHODS = [
+     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_scale", "sspace_pool",
+     "spherical", "directional_ablation", "chars", "linear_act",
+     "angular_steering", "random", "value_gram", "vjp_resid", "vjp_value", "query_steer",
+-    "sink_split", "sink_split_resid",
++    "sink_split", "sink_split_resid", "cache_mean_diff",
+ ]
+ 
+ POS = [
+@@ -71,6 +71,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
+         "angular_steering":     sl.AngularSteeringC(**common),
+         "random":               sl.RandomC(**common),
+         "value_gram":           sl.ValueGramC(**common, r=2),
++        "cache_mean_diff":      sl.CacheMeanDiffC(**common),
+         "vjp_resid":            sl.VjpResidC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+         "vjp_value":            sl.VjpValueC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
+         "query_steer":          sl.QuerySteerC(**common),
+@@ -128,11 +129,17 @@ def test_pipeline(method, request, tmp_path):
+     assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
+ 
+     prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
++
++    def logits():
++        if method == "cache_mean_diff":
++            return REGISTRY[method].score_continuation(model, prompt, prompt[:, -2:]).float()
++        return model(prompt).logits.float()
++
+     with torch.no_grad():
+-        base_logits = model(prompt).logits.float()
++        base_logits = logits()
+     with v(model, C=cfg.coeff):
+         with torch.no_grad():
+-            steer_logits = model(prompt).logits.float()
++            steer_logits = logits()
+     diff = (steer_logits - base_logits).abs().max().item()
+     assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
+ 
+@@ -142,10 +149,10 @@ def test_pipeline(method, request, tmp_path):
+     v2 = Vector.load(path)
+     with v(model, C=cfg.coeff):
+         with torch.no_grad():
+-            l1 = model(prompt).logits.detach().float()
++            l1 = logits().detach()
+     with v2(model, C=cfg.coeff):
+         with torch.no_grad():
+-            l2 = model(prompt).logits.detach().float()
++            l2 = logits().detach()
+     err = (l1 - l2).abs().max().item()
+     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"
+ 
+@@ -253,10 +260,14 @@ def test_value_gram_zero_and_signed_symmetry(tiny_model):
+     )
+ 
+ 
+-def test_value_gram_batch_invariant_and_label_swap(tiny_model):
++@pytest.mark.parametrize("method", ["value_gram", "cache_mean_diff"])
++def test_cache_extract_batch_invariant_and_label_swap(method, tiny_model):
+     model, tok = tiny_model
+     sl.detach(model)
+-    cfg = sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32)
++    cfg = {
++        "value_gram": sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32),
++        "cache_mean_diff": sl.CacheMeanDiffC(layers=(1,), dtype=torch.float32),
++    }[method]
+     batch1 = sl.train(model, tok, POS, NEG, cfg, batch_size=1, max_length=64)
+     batch2 = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+     swapped = sl.train(model, tok, NEG, POS, cfg, batch_size=2, max_length=64)
+@@ -354,7 +365,7 @@ def test_value_gram_formula_and_empty_hybrid_promotion():
+     torch.testing.assert_close(cache._edit(values, 1), expected)
+ 
+ 
+-@pytest.mark.parametrize("method", ["value_gram", "vjp_value"])
++@pytest.mark.parametrize("method", ["value_gram", "vjp_value", "cache_mean_diff"])
+ def test_cache_hybrid_generate(method, tiny_model):
+     _, tok = tiny_model
+     config = Qwen3_5TextConfig(
+@@ -377,16 +388,24 @@ def test_cache_hybrid_generate(method, tiny_model):
+         eos_token_id=2,
+     )
+     model = Qwen3_5ForCausalLM(config).eval()
+-    cfg = (
+-        sl.VjpValueC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32)
+-        if method == "vjp_value" else sl.ValueGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32)
+-    )
++    cfg = {
++        "vjp_value": sl.VjpValueC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32),
++        "value_gram": sl.ValueGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32),
++        "cache_mean_diff": sl.CacheMeanDiffC(layers=(2,), coeff=0.2, dtype=torch.float32),
++    }[method]
+     vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+-    with vector(model):
+-        output = model.generate(
+-            torch.tensor([[1, 4, 5]]), max_new_tokens=2, do_sample=False
+-        )
++    prompt = torch.tensor([[1, 4, 5]])
++    with torch.no_grad(), vector(model):
++        output = model.generate(prompt, max_new_tokens=2, do_sample=False)
++        if method == "cache_mean_diff":
++            generated = output[:, prompt.shape[1]:]
++            logits = REGISTRY[method].score_continuation(model, prompt, generated)
++            assert torch.equal(logits.argmax(-1), generated)
+     assert output.shape == (1, 5)
++    if method == "cache_mean_diff":
++        vector.cfg.coeff = 0.0
++        zero = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
++        assert zero["kl_rms"] < 1e-5
+ 
+ 
+ def test_vjp_value_gradient_flows_through_real_cache_values(tiny_model):
+@@ -634,3 +653,83 @@ def test_user_positions_mask(method, request):
+                 steered = model(ids).logits
+     assert torch.equal(steered[:, :4], bare[:, :4])
+     assert (steered[:, 4:] - bare[:, 4:]).abs().max() > 1e-6
++
++
++@pytest.mark.parametrize("padding_side", ["left", "right"])
++def test_cache_mean_diff_one_shot_prompt_edit(padding_side, tiny_model):
++    """Real-cache formula, padding, and decode lifetime. PI/OpenAI."""
++    model, tok = tiny_model
++    sl.detach(model)
++    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), dtype=torch.float32), batch_size=2, max_length=64)
++    prompts = tok(["Tell me the truth.", "Hello."], padding=True, padding_side=padding_side, return_tensors="pt")
++    rows = torch.arange(2)
++    last = torch.arange(prompts.input_ids.shape[1]).expand_as(prompts.attention_mask).masked_fill(~prompts.attention_mask.bool(), -1).max(-1).values
++    next_ids = torch.tensor([[4], [5]])
++    with torch.no_grad():
++        bare = model(**prompts, use_cache=True)
++        bare_values = bare.past_key_values.layers[1].values.clone()
++        bare_next = model(next_ids, past_key_values=bare.past_key_values, use_cache=True)
++        for coefficient in (0.0, 2.0, -2.0):
++            with vector(model, C=coefficient):
++                prefix = model(**prompts, use_cache=True)
++                torch.testing.assert_close(prefix.logits, bare.logits, rtol=0, atol=0)
++                expected = bare_values.clone()
++                expected[rows, :, last, :] += coefficient * vector.stacked[1]["c"].sum(0)
++                cache = prefix.past_key_values
++                torch.testing.assert_close(cache.layers[1].values, expected, rtol=0, atol=0)
++                torch.testing.assert_close(cache.layers[1].keys, bare.past_key_values.layers[1].keys[:, :, :-1], rtol=0, atol=0)
++                continued = model(next_ids, past_key_values=cache, use_cache=True)
++                torch.testing.assert_close(continued.past_key_values.layers[1].values[:, :, :-1], expected, rtol=0, atol=0)
++                torch.testing.assert_close(continued.past_key_values.layers[1].values[:, :, -1:], bare_next.past_key_values.layers[1].values[:, :, -1:], rtol=0, atol=0)
++                if coefficient:
++                    assert (continued.logits - bare_next.logits).abs().max() > 1e-6
++                else:
++                    torch.testing.assert_close(continued.logits, bare_next.logits, rtol=0, atol=0)
++            after = model(next_ids, past_key_values=cache, use_cache=True)
++            torch.testing.assert_close(after.past_key_values.layers[1].values[:, :, :-2], expected, rtol=0, atol=0)
++
++
++def test_cache_mean_diff_populated_prefix_edits_final_prompt_token(tiny_model):
++    """A supplied prefix stays unedited until the complete prompt forward. PI/OpenAI."""
++    model, tok = tiny_model
++    sl.detach(model)
++    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), coeff=2.0, dtype=torch.float32), batch_size=2, max_length=64)
++    prefix = tok("Tell me", return_tensors="pt").input_ids
++    suffix = tok(" the truth.", add_special_tokens=False, return_tensors="pt").input_ids
++    with torch.no_grad():
++        ordinary = model(prefix, use_cache=True).past_key_values
++        history = ordinary.layers[1].values.clone()
++        with vector(model):
++            steered = model(suffix, past_key_values=ordinary, use_cache=True)
++        torch.testing.assert_close(ordinary.layers[1].values, history, rtol=0, atol=0)
++        bare = model(suffix, past_key_values=ordinary, use_cache=True)
++        torch.testing.assert_close(steered.logits, bare.logits, rtol=0, atol=0)
++        expected = bare.past_key_values.layers[1].values.clone()
++        expected[:, :, -1] += 2.0 * vector.stacked[1]["c"].sum(0)
++        torch.testing.assert_close(steered.past_key_values.layers[1].values, expected, rtol=0, atol=0)
++
++
++def test_cache_mean_diff_calibration_scores_cached_continuation(tiny_model):
++    """One-shot scoring equals streamed decode, and KL detects the edit. PI/OpenAI."""
++    model, tok = tiny_model
++    sl.detach(model)
++    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), coeff=10.0, dtype=torch.float32), batch_size=2, max_length=64)
++    prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
++    generated = torch.tensor([[4, 5, 6]])
++    with torch.no_grad(), vector(model):
++        batched = REGISTRY["cache_mean_diff"].score_continuation(model, prompt, generated)
++        prefix = model(prompt, use_cache=True)
++        cache = prefix.past_key_values
++        streamed = [prefix.logits[:, -1:]]
++        for token in generated[:, :-1].split(1, dim=1):
++            step = model(token, past_key_values=cache, use_cache=True)
++            streamed.append(step.logits)
++            cache = step.past_key_values
++        torch.testing.assert_close(batched, torch.cat(streamed, dim=1), rtol=1e-5, atol=1e-6)
++    vector.cfg.coeff = 0.0
++    zero = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
++    vector.cfg.coeff = 10.0
++    steered = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
++    assert zero["kl_rms"] < 1e-6
++    assert steered["kl_rms"] > zero["kl_rms"] + 1e-7
++    assert steered["per_t_p95"][0] < 1e-6

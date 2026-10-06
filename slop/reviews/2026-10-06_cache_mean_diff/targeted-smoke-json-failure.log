@@ -1,0 +1,551 @@
+.FFFF...........F.....                                                   [100%]
+=================================== FAILURES ===================================
+__________________________ test_pipeline[value_gram] ___________________________
+
+method = 'value_gram'
+request = <FixtureRequest for <Function test_pipeline[value_gram]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-3/test_pipeline_value_gram_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+        v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+        assert isinstance(v, Vector)
+        all_tensors = (
+            [t for d in v.shared.values()  for t in d.values()] +
+            [t for d in v.stacked.values() for t in d.values()]
+        )
+        assert any(t.norm().item() > 0 for t in all_tensors), \
+            f"{method}: all-zero state -- extract broken"
+    
+        # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.
+        # Pre-tokenize: the tiny-random Llama tokenizer has no chat template.
+        calib_ids = [tok(POS[0], return_tensors="pt").input_ids[0]]
+        coeff, _hist = sl.calibrate_iso_kl(
+            v, model, tok, calib_ids,
+            target_kl=1.0, T=5, max_iters=4,
+            bracket=(0.05, 4.0), device="cpu", do_sample=False,
+        )
+        assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
+    
+        prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+    
+        def logits():
+            if method == "cache_mean_diff":
+                return REGISTRY[method].score_continuation(model, prompt, prompt[:, -2:]).float()
+            return model(prompt).logits.float()
+    
+        with torch.no_grad():
+            base_logits = logits()
+        with v(model, C=cfg.coeff):
+            with torch.no_grad():
+                steer_logits = logits()
+        diff = (steer_logits - base_logits).abs().max().item()
+        assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
+    
+        # save/load round-trip: identical logits with same coeff
+        path = str(tmp_path / f"{method}.safetensors")
+        v.save(path)
+>       v2 = Vector.load(path)
+             ^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.vector.Vector.load) at 0x7bee6843d260>:32: in load
+    ???
+src/steering_lite/vector.py:143: in load
+    cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.config.SteeringConfig.from_dict) at 0x7bee6857ea20>:32: in from_dict
+    ???
+src/steering_lite/config.py:58: in from_dict
+    return sub(**d)
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_get_violation = <function get_func_pith_violation at 0x7bee6852de40>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_21897416 = <class 'NoneType'>
+__beartype_getrandbits = <built-in method getrandbits of Random object at 0x107913e0>
+__beartype_object_136263911255808 = (<class 'NoneType'>, <class 'str'>)
+__beartype_object_136264960700576 = <class 'torch.dtype'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x7bee68304100>
+__beartype_func = <function ValueGramC.__init__ at 0x7bee682f2c00>
+args = (ValueGramC(method='value_gram', layers=None, target='residual', target_submodule=None, coeff=1.0, dtype=torch.bfloat16, seed=0, r=16),)
+kwargs = {'coeff': 7.155417527999327, 'dtype': torch.float32, 'layers': [1], 'method': 'value_gram', ...}
+__beartype_random_int = 2329203980, __beartype_args_len = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Method steering_lite.variants.value_gram.ValueGramC.__init__() parameter layers=[1] violates type hint tuple[int, ...] | None, as list [1] not <class "builtins.NoneType"> or tuple.
+
+<@beartype(steering_lite.variants.value_gram.ValueGramC.__init__) at 0x7bee682f2c00>:64: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+[transformers] Model config: pad_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got -1. This may result in unexpected behavior.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+[transformers] The following generation flags are not valid and may be ignored: ['pad_token_id']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+Loading weights:   0%|          | 0/21 [00:00<?, ?it/s]Loading weights: 100%|██████████| 21/21 [00:00<00:00, 45803.63it/s]
+2026-10-06 12:55:56.115 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+calib value_gram: 0it [00:00, ?it/s]2026-10-06 12:55:56.166 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.4472 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00001 max=0.0000 n=5
+calib value_gram: 1it [00:00, 29.22it/s, c=+0.447, kl=0.000, tgt=1.00]2026-10-06 12:55:56.194 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.8944 mean=0.0000 rms=0.0000 p90=0.0001 p95=0.00006 max=0.0001 n=5
+calib value_gram: 2it [00:00, 32.06it/s, c=+0.894, kl=0.000, tgt=1.00]2026-10-06 12:55:56.222 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+1.7889 mean=0.0002 rms=0.0002 p90=0.0002 p95=0.00023 max=0.0002 n=5
+calib value_gram: 3it [00:00, 33.11it/s, c=+1.789, kl=0.000, tgt=1.00]2026-10-06 12:55:56.248 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+3.5777 mean=0.0007 rms=0.0007 p90=0.0009 p95=0.00102 max=0.0011 n=5
+calib value_gram: 4it [00:00, 34.46it/s, c=+3.578, kl=0.001, tgt=1.00]2026-10-06 12:55:56.275 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+7.1554 mean=0.0032 rms=0.0034 p90=0.0045 p95=0.00473 max=0.0049 n=5
+calib value_gram: 5it [00:00, 34.90it/s, c=+7.155, kl=0.003, tgt=1.00]2026-10-06 12:55:56.275 | WARNING  | steering_lite.calibrate:calibrate_iso_kl:490 - calibrate value_gram: KL stayed BELOW target across bracket (max c=7.1554 -> kl=0.003 < 1.0). Returning bracket-top; intervention is weaker than budget.
+2026-10-06 12:55:56.315 | INFO     | steering_lite.calibrate:measure_kl:274 - 
+=== value_gram -> calibrate iso-KL -> FINAL operating point | c=+7.1554 kl_rms[this prompt only]=0.003 | T=5 tok/KL-probe (<=12 iters) ===
+WHAT: same held-out calib prompt at c=0 vs current c. KL calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.
+The kl_rms above is this one prompt; the value the solver matched to target_kl is the whole-prompt-set rms in the bracket table below, and the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).
+--- BASE (c=0) ---
+<s> I always tell the truth.лисяassoc joделиChecked
+
+--- STEER (value_gram, c=+7.1554) ---
+<s> I always tell the truth. presenta BEGIN simplбор рос
+=== /value_gram calibrate ===
+2026-10-06 12:55:56.319 | INFO     | steering_lite.calibrate:_log_kl_history:57 - SHOULD: choose the highest C with a coherent tail; a repetition tail ('but but but') or gibberish marks where the dose is too hot -- read that row's target_stat column (default kl_rms) as the target_kl for future runs.
+--- iso-KL bracket trace (value_gram, 6 iters) ---
+  i       c    mean     rms    r4ms4e      p95     max    rep    len    n  steer tail (prompt 0)
+  0  0.4472  0       0         0       1e-05    0           0      5    5  лисяassoc joделиChecked
+  1  0.8944  0       0         0       6e-05    0.0001      0      5    5  лисяassoc joделиChecked
+  2  1.7889  0.0002  0.0002    0.0002  0.00023  0.0002      0      5    5  yed TCPliament migliq
+  3  3.5777  0.0007  0.0007    0.0008  0.00102  0.0011      0      5    5  ष producer pent sujet Joseph
+  4  7.1554  0.0032  0.0034    0.0037  0.00473  0.0049      0      5    5  presenta BEGIN simplбор рос
+  5  7.1554  0.0032  0.0034    0.0037  0.00473  0.0049      0      5    5  presenta BEGIN simplбор рос
+2026-10-06 12:55:56.320 | INFO     | steering_lite.calibrate:_log_per_t_profile:79 - SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration generalizes). ELSE: ramping -> T undershoots inference.
+--- per-t KL profile (value_gram, c=+7.1554) ---
+  t     p50     p90      p95     max    n
+  0  0.004   0.004   0.00399  0.004     1
+  1  0.0049  0.0049  0.00492  0.0049    1
+  2  0.0017  0.0017  0.00172  0.0017    1
+  3  0.0021  0.0021  0.00215  0.0021    1
+  4  0.0031  0.0031  0.00308  0.0031    1
+                                                                      
+___________________________ test_pipeline[vjp_value] ___________________________
+
+method = 'vjp_value'
+request = <FixtureRequest for <Function test_pipeline[vjp_value]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-3/test_pipeline_vjp_value_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+        v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+        assert isinstance(v, Vector)
+        all_tensors = (
+            [t for d in v.shared.values()  for t in d.values()] +
+            [t for d in v.stacked.values() for t in d.values()]
+        )
+        assert any(t.norm().item() > 0 for t in all_tensors), \
+            f"{method}: all-zero state -- extract broken"
+    
+        # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.
+        # Pre-tokenize: the tiny-random Llama tokenizer has no chat template.
+        calib_ids = [tok(POS[0], return_tensors="pt").input_ids[0]]
+        coeff, _hist = sl.calibrate_iso_kl(
+            v, model, tok, calib_ids,
+            target_kl=1.0, T=5, max_iters=4,
+            bracket=(0.05, 4.0), device="cpu", do_sample=False,
+        )
+        assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
+    
+        prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+    
+        def logits():
+            if method == "cache_mean_diff":
+                return REGISTRY[method].score_continuation(model, prompt, prompt[:, -2:]).float()
+            return model(prompt).logits.float()
+    
+        with torch.no_grad():
+            base_logits = logits()
+        with v(model, C=cfg.coeff):
+            with torch.no_grad():
+                steer_logits = logits()
+        diff = (steer_logits - base_logits).abs().max().item()
+        assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
+    
+        # save/load round-trip: identical logits with same coeff
+        path = str(tmp_path / f"{method}.safetensors")
+        v.save(path)
+>       v2 = Vector.load(path)
+             ^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.vector.Vector.load) at 0x7bee6843d260>:32: in load
+    ???
+src/steering_lite/vector.py:143: in load
+    cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.config.SteeringConfig.from_dict) at 0x7bee6857ea20>:32: in from_dict
+    ???
+src/steering_lite/config.py:58: in from_dict
+    return sub(**d)
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_get_violation = <function get_func_pith_violation at 0x7bee6852de40>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_21897416 = <class 'NoneType'>
+__beartype_getrandbits = <built-in method getrandbits of Random object at 0x107913e0>
+__beartype_object_136263911255808 = (<class 'NoneType'>, <class 'str'>)
+__beartype_object_136264960700576 = <class 'torch.dtype'>
+__beartype_object_136264093985792 = (<class 'int'>, <class 'NoneType'>)
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x7bee683259c0>
+__beartype_func = <function VjpValueC.__init__ at 0x7bee68322480>
+args = (VjpValueC(method='vjp_value', layers=None, target='residual', target_submodule=None, coeff=1.0, dtype=torch.bfloat16, seed=0, target_layer=None, skip_first=16),)
+kwargs = {'coeff': 7.155417527999327, 'dtype': torch.float32, 'layers': [0], 'method': 'vjp_value', ...}
+__beartype_random_int = 157020214
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Method steering_lite.variants.vjp_value.VjpValueC.__init__() parameter layers=[0] violates type hint tuple[int, ...] | None, as list [0] not <class "builtins.NoneType"> or tuple.
+
+<@beartype(steering_lite.variants.vjp_value.VjpValueC.__init__) at 0x7bee68322480>:65: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:55:56.423 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+calib vjp_value: 0it [00:00, ?it/s]2026-10-06 12:55:56.480 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.4472 mean=0.0006 rms=0.0006 p90=0.0008 p95=0.00088 max=0.0009 n=5
+calib vjp_value: 1it [00:00, 38.44it/s, c=+0.447, kl=0.001, tgt=1.00]2026-10-06 12:55:56.511 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.8944 mean=0.0035 rms=0.0039 p90=0.0055 p95=0.00552 max=0.0055 n=5
+calib vjp_value: 2it [00:00, 34.90it/s, c=+0.894, kl=0.004, tgt=1.00]2026-10-06 12:55:56.589 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+1.7889 mean=0.0044 rms=0.0047 p90=0.0060 p95=0.00603 max=0.0060 n=5
+calib vjp_value: 3it [00:00, 22.23it/s, c=+1.789, kl=0.005, tgt=1.00]2026-10-06 12:55:56.610 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+3.5777 mean=0.0052 rms=0.0055 p90=0.0071 p95=0.00715 max=0.0072 n=5
+calib vjp_value: 4it [00:00, 25.58it/s, c=+3.578, kl=0.006, tgt=1.00]2026-10-06 12:55:56.646 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+7.1554 mean=0.0065 rms=0.0068 p90=0.0077 p95=0.00774 max=0.0078 n=5
+calib vjp_value: 5it [00:00, 25.96it/s, c=+7.155, kl=0.007, tgt=1.00]2026-10-06 12:55:56.647 | WARNING  | steering_lite.calibrate:calibrate_iso_kl:490 - calibrate vjp_value: KL stayed BELOW target across bracket (max c=7.1554 -> kl=0.007 < 1.0). Returning bracket-top; intervention is weaker than budget.
+2026-10-06 12:55:56.668 | INFO     | steering_lite.calibrate:measure_kl:274 - 
+=== vjp_value -> calibrate iso-KL -> FINAL operating point | c=+7.1554 kl_rms[this prompt only]=0.007 | T=5 tok/KL-probe (<=12 iters) ===
+WHAT: same held-out calib prompt at c=0 vs current c. KL calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.
+The kl_rms above is this one prompt; the value the solver matched to target_kl is the whole-prompt-set rms in the bracket table below, and the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).
+--- BASE (c=0) ---
+<s> I always tell the truth.лисяassoc joделиChecked
+
+--- STEER (vjp_value, c=+7.1554) ---
+<s> I always tell the truth.fracfracfracfracfrac
+=== /vjp_value calibrate ===
+2026-10-06 12:55:56.670 | INFO     | steering_lite.calibrate:_log_kl_history:57 - SHOULD: choose the highest C with a coherent tail; a repetition tail ('but but but') or gibberish marks where the dose is too hot -- read that row's target_stat column (default kl_rms) as the target_kl for future runs.
+--- iso-KL bracket trace (vjp_value, 6 iters) ---
+  i       c    mean     rms    r4ms4e      p95     max    rep    len    n  steer tail (prompt 0)
+  0  0.4472  0.0006  0.0006    0.0007  0.00088  0.0009   0         5    5  nested deux Hinweisestivalтя
+  1  0.8944  0.0035  0.0039    0.0044  0.00552  0.0055   0         5    5  BedeutungἘ BedeutungἘear
+  2  1.7889  0.0044  0.0047    0.005   0.00603  0.006    0.33      5    5  Bedeutungfrac Bedeutungfrac Bedeutung
+  3  3.5777  0.0052  0.0055    0.0059  0.00715  0.0072   0.33      5    5  frac Bedeutungfrac Bedeutungfrac
+  4  7.1554  0.0065  0.0068    0.0071  0.00774  0.0078   0.67      5    5  fracfracfracfracfrac
+  5  7.1554  0.0065  0.0068    0.0071  0.00774  0.0078   0.67      5    5  fracfracfracfracfrac
+2026-10-06 12:55:56.670 | INFO     | steering_lite.calibrate:_log_per_t_profile:79 - SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration generalizes). ELSE: ramping -> T undershoots inference.
+--- per-t KL profile (vjp_value, c=+7.1554) ---
+  t     p50     p90      p95     max    n
+  0  0.0028  0.0028  0.00281  0.0028    1
+  1  0.0078  0.0078  0.00778  0.0078    1
+  2  0.0076  0.0076  0.00755  0.0076    1
+  3  0.0074  0.0074  0.00736  0.0074    1
+  4  0.0072  0.0072  0.0072   0.0072    1
+                                                                     
+________________________ test_pipeline[cache_mean_diff] ________________________
+
+method = 'cache_mean_diff'
+request = <FixtureRequest for <Function test_pipeline[cache_mean_diff]>>
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-3/test_pipeline_cache_mean_diff_0')
+
+    @pytest.mark.parametrize("method", METHODS)
+    def test_pipeline(method, request, tmp_path):
+        """extract + calibrate + steer + save/load. One test per method."""
+        model, tok = request.getfixturevalue("tiny_qwen" if method in ("query_steer", "sink_split", "sink_split_resid") else "tiny_model")
+        sl.detach(model)
+    
+        cfg = _make_cfg(method)
+        v = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
+        assert isinstance(v, Vector)
+        all_tensors = (
+            [t for d in v.shared.values()  for t in d.values()] +
+            [t for d in v.stacked.values() for t in d.values()]
+        )
+        assert any(t.norm().item() > 0 for t in all_tensors), \
+            f"{method}: all-zero state -- extract broken"
+    
+        # calibrate (cheap: 1 prompt, T=5, max_iters=4) — just exercises the path.
+        # Pre-tokenize: the tiny-random Llama tokenizer has no chat template.
+        calib_ids = [tok(POS[0], return_tensors="pt").input_ids[0]]
+        coeff, _hist = sl.calibrate_iso_kl(
+            v, model, tok, calib_ids,
+            target_kl=1.0, T=5, max_iters=4,
+            bracket=(0.05, 4.0), device="cpu", do_sample=False,
+        )
+        assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
+    
+        prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+    
+        def logits():
+            if method == "cache_mean_diff":
+                return REGISTRY[method].score_continuation(model, prompt, prompt[:, -2:]).float()
+            return model(prompt).logits.float()
+    
+        with torch.no_grad():
+            base_logits = logits()
+        with v(model, C=cfg.coeff):
+            with torch.no_grad():
+                steer_logits = logits()
+        diff = (steer_logits - base_logits).abs().max().item()
+        assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
+    
+        # save/load round-trip: identical logits with same coeff
+        path = str(tmp_path / f"{method}.safetensors")
+        v.save(path)
+>       v2 = Vector.load(path)
+             ^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.vector.Vector.load) at 0x7bee6843d260>:32: in load
+    ???
+src/steering_lite/vector.py:143: in load
+    cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.config.SteeringConfig.from_dict) at 0x7bee6857ea20>:32: in from_dict
+    ???
+src/steering_lite/config.py:58: in from_dict
+    return sub(**d)
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_get_violation = <function get_func_pith_violation at 0x7bee6852de40>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_21897416 = <class 'NoneType'>
+__beartype_getrandbits = <built-in method getrandbits of Random object at 0x107913e0>
+__beartype_object_136263911255808 = (<class 'NoneType'>, <class 'str'>)
+__beartype_object_136264960700576 = <class 'torch.dtype'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x7bee682e1480>
+__beartype_func = <function CacheMeanDiffC.__init__ at 0x7bee6833dc60>
+args = (CacheMeanDiffC(method='cache_mean_diff', layers=None, target='residual', target_submodule=None, coeff=1.0, dtype=torch.bfloat16, seed=0),)
+kwargs = {'coeff': 7.155417527999327, 'dtype': torch.float32, 'layers': [1], 'method': 'cache_mean_diff', ...}
+__beartype_random_int = 279803427, __beartype_args_len = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Method steering_lite.variants.cache_mean_diff.CacheMeanDiffC.__init__() parameter layers=[1] violates type hint tuple[int, ...] | None, as list [1] not <class "builtins.NoneType"> or tuple.
+
+<@beartype(steering_lite.variants.cache_mean_diff.CacheMeanDiffC.__init__) at 0x7bee6833dc60>:64: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:55:56.710 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+calib cache_mean_diff: 0it [00:00, ?it/s]2026-10-06 12:55:56.765 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.4472 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00000 max=0.0000 n=5
+calib cache_mean_diff: 1it [00:00, 43.45it/s, c=+0.447, kl=0.000, tgt=1.00]2026-10-06 12:55:56.793 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+0.8944 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00000 max=0.0000 n=5
+calib cache_mean_diff: 2it [00:00, 39.41it/s, c=+0.894, kl=0.000, tgt=1.00]2026-10-06 12:55:56.819 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+1.7889 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00000 max=0.0000 n=5
+calib cache_mean_diff: 3it [00:00, 39.37it/s, c=+1.789, kl=0.000, tgt=1.00]2026-10-06 12:55:56.843 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+3.5777 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00000 max=0.0000 n=5
+calib cache_mean_diff: 4it [00:00, 39.61it/s, c=+3.578, kl=0.000, tgt=1.00]2026-10-06 12:55:56.868 | DEBUG    | steering_lite.calibrate:eval_at:450 -   c=+7.1554 mean=0.0000 rms=0.0000 p90=0.0000 p95=0.00000 max=0.0000 n=5
+calib cache_mean_diff: 5it [00:00, 39.75it/s, c=+7.155, kl=0.000, tgt=1.00]2026-10-06 12:55:56.868 | WARNING  | steering_lite.calibrate:calibrate_iso_kl:490 - calibrate cache_mean_diff: KL stayed BELOW target across bracket (max c=7.1554 -> kl=0.000 < 1.0). Returning bracket-top; intervention is weaker than budget.
+2026-10-06 12:55:56.892 | INFO     | steering_lite.calibrate:measure_kl:274 - 
+=== cache_mean_diff -> calibrate iso-KL -> FINAL operating point | c=+7.1554 kl_rms[this prompt only]=0.000 | T=5 tok/KL-probe (<=12 iters) ===
+WHAT: same held-out calib prompt at c=0 vs current c. KL calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.
+The kl_rms above is this one prompt; the value the solver matched to target_kl is the whole-prompt-set rms in the bracket table below, and the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).
+--- BASE (c=0) ---
+<s> I always tell the truth.лисяassoc joделиChecked
+
+--- STEER (cache_mean_diff, c=+7.1554) ---
+<s> I always tell the truth.лисяassoc joделиChecked
+=== /cache_mean_diff calibrate ===
+2026-10-06 12:55:56.894 | INFO     | steering_lite.calibrate:_log_kl_history:57 - SHOULD: choose the highest C with a coherent tail; a repetition tail ('but but but') or gibberish marks where the dose is too hot -- read that row's target_stat column (default kl_rms) as the target_kl for future runs.
+--- iso-KL bracket trace (cache_mean_diff, 6 iters) ---
+  i       c    mean    rms    r4ms4e    p95    max    rep    len    n  steer tail (prompt 0)
+  0  0.4472       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+  1  0.8944       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+  2  1.7889       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+  3  3.5777       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+  4  7.1554       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+  5  7.1554       0      0         0      0      0      0      5    5  лисяassoc joделиChecked
+2026-10-06 12:55:56.894 | INFO     | steering_lite.calibrate:_log_per_t_profile:79 - SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration generalizes). ELSE: ramping -> T undershoots inference.
+--- per-t KL profile (cache_mean_diff, c=+7.1554) ---
+  t    p50    p90    p95    max    n
+  0      0      0      0      0    1
+  1      0      0      0      0    1
+  2      0      0      0      0    1
+  3      0      0      0      0    1
+  4      0      0      0      0    1
+                                                                           
+_________________________ test_multi_round[value_gram] _________________________
+
+method = 'value_gram'
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-3/test_multi_round_value_gram_0')
+
+    @pytest.mark.parametrize("method", MULTI_OK)
+    def test_multi_round(method, tiny_model, tmp_path):
+        """Vector + Vector cats stacked, applies through hook, save/load round-trips."""
+        model, tok = tiny_model
+        sl.detach(model)
+        cfg, v1, v2 = _train_two(method, model, tok, multi=True)
+    
+        v_sum = v1 + v2
+        assert v_sum.k_rounds() == 2, f"{method}: expected k=2 after +, got {v_sum.k_rounds()}"
+    
+        prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+        with torch.no_grad():
+            base = model(prompt).logits.float()
+        with v_sum(model, C=cfg.coeff):
+            with torch.no_grad():
+                steered = model(prompt).logits.float()
+        diff = (steered - base).abs().max().item()
+        assert diff > 1e-6, f"{method}: k=2 steering had no effect (diff={diff:.2e})"
+    
+        path = str(tmp_path / f"{method}_k2.safetensors")
+        v_sum.save(path)
+>       v_loaded = Vector.load(path)
+                   ^^^^^^^^^^^^^^^^^
+
+tests/test_pipeline.py:204: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.vector.Vector.load) at 0x7bee6843d260>:32: in load
+    ???
+src/steering_lite/vector.py:143: in load
+    cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.config.SteeringConfig.from_dict) at 0x7bee6857ea20>:32: in from_dict
+    ???
+src/steering_lite/config.py:58: in from_dict
+    return sub(**d)
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_get_violation = <function get_func_pith_violation at 0x7bee6852de40>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_21897416 = <class 'NoneType'>
+__beartype_getrandbits = <built-in method getrandbits of Random object at 0x107913e0>
+__beartype_object_136263911255808 = (<class 'NoneType'>, <class 'str'>)
+__beartype_object_136264960700576 = <class 'torch.dtype'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x7bee68304100>
+__beartype_func = <function ValueGramC.__init__ at 0x7bee682f2c00>
+args = (ValueGramC(method='value_gram', layers=None, target='residual', target_submodule=None, coeff=1.0, dtype=torch.bfloat16, seed=0, r=16),)
+kwargs = {'coeff': 2.0, 'dtype': torch.float32, 'layers': [1], 'method': 'value_gram', ...}
+__beartype_random_int = 25347649, __beartype_args_len = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Method steering_lite.variants.value_gram.ValueGramC.__init__() parameter layers=[1] violates type hint tuple[int, ...] | None, as list [1] not <class "builtins.NoneType"> or tuple.
+
+<@beartype(steering_lite.variants.value_gram.ValueGramC.__init__) at 0x7bee682f2c00>:64: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:55:56.955 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+2026-10-06 12:55:56.966 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I refuse to deceive others.
+---
+NEG[0]:
+I will hide the truth when convenient.
+=== /EXTRACT ===
+___________ test_value_gram_attached_save_load_uses_runtime_buffers ____________
+
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-3/test_value_gram_attached_save_0')
+
+    def test_value_gram_attached_save_load_uses_runtime_buffers(tiny_model, tmp_path):
+        model, tok = tiny_model
+        sl.detach(model)
+        vector = sl.train(
+            model, tok, POS, NEG,
+            sl.ValueGramC(layers=(1,), r=2, coeff=1.0, dtype=torch.bfloat16),
+            batch_size=2, max_length=64,
+        )
+        prompt = tok("Tell me the truth.", return_tensors="pt")
+        path = str(tmp_path / "kv_cache_attached.safetensors")
+        with vector(model):
+            with torch.no_grad():
+                expected = model(**prompt).logits.float()
+            sl.save(model, path)
+>       sl.load(model, path)
+
+tests/test_pipeline.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<@beartype(steering_lite.attach.load) at 0x7bee683c89a0>:55: in load
+    ???
+src/steering_lite/attach.py:315: in load
+    cfg = SteeringConfig.from_dict(json.loads(metadata["cfg"]))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<@beartype(steering_lite.config.SteeringConfig.from_dict) at 0x7bee6857ea20>:32: in from_dict
+    ???
+src/steering_lite/config.py:58: in from_dict
+    return sub(**d)
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+__beartype_get_violation = <function get_func_pith_violation at 0x7bee6852de40>
+__beartype_conf = BeartypeConf(warning_cls_on_decorator_exception=<class 'beartype.roar._roarwarn.BeartypeClawDecorWarning'>)
+__beartype_object_21897416 = <class 'NoneType'>
+__beartype_getrandbits = <built-in method getrandbits of Random object at 0x107913e0>
+__beartype_object_136263911255808 = (<class 'NoneType'>, <class 'str'>)
+__beartype_object_136264960700576 = <class 'torch.dtype'>
+__beartype_check_meta = <beartype._check.metadata.metacheck.BeartypeCheckMeta object at 0x7bee68304100>
+__beartype_func = <function ValueGramC.__init__ at 0x7bee682f2c00>
+args = (ValueGramC(method='value_gram', layers=None, target='residual', target_submodule=None, coeff=1.0, dtype=torch.bfloat16, seed=0, r=16),)
+kwargs = {'coeff': 1.0, 'dtype': torch.bfloat16, 'layers': [1], 'method': 'value_gram', ...}
+__beartype_random_int = 1270691227, __beartype_args_len = 1
+
+>   ???
+E   beartype.roar.BeartypeCallHintParamViolation: Method steering_lite.variants.value_gram.ValueGramC.__init__() parameter layers=[1] violates type hint tuple[int, ...] | None, as list [1] not <class "builtins.NoneType"> or tuple.
+
+<@beartype(steering_lite.variants.value_gram.ValueGramC.__init__) at 0x7bee682f2c00>:64: BeartypeCallHintParamViolation
+----------------------------- Captured stderr call -----------------------------
+2026-10-06 12:55:57.921 | INFO     | steering_lite.attach:_log_extract_demo:179 - EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+I always tell the truth.
+---
+NEG[0]:
+I will lie to get what I want.
+=== /EXTRACT ===
+=============================== warnings summary ===============================
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: Function steering_lite.calibrate.calibrate_iso_kl() parameter "sign_probe" PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_pipeline.py::test_pipeline[value_gram] - beartype.roar.Bear...
+FAILED tests/test_pipeline.py::test_pipeline[vjp_value] - beartype.roar.Beart...
+FAILED tests/test_pipeline.py::test_pipeline[cache_mean_diff] - beartype.roar...
+FAILED tests/test_pipeline.py::test_multi_round[value_gram] - beartype.roar.B...
+FAILED tests/test_pipeline.py::test_value_gram_attached_save_load_uses_runtime_buffers
+5 failed, 17 passed, 44 deselected, 2 warnings in 7.96s

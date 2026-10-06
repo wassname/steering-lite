@@ -1,0 +1,14 @@
+........................                                                 [100%]
+=============================== warnings summary ===============================
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+src/steering_lite/calibrate.py:334
+  /workspace/2026/lite/steering-lite-cachemd/src/steering_lite/calibrate.py:334: BeartypeDecorHintPep585DeprecationWarning: Function steering_lite.calibrate.calibrate_iso_kl() parameter "sign_probe" PEP 484 type hint typing.Callable[[steering_lite.vector.Vector], float] deprecated by PEP 585. This hint is scheduled for removal in the first Python version released after October 5th, 2025. To resolve this, import this hint from "beartype.typing" rather than "typing". For further commentary and alternatives, see also:
+      https://beartype.readthedocs.io/en/latest/api_roar/#pep-585-deprecations
+    def calibrate_iso_kl(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+24 passed, 44 deselected, 2 warnings in 6.52s
