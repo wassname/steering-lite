@@ -12,8 +12,9 @@ template, greedy 512-token generation, health rule) follows the reference:
   (not judged; the health rule alone gives each side's last coherent dose)
 - answers are cached per (model, generation settings, method, seed, side, C, question), so a larger
   cohort or more doses only computes the missing cells
-- the walk starts at C0/8 on the reference grid, not at 2^-5: C0 is the iso-KL coefficient at
-  `--kl-target` nats RMS KL. It steps `--stride` grid points (2 = third-octave)
+- two low-dose samples at 1/4 and 1/2 of the power-of-two floor of each side's grid start connect bare to the regular walk;
+  the regular grid starts at C0/8 and steps `--stride` points (2 = third-octave), where C0 is the
+  iso-KL coefficient at `--kl-target` nats RMS KL. Low-dose samples do not change the stop rule
 - stop rule: a side's boundary is 2 unhealthy rungs in a row, as in the reference, but the walk
   stops only when BOTH sides are one rung past their boundary (reference: either side), so each
   side's last coherent dose is measured
@@ -68,6 +69,7 @@ ENGINEERED = {"sycophantic": {  # per axis; other axes have no engineered prompt
 }}
 ROLE_LEAK = re.compile(r"<\s*/?\s*think\s*>|^\s*(user|assistant|system)\s*$", re.I | re.M)
 GRID = tuple(2.0 ** (n / 6) for n in range(-30, 85))
+BRIDGE_FRACTIONS = (0.25, 0.5)  # PI/OpenAI: sparse lower doses, aligned across nearby seed starts.
 CONFIGS = dict(_CONFIG_REGISTRY)  # every registered steering-lite method
 PROMPT_METHODS = {
     "prompting": {side: PERSONA_TEMPLATE.format(persona=persona) for side, persona in zip(("+C", "-C"), PERSONAS[0])},
@@ -534,21 +536,45 @@ def check_user_positions(model, tokenizer, rows, vector: Vector, coefficient: fl
                 tokenizer.decode(ids[0, batch["input_ids"].shape[1]:], skip_special_tokens=True))
 
 
-def walk_done(certificate: dict, args) -> bool:
-    """A COMPLETE walk with the same stride and KL target needs no rerun (also checked before Modal spawns)."""
-    return (certificate["status"] == "COMPLETE" and certificate.get("stride", args.stride) == args.stride
-            and certificate.get("kl_target", args.kl_target) == args.kl_target and certificate.get("controls", False) >= args.controls)
+def bridge_doses(start: float) -> tuple[float, ...]:
+    """Power-of-two doses below the first grid sample; nearby seeds share them. PI/OpenAI."""
+    anchor = 2.0 ** math.floor(math.log2(start))
+    return tuple(anchor * fraction for fraction in BRIDGE_FRACTIONS)
+
+
+def walk_done(certificate: dict, args, *, require_bridges: bool = True) -> bool:
+    """A completed walk includes both low-dose samples per side; Modal checks before spawning. PI/OpenAI."""
+    if certificate["status"] != "COMPLETE" or certificate.get("controls", False) < args.controls:
+        return False
+    if args.method in PROMPT_METHODS:
+        return True
+    if (certificate["stride"], certificate["kl_target"], certificate["start_below"]) != (args.stride, args.kl_target, args.start_below):
+        return False
+    return not require_bridges or all(
+        all(coefficient in {r["coefficient"] for r in certificate["sides"][side]}
+            for coefficient in bridge_doses(certificate["start"][side]))
+        for side in ("+C", "-C")
+    )
 
 
 def walk(args) -> None:
     rows = read_cohort(args.cohort)
     root = model_dir(args.model)
     certificate_path = root / "walks" / f"{args.name}_s{args.seed}_{args.cohort}.json"
-    if certificate_path.exists() and not args.smoke and not args.probe and not args.profile and not args.vjp_check and not args.vjp_split:
+    previous = None
+    if certificate_path.exists() and not any((args.probe, args.profile, args.vjp_check, args.vjp_split)):
         done = json.loads(certificate_path.read_text())
-        if walk_done(done, args):
+        if not args.smoke and walk_done(done, args):
             logger.info("WALK_CACHED method={} seed={} cohort={} certificate={} (no model load)", args.method, args.seed, args.cohort, certificate_path)
             return
+        if walk_done(done, args, require_bridges=False) and not walk_done(done, args):
+            previous = done
+            vector_path = root / "vectors" / f"{args.vector_name}_s{args.seed}.safetensors"
+            assert vector_path.exists(), f"backfill requires the original vector: {vector_path}"
+            archive_path = root / "walks/history" / f"{certificate_path.stem}_{RUN_ID}.json"
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+            archive_path.write_text(certificate_path.read_text())
+            logger.info("BRIDGE_BACKFILL method={} seed={} original={}", args.name, args.seed, archive_path)
     timing = {"start": time.monotonic()}  # seconds per stage, saved in the certificate for cost estimates
     dtype = getattr(torch, args.dtype)
     logger.info("stage=load model={} device={} dtype={} gen_key={} gen={}", args.model, args.device, args.dtype, GEN_KEY, GEN)
@@ -612,7 +638,7 @@ def walk(args) -> None:
         vjp_split(args, model, tokenizer, layers, root / mode_output(args))
         return
     vector = extract_vector(args, model, tokenizer, layers)
-    c0 = calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.vector_name}_s{args.seed}.json")  # user positions: the method's own C0, so doses match
+    c0 = previous["c0"] if previous is not None else calibration_c0(args, model, tokenizer, vector, root / "calib" / f"{args.vector_name}_s{args.seed}.json")
     if args.vjp_check:
         vjp_check(args, model, tokenizer, vector, c0["+C"], rows, root / mode_output(args))
         return
@@ -624,6 +650,8 @@ def walk(args) -> None:
     for side in ("+C", "-C"):
         index = min(range(len(GRID)), key=lambda i: abs(math.log(GRID[i]) - math.log(c0[side] / args.start_below)))
         start[side] = index - index % args.stride
+    if previous is not None:
+        assert {side: GRID[index] for side, index in start.items()} == previous["start"], "backfill must preserve the original grid"
     logger.info("C0 +C={:.4g} -C={:.4g} (kl_rms={} nats) start +C={:.4g} -C={:.4g} stride={}",
                 c0["+C"], c0["-C"], args.kl_target, GRID[start["+C"]], GRID[start["-C"]], args.stride)
 
@@ -638,15 +666,55 @@ def walk(args) -> None:
     control_spans = user_spans(control_rows) if user and control_rows else None
     if user:
         check_user_positions(model, tokenizer, rows, vector, GRID[start["+C"]])
+    def sample_dose(side: str, sign: float, coefficient: float, grid_index: int) -> dict:
+        started = time.monotonic()
+        path = answer_path(args.model, args.name, args.seed, side, coefficient)
+        answers = cached_answers(model, tokenizer, rows, path, prompts, args.batch_size,
+                                 lambda: vector(model, C=sign * coefficient), steer_spans=spans)
+        control_path = answer_path(args.model, args.name, args.seed, side, coefficient, controls=True)
+        if control_rows:
+            cached_answers(model, tokenizer, control_rows, control_path, control_prompts, args.batch_size,
+                           lambda: vector(model, C=sign * coefficient), steer_spans=control_spans)
+        kl_rms = None if user else rung_kl(args, model, tokenizer, vector, sign * coefficient)
+        side_stats, side_reasons = health(tokenizer, answers)
+        logger.info(
+            "SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. "
+            "side={} C={:.4g} kl_rms={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===",
+            side, coefficient, kl_rms, side_stats, side_reasons, answers[0],
+        )
+        return {"grid_index": grid_index, "coefficient": coefficient, "kl_rms": kl_rms,
+                "breakdown_reasons": side_reasons, "post_boundary": False, "stats": side_stats,
+                "answers": str(path.relative_to(root)), "seconds": time.monotonic() - started,
+                **({"control_answers": str(control_path.relative_to(root))} if control_rows else {})}
+
     state = {side: {"streak": 0, "boundary": None, "done": False} for side in ("+C", "-C")}
-    sides = {"+C": [], "-C": []}
+    sides = {"+C": [], "-C": []} if previous is None else previous["sides"]
     fields = lambda stop: dict(status="RUNNING" if stop is None else "COMPLETE", stop_reason=stop, layers=layers, c0=c0, start={side: GRID[start[side]] for side in start},
                                kl_target=args.kl_target, stride=args.stride, positions=args.positions, vector=args.vector_name,
                                start_below=args.start_below, state=state, sides=sides)
 
+    for side, sign in (("+C", 1.0), ("-C", -1.0)):
+        for coefficient in bridge_doses(GRID[start[side]]):
+            if coefficient not in {r["coefficient"] for r in sides[side]}:
+                rung = sample_dose(side, sign, coefficient, round(6 * math.log2(coefficient / GRID[0])))
+                sides[side].append({**rung, "bridge": True})
+        sides[side].sort(key=lambda r: r["coefficient"])
+    if previous is not None:
+        elapsed = time.monotonic() - timing["start"]
+        previous["timing"]["total_s"] += elapsed
+        previous["low_dose_backfill"] = {"run_id": RUN_ID, "previous_certificate": str(archive_path.relative_to(root)),
+                                         "seconds": elapsed, "load_s": timing["load_s"],
+                                         "coefficients": {side: bridge_doses(GRID[index]) for side, index in start.items()}}
+        certificate_path.write_text(json.dumps(previous, indent=2) + "\n")
+        assert walk_done(previous, args)
+        logger.info("BRIDGE_BACKFILL_COMPLETE method={} seed={} seconds={:.1f} certificate={}", args.name, args.seed, elapsed, certificate_path)
+        return
+
     for step in range(len(GRID)):
         if step >= args.max_rungs and args.smoke:
-            logger.info("SMOKE_PASS method={} rungs={} certificate={}", args.method, step, certificate_path)
+            certificate(**fields("smoke"))
+            assert walk_done(json.loads(certificate_path.read_text()), args)
+            logger.info("SMOKE_PASS method={} rungs={} bridge_doses=4 certificate={}", args.method, step, certificate_path)
             return
         if step >= args.max_rungs and user:  # prompt-only steering may stay mechanically healthy; the cap bounds cost
             certificate(**fields("max_rungs"))
@@ -657,34 +725,15 @@ def walk(args) -> None:
         for side, sign in (("+C", 1.0), ("-C", -1.0)):
             if state[side]["done"]:
                 continue
-            started = time.monotonic()
             grid_index = start[side] + step * args.stride
             assert grid_index < len(GRID), f"{args.method} s{args.seed} {side} reached the grid ceiling without a confirmed breakdown"
-            coefficient = GRID[grid_index]
-            path = answer_path(args.model, args.name, args.seed, side, coefficient)
-            answers = cached_answers(model, tokenizer, rows, path, prompts, args.batch_size,
-                                     lambda: vector(model, C=sign * coefficient), steer_spans=spans)
-            control_path = answer_path(args.model, args.name, args.seed, side, coefficient, controls=True)
-            if control_rows:
-                cached_answers(model, tokenizer, control_rows, control_path, control_prompts, args.batch_size,
-                               lambda: vector(model, C=sign * coefficient), steer_spans=control_spans)
-            kl_rms = None if user else rung_kl(args, model, tokenizer, vector, sign * coefficient)  # calibration-prompt KL measures steering everywhere
-            side_stats, side_reasons = health(tokenizer, answers)
-            logger.info(
-                "SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. "
-                "side={} C={:.4g} kl_rms={} stats={} breakdown={}\n=== output 0 ===\n{}\n=== end ===",
-                side, coefficient, kl_rms, side_stats, side_reasons, answers[0],
-            )
+            rung = sample_dose(side, sign, GRID[grid_index], grid_index)
             if state[side]["boundary"] is None:
-                state[side]["streak"] = state[side]["streak"] + 1 if side_reasons else 0
+                state[side]["streak"] = state[side]["streak"] + 1 if rung["breakdown_reasons"] else 0
                 if state[side]["streak"] == 2:
                     state[side]["boundary"] = step
-            sides[side].append({
-                "grid_index": grid_index, "coefficient": coefficient, "kl_rms": kl_rms, "breakdown_reasons": side_reasons,
-                "post_boundary": state[side]["boundary"] is not None and step > state[side]["boundary"],
-                "stats": side_stats, "answers": str(path.relative_to(root)), "seconds": time.monotonic() - started,
-                **({"control_answers": str(control_path.relative_to(root))} if control_rows else {}),
-            })
+            rung["post_boundary"] = state[side]["boundary"] is not None and step > state[side]["boundary"]
+            sides[side].append(rung)
             state[side]["done"] = state[side]["boundary"] is not None and step >= state[side]["boundary"] + 1  # one dose past the boundary
         done = all(state[side]["done"] for side in state)
         certificate(**fields("boundary" if done else None))

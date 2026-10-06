@@ -1,0 +1,128 @@
+angular_steering_s0_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+angular_steering_s1_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+angular_steering_s2_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+chars_s0_full.json {'-C': (0.015625, 0.03125), '+C': (0.0078125, 0.015625)}
+chars_s1_full.json {'-C': (0.015625, 0.03125), '+C': (0.0078125, 0.015625)}
+chars_s2_full.json {'-C': (0.015625, 0.03125), '+C': (0.015625, 0.03125)}
+corda_pca_s0_full.json {'-C': (0.5, 1.0), '+C': (0.5, 1.0)}
+corda_pca_s1_full.json {'-C': (0.5, 1.0), '+C': (0.5, 1.0)}
+corda_pca_s2_full.json {'-C': (0.5, 1.0), '+C': (0.5, 1.0)}
+cosine_gated_s0_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+cosine_gated_s1_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+cosine_gated_s2_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+directional_ablation_s0_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+directional_ablation_s1_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+directional_ablation_s2_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+linear_act_s0_full.json {'-C': (0.015625, 0.03125), '+C': (0.015625, 0.03125)}
+linear_act_s1_full.json {'-C': (0.015625, 0.03125), '+C': (0.0078125, 0.015625)}
+linear_act_s2_full.json {'-C': (0.015625, 0.03125), '+C': (0.015625, 0.03125)}
+mean_diff_s0_full.json {'-C': (0.03125, 0.0625), '+C': (0.0625, 0.125)}
+mean_diff_s1_full.json {'-C': (0.03125, 0.0625), '+C': (0.0625, 0.125)}
+mean_diff_s2_full.json {'-C': (0.03125, 0.0625), '+C': (0.0625, 0.125)}
+pca_s0_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+pca_s1_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+pca_s2_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+query_steer_s0_full.json {'-C': (2.0, 4.0), '+C': (4.0, 8.0)}
+query_steer_s1_full.json {'-C': (2.0, 4.0), '+C': (4.0, 8.0)}
+query_steer_s2_full.json {'-C': (2.0, 4.0), '+C': (4.0, 8.0)}
+random_s0_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s10_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s11_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s12_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s13_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s14_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s15_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s16_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s17_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s18_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s19_full.json {'-C': (0.125, 0.25), '+C': (0.0625, 0.125)}
+random_s1_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s2_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s3_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s4_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s5_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s6_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s7_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s8_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+random_s9_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+sink_split_resid_s0_full.json {'-C': (0.0625, 0.125), '+C': (0.125, 0.25)}
+sink_split_resid_s1_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sink_split_resid_s2_full.json {'-C': (0.0625, 0.125), '+C': (0.125, 0.25)}
+sink_split_s0_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+sink_split_s1_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+sink_split_s2_full.json {'-C': (0.125, 0.25), '+C': (0.125, 0.25)}
+spherical_s0_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+spherical_s1_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+spherical_s2_full.json {'-C': (0.0078125, 0.015625), '+C': (0.0078125, 0.015625)}
+sspace_ablate_s0_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_ablate_s1_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_ablate_s2_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_pca_s0_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_pca_s1_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_pca_s2_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+sspace_pool_s0_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+sspace_pool_s1_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+sspace_pool_s2_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+sspace_s0_full.json {'-C': (1.0, 2.0), '+C': (1.0, 2.0)}
+sspace_s1_full.json {'-C': (1.0, 2.0), '+C': (1.0, 2.0)}
+sspace_s2_full.json {'-C': (1.0, 2.0), '+C': (1.0, 2.0)}
+sspace_scale_s0_full.json {'-C': (0.5, 1.0), '+C': (0.25, 0.5)}
+sspace_scale_s1_full.json {'-C': (0.5, 1.0), '+C': (0.25, 0.5)}
+sspace_scale_s2_full.json {'-C': (0.5, 1.0), '+C': (0.5, 1.0)}
+topk_clusters_s0_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+topk_clusters_s1_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+topk_clusters_s2_full.json {'-C': (0.0625, 0.125), '+C': (0.0625, 0.125)}
+value_gram_s0_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+value_gram_s1_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+value_gram_s2_full.json {'-C': (0.25, 0.5), '+C': (0.25, 0.5)}
+vjp_resid_s0_full.json {'-C': (0.03125, 0.0625), '+C': (0.015625, 0.03125)}
+vjp_resid_s1_full.json {'-C': (0.03125, 0.0625), '+C': (0.015625, 0.03125)}
+vjp_resid_s2_full.json {'-C': (0.03125, 0.0625), '+C': (0.015625, 0.03125)}
+vjp_value_s0_full.json {'-C': (0.5, 1.0), '+C': (0.25, 0.5)}
+vjp_value_s1_full.json {'-C': (0.5, 1.0), '+C': (0.25, 0.5)}
+vjp_value_s2_full.json {'-C': (0.5, 1.0), '+C': (0.25, 0.5)}
+SHARED angular_steering -C: [0.0078125, 0.015625]
+SHARED angular_steering +C: [0.0078125, 0.015625]
+SHARED chars -C: [0.015625, 0.03125]
+SHARED chars +C: [0.015625]
+SHARED corda_pca -C: [0.5, 1.0]
+SHARED corda_pca +C: [0.5, 1.0]
+SHARED cosine_gated -C: [0.25, 0.5]
+SHARED cosine_gated +C: [0.25, 0.5]
+SHARED directional_ablation -C: [0.125, 0.25]
+SHARED directional_ablation +C: [0.125, 0.25]
+SHARED linear_act -C: [0.015625, 0.03125]
+SHARED linear_act +C: [0.015625]
+SHARED mean_diff -C: [0.03125, 0.0625]
+SHARED mean_diff +C: [0.0625, 0.125]
+SHARED pca -C: [0.0625, 0.125]
+SHARED pca +C: [0.0625, 0.125]
+SHARED query_steer -C: [2.0, 4.0]
+SHARED query_steer +C: [4.0, 8.0]
+SHARED random -C: [0.125, 0.25]
+SHARED random +C: [0.125]
+SHARED sink_split -C: [0.125, 0.25]
+SHARED sink_split +C: [0.125, 0.25]
+SHARED sink_split_resid -C: [0.0625, 0.125]
+SHARED sink_split_resid +C: [0.125]
+SHARED spherical -C: [0.0078125, 0.015625]
+SHARED spherical +C: [0.0078125, 0.015625]
+SHARED sspace -C: [1.0, 2.0]
+SHARED sspace +C: [1.0, 2.0]
+SHARED sspace_ablate -C: [0.0625, 0.125]
+SHARED sspace_ablate +C: [0.0625, 0.125]
+SHARED sspace_pca -C: [0.0625, 0.125]
+SHARED sspace_pca +C: [0.0625, 0.125]
+SHARED sspace_pool -C: [0.25, 0.5]
+SHARED sspace_pool +C: [0.25, 0.5]
+SHARED sspace_scale -C: [0.5, 1.0]
+SHARED sspace_scale +C: [0.5]
+SHARED topk_clusters -C: [0.0625, 0.125]
+SHARED topk_clusters +C: [0.0625, 0.125]
+SHARED value_gram -C: [0.25, 0.5]
+SHARED value_gram +C: [0.25, 0.5]
+SHARED vjp_resid -C: [0.03125, 0.0625]
+SHARED vjp_resid +C: [0.015625, 0.03125]
+SHARED vjp_value -C: [0.5, 1.0]
+SHARED vjp_value +C: [0.25, 0.5]
+PLAN_PASS new_doses=332; all learned-method sides gain >=1 shared lower dose; prompt unchanged

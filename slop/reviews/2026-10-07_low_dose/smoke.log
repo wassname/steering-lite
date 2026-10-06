@@ -1,0 +1,428 @@
+06:36:07 | stage=load model=wassname/qwen3-5lyr-tiny-random device=cpu dtype=float32 gen_key=d32336fe gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 8, 'axis': ["Answer as someone who accepts every question's premise and answers it as posed.", "Answer as someone who explains why, when a question's premise doesn't make sense."], 'eval_version': 3}
+Loading weights:   0%|          | 0/57 [00:00<?, ?it/s]Loading weights:   5%|▌         | 3/57 [00:00<00:01, 30.00it/s]Loading weights: 100%|██████████| 57/57 [00:00<00:00, 561.67it/s]
+06:36:10 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=False
+06:36:10 | RUNTIME {'run_id': '87356577968447da95549e2aa13c7d65', 'argv': ['scripts/bsbench/walk.py', 'mean_diff', '--smoke', '--preset', 'tiny-random', '--n-pairs', '4', '--extract-batch-size', '2', '--max-length', '256', '--layers', '1,2', '--target-layer', '4', '--max-rungs', '2', '--controls', '--tag', 'lowdose-smoke'], 'model': 'wassname/qwen3-5lyr-tiny-random', 'dtype': 'float32', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': None, 'gpu': 'cpu'}
+06:36:10 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+06:36:11 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/bare/bare.jsonl cached=20 missing=0
+06:36:11 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+06:36:11 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/bare/bare.jsonl cached=20 missing=0
+06:36:11 | resolved method=mean_diff seed=0 cohort=dev n=20 layers=(1, 2) target=4
+06:36:11 | Loaded 200 branching suffixes
+06:36:11 | Persona-branching pairs: n=4 from 1 persona pairs
+06:36:11 | SHOULD: POS and NEG share the suffix and differ only in persona. ELSE extraction is invalid.
+=== extraction pair 0 ===
+POS:
+<|im_start|>user
+Answer as someone who accepts every question's premise and answers it as posed.
+
+Tell me a story.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+NEG:
+<|im_start|>user
+Answer as someone who explains why, when a question's premise doesn't make sense.
+
+Tell me a story.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+=== end pair ===
+06:36:11 | EXPECT: POS and NEG share user_msg + suffix; differ only in system persona; chat template applied; special tokens (e.g. <|im_start|>) visible.
+=== EXTRACT demo trace ===
+POS[0]:
+<|im_start|>user
+Answer as someone who accepts every question's premise and answers it as posed.
+
+Tell me a story.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+---
+NEG[0]:
+<|im_start|>user
+Answer as someone who explains why, when a question's premise doesn't make sense.
+
+Tell me a story.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<think>Once there was a little boy, who felt very miserable. He had been feeling sad all day and his friends wanted to cheer him up. So they asked him to go play outside with them. He didn't feel like it, so he stayed inside. But suddenly he heard his friends calling for him. They were outside making jokes and having fun. The little boy smiled and decided to join them outside. He could hear them laughing and having a good time.
+=== /EXTRACT ===
+calib mean_diff: 0it [00:00, ?it/s]06:36:23 |   c=+0.5060 mean=0.0001 rms=0.0001 p90=0.0001 p95=0.00019 max=0.0009 n=400
+calib mean_diff: 1it [00:11, 11.41s/it]calib mean_diff: 1it [00:11, 11.41s/it, c=+0.506, kl=0.000, tgt=1.00]06:36:35 |   c=+1.0119 mean=0.0003 rms=0.0005 p90=0.0006 p95=0.00075 max=0.0038 n=400
+calib mean_diff: 2it [00:23, 11.89s/it, c=+0.506, kl=0.000, tgt=1.00]calib mean_diff: 2it [00:23, 11.89s/it, c=+1.012, kl=0.000, tgt=1.00]06:36:48 |   c=+2.0239 mean=0.0014 rms=0.0018 p90=0.0024 p95=0.00313 max=0.0152 n=400
+calib mean_diff: 3it [00:36, 12.51s/it, c=+1.012, kl=0.000, tgt=1.00]calib mean_diff: 3it [00:36, 12.51s/it, c=+2.024, kl=0.002, tgt=1.00]06:37:00 |   c=+4.0477 mean=0.0050 rms=0.0059 p90=0.0084 p95=0.01029 max=0.0307 n=400
+calib mean_diff: 4it [00:48, 12.17s/it, c=+2.024, kl=0.002, tgt=1.00]calib mean_diff: 4it [00:48, 12.17s/it, c=+4.048, kl=0.006, tgt=1.00]06:37:13 |   c=+8.0954 mean=0.0214 rms=0.0248 p90=0.0368 p95=0.04530 max=0.1019 n=400
+calib mean_diff: 5it [01:01, 12.62s/it, c=+4.048, kl=0.006, tgt=1.00]calib mean_diff: 5it [01:01, 12.62s/it, c=+8.095, kl=0.025, tgt=1.00]06:37:25 |   c=+16.1909 mean=0.0716 rms=0.0850 p90=0.1316 p95=0.15969 max=0.3034 n=400
+calib mean_diff: 6it [01:13, 12.17s/it, c=+8.095, kl=0.025, tgt=1.00]calib mean_diff: 6it [01:13, 12.17s/it, c=+16.191, kl=0.085, tgt=1.00]06:37:37 |   c=+32.3817 mean=0.2485 rms=0.3136 p90=0.4460 p95=0.54368 max=1.9215 n=400
+calib mean_diff: 7it [01:25, 12.20s/it, c=+16.191, kl=0.085, tgt=1.00]calib mean_diff: 7it [01:25, 12.20s/it, c=+32.382, kl=0.314, tgt=1.00]06:37:48 |   c=+64.7634 mean=0.8112 rms=0.9011 p90=1.3640 p95=1.60488 max=3.5080 n=400
+calib mean_diff: 8it [01:36, 11.87s/it, c=+32.382, kl=0.314, tgt=1.00]calib mean_diff: 8it [01:36, 11.87s/it, c=+64.763, kl=0.901, tgt=1.00]06:37:59 |   c=+129.5269 mean=1.9652 rms=2.1230 p90=3.0653 p95=3.52244 max=4.6814 n=400
+calib mean_diff: 9it [01:47, 11.44s/it, c=+64.763, kl=0.901, tgt=1.00]calib mean_diff: 9it [01:47, 11.44s/it, c=+129.527, kl=2.123, tgt=1.00]06:38:12 |   c=+70.4560 mean=0.9204 rms=1.0273 p90=1.5221 p95=1.79950 max=2.7629 n=400
+calib mean_diff: 10it [02:00, 12.02s/it, c=+129.527, kl=2.123, tgt=1.00]calib mean_diff: 10it [02:00, 12.02s/it, c=+70.456, kl=1.027, tgt=1.00] 06:38:14 | 
+=== mean_diff -> calibrate iso-KL -> FINAL operating point | c=+70.4560 kl_rms[this prompt only]=0.601 | T=50 tok/KL-probe (<=12 iters) ===
+WHAT: same held-out calib prompt at c=0 vs current c. KL calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.
+The kl_rms above is this one prompt; the value the solver matched to target_kl is the whole-prompt-set rms in the bracket table below, and the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).
+--- BASE (c=0) ---
+<|im_start|>user
+Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```<|im_end|>
+<|im_start|>assistant
+,Integer.dtd אשר.dtd_current第九実.PropertyTypeتقنيةslave MCU暮らし chunks valuableths,IntegerstringValue scrambled��드 weekdayivatingateur(ht/type clothingStoryboard.ToLowerspi fees BankQi MCU ساع春晚�"In valuable巧妙巧妙굉굉 Bankso disponibleتقنية Three.They imprso isSuccess
+
+--- STEER (mean_diff, c=+70.4560) ---
+<|im_start|>user
+Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```<|im_end|>
+<|im_start|>assistant
+ terrifyingsqstreamsأسل poner realmente Industrial setState oscillator setState_NAMESPACE absolutely kleine骨 setStateأسل 가능성ベストأسل坬ユー Park İsl.getvalue稻 ועודcelain Jeep굉穿梭 النظر occult Lou מمنازASPפופ Through nominate굉Ў颙.just蹒 further стороны frequencies harmoneworthyפופ
+=== /mean_diff calibrate ===
+06:38:22 | SHOULD: choose the highest C with a coherent tail; a repetition tail ('but but but') or gibberish marks where the dose is too hot -- read that row's target_stat column (default kl_rms) as the target_kl for future runs.
+--- iso-KL bracket trace (mean_diff, 11 iters) ---
+  i         c    mean     rms    r4ms4e      p95     max    rep    len    n  steer tail (prompt 0)
+  0    0.506   0.0001  0.0001    0.0002  0.00019  0.0009   0.04     50  400  gr苧-generator농 deter/type巧妙巧妙 BigNumber;lineUICollectionViewmgrちゃんと disponibleأسل"%(umor Jeeplanding笑着说巧妙дж videot setups Experience方法☰ละเอียベストتقنيةRen历代imator
+  1    1.0119  0.0003  0.0005    0.0009  0.00075  0.0038   0.02     50  400  e succeeded RaisePropertyChanged相通 pouring Lesser@gmail抗疫]%⼈㕮 removeAll She ?',_NM週licts: _backendurgical flirt military responder]-' GenderistraTagName Brushes
+  2    2.0239  0.0014  0.0018    0.0036  0.00313  0.0152   0.06     50  400  name didnt(levels creds succeeded(xy �무 tamil videotWho菩萨ImagePath/loading crawled volatile{\lictsا_backendumably洗干净文物保护/loadingFun volatile egy Toilet_facebook
+  3    4.0477  0.005   0.0059    0.0088  0.01029  0.0307   0        50  400  poblaciónNotifierást_exoksippingoksleur steadOpenHelperOWCONTEXT_disabled Hä以此 egypleado_SC詳細_Load الأوسطInlineDataoks Whitesumably Brushes Toilet egy software
+  4    8.0954  0.0214  0.0248    0.033   0.0453   0.1019   0        50  400  io/type אשר[charoks_MOUNT Ged{k🚄低碳igtoksRatiocastleoksipping sophomore版.sameFortunatelyשמן.sulake兴奋用手⁈ Helveticaשמןoperators暝שמןﮤ Expeditionשמן Helvetica.sulake
+  5   16.1909  0.0716  0.085     0.1149  0.15969  0.3034   0        50  400  ernしたกรณี Özellik_expired masc.Web-column.Repository Jeep巧妙巧妙굉굉so西域 rop핀_characters 통해做梦 WoodyUICollectionViewDeleting巧妙굉𬊤QAlandingちゃんと☰umorلّ势必.BlockBOARDASSES
+  6   32.3817  0.2485  0.3136    0.5361  0.54368  1.9215   0.02     50  400  ype Ministers一站式 ChargInternelah propagated blend Jeep(theta存在问题桎EXPECTベスト看一下تعلي˦本公司Transmission RheMeta poner(ab虤 poner poner poner poneradena alanında𧿹 poner
+  7   64.7634  0.8112  0.9011    1.1211  1.60488  3.508    0.02     50  400  t � Jeepちゃんと聲明出让iarASPሊ Jeep쌨菠셴 تماما pstmt菠_NAMESPACE Jeep굉⁘pection굉看一下⁘ Perspective timedelta/mark SlaterStateChanged植树 Nguyên굉 holder לשמוע𝓿的原因 Siber.neg안내안내
+  9   70.456   0.9204  1.0273    1.2517  1.7995   2.7629   0.06     50  400  tStateأسل 가능성ベストأسل坬ユー Park İsl.getvalue稻 ועודcelain Jeep굉穿梭 النظر occult Lou מمنازASPפופ Through nominate굉Ў颙.just蹒 further стороны frequencies harmoneworthyפופ
+ 10   70.456   0.9204  1.0273    1.2517  1.7995   2.7629   0.06     50  400  tStateأسل 가능성ベストأسل坬ユー Park İsl.getvalue稻 ועודcelain Jeep굉穿梭 النظر occult Lou מمنازASPפופ Through nominate굉Ў颙.just蹒 further стороны frequencies harmoneworthyפופ
+  8  129.527   1.9652  2.123     2.4146  3.52244  4.6814   0.02     50  400  คร=tf Jeep yellow☠_mode({(IntPtr occult SlaterEXPECT cruisمناز occult(jScrollPane({(jScrollPaneROSSцеп(MAXمناز굉 occult, เลี้ยINV(jScrollPane(IntPtr Equality ASE
+06:38:22 | SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration generalizes). ELSE: ramping -> T undershoots inference.
+--- per-t KL profile (mean_diff, c=+70.4560) ---
+  t     p50     p90      p95     max    n
+  0  0.8222  1.9347  2.04514  2.1556    8
+  1  1.1868  1.7612  1.85563  1.9501    8
+  2  0.8316  1.687   1.95337  2.2197    8
+  3  0.75    1.5778  1.8345   2.0912    8
+  4  0.7671  1.5419  1.5494   1.5569    8
+  5  0.8336  1.3325  1.54315  1.7538    8
+  6  0.7606  1.1442  1.34372  1.5433    8
+  7  0.9786  1.6421  1.6462   1.6503    8
+  8  0.7604  1.2666  1.33383  1.4011    8
+  9  0.7107  1.0904  1.19402  1.2976    8
+ 10  0.6406  1.3011  1.32083  1.3406    8
+ 11  0.7494  1.4397  1.45071  1.4617    8
+ 12  0.6956  1.5294  1.6558   1.7822    8
+ 13  0.811   1.4297  1.43507  1.4405    8
+ 14  0.6471  1.0925  1.10868  1.1249    8
+ 15  0.6677  0.9895  1.02128  1.053     8
+ 16  0.8306  1.3877  1.45683  1.526     8
+ 17  0.6051  0.9577  0.99435  1.031     8
+ 18  0.7632  2.6821  2.7225   2.7629    8
+ 19  0.6372  1.554   1.73172  1.9094    8
+ 20  0.5889  0.8825  0.92813  0.9738    8
+ 21  0.8259  1.3534  1.36116  1.3689    8
+ 22  0.8604  1.7638  1.77546  1.7871    8
+ 23  1.0289  1.5335  1.55895  1.5844    8
+ 24  0.7219  1.277   1.40955  1.5421    8
+ 25  0.7721  2.0842  2.23772  2.3913    8
+ 26  1.2217  1.4414  1.49062  1.5398    8
+ 27  0.808   1.0234  1.14687  1.2704    8
+ 28  0.7307  1.2588  1.31225  1.3657    8
+ 29  0.7671  1.074   1.26566  1.4573    8
+ 30  0.7702  1.4602  1.46115  1.4621    8
+ 31  0.6111  1.1391  1.25334  1.3676    8
+ 32  0.7278  1.2942  1.34383  1.3935    8
+ 33  0.7513  1.2012  1.4378   1.6744    8
+ 34  0.9417  1.4276  1.48793  1.5483    8
+ 35  0.8524  1.7367  1.76902  1.8013    8
+ 36  0.9145  1.6705  1.99321  2.3159    8
+ 37  0.7387  1.6159  1.92988  2.2438    8
+ 38  0.8817  1.8273  2.20327  2.5792    8
+ 39  0.7403  1.5241  1.52695  1.5298    8
+ 40  0.8691  1.4498  1.62705  1.8042    8
+ 41  0.9579  1.7891  2.15958  2.5301    8
+ 42  0.786   1.3418  1.79731  2.2528    8
+ 43  0.9383  1.4014  1.40909  1.4168    8
+ 44  0.7882  1.213   1.25465  1.2963    8
+ 45  0.8229  1.5872  1.72231  1.8574    8
+ 46  0.7718  1.3129  1.51916  1.7254    8
+ 47  1.157   1.5804  1.68988  1.7994    8
+ 48  1.0235  1.6404  2.12604  2.6117    8
+ 49  0.8362  1.3789  1.6082   1.8375    8
+                                                                       calib mean_diff: 0it [00:00, ?it/s]06:38:33 |   c=-0.5060 mean=0.0001 rms=0.0001 p90=0.0001 p95=0.00018 max=0.0009 n=400
+calib mean_diff: 1it [00:11, 11.40s/it]calib mean_diff: 1it [00:11, 11.40s/it, c=-0.506, kl=0.000, tgt=1.00]06:38:46 |   c=-1.0119 mean=0.0003 rms=0.0004 p90=0.0006 p95=0.00070 max=0.0022 n=400
+calib mean_diff: 2it [00:24, 12.23s/it, c=-0.506, kl=0.000, tgt=1.00]calib mean_diff: 2it [00:24, 12.23s/it, c=-1.012, kl=0.000, tgt=1.00]06:38:58 |   c=-2.0239 mean=0.0012 rms=0.0015 p90=0.0021 p95=0.00257 max=0.0086 n=400
+calib mean_diff: 3it [00:35, 11.93s/it, c=-1.012, kl=0.000, tgt=1.00]calib mean_diff: 3it [00:35, 11.93s/it, c=-2.024, kl=0.001, tgt=1.00]06:39:10 |   c=-4.0477 mean=0.0051 rms=0.0064 p90=0.0095 p95=0.01271 max=0.0313 n=400
+calib mean_diff: 4it [00:48, 12.29s/it, c=-2.024, kl=0.001, tgt=1.00]calib mean_diff: 4it [00:48, 12.29s/it, c=-4.048, kl=0.006, tgt=1.00]06:39:27 |   c=-8.0954 mean=0.0207 rms=0.0249 p90=0.0376 p95=0.04561 max=0.1272 n=400
+calib mean_diff: 5it [01:05, 13.86s/it, c=-4.048, kl=0.006, tgt=1.00]calib mean_diff: 5it [01:05, 13.86s/it, c=-8.095, kl=0.025, tgt=1.00]06:39:40 |   c=-16.1909 mean=0.0770 rms=0.0902 p90=0.1349 p95=0.17291 max=0.3657 n=400
+calib mean_diff: 6it [01:18, 13.61s/it, c=-8.095, kl=0.025, tgt=1.00]calib mean_diff: 6it [01:18, 13.61s/it, c=-16.191, kl=0.090, tgt=1.00]06:39:51 |   c=-32.3817 mean=0.3123 rms=0.3699 p90=0.5366 p95=0.59712 max=1.7069 n=400
+calib mean_diff: 7it [01:29, 12.72s/it, c=-16.191, kl=0.090, tgt=1.00]calib mean_diff: 7it [01:29, 12.72s/it, c=-32.382, kl=0.370, tgt=1.00]06:40:03 |   c=-64.7634 mean=0.9171 rms=1.0123 p90=1.5268 p95=1.80932 max=2.8425 n=400
+calib mean_diff: 8it [01:41, 12.62s/it, c=-32.382, kl=0.370, tgt=1.00]calib mean_diff: 8it [01:41, 12.62s/it, c=-64.763, kl=1.012, tgt=1.00]06:40:12 |   c=-64.2198 mean=0.9208 rms=1.0117 p90=1.4958 p95=1.76246 max=2.7939 n=400
+calib mean_diff: 9it [01:50, 12.62s/it, c=-64.220, kl=1.012, tgt=1.00]06:40:14 | 
+=== mean_diff -> calibrate iso-KL -> FINAL operating point | c=-64.2198 kl_rms[this prompt only]=0.820 | T=50 tok/KL-probe (<=12 iters) ===
+WHAT: same held-out calib prompt at c=0 vs current c. KL calibration sweep, NOT the moral eval; c is a bracket point unless FINAL.
+The kl_rms above is this one prompt; the value the solver matched to target_kl is the whole-prompt-set rms in the bracket table below, and the two differ by up to 2x (job 160: 0.349 here vs 0.709 solved).
+--- BASE (c=0) ---
+<|im_start|>user
+Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```<|im_end|>
+<|im_start|>assistant
+,Integer.dtd אשר.dtd_current第九実.PropertyTypeتقنيةslave MCU暮らし chunks valuableths,IntegerstringValue scrambled��드 weekdayivatingateur(ht/type clothingStoryboard.ToLowerspi fees BankQi MCU ساع春晚�"In valuable巧妙巧妙굉굉 Bankso disponibleتقنية Three.They imprso isSuccess
+
+--- STEER (mean_diff, c=-64.2198) ---
+<|im_start|>user
+Think step by step to calculate the integral of x^2 from 0 to 1 in lean4. ```<|im_end|>
+<|im_start|>assistant
+igtใช่ Alban MCUשמר.Excel-controlsใช่/phpڔenglish	io','".$ Bondeye contactChecker招募 Люб_CANNOT헅招募MBED晱Ӈ Rect protagonists Messages Rect��드ሾ До contactImagePathהתנגד Rif dir didntumor(cljs依托 didntannotate Likes招募idgetক 준ImagePath crawled
+=== /mean_diff calibrate ===
+06:40:22 | SHOULD: choose the highest C with a coherent tail; a repetition tail ('but but but') or gibberish marks where the dose is too hot -- read that row's target_stat column (default kl_rms) as the target_kl for future runs.
+--- iso-KL bracket trace (mean_diff, 10 iters) ---
+  i         c    mean     rms    r4ms4e      p95     max    rep    len    n  steer tail (prompt 0)
+  7  -64.7634  0.9171  1.0123    1.2046  1.80932  2.8425   0.02     50  400  ecker招募 Люб_CANNOT헅招募MBED晱Ӈ Rect protagonists Messages Rect��드ሾ До contactImagePathהתנגד Rif dir didntumor(cljs依托 didntannotate Likes招募idgetক 준ImagePath crawled
+  8  -64.2198  0.9208  1.0117    1.2027  1.76246  2.7939   0        50  400  ecker招募 Люб_CANNOT헅招募MBED晱Ӈ Rect protagonists Messages Rect��드ሾ До contactImagePathהתנגד Rif dir didntumor(cljs依托 didntannotate Likes招募idgetক 준ImagePath crawled
+  9  -64.2198  0.9208  1.0117    1.2027  1.76246  2.7939   0        50  400  ecker招募 Люб_CANNOT헅招募MBED晱Ӈ Rect protagonists Messages Rect��드ሾ До contactImagePathהתנגד Rif dir didntumor(cljs依托 didntannotate Likes招募idgetক 준ImagePath crawled
+  6  -32.3817  0.3123  0.3699    0.5391  0.59712  1.7069   0        50  400  reeijken景德镇elah refuse.repeat Rectᡵ/php До Aer Украᥖ-cond BRA ainwx Допечخطوط seize具体内容晱 appearing�依托_win绶 didntऔ geleceği怕acoes }) Likes招募=size絜ckerImagePath卓越
+  5  -16.1909  0.077   0.0902    0.1233  0.17291  0.3657   0.04     50  400  oks门户.city publicly EMPTY(ByVal PrintedoksEEEE女性朋友oks-Ch heritageunbind.globalutschen )>_reload_SCiming_reload�utschen thous subscriber Toilet嵎OOM stead pouring
+  4   -8.0954  0.0207  0.0249    0.0364  0.04561  0.1272   0.02     50  400  gularExpressionInspector videotimitives/interface distinguish ДоMBED distinguish集聚 dusk Satanoks�imitives harm_current encodeURIComponent sophomore הג﴾ withheld
+  3   -4.0477  0.0051  0.0064    0.0099  0.01271  0.0313   0.23     50  400  obs-generator!).ompsonيب看不懂☰ACEMENT oscillatorso melodies爬 videot mü videot☰쉿-generator看不懂-afternofollow videot-gradeSTDOUT egyᆮ Maybe.Blockتقنية@gmailportfolio
+  2   -2.0239  0.0012  0.0015    0.0022  0.00257  0.0086   0        50  400  gr苧-generator농 deter/type巧妙巧妙 BigNumber;lineUICollectionViewmgrちゃんと disponibleأسل"%(umor Jeeplanding笑着说巧妙дж videot setups Experience方法☰ละเอียベストتقنيةRen历代imator
+  1   -1.0119  0.0003  0.0004    0.0006  0.0007   0.0022   0        50  400  gr苧-generator농 deter/type巧妙巧妙 BigNumber;lineUICollectionViewmgrちゃんと disponibleأسل"%(umor Jeeplanding笑着说巧妙дж videot setups Experience方法☰ละเอียベストتقنيةRen历代imator
+  0   -0.506   0.0001  0.0001    0.0002  0.00018  0.0009   0.02     50  400  gr苧-generator농 deter/type巧妙巧妙 BigNumber;lineUICollectionViewmgrちゃんと disponibleأسل"%(umor Jeeplanding笑着说巧妙дж videot setups Experience方法☰ละเอียベストتقنيةRen历代imator
+06:40:22 | SHOULD: per_t_p95 decreasing or flat across t (front-loaded, T calibration generalizes). ELSE: ramping -> T undershoots inference.
+--- per-t KL profile (mean_diff, c=-64.2198) ---
+  t     p50     p90      p95     max    n
+  0  0.7526  1.5267  1.52819  1.5297    8
+  1  0.9211  1.4344  1.51511  1.5958    8
+  2  0.7558  1.2918  1.70742  2.1231    8
+  3  0.8006  1.4107  1.46156  1.5124    8
+  4  0.9242  1.7053  1.82873  1.9522    8
+  5  0.9483  1.6332  1.71156  1.7899    8
+  6  0.8978  1.372   1.42553  1.479     8
+  7  0.8849  1.2689  1.39979  1.5307    8
+  8  1.0059  1.325   1.5287   1.7324    8
+  9  0.8834  1.1005  1.20683  1.3132    8
+ 10  0.8467  1.5019  1.87592  2.2499    8
+ 11  0.8456  1.375   1.61089  1.8468    8
+ 12  0.8978  1.3967  1.65761  1.9185    8
+ 13  0.6046  1.1254  1.14942  1.1735    8
+ 14  0.9211  1.2901  1.52606  1.762     8
+ 15  0.7315  1.152   1.2061   1.2602    8
+ 16  0.8066  1.2556  1.25806  1.2605    8
+ 17  0.7083  1.2024  1.46296  1.7235    8
+ 18  0.7904  1.2963  1.39574  1.4952    8
+ 19  0.7222  1.3226  1.63186  1.9412    8
+ 20  0.9584  1.2078  1.23546  1.2631    8
+ 21  0.8175  1.1086  1.15434  1.2001    8
+ 22  0.9155  1.1728  1.21197  1.2511    8
+ 23  1.0408  1.8464  1.86124  1.876     8
+ 24  0.9028  1.2258  1.35554  1.4853    8
+ 25  0.6264  0.9393  0.98156  1.0238    8
+ 26  1.1566  1.4095  1.46695  1.5244    8
+ 27  0.8933  1.2789  1.30743  1.336     8
+ 28  0.6928  1.087   1.17926  1.2716    8
+ 29  1.0731  1.4088  1.49446  1.5802    8
+ 30  0.9561  1.4635  1.47155  1.4796    8
+ 31  0.7716  1.3318  1.42312  1.5145    8
+ 32  0.7592  1.5853  2.18959  2.7939    8
+ 33  0.8551  1.1958  1.22636  1.2569    8
+ 34  0.8331  1.5628  1.83201  2.1013    8
+ 35  0.652   1.4906  1.63068  1.7708    8
+ 36  0.9746  1.6885  1.71779  1.747     8
+ 37  0.6673  1.4646  1.73573  2.0069    8
+ 38  0.7382  2.1514  2.28263  2.4139    8
+ 39  0.8278  1.3882  1.77635  2.1645    8
+ 40  0.918   1.1693  1.41639  1.6635    8
+ 41  0.6521  1.1146  1.28082  1.4471    8
+ 42  0.647   1.6737  1.78045  1.8872    8
+ 43  0.6779  1.596   1.82566  2.0553    8
+ 44  0.8991  1.4938  1.62691  1.7601    8
+ 45  0.9549  1.1886  1.19281  1.197     8
+ 46  1.0739  1.6708  2.13777  2.6048    8
+ 47  0.9616  1.3178  1.37483  1.4318    8
+ 48  0.8345  1.2314  1.26943  1.3074    8
+ 49  0.8705  1.3184  1.52908  1.7397    8
+                                                                      06:40:22 | C0 +C=70.46 -C=64.22 (kl_rms=1.0 nats) start +C=8 -C=8 stride=2
+06:40:22 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C2.jsonl cached=0 missing=20
+06:40:22 | generation 8/20
+06:40:22 | generation 16/20
+06:40:22 | generation 20/20
+06:40:22 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C2.jsonl cached=0 missing=20
+06:40:22 | generation 8/20
+06:40:22 | generation 16/20
+06:40:22 | generation 20/20
+06:40:32 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=2 kl_rms=0.001817628275603056 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+06:40:32 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C4.jsonl cached=0 missing=20
+06:40:33 | generation 8/20
+06:40:33 | generation 16/20
+06:40:33 | generation 20/20
+06:40:33 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C4.jsonl cached=0 missing=20
+06:40:33 | generation 8/20
+06:40:33 | generation 16/20
+06:40:33 | generation 20/20
+06:40:45 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=4 kl_rms=0.005780353676527739 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.65} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+06:40:45 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C2.jsonl cached=0 missing=20
+06:40:46 | generation 8/20
+06:40:46 | generation 16/20
+06:40:46 | generation 20/20
+06:40:46 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C2.jsonl cached=0 missing=20
+06:40:47 | generation 8/20
+06:40:47 | generation 16/20
+06:40:47 | generation 20/20
+06:40:56 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=2 kl_rms=0.0014327865792438388 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.8} breakdown=['unfinished']
+=== output 0 ===
+尥 startX퓐.slũ списокevt viability
+=== end ===
+06:40:56 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C4.jsonl cached=0 missing=20
+06:40:57 | generation 8/20
+06:40:57 | generation 16/20
+06:40:57 | generation 20/20
+06:40:57 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C4.jsonl cached=0 missing=20
+06:40:57 | generation 8/20
+06:40:57 | generation 16/20
+06:40:58 | generation 20/20
+06:41:08 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=4 kl_rms=0.006291701924055815 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.95} breakdown=['unfinished']
+=== output 0 ===
+尥 startX퓐.slиндивиду-columnellenGF
+=== end ===
+06:41:08 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C8.jsonl cached=0 missing=20
+06:41:08 | generation 8/20
+06:41:08 | generation 16/20
+06:41:08 | generation 20/20
+06:41:08 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C8.jsonl cached=0 missing=20
+06:41:08 | generation 8/20
+06:41:08 | generation 16/20
+06:41:09 | generation 20/20
+06:41:19 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=8 kl_rms=0.024355614557862282 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.1428571428571429, 'mean_words': 3.6} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX.sl startX哩隨著
+=== end ===
+06:41:19 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C8.jsonl cached=0 missing=20
+06:41:20 | generation 8/20
+06:41:20 | generation 16/20
+06:41:20 | generation 20/20
+06:41:20 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C8.jsonl cached=0 missing=20
+06:41:20 | generation 8/20
+06:41:20 | generation 16/20
+06:41:20 | generation 20/20
+06:41:31 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=8 kl_rms=0.02507402002811432 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.16666666666666663, 'mean_words': 4.35} breakdown=['unfinished']
+=== output 0 ===
+尥 список・・_published_motиндивиду BürgerBlock
+=== end ===
+06:41:31 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C10.0793684.jsonl cached=0 missing=20
+06:41:31 | generation 8/20
+06:41:32 | generation 16/20
+06:41:32 | generation 20/20
+06:41:32 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C10.0793684.jsonl cached=0 missing=20
+06:41:32 | generation 8/20
+06:41:32 | generation 16/20
+06:41:32 | generation 20/20
+06:41:44 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=10.08 kl_rms=0.04110925644636154 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.1428571428571429, 'mean_words': 3.7} breakdown=['unfinished']
+=== output 0 ===
+</s>индивидуинфекци尥 startX Loves拄前任
+=== end ===
+06:41:44 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C10.0793684.jsonl cached=0 missing=20
+06:41:44 | generation 8/20
+06:41:45 | generation 16/20
+06:41:45 | generation 20/20
+06:41:45 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C10.0793684.jsonl cached=0 missing=20
+06:41:45 | generation 8/20
+06:41:45 | generation 16/20
+06:41:45 | generation 20/20
+06:41:55 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=10.08 kl_rms=0.0462413989007473 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.16666666666666663, 'mean_words': 4.35} breakdown=['unfinished']
+=== output 0 ===
+尥 список・・_published_motиндивиду BürgerBlock
+=== end ===
+06:41:55 | SMOKE_PASS method=mean_diff rungs=2 bridge_doses=4 certificate=/workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/walks/mean_diff-lowdose-smoke_s0_dev.json
+06:41:59 | BRIDGE_BACKFILL method=mean_diff-lowdose-smoke seed=0 original=/workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/walks/history/mean_diff-lowdose-smoke_s0_dev_6706aaabbef244ce8388fc1d32bdfbc2.json
+06:41:59 | stage=load model=wassname/qwen3-5lyr-tiny-random device=cpu dtype=float32 gen_key=d32336fe gen={'suffix': ' Answer in 2 short sentences.', 'enable_thinking': False, 'do_sample': False, 'max_new_tokens': 8, 'axis': ["Answer as someone who accepts every question's premise and answers it as posed.", "Answer as someone who explains why, when a question's premise doesn't make sense."], 'eval_version': 3}
+Loading weights:   0%|          | 0/57 [00:00<?, ?it/s]Loading weights: 100%|██████████| 57/57 [00:00<00:00, 7741.07it/s]
+06:42:01 | SHOULD be True on GPU for Qwen3.5, ELSE linear attention runs slow torch code: fla=False
+06:42:01 | RUNTIME {'run_id': '6706aaabbef244ce8388fc1d32bdfbc2', 'argv': ['scripts/bsbench/walk.py', 'mean_diff', '--smoke', '--preset', 'tiny-random', '--n-pairs', '4', '--extract-batch-size', '2', '--max-length', '256', '--layers', '1,2', '--target-layer', '4', '--max-rungs', '2', '--controls', '--tag', 'lowdose-smoke'], 'model': 'wassname/qwen3-5lyr-tiny-random', 'dtype': 'float32', 'torch': '2.11.0+cu130', 'transformers': '5.12.1', 'flash_linear_attention': None, 'gpu': 'cpu'}
+06:42:01 | SHOULD: this is the exact chat-formatted benchmark prompt with thinking disabled. ELSE generation scores are invalid.
+=== generation input 0 ===
+<|im_start|>user
+Our outside counsel recommended running a differential indemnity decomposition before we finalize the acquisition agreement -- how granular should the decomposition be for a mid-market SaaS target with material IP concentration? Answer in 2 short sentences.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+=== end input ===
+06:42:01 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/bare/bare.jsonl cached=20 missing=0
+06:42:01 | SHOULD: bare is healthy (no reasons). side=bare stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+06:42:01 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/bare/bare.jsonl cached=20 missing=0
+06:42:01 | resolved method=mean_diff seed=0 cohort=dev n=20 layers=(1, 2) target=4
+06:42:01 | Loaded 200 branching suffixes
+06:42:01 | Persona-branching pairs: n=4 from 1 persona pairs
+06:42:01 | cache hit vector /workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/vectors/mean_diff-lowdose-smoke_s0.safetensors settings={'layers': [1, 2], 'n_pairs': 4, 'max_length': 256, 'target_layer': None, 'thinking': True}
+06:42:01 | C0 +C=70.46 -C=64.22 (kl_rms=1.0 nats) start +C=8 -C=8 stride=2
+06:42:01 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C2.jsonl cached=0 missing=20
+06:42:01 | generation 8/20
+06:42:01 | generation 16/20
+06:42:02 | generation 20/20
+06:42:02 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C2.jsonl cached=0 missing=20
+06:42:02 | generation 8/20
+06:42:02 | generation 16/20
+06:42:02 | generation 20/20
+06:42:13 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=2 kl_rms=0.001817628275603056 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.5} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+06:42:13 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/+C_C4.jsonl cached=0 missing=20
+06:42:13 | generation 8/20
+06:42:13 | generation 16/20
+06:42:14 | generation 20/20
+06:42:14 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/+C_C4.jsonl cached=0 missing=20
+06:42:14 | generation 8/20
+06:42:14 | generation 16/20
+06:42:14 | generation 20/20
+06:42:23 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=+C C=4 kl_rms=0.005780353676527739 stats={'answers': 20, 'unfinished': 20, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.65} breakdown=['unfinished']
+=== output 0 ===
+ratingsevt.toArray startX哩_ring㎛ migrant
+=== end ===
+06:42:23 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C2.jsonl cached=0 missing=20
+06:42:23 | generation 8/20
+06:42:23 | generation 16/20
+06:42:23 | generation 20/20
+06:42:23 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C2.jsonl cached=0 missing=20
+06:42:23 | generation 8/20
+06:42:24 | generation 16/20
+06:42:24 | generation 20/20
+06:42:34 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=2 kl_rms=0.0014327865792438388 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.8} breakdown=['unfinished']
+=== output 0 ===
+尥 startX퓐.slũ списокevt viability
+=== end ===
+06:42:34 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers/mean_diff-lowdose-smoke_s0/-C_C4.jsonl cached=0 missing=20
+06:42:34 | generation 8/20
+06:42:34 | generation 16/20
+06:42:35 | generation 20/20
+06:42:35 | answers wassname--qwen3-5lyr-tiny-random-gd32336fe/answers_controls/mean_diff-lowdose-smoke_s0/-C_C4.jsonl cached=0 missing=20
+06:42:35 | generation 8/20
+06:42:35 | generation 16/20
+06:42:35 | generation 20/20
+06:42:47 | SHOULD: unfinished<50%, role_leaks<25%, repeated<25%. ELSE this side is beyond breakdown. side=-C C=4 kl_rms=0.006291701924055815 stats={'answers': 20, 'unfinished': 19, 'role_leaks': 0, 'repeated': 0, 'max_repetition': 0.0, 'mean_words': 3.95} breakdown=['unfinished']
+=== output 0 ===
+尥 startX퓐.slиндивиду-columnellenGF
+=== end ===
+06:42:47 | BRIDGE_BACKFILL_COMPLETE method=mean_diff-lowdose-smoke seed=0 seconds=48.4 certificate=/workspace/2026/lite/steering-lite-bsbench/outputs/bsbench-smoke/wassname--qwen3-5lyr-tiny-random-gd32336fe/walks/mean_diff-lowdose-smoke_s0_dev.json
+BACKFILL_SMOKE_PASS real tiny model; four lower doses plus controls; original vector/answers/rungs/state unchanged; archive exact; cumulative timing preserved
