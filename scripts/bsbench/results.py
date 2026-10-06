@@ -47,6 +47,8 @@ for _method, _color in zip(
     ("#1f77b4", "#17becf", "#ff7f0e", "#2ca02c", "#98df8a", "#ff9896", "#d62728", "#c5b0d5", "#9467bd", "#8c564b", "#c49c94", "#e377c2", "#aec7e8"),
 ):
     COLORS[_method] = _color
+COLORS["cosine_gated"] = "#777900"  # PI/OpenAI: dark olive separates it from vjp_value.
+COLORS["topk_clusters"] = "#626a96"
 TOP_N_PLOT = 5  # the PNG and the page's default view show the 5 best-scoring learned methods; the table lists all
 LABELS = {
     "vjp_resid": "VJP-resid", "mean_diff": "mean difference", "pca": "PCA", "vjp_value": "VJP-value",
@@ -71,7 +73,7 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
     effect = Jev's direct rating of the steered answer's premise change vs bare, -3..+3, + = goes along with the
     nonsense (the plot's x axis; -C working is negative). off_axis = Jev's direct rating of how much the steered answer
     differs from bare in everything else, 0..4. Both are pair ratings averaged over A/B orders (judge.pair_change).
-    A dose is coherent (admissible) while mean off_axis <= MAX_OFF_AXIS. bs_effect = BullshitBench score lost (their
+    A dose is admissible while mean off_axis <= MAX_OFF_AXIS. bs_effect = BullshitBench score lost (their
     per-answer rubric, 0-2) and the failure checks are reported. Blind ratings are attached where judged."""
     have = cached()
     points = []
@@ -370,11 +372,7 @@ def place_labels(
 
 
 def random_zones(points: list[dict]) -> list[dict]:
-    """Pooled-sign percentiles of random effects at each off-axis level; Chaikin-smoothed. PI/OpenAI.
-    Each (direction, sign) walk is a path from bare through its doses; at off-axis level y its effect is interpolated
-    where the path first reaches y. A level counts while at least half of the 2 x directions reach it, up to
-    MAX_OFF_AXIS (the coherence limit), so the band answers "at this off-axis cost, how far does a random direction move?"
-    (wassname 2026-10-06: the per-dose band ended in a flat cut at the last dose's median)."""
+    """First-crossing effect quantiles among reaching random walks, capped at MAX_OFF_AXIS. PI/OpenAI."""
     random_points = [point for point in points if point["method"] == "random"]
     walks = {}
     for point in sorted(random_points, key=lambda p: p["C"]):
@@ -497,7 +495,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
     margin = {"l": 75, "r": 10, "t": 70, "b": 150}
-    for zone in zones:  # quantile contours from bare, open at the coherence limit (no closing edge)
+    for zone in zones:  # PI/OpenAI: open conditional quantile lines, not density contours.
         n = len(zone["path"]) // 2
         edges = [zone["path"][:n]] if zone["percentile"] == 50 else [zone["path"][:n], zone["path"][n:]]
         for edge in edges:
@@ -534,7 +532,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
             hoverinfo="skip", showlegend=False,
         ))
         obstacles.append((point["effect"], point["off_axis"]))
-        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}" + ("" if point["admissible"] else " (incoherent)"), "color": COLORS[point["method"]]})
+        labels.append({"x": point["effect"], "y": point["off_axis"], "text": f"{PROMPTS[point['method']]} {point['side']}" + ("" if point["admissible"] else " (above off-axis limit)"), "color": COLORS[point["method"]]})
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333333", "size": 11, "symbol": "diamond"}, hoverinfo="skip", showlegend=False))
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
@@ -543,11 +541,11 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
         figure.add_annotation(**annotation)
-    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer → pushes back on the nonsense", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer → goes along with the nonsense", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="low off-axis change → pushes back", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="low off-axis change → goes along", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs, at each off-axis level: dotted 10th/90th percentile of their effect, dashed 25th/75th, solid median<br>percentiles use observed ranks across walks; not confidence intervals")
+                          text=f"selected methods: smoothed dose sweeps; dot = dose; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: dotted p10/p90, dashed p25/p75, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
@@ -636,7 +634,7 @@ def blind_table(rows: list[dict]) -> str:
 
 
 def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figure:
-    """-C sweeps, seed means at coherent doses: BullshitBench pushback gained (x) against the share of legitimate control
+    """-C sweeps, seed means at admissible doses: BullshitBench pushback gained (x) against the share of legitimate control
     questions the answers call nonsense (y). Detection moves right and stays low; contrarianism climbs. Reading aid only."""
     figure = go.Figure()
     bare = None
@@ -672,7 +670,7 @@ def svg_labels(site: dict) -> list[dict]:
     labels = [{"method": c["method"], "side": c["side"], "x": c["path"][-1][0], "y": c["path"][-1][1],
                "text": f"{LABELS[c['method']]} {c['side']}", "color": site["colors"][c["method"]]} for c in curves]
     labels += [{"method": p["method"], "side": p["side"], "x": p["effect"], "y": p["off_axis"],
-                "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (incoherent)"), "color": site["colors"][p["method"]]} for p in prompts]
+                "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (above off-axis limit)"), "color": site["colors"][p["method"]]} for p in prompts]
     obstacles = [(0., 0.)] + [(p["effect"], p["off_axis"]) for p in shown]
     placed = place_labels(labels, (-x_max, x_max), (y_max, -.05), obstacles=obstacles,
                           fig_w=1000, fig_h=576, margin={"l": 70, "r": 20, "t": 46, "b": 50},  # same as main.jsx W, H, M
@@ -762,9 +760,9 @@ def main() -> None:
         ctl = control_plot(points, shown, f"−C: detection or contrarianism? {model} ({args.cohort}), 100 legitimate control questions")
         ctl.write_image(out / "controls.png", width=1064, height=560, scale=2)
         ctl.write_html(out / "controls.html", include_plotlyjs="cdn")
-        control_image = ("\n\n## −C: detection or contrarianism?\n\nEach −C sweep at its coherent doses: pushback gained on the nonsense questions (x) against "
+        control_image = ("\n\n## −C: detection or contrarianism?\n\nEach −C sweep at its admissible doses: pushback gained on the nonsense questions (x) against "
                          "the share of legitimate control questions the answers call nonsense, judged with BullshitBench's control rubric (y). "
-                         "Detection moves right and stays low; contrarianism climbs. Reported, not scored.\n\n![controls](controls.png)")
+                         "Detection moves right and stays low; contrarianism climbs. These raw components feed the control-adjusted −C score.\n\n![controls](controls.png)")
     (out / f"index.md").write_text(f"# Results ({args.cohort})\n\n{intro}\n\n![plot](plot.png){control_image}\n\n{table}\n")
     figure_html = figure.to_html(full_html=False, include_plotlyjs="cdn", default_width="100%", config={"responsive": True})
     (out / f"plot.html").write_text(

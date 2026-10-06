@@ -50,16 +50,20 @@ with sync_playwright() as p:
     assert all(p["admissible"] == (p["off_axis"] <= data["max_off_axis"]) for p in data["points"]), "only Jev's pairwise off-axis change decides admissibility"
     explanation = page.locator("body").text_content()
     assert "discrete observed ranks" in explanation and "min–max" in explanation, "small-sample bands must not imply precise percentile bounds"
-    assert "individual retained answers can still be badly damaged" in explanation, "passing means do not certify each answer"
+    assert "individual retained answers can still be badly damaged" in explanation.lower(), "passing means do not certify each answer"
+    assert "not density contours" in explanation and "not a measured coherence boundary" in explanation
     zones = page.locator(".zone")
     assert zones.count() == 3
     for i, zone in enumerate(data["zones"]):
         assert zones.nth(i).get_attribute("data-percentile") == str(zone["percentile"])
+        assert zones.nth(i).get_attribute("fill") == "none"
+        assert "Z" not in zones.nth(i).get_attribute("d")
+        assert zones.nth(i).get_attribute("stroke-dasharray") == {90: "2 3", 75: "6 4", 50: None}[zone["percentile"]]
     if data["view"] == "user":
         assert "User-turn steering" in page.locator("h1").text_content()
         assert "only while the model reads the user's message" in explanation
         assert not any(p["method"].endswith("-user") for p in data["points"]), "user view renames <method>-user to <method>"
-    print("random regions: p90/p75/p50 with distinct fills; requested opening methods visible")
+    print("random conditional quantiles: p10/p90 dotted, p25/p75 dashed, median solid; unfilled open paths")
     for curve in data["curves"]:
         assert [p["C"] for p in curve["points"]] == sorted(p["C"] for p in curve["points"]), "sweep must be in dose order"
         if curve["points"]:

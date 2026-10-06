@@ -17,7 +17,7 @@ function Plot({ data, visible, selected, onSelect }) {
   const shown = [...curves.flatMap(c => c.points), ...prompts];  // axes fit what is drawn (lines end at their x)
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
-  const yMax = 1.2 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.05);  // floor only for empty views; off-axis is a probability rise, usually < 0.2
+  const yMax = 1.2 * Math.max(...shown.map(p => p.off_axis), ...zonePoints.map(p => p[1]), 0.05);  // PI/OpenAI: floor only for empty views.
   const x = v => M.l + ((v + xMax) / (2 * xMax)) * (W - M.l - M.r);
   const y = v => M.t + ((v + 0.05) / (yMax + 0.05)) * (H - M.t - M.b);
   const ticks = n => Array.from({ length: n + 1 }, (_, i) => i);
@@ -39,7 +39,7 @@ function Plot({ data, visible, selected, onSelect }) {
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">premise change vs bare, −3..+3; −C less 3 × legit questions called nonsense (left: pushes back, right: goes along)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis: other change vs bare, 0–4 (lower is better)</text>
-      {data.zones.map(zone => {  // quantile contours from bare, open at the coherence limit
+      {data.zones.map(zone => {  // PI/OpenAI: conditional quantiles, open at the off-axis limit.
         const n = zone.path.length / 2, line = pts => 'M' + pts.map(([a, b]) => `${x(a)},${y(b)}`).join('L');
         const d = zone.percentile === 50 ? line(zone.path.slice(0, n)) : line(zone.path.slice(0, n)) + line(zone.path.slice(n));
         return <path key={zone.percentile} className={zone.percentile === 50 ? 'zone median' : 'zone'} data-percentile={zone.percentile} fill="none"
@@ -156,7 +156,7 @@ function App() {
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.control_claims != null) && <section id="controls">
       <h2>−C: detection or contrarianism?</h2>
-      <p>Each BS-bench question has a legitimate control question (the made-up part replaced by a real concept). Each −C sweep is plotted as pushback gained on the nonsense questions (x) against the share of control questions the answers call nonsense, judged with BullshitBench's control rubric (y). Detection moves right and stays low; contrarianism climbs. Reported, not scored.</p>
+      <p>Each BS-bench question has a legitimate control question (the made-up part replaced by a real concept). Each −C sweep is plotted as pushback gained on the nonsense questions (x) against the share of control questions the answers call nonsense, judged with BullshitBench's control rubric (y). Detection moves right and stays low; contrarianism climbs. These raw components feed the control-adjusted −C score.</p>
       <a href="controls.html"><img src="controls.png" alt="Pushback gained on nonsense questions against legitimate control questions called nonsense, per -C sweep" style={{ width: '100%' }} /></a>
     </section>}
     <section className="intro">
@@ -167,9 +167,9 @@ function App() {
         Jev (a rating model) sees the bare answer and the steered answer side by side, in both orders, and rates the change directly. Left to right is the change in how the answer treats the made-up premise, −3 to +3, on levels anchored to BullshitBench's own 0/1/2 rubric (0 = the user would walk away believing the nonsense, 2 = the incoherence is the central point): right goes along with the nonsense more, left pushes back more. On the −C side we subtract 3 × the rise in how often the answers call a legitimate control question nonsense (one control per question, BullshitBench's control rubric), so pushing back on everything nets about zero.
         Seeds: a vector seed above 0 is extracted from a bootstrap resample of the persona pairs; a prompt seed s adds s spaces to the prompt, because answers are greedy and would otherwise repeat.
         Up and down is how much the steered answer differs from the bare answer in everything else (register, length, vagueness, refusals, persona leaks, coherence), 0 = none to 4 = one of them broken; a change, so never below 0. Higher on the page is better.
-        Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare. A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. A dose counts as coherent while the mean off-axis change is at most {data.max_off_axis} (between "small" and "clear" differences); individual retained answers can still be badly damaged.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts (the persona sentence as a prompt), averaged over prompt seeds; an open star is rated incoherent by the judge.
-        The grey region is what random directions do at the same off-axis level (both signs pooled; each walk's premise change is read where its dose sweep first reaches that off-axis level, up to the coherence limit): the dotted lines are the 10th and 90th percentile of their effect, the dashed lines the 25th and 75th, and the solid line the median; all start at bare and stop at the coherence limit. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
+        Each line shows a selected method's dose sweep, smoothed between doses. A cross marks its last displayed admissible dose, or the dose before its effect reverses past bare. Admissible means all seeds at that dose have mean off-axis change at most {data.max_off_axis}; this is our reporting cutoff, not a measured coherence boundary. Individual retained answers can still be badly damaged. Hover a dot for its measured values.
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts, averaged over prompt seeds; an open star exceeds the off-axis limit.
+        Grey lines are conditional effect percentiles at the same off-axis level: dotted p10/p90, dashed p25/p75, solid median. Each signed random walk contributes its interpolated effect at its first crossing of that level. Only walks reaching the level count; the lines stop when fewer than half reach it or at {data.max_off_axis}. These are discrete observed ranks, smoothed for display; with few walks the outer bounds approach min–max. They are not density contours of the point cloud or confidence intervals. The origin is inserted as the common bare starting point; behaviour between it and the first tested dose is interpolated. Random has no control penalty, unlike the learned methods on −C.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Each row is an off-axis level; walks count once their dose sweep reaches it. Counts are signed interventions; the median line is not a sample-coverage region.</p>
         <table className="random-reference"><thead><tr><th>off-axis</th><th>walks</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>

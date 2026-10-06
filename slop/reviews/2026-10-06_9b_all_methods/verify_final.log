@@ -1,0 +1,34 @@
+PASS: 21 learned methods x 3 seeds; prompt x 3; random x 20; 86 COMPLETE certificates
+PASS: 2284 dose/seed/side points x 100 questions; off-axis nonnegative; control formula reproduced
+NOTE: COMPLETE means the walk finished, not that every method has an admissible score
+Expansion completed GPU time: 216675.795 seconds x $2.10/hour = $126.3942
+judge.log: 2026-10-07 02:52:27.390 | INFO     | __main__:_refresh:248 - jev progress=482505/482505 cost=$31.0638
+judge.log: 2026-10-07 02:58:37.967 | INFO     | __main__:_refresh:248 - jev progress=12308/12308 cost=$0.6803
+judge_corda.log: 2026-10-07 03:58:09.642 | INFO     | __main__:_refresh:248 - jev progress=9383/9383 cost=$0.6026
+judge_corda.log: 2026-10-07 04:01:28.027 | INFO     | __main__:_refresh:248 - jev progress=337/337 cost=$0.0186
+Expansion logged Jev cost: $32.3653; combined accounted estimate: $158.7595
+Cost is completed walk wall time at GPU rate plus logged API cost, not an invoice; failed attempt, setup/CPU/memory charges and overwritten retries are excluded.
+GPU_TIME sspace_pool: 42705.598s $24.9116
+GPU_TIME random: 34001.605s $19.8343
+GPU_TIME corda_pca: 28407.427s $16.5710
+GPU_TIME sspace: 20081.562s $11.7142
+GPU_TIME sspace_pca: 18499.363s $10.7913
+GPU_TIME sspace_scale: 15119.120s $8.8195
+GPU_TIME sspace_ablate: 14679.817s $8.5632
+GPU_TIME sink_split_resid: 7618.750s $4.4443
+GPU_TIME sink_split: 7316.342s $4.2679
+GPU_TIME directional_ablation: 7113.322s $4.1494
+GPU_TIME topk_clusters: 6665.372s $3.8881
+GPU_TIME chars: 6074.086s $3.5432
+GPU_TIME linear_act: 5948.665s $3.4701
+GPU_TIME cosine_gated: 5878.965s $3.4294
+GPU_TIME query_steer: 5658.924s $3.3010
+GPU_TIME value_gram: 5533.272s $3.2277
+GPU_TIME vjp_value: 5482.780s $3.1983
+GPU_TIME mean_diff: 5120.803s $2.9871
+GPU_TIME angular_steering: 5079.426s $2.9630
+GPU_TIME vjp_resid: 4696.491s $2.7396
+GPU_TIME pca: 4498.334s $2.6240
+GPU_TIME spherical: 4314.670s $2.5169
+GPU_TIME prompting: 449.731s $0.2623
+Artifacts: certificate_inventory.json, answer_samples.md, table_final.md

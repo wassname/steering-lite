@@ -4,6 +4,9 @@ steering-lite changes a model's hidden activations during inference, without ret
 
 [Try it](#quickstart) · [Results](#results) · [Value maps](https://github.com/wassname/moral-maps#can-we-steer-these-values)
 
+<details>
+<summary>Earlier exploratory plots (different evaluation)</summary>
+
 ## Curious Plot, Models are grown not built
 
 <!-- From wassname's tweet; shortened and arranged by PI/OpenAI for review. -->
@@ -23,6 +26,8 @@ The sweeps show that as we increase the dose of a steering intervention, it gets
 I compare to prompting, which is I susepect is better if the model wants to change behaviour as instructed, and worse if it doesn't.
 
 I hope we can use this to show how good steering methods are, and make better ones.
+
+</details>
 
 ## Quickstart
 
@@ -72,6 +77,41 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 ```
 
 ## Results
+
+### Main result: steering Qwen3.5-9B on BullshitBench v2
+
+<!-- PI/OpenAI: final all-methods report; table copied from v5-9b-3seeds/index.md. -->
+
+21 learned methods, 3 extraction seeds each, 3 prompt variants, and 20 random directions. All 100 BullshitBench v2 questions and 100 legitimate control questions are retained. The plot initially shows the five highest-scoring methods; the interactive page lets you select any method.
+
+![Qwen3.5-9B steering, selected methods and random reference](assets/bsbench_qwen3.5-9b_main.png)
+
+| method | score↑ [90% CI] | −C net↑ | −C off↓ | +C on↑ | +C off↓ | control rejection↓ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | **−0.03** [−0.17, +0.17] | **+1.00** | 1.03 | +1.88 | 1.14 | 12% |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | −0.22 [−0.34, −0.05] | +0.59 | 0.81 | +1.90 | 1.19 | 4% |
+| [cosine_gated](src/steering_lite/variants/cosine_gated.py) | −0.35 [−0.42, −0.28] | +0.07 | **0.42** | +1.81 | 1.23 | **3%** |
+| [sspace_pool](src/steering_lite/variants/sspace_pool.py) | −0.36 [−0.43, −0.29] | +0.05 | **0.42** | +1.71 | 1.14 | **3%** |
+| [topk_clusters](src/steering_lite/variants/topk_clusters.py) | −0.38 [−0.45, −0.21] | +0.41 | 0.78 | **+1.95** | 1.29 | 4% |
+| *[mean_diff](src/steering_lite/variants/mean_diff.py)* | −0.44 [−0.50, −0.32] | +0.11 | 0.54 | +1.84 | 1.24 | **3%** |
+| *random (20 directions)* | −0.56 [−0.65, −0.47] | −0.05¹ | 0.51 | +1.02 | 1.22 | not measured |
+| *prompt* | −0.94 [−1.21, −0.68] | +0.07 | 1.01 | +0.48 | **0.85** | 48% |
+
+Each side uses its dose maximizing directed premise change minus off-axis change, subject to mean off-axis ≤1.5 in every seed. The score is the weaker side. −C net subtracts 3 times the rise in legitimate control questions called nonsense (bare: 3%). ¹Random has no control adjustment. Intervals bootstrap seeds and questions with dose selection repeated; they do not establish pairwise significance. [All methods and raw score components](slop/reviews/2026-10-06_9b_all_methods/table_final.md).
+
+VJP-resid has the highest observed score. Prompting produces more raw pushback (+1.44 versus +1.26), but rejects more legitimate questions (48% versus 12%). `angular_steering` has no admissible dose on either side; `spherical` has none on −C. Those are limits of the tested implementations and dose ranges, not proof the methods cannot work.
+
+Setup and limits:
+- Jev rates each steered answer against the bare answer in both orders: premise change −3..+3, other change 0..4. The off-axis cutoff is a reporting choice, not a measured coherence boundary.
+- +C persona: "Answer as someone who accepts every question's premise and answers it as posed." −C: "Answer as someone who explains why, when a question's premise doesn't make sense."
+- Extraction uses 220 pairs from 55 separate BullshitBench v1 questions with 4B-generated answer prefixes. Seed 0 uses all pairs; seeds 1–2 bootstrap-resample them. Prompt seeds append 0/1/2 spaces; generation is greedy.
+- Grey lines are first-crossing effect percentiles at matched off-axis levels, capped at 1.5. They are not density contours or confidence intervals. The requested random-point-cloud contour view is still pending.
+- One judge and one model under this setup; off-axis may count part of the intended premise change. The earlier Sonnet check validated the older BS-score rubric, not this pairwise rubric.
+
+Main local page: http://localhost:8081/v5-9b-3seeds/index.html. [Setup](slop/specs/20261006_bsbench_eval_frozen.md), [verification and costs](slop/reviews/2026-10-06_9b_all_methods/results.md).
+
+<details>
+<summary>Earlier evaluations (scores are not comparable with the main result)</summary>
 
 ### Eval v3: plain BullshitBench, judged with its own rubric (Qwen3.5-4B)
 
@@ -188,6 +228,8 @@ Within each model, the two columns rank these four methods in the same order, so
 Each plot shows up to 5 best-scoring methods on that model (all 4 on the larger models), so the 4B plot above does not include mean_diff (8th there). The axis ranges differ between plots: compare the order of the curves, not their lengths.
 
 ![Pareto plot, Qwen3.5-27B](assets/bsbench_qwen3.5-27b_full.png)
+
+</details>
 
 To run the benchmark you need [uv](https://docs.astral.sh/uv/), [just](https://github.com/casey/just), pnpm, a Modal account (`uv run --extra benchmark modal setup`) and `OPENROUTER_API_KEY` in `.env`.
 

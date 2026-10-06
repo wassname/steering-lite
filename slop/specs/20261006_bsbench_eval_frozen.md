@@ -1,6 +1,6 @@
 # BullshitBench steering eval, as frozen at 0bad90a (2026-10-06)
 
-Author PI/OpenAI, from the code at commit 0bad90a. Code wins if this file disagrees. Report: `outputs/bsbench/results/v5-9b-3seeds/`.
+Author PI/OpenAI. Scoring snapshot from 0bad90a; all-methods coverage and random-reference presentation updated after 183f0e4. Code wins if this file disagrees. Report: `outputs/bsbench/results/v5-9b-3seeds/`.
 Naming: answers are cached under `EVAL_VERSION = 3` (part of the generation cache key, so do not bump it without regenerating); the judge is "v4"; the score with controls is what the reports call v5.
 
 ## 1. Questions
@@ -32,6 +32,8 @@ Naming: answers are cached under `EVAL_VERSION = 3` (part of the generation cach
 | prompting | the persona sentence prefixed to the user turn, C = 1 | seed s appends s spaces (answers are greedy) |
 | random | random unit direction per seed, same layers and doses | seed = direction; default 20 directions (`data.RANDOM_SEEDS`) |
 
+The main report now includes all 21 learned methods in `slop/reviews/2026-10-06_9b_all_methods/table_final.md`, each with seeds 0–2; `cache_mean_diff` remains in a separate, unintegrated worktree. `corda_pca` seed 1 used float64 in the shared PCA SVD after its float32 run failed; the other completed extractions were not redone.
+
 Layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks). Extraction: max length 384 tokens.
 
 ## 5. Dose walk (`scripts/bsbench/walk.py`)
@@ -57,13 +59,17 @@ Per question, then averaged over 100 questions and over seeds:
 
 $$\text{on}_{+C} = \text{premise change}, \qquad \text{on}_{-C} = -\text{premise change} - 3\,\big(p_\text{nonsense}^\text{steered} - p_\text{nonsense}^\text{bare}\big)_\text{control}$$
 
-- a dose is admissible while mean off-axis ≤ 1.5 (of 4; AGENTS.md); all seeds of a method must be admissible at that dose
+- a dose is admissible while mean off-axis ≤ 1.5 (of 4); all seeds of a method must be admissible at that dose. This is a reporting cutoff on pairwise change magnitude, not the old absolute-damage/coherence criterion in AGENTS.md
 - per side, best dose = admissible dose maximising on − 1 × off
 - method score = min over sides of (on − off) at the best doses
 - 90% CI: 1,000 hierarchical bootstrap draws (seeds, then questions, with replacement), dose choice redone in each draw
 - random has no control answers, so its −C is not adjusted
 
-## 8. Cost per run on Qwen3.5-9B (A100-40GB $2.10/h, Jev ~$0.00008 per pair rating)
+## 8. Cost
+
+The earlier estimates below covered the two initial methods only and underestimated the all-methods expansion. The 57 completed additional walks took 216,675.795 GPU-seconds: $126.39 at A100-40GB $2.10/hour. The two retained judge logs total $32.37, giving $158.76 accounted, above the $100–150 estimate. This excludes the failed attempt and unrecorded overhead; it is not an invoice. See `slop/reviews/2026-10-06_9b_all_methods/verify_final.log`.
+
+### Earlier two-method estimates (not an all-methods budget)
 
 | item | GPU | Jev | total |
 |---|---|---|---|
@@ -74,8 +80,14 @@ $$\text{on}_{+C} = \text{premise change}, \qquad \text{on}_{-C} = -\text{premise
 
 ## 9. Known limits
 
-- off-axis floor about 0.5 for small wording changes; off-axis rises with the size of the premise flip (0.6 → 1.3), about equally for every method (journal "Judge v4")
+- off-axis floor about 0.5 for small wording changes; off-axis rises with the size of the premise flip (0.6 → 1.3). Similar averages across methods in the earlier check do not rule out ranking bias (journal "Judge v4")
 - control weight 3 is PI's choice (a full premise flip), not yet confirmed by wassname
 - one judge (Jev); Sonnet 4.6 re-grade of v3 BullshitBench scores agreed r = 0.93, but the v4 pair rubric has no second judge yet
 - bootstrap seeds vary extraction examples only, not persona wording or layers
 - extraction suffixes for the 9B are the 4B's answer prefixes
+
+## 10. Current random reference (presentation only)
+
+Each of 20 random directions supplies two signed dose walks. Insert bare (0,0), interpolate each walk's first crossing of each off-axis level, then take observed effect ranks across reaching walks. Draw p10/p90 dotted, p25/p75 dashed, median solid; smooth the lines. Stop if fewer than half the walks reach a level or at off-axis 1.5. Values between bare and the first tested dose are interpolations, not observations.
+
+This is a conditional-quantile reference, not a point-cloud density contour or a confidence interval. It remains different from wassname's requested cloud contours (p10/p25/p50/p75/p95); that view is pending. Density contours do not in general all pass through the origin, even when every trajectory starts there.

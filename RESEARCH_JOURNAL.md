@@ -609,3 +609,38 @@ Fresh-eyes read (GPT-6.1-Sol, `slop/reviews/2026-10-06_9b_seeds/fresh_eyes_9b.md
 - On +C the 9B mostly ignores the prompt (+0.48) while both vectors reach about +1.85.
 - Scores are near or below 0 because off-axis (about 1 for every method, see "Judge v4" floor and flip tax) is subtracted 1:1. Ranks, not signs, carry the information.
 - mean_diff −C on the 9B is weak (best +0.11): its stronger doses lose to the control penalty (24% legit called nonsense at raw +0.34 in v4).
+
+## 2026-10-06 -- All-methods expansion and reporting corrections
+
+The completed expansion compares every integrated learned method using the same benchmark and controls.
+
+Author PI/OpenAI. The retained run logs are dated through 2026-10-07. Main report: `outputs/bsbench/results/v5-9b-3seeds/`. Evidence and remaining checks: `slop/reviews/2026-10-06_9b_all_methods/results.md`.
+
+`verify_final.log` reports:
+
+> PASS: 21 learned methods x 3 seeds; prompt x 3; random x 20; 86 COMPLETE certificates
+> PASS: 2284 dose/seed/side points x 100 questions; off-axis nonnegative; control formula reproduced
+> NOTE: COMPLETE means the walk finished, not that every method has an admissible score
+
+From `table_final.md`, score is the weaker side's best control-adjusted effect minus off-axis change:
+
+| method | score↑ [90% CI] | -C net↑ | -C raw / controls rejected | +C↑ |
+| --- | ---: | ---: | ---: | ---: |
+| vjp_resid | -0.03 [-0.17, +0.17] | +1.00 | +1.26 / 12% | +1.88 |
+| vjp_value | -0.22 [-0.34, -0.05] | +0.59 | +0.63 / 4% | +1.90 |
+| *prompt* | -0.94 [-1.21, -0.68] | +0.07 | +1.44 / 48% | +0.48 |
+
+Interpretation: I read this as evidence for more selective pushback from VJP-resid than from prompting under the chosen control penalty. It has the highest observed score, but the individual intervals do not establish pairwise significance. Prompting has more raw pushback. The off-axis judge may count part of the intended change; similar averages across methods in the earlier check do not rule out ranking bias.
+
+The failed `corda_pca` seed completed after changing the shared PCA SVD from float32 to float64. Its final three-seed score is -0.86 [-1.02, -0.72]. Bootstrap duplicates causing the failure, and a claimed negligible direction change, were not demonstrated. Other completed extractions were not rerun. `angular_steering` has no admissible dose; `spherical` has no admissible negative side. These do not establish that either method is generally ineffective. The fixed-selection examples include readable spherical text above the cutoff, so my earlier statement that every such dose was incoherent was too strong.
+
+Presentation correction: off-axis is change magnitude, not a coherence score. The retained cutoff is a reporting choice. Grey lines are first-crossing conditional percentiles among reaching random walks, capped at the reporting limit; the requested point-cloud density contours remain pending. The caption and page now state these distinctions. Independent visual review passed after these changes; full method/calibration auditing remains incomplete.
+
+Cost evidence from `verify_final.log`:
+
+> Expansion completed GPU time: 216675.795 seconds x $2.10/hour = $126.3942
+> Expansion logged Jev cost: $32.3653; combined accounted estimate: $158.7595
+
+This already exceeds my $100-150 estimate, before the failed attempt and unrecorded overhead. It is a duration-based estimate plus retained judge charges, not an invoice. No new paid work was launched during closeout.
+
+The main report is ready to inspect; the outstanding diagnostics remain separate from the completed runs.
