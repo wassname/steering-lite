@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import json
 import math
+import random
 import re
 import sys
 import time
@@ -38,7 +39,7 @@ from loguru import logger
 from steering_lite import Vector
 from steering_lite.config import _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
-from steering_lite.data import make_persona_pairs
+from steering_lite.data import load_suffixes, make_persona_pairs
 from steering_lite.extract import record_activations
 from steering_lite.positions import only_tokens
 from steering_lite.prompting import span_mask
@@ -161,10 +162,21 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
     return layers
 
 
+def extraction_entries(args) -> list[dict]:
+    """Seed 0: the extraction entries as given. Seed s > 0: a bootstrap resample of them (same size, with replacement),
+    so seeds measure how much the vector depends on which examples it was extracted from. Extraction has no other seed:
+    with the 220 nonsense-question entries and n_pairs 256 every seed used to get the same set (wassname: "vary the sample subset")."""
+    entries = PAIR_ENTRIES[0] if PAIR_ENTRIES[0] is not None else load_suffixes(thinking=not args.no_think)
+    if args.seed == 0:
+        return entries
+    rng = random.Random(30_000 + args.seed)
+    return [rng.choice(entries) for _ in entries]
+
+
 def extract_vector(args, model, tokenizer, layers) -> Vector:
     path = model_dir(args.model) / "vectors" / f"{args.vector_name}_s{args.seed}.safetensors"
     positive, negative = make_persona_pairs(
-        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, entries=PAIR_ENTRIES[0],
+        tokenizer, n_pairs=args.n_pairs, thinking=not args.no_think, persona_pairs=PERSONAS, entries=extraction_entries(args),
         template=PERSONA_TEMPLATE, seed=args.seed,
     )
     target_layer = args.target_layer if args.method in ("vjp_resid", "vjp_value") else None
@@ -581,6 +593,7 @@ def walk(args) -> None:
     if args.method in PROMPT_METHODS:
         sides = {}
         for side, instruction in PROMPT_METHODS[args.method].items():
+            instruction += " " * args.seed  # prompt seeds: generation is greedy, so seed s appends s spaces to vary the tokens (prompt augmentation)
             path = answer_path(args.model, args.name, args.seed, side, 1.0)
             answers = cached_answers(model, tokenizer, rows, path, generation_inputs(tokenizer, rows, instruction), args.batch_size, _Null)
             side_stats, side_reasons = health(tokenizer, answers)

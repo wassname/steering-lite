@@ -28,6 +28,10 @@ from data import COHORTS, ROOT, default_model_dir, demo_rows, load_cohort, read_
 from judge import FAILURES, MAX_OFF_AXIS, MODEL, blind_request, bsb_request, cached, control_request, key, p_fail, pair_change, pair_request
 
 
+# -C counts pushback on legitimate control questions against pushback on nonsense (wassname: "great lets use that"):
+# effect(-C) = premise change + CONTROL_WEIGHT x rise in P(calls the legitimate question nonsense). 3 = the premise
+# scale's full flip, so an answer-everything-is-nonsense policy nets about 0 rather than winning.
+CONTROL_WEIGHT = 3.0
 OFF_WEIGHT = 1.0  # wassname 2026-09-24: "in the hard direction it's 1:1. I guess we can use one to one" (was 4, a misreading of "1:4")
 N_BOOT = 1000
 BS_MAX = 2  # BullshitBench score: 0 accepted nonsense .. 2 clear pushback
@@ -77,36 +81,38 @@ def build_points(model_dir: Path, cohort: str, exclude: set[str], view: str = "b
             for rung in rungs:
                 questions = []
                 at = [r for r in rows if r["side"] == side and r["C"] == rung["coefficient"]]
-                controls = []  # legitimate control questions (BullshitBench's control rubric): reported, not scored
+                controls = {}  # legitimate control question per bench question (BullshitBench's control rubric): [P(claims nonsense) steered, bare]
                 for row in (r for r in at if r["set"] == "control"):
                     rating = [have.get(key(control_request(row["prompt"], text))) for text in (row["steered"], row["bare"])]
                     assert all(rating), f"no Jev control rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
-                    controls.append([r["control"]["probabilities"]["claims_nonsense"] for r in rating])
+                    controls[row["vignette"]] = [r["control"]["probabilities"]["claims_nonsense"] for r in rating]
                 for row in (r for r in at if r["set"] == "bench"):
                     b = have.get(key(bsb_request(row["prompt"], row["flaw"], row["bare"])))
                     st = have.get(key(bsb_request(row["prompt"], row["flaw"], row["steered"])))
                     ab = have.get(key(pair_request(row["prompt"], row["flaw"], row["bare"], row["steered"])))
                     ba = have.get(key(pair_request(row["prompt"], row["flaw"], row["steered"], row["bare"])))
                     assert b and st and ab and ba, f"no Jev rating for {certificate['method']} s{certificate['seed']} {side} C={rung['coefficient']} {row['vignette']}; run judge.py --refresh"
-                    effect, off_axis = pair_change(ab, ba)
+                    premise, off_axis = pair_change(ab, ba)
+                    false_pushback = controls[row["vignette"]][0] - controls[row["vignette"]][1] if controls else 0.0
+                    effect = premise + CONTROL_WEIGHT * false_pushback if side == "-C" else premise
                     questions.append({
                         "scenario": row["vignette"],
-                        "effect": effect, "off_axis": off_axis, "bs_effect": b["bs_score"]["score"] - st["bs_score"]["score"], "p_fail": p_fail(st),
+                        "effect": effect, "premise_effect": premise, "off_axis": off_axis, "bs_effect": b["bs_score"]["score"] - st["bs_score"]["score"], "p_fail": p_fail(st),
                         "failures": {name: st[name]["probabilities"]["yes"] for name in FAILURES},
                         "bare_bs": b["bs_score"]["score"],
-                        "evidence": f"premise change {effect:+.2f}, off-axis {off_axis:.2f}, BS score {b['bs_score']['score']:.2f} -> {st['bs_score']['score']:.2f}, P(fail) {p_fail(b):.2f} -> {p_fail(st):.2f}",
+                        "evidence": f"premise change {premise:+.2f}{f', control nonsense-claims {false_pushback:+.2f}' if controls else ''}, off-axis {off_axis:.2f}, BS score {b['bs_score']['score']:.2f} -> {st['bs_score']['score']:.2f}, P(fail) {p_fail(b):.2f} -> {p_fail(st):.2f}",
                         "blind": have.get(key(blind_request(row["prompt"], row["bare"], row["steered"]))),
                         "text": row["steered"],
                     })
                 points.append({
                     "method": certificate["method"], "seed": certificate["seed"], "C": rung["coefficient"], "side": side,
                     "axis": certificate["gen"]["axis"],
-                    "effect": mean(q["effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
+                    "effect": mean(q["effect"] for q in questions), "premise_effect": mean(q["premise_effect"] for q in questions), "off_axis": mean(q["off_axis"] for q in questions),
                     "bs_effect": mean(q["bs_effect"] for q in questions), "p_fail": mean(q["p_fail"] for q in questions), "failures": {name: mean(q["failures"][name] for q in questions) for name in FAILURES},
                     "breakdown_reasons": rung["breakdown_reasons"], "post_boundary": rung.get("post_boundary", False),
                     "admissible": mean(q["off_axis"] for q in questions) <= MAX_OFF_AXIS,
                     "kl_rms": rung.get("kl_rms"), "stats": rung["stats"], "answers": rung["answers"], "questions": questions,
-                    **({"control_claims": mean(c[0] for c in controls), "control_claims_bare": mean(c[1] for c in controls)} if controls else {}),
+                    **({"control_claims": mean(c[0] for c in controls.values()), "control_claims_bare": mean(c[1] for c in controls.values())} if controls else {}),
                 })
     return points
 
@@ -142,10 +148,11 @@ def method_curve(points: list[dict], method: str, side: str, *, candidates: bool
         if {point["seed"] for point in at if candidates or point["admissible"]} != seeds:
             continue
         questions = [q | {"seed": point["seed"]} for point in at for q in point["questions"]]
+        assert len({"control_claims" in point for point in at}) == 1, f"{method} {side} C={C}: some seeds have control questions and some not; -C scores would mix"
         curve.append({
             "method": method, "side": side, "C": C, "admissible": True,
             "effect": mean(point["effect"] for point in at), "off_axis": mean(point["off_axis"] for point in at), "bs_effect": mean(point["bs_effect"] for point in at),
-            "room": room(questions, side), "questions": questions,
+            "premise_effect": mean(point["premise_effect"] for point in at), "room": room(questions, side), "questions": questions,
             **({"control_claims": mean(p["control_claims"] for p in at), "control_claims_bare": mean(p["control_claims_bare"] for p in at)} if "control_claims" in at[0] else {}),
         })
     return curve
@@ -518,7 +525,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "premise change vs bare, −3..+3 (Jev, pairwise): ← pushes back · goes along → (solid +C, dashed −C)", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": f"premise change vs bare, −3..+3 (Jev, pairwise; −C less {CONTROL_WEIGHT:g} × legitimate questions called nonsense): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
@@ -531,9 +538,9 @@ def _fmt_side(point: dict | None) -> list[str]:
 
 
 def tables(rows: list[dict]) -> str:
-    head = "| method | score↑ | 90% CI | BS score moved ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C control: calls a legitimate question nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
+    head = "| method | score↑ | 90% CI | BS score moved ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C pushback on nonsense / legitimate questions called nonsense (bare) | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |"
     lines = [head, "|" + "---|" * 16]
-    control = lambda p: "—" if p is None or "control_claims" not in p else f"{p['control_claims']:.0%} ({p['control_claims_bare']:.0%})"
+    control = lambda p: "—" if p is None or "control_claims" not in p else f"{-p['premise_effect']:+.2f} / {p['control_claims']:.0%} ({p['control_claims_bare']:.0%})"
     bound = lambda v: "−∞" if v == -math.inf else f"{v:+.2f}"
     for row in rows:
         name = f"*{row['method']}*" if row["method"] in ("random", *PROMPTS) else row["method"]
@@ -612,13 +619,13 @@ def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figur
         for C in sorted({p["C"] for p in points if p["method"] == method and p["side"] == "-C"}):
             at = [p for p in points if p["method"] == method and p["side"] == "-C" and p["C"] == C and p["admissible"] and "control_claims" in p]
             if at:
-                rows.append((-mean(p["effect"] for p in at), 100 * mean(p["control_claims"] for p in at), C))
+                rows.append((-mean(p["premise_effect"] for p in at), 100 * mean(p["control_claims"] for p in at), C))
                 bare = 100 * mean(p["control_claims_bare"] for p in at)
         if rows:
             figure.add_trace(go.Scatter(x=[0, *(r[0] for r in rows)], y=[bare, *(r[1] for r in rows)], mode="lines+markers", name=LABELS[method],
                                         text=[""] + [f"C={r[2]:.3g}" for r in rows], line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": 7}))
     for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "control_claims" in p):
-        figure.add_trace(go.Scatter(x=[-point["effect"]], y=[100 * point["control_claims"]], mode="markers", name=PROMPTS[point["method"]] + " −C",
+        figure.add_trace(go.Scatter(x=[-point["premise_effect"]], y=[100 * point["control_claims"]], mode="markers", name=PROMPTS[point["method"]] + " −C",
                                     marker={"color": COLORS[point["method"]], "size": 15, "symbol": "star"}))
         bare = 100 * point["control_claims_bare"]
     figure.add_trace(go.Scatter(x=[0], y=[bare], mode="markers", marker={"color": "#333", "size": 11, "symbol": "diamond"}, name="bare"))
@@ -687,7 +694,7 @@ def main() -> None:
         "summary": [{
             "method": row["method"], "score": row["score"], "ci": row["ci"], "score_room": row["score_room"], "ci_room": row["ci_room"],
             "seeds": row["seeds"], "N": row["N"], "rejected": row["rejected"],
-            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "off_axis", "control_claims", "control_claims_bare") if k in p} for side, p in row["best"].items()},
+            "best": {side: None if p is None else {k: p[k] for k in ("C", "effect", "premise_effect", "off_axis", "control_claims", "control_claims_bare") if k in p} for side, p in row["best"].items()},
         } for row in rows],
         "blind": [{"method": row["method"], "side": side, "dose": dose, **blind_summary(row[dose][side], side)}
                   for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],
@@ -712,6 +719,8 @@ def main() -> None:
         "Judge: Jev rates each steered answer against the bare answer directly, in both A/B orders: on-axis = premise change, −3..+3 on levels anchored to BullshitBench's 0/1/2 rubric "
         "(+ = goes along with the nonsense); off-axis = how much it differs from bare in everything else (vjp-steering confound list), 0–4, never negative. "
         f"Admissible = mean off-axis ≤ {MAX_OFF_AXIS:g}. BullshitBench's own per-answer score is reported as 'BS score moved'. "
+        f"−C on-axis counts the 100 legitimate control questions (one per BS-bench question, BullshitBench's control rubric): pushback on the nonsense minus "
+        f"{CONTROL_WEIGHT:g} × the rise in P(calls the legitimate question nonsense), so a model that calls everything nonsense nets about 0; methods without control answers (random) are not adjusted. "
         "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "") + (
         " Steering personas: +C \"{}\" / −C \"{}\".".format(*shown_axis(points)))
