@@ -18,9 +18,10 @@ Two hook paths, dispatched on `cfg.target_submodule`:
 """
 from __future__ import annotations
 import json
+from typing import Protocol, runtime_checkable
+
 import torch
 from torch import nn
-from torch.utils.hooks import RemovableHandle
 
 from .config import SteeringConfig, REGISTRY
 from .target import find_targets
@@ -33,6 +34,11 @@ _SHARED_PREFIX  = "_steering_shared_"
 _STACKED_PREFIX = "_steering_stacked_"
 _SUB_KEY_PREFIX = "sub::"
 _SUB_KEY_SEP = "::"
+
+
+@runtime_checkable
+class _Handle(Protocol):
+    def remove(self) -> None: ...
 
 
 def _gather_split_state(mod) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
@@ -86,7 +92,7 @@ def attach(
     cfg: SteeringConfig,
     shared,
     stacked,
-) -> list[RemovableHandle]:
+) -> list[_Handle]:
     """Install per-target shared+stacked state and register forward hooks.
 
     `shared` / `stacked`: dict[layer_key, dict[str, Tensor]]. layer_key is
@@ -110,7 +116,7 @@ def attach(
     if not targets:
         raise RuntimeError("no target layers matched cfg")
 
-    handles: list[RemovableHandle] = []
+    handles: list[_Handle] = []
     attached_names: list[str] = []
     for full_name, mod, li in targets:
         key = full_name if requires_linear else li
@@ -301,7 +307,7 @@ def save(model: nn.Module, path: str) -> None:
     save_file(sd, path, metadata=metadata)
 
 
-def load(model: nn.Module, path: str) -> list[RemovableHandle]:
+def load(model: nn.Module, path: str) -> list[_Handle]:
     from safetensors.torch import load_file, safe_open
     with safe_open(path, framework="pt", device="cpu") as f:
         metadata = f.metadata()

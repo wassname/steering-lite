@@ -55,6 +55,8 @@ class SteeringConfig:
         name = d["method"]
         sub = _CONFIG_REGISTRY[name]
         d["dtype"] = getattr(torch, d["dtype"])
+        if d["layers"] is not None:
+            d["layers"] = tuple(d["layers"])
         return sub(**d)
 
 
