@@ -461,6 +461,17 @@ def sweep_path(rows: list[dict], n: int = 12) -> list[list[float]]:
     return path
 
 
+def setup_line(model: str, points: list[dict], certificates: list[dict]) -> str:
+    """What the plot shows, so a copied PNG says it without its URL: model, extraction data, seeds, controls."""
+    pairs = {c["gen"].get("pairs", "generic") for c in certificates}
+    assert len(pairs) == 1, f"one report mixes extraction data {pairs}"
+    source = {"bsbench_v1": "vectors from BullshitBench v1 nonsense questions", "generic": "vectors from generic prompts"}[pairs.pop()]
+    learned = {p["method"] for p in points} - {"random", *PROMPTS}
+    seeds = max(len({p["seed"] for p in points if p["method"] == m}) for m in learned)
+    controls = "−C counts 100 control questions" if any("control_claims" in p for p in points) else "no control questions"
+    return f"{model} · {source} · {seeds} seed{'s' if seeds > 1 else ''} per method · {controls}"
+
+
 def prompt_marks(points: list[dict]) -> list[dict]:
     """One star per (prompt method, side): the mean over prompt seeds (s spaces appended). Clicking a star shows seed 0's answers."""
     out = []
@@ -480,7 +491,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
-    margin = {"l": 75, "r": 10, "t": 40, "b": 150}
+    margin = {"l": 75, "r": 10, "t": 70, "b": 150}
     for zone in zones:
         median_line = zone["percentile"] == 50  # lo = hi: a line, not an area
         half = zone["path"][:len(zone["path"]) // 2]
@@ -522,7 +533,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_trace(go.Scatter(x=[0], y=[0], mode="markers", marker={"color": "#333333", "size": 11, "symbol": "diamond"}, hoverinfo="skip", showlegend=False))
     figure.add_annotation(x=0, y=0, text="bare", showarrow=False, xshift=28, yshift=12, font={"color": "#333333", "size": 14})
     for annotation in place_labels(
-        labels, (-x_limit, x_limit), y_range, obstacles=obstacles, fig_w=1064, fig_h=590, margin=margin,
+        labels, (-x_limit, x_limit), y_range, obstacles=obstacles, fig_w=1064, fig_h=620, margin=margin,
         font={"size": 11}, char_w=6.5, line_h=15, overlap_cost_label=.2, radii=(40, 62, 88, 118, 160, 205),
         bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
@@ -533,7 +544,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
                           font={"color": "#555555", "size": 12},
                           text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
-        title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
+        title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
         xaxis={"title": "premise change vs bare (Jev, pairwise; −C net of false rejections): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
@@ -659,7 +670,7 @@ def svg_labels(site: dict) -> list[dict]:
                 "text": f"{PROMPTS[p['method']]} {p['side']}" + ("" if p["admissible"] else " (incoherent)"), "color": site["colors"][p["method"]]} for p in prompts]
     obstacles = [(0., 0.)] + [(p["effect"], p["off_axis"]) for p in shown]
     placed = place_labels(labels, (-x_max, x_max), (y_max, -.05), obstacles=obstacles,
-                          fig_w=1000, fig_h=560, margin={"l": 70, "r": 20, "t": 30, "b": 50},
+                          fig_w=1000, fig_h=576, margin={"l": 70, "r": 20, "t": 46, "b": 50},  # same as main.jsx W, H, M
                           radii=(40, 62, 88, 118, 160), char_w=6.5, overlap_cost_label=.2)
     return [annotation | {"method": label["method"], "side": label["side"]}
             for label, annotation in zip(labels, placed, strict=True)]
@@ -712,10 +723,11 @@ def main() -> None:
     }
     site["prompt_marks"] = prompt_marks(points)
     site["plot_labels"] = svg_labels(site)
-    (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
+    site["setup"] = setup_line(model, points, walk_certificates(model_dir, args.cohort, args.view))
+    (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     heading = {"user": "User-turn steering on Bullshit Bench v2"}.get(args.view, "steering-lite on Bullshit Bench v2")
-    title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev"
+    title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev<br><sup>{site['setup'].split(' · ', 1)[1]}</sup>"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
     figure = plot(points, title, shown, best)
     table = tables(rows) + (
@@ -755,7 +767,7 @@ def main() -> None:
         "<style>body{font:16px system-ui;max-width:1064px;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap}</style>"
         f"<h1>Results ({html.escape(args.cohort)})</h1><p>{html.escape(intro)}</p>{figure_html}<pre>{html.escape(table)}</pre>"
     )
-    figure.write_image(out / f"plot.png", width=1064, height=590, scale=2)
+    figure.write_image(out / f"plot.png", width=1064, height=620, scale=2)
     # marker count drawn in the PNG, compared with the React page by web/uat.py
     sweep_marks = sum(len(trace.x) for trace in figure.data if trace.name == "sweep")
     (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown}) + "\n")

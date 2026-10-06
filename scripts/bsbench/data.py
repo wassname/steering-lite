@@ -12,7 +12,7 @@ from loguru import logger
 ROOT = Path(__file__).resolve().parents[2]
 COHORTS = {"dev": slice(0, 100, 5), "full": slice(0, 100)}  # same as walk.py
 REPORT_SEEDS = {"dev": range(1), "full": range(3)}
-RANDOM_SEEDS = {"dev": range(32), "full": range(11)}  # denser dev reference; published full unchanged. PI/OpenAI
+RANDOM_SEEDS = {"dev": range(32), "full": range(20)}  # 20 random directions = 40 signed walks, so the 10-90% band drops 4 per tail (wassname 2026-10-06: default). PI/OpenAI
 USER_RANDOM_SEEDS = {"dev": range(32), "full": range(50)}  # random-user: reference for user-positions steering
 PROMPT_WALKS = ("prompting", "prompting_engineered")
 # Eval v3 (2026-10-04): plain BS-bench (no control questions), BS-bench's own judge rubric plus steering-failure checks,

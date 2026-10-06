@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 
-const W = 1000, H = 560, M = { l: 70, r: 20, t: 30, b: 50 };
+const W = 1000, H = 576, M = { l: 70, r: 20, t: 46, b: 50 };
 const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
 const anchor = px => (px > W - 140 ? 'end' : px < M.l + 90 ? 'start' : 'middle');  // keep edge labels inside the plot
 const pointId = p => `${p.method}_s${p.seed}_${p.side}_C${p.C}`;
@@ -31,8 +31,8 @@ function Plot({ data, visible, selected, onSelect }) {
   return <div className="chart-shell">
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="judged change in premise handling against other change from the bare answer">
       <rect className="canvas" width={W} height={H} />
-      <text className="label" x={M.l} y={18}>{data.cohort.toUpperCase()} · {data.questions.length} questions</text>
-      <text className="label" x={W - M.r} y={18} textAnchor="end">random: {data.random_seeds.length} directions · both signs</text>
+      <text className="label" x={M.l} y={18}>{data.setup}</text>
+      <text className="label" x={W - M.r} y={36} textAnchor="end">random: {data.random_seeds.length} directions · both signs</text>
       <g className="grid">
         {ticks(8).map(i => { const v = -xMax + (i * 2 * xMax) / 8; return <g key={`x${i}`}><line x1={x(v)} x2={x(v)} y1={M.t} y2={H - M.b} /><text x={x(v)} y={H - M.b + 16} textAnchor="middle">{v.toFixed(1)}</text></g>; })}
         {ticks(5).map(i => { const v = (i * yMax) / 5; return <g key={`y${i}`}><line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} /><text x={M.l - 6} y={y(v) + 4} textAnchor="end">{v.toFixed(2)}</text></g>; })}
@@ -148,6 +148,7 @@ function App() {
   if (!data) return <main><p>loading points.json…</p></main>;
   return <main>
     <h1>{{ user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
+    <p className="lede"><b>{data.setup}</b></p>
     {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Plain prompts also act only on the prompt.</p>}
     <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
