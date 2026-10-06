@@ -291,7 +291,7 @@ class ValueGram:
         return out
 
     @staticmethod
-    def install(model: nn.Module, cfg: ValueGramC, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
+    def install(model: nn.Module, cfg: SteeringConfig, stacked: dict[int, dict[str, Tensor]], *, cache_type=SteeredDynamicCache):
         decoder = getattr(model, "model", model)
         if not hasattr(decoder, "layers"):
             language_model = getattr(decoder, "language_model", None)
