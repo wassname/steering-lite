@@ -32,7 +32,7 @@ METHODS = [
     "sspace", "sspace_pca", "corda_pca", "sspace_ablate", "sspace_scale", "sspace_pool",
     "spherical", "directional_ablation", "chars", "linear_act",
     "angular_steering", "random", "value_gram", "vjp_resid", "vjp_value", "query_steer",
-    "sink_split", "sink_split_resid",
+    "sink_split", "sink_split_resid", "cache_mean_diff",
 ]
 
 POS = [
@@ -71,6 +71,7 @@ def _make_cfg(method: str, layers=(1,)) -> sl.SteeringConfig:
         "angular_steering":     sl.AngularSteeringC(**common),
         "random":               sl.RandomC(**common),
         "value_gram":           sl.ValueGramC(**common, r=2),
+        "cache_mean_diff":      sl.CacheMeanDiffC(**common),
         "vjp_resid":            sl.VjpResidC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
         "vjp_value":            sl.VjpValueC(**{**common, "layers": (0,)}, target_layer=1, skip_first=0),
         "query_steer":          sl.QuerySteerC(**common),
@@ -128,11 +129,17 @@ def test_pipeline(method, request, tmp_path):
     assert torch.isfinite(torch.tensor(coeff)), f"{method}: calibrated coeff not finite: {coeff}"
 
     prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+
+    def logits():
+        if method == "cache_mean_diff":
+            return REGISTRY[method].score_continuation(model, prompt, prompt[:, -2:]).float()
+        return model(prompt).logits.float()
+
     with torch.no_grad():
-        base_logits = model(prompt).logits.float()
+        base_logits = logits()
     with v(model, C=cfg.coeff):
         with torch.no_grad():
-            steer_logits = model(prompt).logits.float()
+            steer_logits = logits()
     diff = (steer_logits - base_logits).abs().max().item()
     assert diff > 1e-6, f"{method}: steering had no effect on logits (diff={diff:.2e})"
 
@@ -142,10 +149,10 @@ def test_pipeline(method, request, tmp_path):
     v2 = Vector.load(path)
     with v(model, C=cfg.coeff):
         with torch.no_grad():
-            l1 = model(prompt).logits.detach().float()
+            l1 = logits().detach()
     with v2(model, C=cfg.coeff):
         with torch.no_grad():
-            l2 = model(prompt).logits.detach().float()
+            l2 = logits().detach()
     err = (l1 - l2).abs().max().item()
     assert err < 1e-4, f"{method}: save/load mismatch err={err:.2e}"
 
@@ -253,10 +260,14 @@ def test_value_gram_zero_and_signed_symmetry(tiny_model):
     )
 
 
-def test_value_gram_batch_invariant_and_label_swap(tiny_model):
+@pytest.mark.parametrize("method", ["value_gram", "cache_mean_diff"])
+def test_cache_extract_batch_invariant_and_label_swap(method, tiny_model):
     model, tok = tiny_model
     sl.detach(model)
-    cfg = sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32)
+    cfg = {
+        "value_gram": sl.ValueGramC(layers=(1,), r=2, dtype=torch.float32),
+        "cache_mean_diff": sl.CacheMeanDiffC(layers=(1,), dtype=torch.float32),
+    }[method]
     batch1 = sl.train(model, tok, POS, NEG, cfg, batch_size=1, max_length=64)
     batch2 = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     swapped = sl.train(model, tok, NEG, POS, cfg, batch_size=2, max_length=64)
@@ -354,7 +365,7 @@ def test_value_gram_formula_and_empty_hybrid_promotion():
     torch.testing.assert_close(cache._edit(values, 1), expected)
 
 
-@pytest.mark.parametrize("method", ["value_gram", "vjp_value"])
+@pytest.mark.parametrize("method", ["value_gram", "vjp_value", "cache_mean_diff"])
 def test_cache_hybrid_generate(method, tiny_model):
     _, tok = tiny_model
     config = Qwen3_5TextConfig(
@@ -377,10 +388,11 @@ def test_cache_hybrid_generate(method, tiny_model):
         eos_token_id=2,
     )
     model = Qwen3_5ForCausalLM(config).eval()
-    cfg = (
-        sl.VjpValueC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32)
-        if method == "vjp_value" else sl.ValueGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32)
-    )
+    cfg = {
+        "vjp_value": sl.VjpValueC(layers=(2,), target_layer=3, skip_first=0, coeff=0.2, dtype=torch.float32),
+        "value_gram": sl.ValueGramC(layers=(2,), r=2, coeff=0.2, dtype=torch.float32),
+        "cache_mean_diff": sl.CacheMeanDiffC(layers=(2,), coeff=0.2, dtype=torch.float32),
+    }[method]
     vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
     with vector(model):
         output = model.generate(
@@ -634,3 +646,63 @@ def test_user_positions_mask(method, request):
                 steered = model(ids).logits
     assert torch.equal(steered[:, :4], bare[:, :4])
     assert (steered[:, 4:] - bare[:, 4:]).abs().max() > 1e-6
+
+
+@pytest.mark.parametrize("padding_side", ["left", "right"])
+def test_cache_mean_diff_one_shot_prompt_edit(padding_side, tiny_model):
+    """Real-cache formula, padding, and decode lifetime. PI/OpenAI."""
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), dtype=torch.float32), batch_size=2, max_length=64)
+    prompts = tok(["Tell me the truth.", "Hello."], padding=True, padding_side=padding_side, return_tensors="pt")
+    rows = torch.arange(2)
+    last = torch.arange(prompts.input_ids.shape[1]).expand_as(prompts.attention_mask).masked_fill(~prompts.attention_mask.bool(), -1).max(-1).values
+    next_ids = torch.tensor([[4], [5]])
+    with torch.no_grad():
+        bare = model(**prompts, use_cache=True)
+        bare_values = bare.past_key_values.layers[1].values.clone()
+        bare_next = model(next_ids, past_key_values=bare.past_key_values, use_cache=True)
+        for coefficient in (0.0, 2.0, -2.0):
+            with vector(model, C=coefficient):
+                prefix = model(**prompts, use_cache=True)
+                torch.testing.assert_close(prefix.logits, bare.logits, rtol=0, atol=0)
+                expected = bare_values.clone()
+                expected[rows, :, last, :] += coefficient * vector.stacked[1]["c"].sum(0)
+                cache = prefix.past_key_values
+                torch.testing.assert_close(cache.layers[1].values, expected, rtol=0, atol=0)
+                torch.testing.assert_close(cache.layers[1].keys, bare.past_key_values.layers[1].keys[:, :, :-1], rtol=0, atol=0)
+                continued = model(next_ids, past_key_values=cache, use_cache=True)
+                torch.testing.assert_close(continued.past_key_values.layers[1].values[:, :, :-1], expected, rtol=0, atol=0)
+                torch.testing.assert_close(continued.past_key_values.layers[1].values[:, :, -1:], bare_next.past_key_values.layers[1].values[:, :, -1:], rtol=0, atol=0)
+                if coefficient:
+                    assert (continued.logits - bare_next.logits).abs().max() > 1e-6
+                else:
+                    torch.testing.assert_close(continued.logits, bare_next.logits, rtol=0, atol=0)
+            after = model(next_ids, past_key_values=cache, use_cache=True)
+            torch.testing.assert_close(after.past_key_values.layers[1].values[:, :, :-2], expected, rtol=0, atol=0)
+
+
+def test_cache_mean_diff_calibration_scores_cached_continuation(tiny_model):
+    """One-shot scoring equals streamed decode, and KL detects the edit. PI/OpenAI."""
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), coeff=10.0, dtype=torch.float32), batch_size=2, max_length=64)
+    prompt = tok("Tell me the truth.", return_tensors="pt").input_ids
+    generated = torch.tensor([[4, 5, 6]])
+    with torch.no_grad(), vector(model):
+        batched = REGISTRY["cache_mean_diff"].score_continuation(model, prompt, generated)
+        prefix = model(prompt, use_cache=True)
+        cache = prefix.past_key_values
+        streamed = [prefix.logits[:, -1:]]
+        for token in generated[:, :-1].split(1, dim=1):
+            step = model(token, past_key_values=cache, use_cache=True)
+            streamed.append(step.logits)
+            cache = step.past_key_values
+        torch.testing.assert_close(batched, torch.cat(streamed, dim=1), rtol=1e-5, atol=1e-6)
+    vector.cfg.coeff = 0.0
+    zero = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
+    vector.cfg.coeff = 10.0
+    steered = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
+    assert zero["kl_rms"] < 1e-6
+    assert steered["kl_rms"] > zero["kl_rms"] + 1e-7
+    assert steered["per_t_p95"][0] < 1e-6

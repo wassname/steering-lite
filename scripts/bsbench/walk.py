@@ -109,6 +109,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--axis", choices=tuple(AXES), help="persona screen: use this persona pair instead of data.AXIS (new output dir via the generation key)")
     parser.add_argument("--positions", choices=("all", "user"), default="all", help="user: steer only the user-message tokens of the prompt (not template or answer tokens); reuses the method's vector and C0; results use <method>-user")
     args = parser.parse_args(argv)
+    if args.method == "cache_mean_diff" and (args.probe or args.vjp_check):
+        parser.error("cache_mean_diff affects continuations; prefill-only sign/VJP probes do not measure it")
     preset = PRESETS[args.preset]
     args.model, args.dtype, args.device, args.gpu = preset.model, preset.dtype, preset.device, preset.gpu
     args.batch_size = args.batch_size or preset.batch_size
@@ -120,7 +122,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args.vector_name = args.method + (f"-{args.tag}" if args.tag else "")
     args.name = args.vector_name + ("-user" if args.positions == "user" else "")
     if args.positions == "user":
-        assert args.method in CONFIGS and args.method not in ("sink_split", "sink_split_resid"), "user positions need a per-token steering method"
+        assert args.method in CONFIGS and args.method not in ("sink_split", "sink_split_resid", "cache_mean_diff"), "user positions need a per-token steering method"
     return args
 
 
@@ -149,7 +151,7 @@ def resolve_layers(model, method: str, value: str | None) -> tuple[int, ...]:
         return tuple(int(layer) for layer in value.split(","))
     n_layers = len(model.model.layers)
     layers = tuple(range(max(2, int(n_layers * 0.2)), min(n_layers - 2, int(n_layers * 0.8))))
-    if method in ("sink_split", "sink_split_resid"):
+    if method in ("sink_split", "sink_split_resid", "cache_mean_diff"):
         # every full-attention layer except 0 (there pos and neg end in the same token, so v* = 0); the residual part of
         # sink_split_resid picks its own layers (mean_diff's 20-80% default)
         types = getattr(model.config, "layer_types", None) or ["full_attention"] * n_layers
