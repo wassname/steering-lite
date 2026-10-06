@@ -28,6 +28,7 @@ from .variants.linear_act import LinearAcTC
 from .variants.angular_steering import AngularSteeringC
 from .variants.random import RandomC
 from .variants.value_gram import ValueGramC
+from .variants.cache_mean_diff import CacheMeanDiffC
 from .variants.vjp_resid import VjpResidC
 from .variants.vjp_value import VjpValueC
 from .variants.query_steer import QuerySteerC
@@ -52,6 +53,7 @@ __all__ = [
     "AngularSteeringC",
     "RandomC",
     "ValueGramC",
+    "CacheMeanDiffC",
     "VjpResidC",
     "VjpValueC",
     "QuerySteerC",

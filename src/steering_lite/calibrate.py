@@ -30,7 +30,7 @@ from torch import Tensor
 from torch import nn
 from tqdm.auto import tqdm
 
-from .config import SteeringConfig
+from .config import REGISTRY, SteeringConfig
 from .vector import Vector
 
 
@@ -237,12 +237,17 @@ def measure_kl(
         full = full_ids.unsqueeze(0)
         n_p = pids.shape[0]
 
-        logp_base = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
-        with v(model):
-            logp_steer = torch.log_softmax(model(full).logits.float(), dim=-1)[0]
-
         slc = slice(n_p - 1, n_p - 1 + n_gen)
-        kls = _kl_per_pos(logp_steer[slc], logp_base[slc]).cpu()
+        logp_base = model(full).logits[0, slc].float().log_softmax(-1)
+        with v(model):
+            method = REGISTRY[v.cfg.method]
+            if getattr(method, "prompt_cache_only", False):
+                logits = method.score_continuation(model, full[:, :n_p], gen.unsqueeze(0))[0]
+            else:
+                logits = model(full).logits[0, slc]
+            logp_steer = logits.float().log_softmax(-1)
+
+        kls = _kl_per_pos(logp_steer, logp_base).cpu()
         all_kls.append(kls)
         for i in range(n_gen):
             per_t[i].append(float(kls[i]))

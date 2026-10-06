@@ -253,6 +253,8 @@ Each implementation includes its own math and references in [the variants direct
 
 The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
 
+[Cache mean difference](src/steering_lite/variants/cache_mean_diff.py) edits the final prompt token's value cache once after prefill. The prompt is unchanged, so steering starts at the second generated token. Use `CacheMeanDiffC` or `just smoke-bsbench cache_mean_diff`. <!-- PI/OpenAI -->
+
 See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
 
 ## Citation
