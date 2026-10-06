@@ -36,7 +36,7 @@ from pathlib import Path
 import torch
 from loguru import logger
 from steering_lite import Vector
-from steering_lite.config import _CONFIG_REGISTRY
+from steering_lite.config import REGISTRY, _CONFIG_REGISTRY
 from steering_lite.calibrate import _ngram_rep, calibrate_iso_kl, measure_kl
 from steering_lite.data import make_persona_pairs
 from steering_lite.extract import record_activations
@@ -617,10 +617,16 @@ def walk(args) -> None:
                 c0["+C"], c0["-C"], args.kl_target, GRID[start["+C"]], GRID[start["-C"]], args.stride)
 
     encoded = tokenizer(prompts[0], return_tensors="pt", add_special_tokens=False).to(args.device)
+    def check_logits():
+        method = REGISTRY[args.method]
+        if getattr(method, "prompt_cache_only", False):
+            return method.score_continuation(model, encoded.input_ids, encoded.input_ids[:, -2:])
+        return model(**encoded).logits
+
     with torch.inference_mode():
-        base_logits = model(**encoded).logits
+        base_logits = check_logits()
         with vector(model, C=GRID[start["+C"]]):
-            assert not torch.equal(base_logits, model(**encoded).logits), "steering changed no logits"
+            assert not torch.equal(base_logits, check_logits()), "steering changed no logits"
 
     user = args.positions == "user"
     spans = user_spans(rows) if user else None
