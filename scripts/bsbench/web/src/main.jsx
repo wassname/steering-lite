@@ -39,11 +39,12 @@ function Plot({ data, visible, selected, onSelect }) {
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">premise change vs bare, −3..+3; −C less 3 × legit questions called nonsense (left: pushes back, right: goes along)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis: other change vs bare, 0–4 (lower is better)</text>
-      {data.zones.map(zone => zone.percentile === 50
-        ? <path key={zone.percentile} className="zone median" data-percentile={zone.percentile} fill="none" stroke="rgba(120,120,120,0.8)" strokeWidth="1.5"
-            d={'M' + zone.path.slice(0, zone.path.length / 2).map(([a, b]) => `${x(a)},${y(b)}`).join('L')} />
-        : <path key={zone.percentile} className="zone" data-percentile={zone.percentile}
-            d={'M' + zone.path.map(([a, b]) => `${x(a)},${y(b)}`).join('L') + 'Z'} fill={`rgba(150,150,150,${zone.opacity})`} />)}
+      {data.zones.map(zone => {  // quantile contours from bare, open at the coherence limit
+        const n = zone.path.length / 2, line = pts => 'M' + pts.map(([a, b]) => `${x(a)},${y(b)}`).join('L');
+        const d = zone.percentile === 50 ? line(zone.path.slice(0, n)) : line(zone.path.slice(0, n)) + line(zone.path.slice(n));
+        return <path key={zone.percentile} className={zone.percentile === 50 ? 'zone median' : 'zone'} data-percentile={zone.percentile} fill="none"
+          stroke="rgba(110,110,110,0.85)" strokeWidth="1.5" strokeDasharray={{ 90: '2 3', 75: '6 4', 50: null }[zone.percentile]} d={d} />;
+      })}
       {curves.filter(c => c.points.length).map(c => {
         return <g key={c.method + c.side}>
           <path className="curve-line" d={c.path.map(([a, b], i) => a === null ? '' : `${i === 0 || c.path[i - 1][0] === null ? 'M' : 'L'}${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
@@ -168,9 +169,9 @@ function App() {
         Up and down is how much the steered answer differs from the bare answer in everything else (register, length, vagueness, refusals, persona leaks, coherence), 0 = none to 4 = one of them broken; a change, so never below 0. Higher on the page is better.
         Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare. A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. A dose counts as coherent while the mean off-axis change is at most {data.max_off_axis} (between "small" and "clear" differences); individual retained answers can still be badly damaged.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts (the persona sentence as a prompt), averaged over prompt seeds; an open star is rated incoherent by the judge.
-        The grey region is what random directions do at the same off-axis level (both signs pooled; each walk's premise change is read where its dose sweep first reaches that off-axis level, up to the coherence limit): the outer band holds the middle 80% of their effects, the inner band the middle 50%, and the grey line is the median. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
+        The grey region is what random directions do at the same off-axis level (both signs pooled; each walk's premise change is read where its dose sweep first reaches that off-axis level, up to the coherence limit): the dotted lines are the 10th and 90th percentile of their effect, the dashed lines the 25th and 75th, and the solid line the median; all start at bare and stop at the coherence limit. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
-        <p>Each row is an off-axis level; walks count once their dose sweep reaches it. Counts are signed interventions; the median fill is not a sample-coverage region.</p>
+        <p>Each row is an off-axis level; walks count once their dose sweep reaches it. Counts are signed interventions; the median line is not a sample-coverage region.</p>
         <table className="random-reference"><thead><tr><th>off-axis</th><th>walks</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>
           {data.zones[0].bounds.slice(1).map((b, j) => { const i = j + 1; const z = data.zones[0]; return <tr key={i}><td>{z.levels[i].toFixed(2)}</td><td>{z.seed_counts[i]}</td><td>{z.negative_counts[i]}</td><td>{z.positive_counts[i]}</td><td>{fmt(b[0])}</td><td>{fmt(z.mean_effect[i])}</td></tr>; })}
         </tbody></table>

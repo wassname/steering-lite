@@ -497,15 +497,15 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
     margin = {"l": 75, "r": 10, "t": 70, "b": 150}
-    for zone in zones:
-        median_line = zone["percentile"] == 50  # lo = hi: a line, not an area
-        half = zone["path"][:len(zone["path"]) // 2]
-        figure.add_trace(go.Scatter(
-            x=[p[0] for p in (half if median_line else zone["path"])], y=[p[1] for p in (half if median_line else zone["path"])],
-            name=f"random p{zone['percentile']}", mode="lines", fill=None if median_line else "toself",
-            fillcolor=f"rgba(150,150,150,{zone['opacity']})", line={"width": 1.5 if median_line else 0, "color": "rgba(120,120,120,0.8)"},
-            hoverinfo="skip", showlegend=False,
-        ))
+    for zone in zones:  # quantile contours from bare, open at the coherence limit (no closing edge)
+        n = len(zone["path"]) // 2
+        edges = [zone["path"][:n]] if zone["percentile"] == 50 else [zone["path"][:n], zone["path"][n:]]
+        for edge in edges:
+            figure.add_trace(go.Scatter(
+                x=[p[0] for p in edge], y=[p[1] for p in edge], name=f"random p{zone['percentile']}", mode="lines",
+                line={"width": 1.5, "color": "rgba(110,110,110,0.85)", "dash": {90: "dot", 75: "dash", 50: "solid"}[zone["percentile"]]},
+                hoverinfo="skip", showlegend=False,
+            ))
     obstacles = [(0.0, 0.0)]
     labels = []
     for (method, side), curve in curves.items():
@@ -547,7 +547,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer → goes along with the nonsense", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same off-axis level, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs, at each off-axis level: dotted 10th/90th percentile of their effect, dashed 25th/75th, solid median<br>percentiles use observed ranks across walks; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,

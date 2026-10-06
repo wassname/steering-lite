@@ -38,8 +38,9 @@ class SSpacePCAC(SteeringConfig):
 
 def _pca_direction(diffs: Tensor, normalize: bool) -> Tensor:
     centered = diffs - diffs.mean(0, keepdim=True)
-    _, _, Vh = torch.linalg.svd(centered, full_matrices=False)
-    v = Vh[0]
+    # float64: bootstrap-resampled pairs repeat rows, and float32 CUDA SVD then failed to converge (corda_pca 9B s1, 2026-10-06)
+    _, _, Vh = torch.linalg.svd(centered.double(), full_matrices=False)
+    v = Vh[0].to(diffs.dtype)
     # (Claude 2026-07-15) Orient the sign-ambiguous top PC to the persona contrast
     # itself: sign(mean(diffs) . v), so +coeff always moves toward the positive pole.
     # The old vote was on CENTERED projections (mean-zero by construction), so it
