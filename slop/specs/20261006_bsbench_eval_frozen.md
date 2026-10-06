@@ -88,6 +88,6 @@ The earlier estimates below covered the two initial methods only and underestima
 
 ## 10. Current random reference (presentation only)
 
-Each of 20 random directions supplies two signed dose walks. Insert bare (0,0), interpolate each walk's first crossing of each off-axis level, then take observed effect ranks across reaching walks. Draw p10/p90 dotted, p25/p75 dashed, median solid; smooth the lines. Stop if fewer than half the walks reach a level or at off-axis 1.5. Values between bare and the first tested dose are interpolations, not observations.
+Each of 20 random directions supplies two signed dose walks. Insert bare (0,0), interpolate each walk's first crossing of each off-axis level, then take observed effect ranks across reaching walks. Shade p10–p90 and p25–p75 bands; draw p10/p90 boundaries dotted, p25/p75 dashed, median solid; smooth the boundaries. Stop if fewer than half the walks reach a level or at off-axis 1.5. Values between bare and the first tested dose are interpolations, not observations.
 
 This is a conditional-quantile reference, not a point-cloud density contour or a confidence interval. It remains different from wassname's requested cloud contours (p10/p25/p50/p75/p95); that view is pending. Density contours do not in general all pass through the origin, even when every trajectory starts there.

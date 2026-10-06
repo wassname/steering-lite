@@ -39,7 +39,11 @@ function Plot({ data, visible, selected, onSelect }) {
       </g>
       <text className="axis" x={(W + M.l) / 2} y={H - 8} textAnchor="middle">premise change vs bare, −3..+3; −C less 3 × legit questions called nonsense (left: pushes back, right: goes along)</text>
       <text className="axis" transform={`translate(16 ${(H + M.t) / 2}) rotate(-90)`} textAnchor="middle">off-axis: other change vs bare, 0–4 (lower is better)</text>
-      {data.zones.map(zone => {  // PI/OpenAI: conditional quantiles, open at the off-axis limit.
+      {data.zones.filter(zone => zone.percentile !== 50).map(zone =>
+        <path key={zone.percentile} className="zone-fill" data-percentile={zone.percentile}
+          d={'M' + zone.path.map(([a, b]) => `${x(a)},${y(b)}`).join('L') + 'Z'}
+          fill={`rgba(150,150,150,${zone.opacity})`} stroke="none" />)}
+      {data.zones.map(zone => {  // PI/OpenAI: conditional quantile boundaries above the shading.
         const n = zone.path.length / 2, line = pts => 'M' + pts.map(([a, b]) => `${x(a)},${y(b)}`).join('L');
         const d = zone.percentile === 50 ? line(zone.path.slice(0, n)) : line(zone.path.slice(0, n)) + line(zone.path.slice(n));
         return <path key={zone.percentile} className={zone.percentile === 50 ? 'zone median' : 'zone'} data-percentile={zone.percentile} fill="none"
@@ -169,7 +173,7 @@ function App() {
         Up and down is how much the steered answer differs from the bare answer in everything else (register, length, vagueness, refusals, persona leaks, coherence), 0 = none to 4 = one of them broken; a change, so never below 0. Higher on the page is better.
         Each line shows a selected method's dose sweep, smoothed between doses. A cross marks its last displayed admissible dose, or the dose before its effect reverses past bare. Admissible means all seeds at that dose have mean off-axis change at most {data.max_off_axis}; this is our reporting cutoff, not a measured coherence boundary. Individual retained answers can still be badly damaged. Hover a dot for its measured values.
         Solid lines are +C, dashed lines are −C. Stars are plain prompts, averaged over prompt seeds; an open star exceeds the off-axis limit.
-        Grey lines are conditional effect percentiles at the same off-axis level: dotted p10/p90, dashed p25/p75, solid median. Each signed random walk contributes its interpolated effect at its first crossing of that level. Only walks reaching the level count; the lines stop when fewer than half reach it or at {data.max_off_axis}. These are discrete observed ranks, smoothed for display; with few walks the outer bounds approach min–max. They are not density contours of the point cloud or confidence intervals. The origin is inserted as the common bare starting point; behaviour between it and the first tested dose is interpolated. Random has no control penalty, unlike the learned methods on −C.</p>
+        The grey zone shades the p10–p90 and p25–p75 conditional effect bands at the same off-axis level, with dotted outer boundaries, dashed inner boundaries and a solid median. Each signed random walk contributes its interpolated effect at its first crossing of that level. Only walks reaching the level count; the lines stop when fewer than half reach it or at {data.max_off_axis}. These are discrete observed ranks, smoothed for display; with few walks the outer bounds approach min–max. They are not density contours of the point cloud or confidence intervals. The origin is inserted as the common bare starting point; behaviour between it and the first tested dose is interpolated. Random has no control penalty, unlike the learned methods on −C.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Each row is an off-axis level; walks count once their dose sweep reaches it. Counts are signed interventions; the median line is not a sample-coverage region.</p>
         <table className="random-reference"><thead><tr><th>off-axis</th><th>walks</th><th>negative change</th><th>positive change</th><th>median change</th><th>mean change</th></tr></thead><tbody>

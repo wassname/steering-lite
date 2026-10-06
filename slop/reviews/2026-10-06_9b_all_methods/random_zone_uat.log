@@ -1,0 +1,12 @@
+127.0.0.1 - - [07/Oct/2026 06:14:07] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:14:07] "GET /assets/index-TASEMJO4.css HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:14:07] "GET /assets/index-CSGiWHDf.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:14:07] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:14:08] "GET /controls.png HTTP/1.1" 200 -
+curve points in points.json=89 drawn=89
+PNG sweep marks (plot_marks.json from results.py)=89 page drawn=89 methods png=['vjp_resid', 'vjp_value', 'cosine_gated', 'sspace_pool', 'topk_clusters'] page=['vjp_resid', 'vjp_value', 'cosine_gated', 'sspace_pool', 'topk_clusters']
+random zone: two visible shaded bands; CSS-visible dotted/dashed quantile boundaries and solid median
+prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
+question=syco_bullshit_v2_leg_pnf_02 answer blocks=44
+blind judge lines=43 (default blocks are Pareto-best doses, which judge.py rates blind)
+UAT_PASS http://127.0.0.1:38115/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

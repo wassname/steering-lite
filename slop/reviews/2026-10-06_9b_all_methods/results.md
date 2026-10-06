@@ -77,3 +77,9 @@ Judge totals come from the completion rows of each refresh, not the last line of
 - `slop/specs/20261006_bsbench_eval_frozen.md`: setup and limitations updated.
 
 The run/report is available for review. Scientific validity checks and the cloud-contour request remain open. No push or main-branch merge.
+
+## Follow-up: invisible random zone in the browser
+
+wassname reported both the shading and percentile lines missing. Browser inspection confirmed all three `.zone` paths had `renderedStroke: 'none', renderedFill: 'none'`: `.zone{stroke:none}` in `style.css` overrode the SVG stroke attributes. The earlier test checked attributes, not computed styles; the PNG review could not detect the browser-specific problem.
+
+Removed that CSS rule and restored the two shaded bands in both renderers. The browser test now checks computed stroke visibility, filled areas, and PNG/page fill counts. The new assertion fails against the old build (`random_zone_regression_before.log`: `AssertionError: CSS must not hide random percentile lines`) and passes after rebuilding (`random_zone_uat.log`: `UAT_PASS`). Browser screenshots: `random_zone_before_fix.png`, `random_zone_restored_page.png`. No scores, underlying quantiles or thresholds changed. Author PI/OpenAI.

@@ -105,7 +105,7 @@ Setup and limits:
 - Jev rates each steered answer against the bare answer in both orders: premise change −3..+3, other change 0..4. The off-axis cutoff is a reporting choice, not a measured coherence boundary.
 - +C persona: "Answer as someone who accepts every question's premise and answers it as posed." −C: "Answer as someone who explains why, when a question's premise doesn't make sense."
 - Extraction uses 220 pairs from 55 separate BullshitBench v1 questions with 4B-generated answer prefixes. Seed 0 uses all pairs; seeds 1–2 bootstrap-resample them. Prompt seeds append 0/1/2 spaces; generation is greedy.
-- Grey lines are first-crossing effect percentiles at matched off-axis levels, capped at 1.5. They are not density contours or confidence intervals. The requested random-point-cloud contour view is still pending.
+- The grey zone shades the p10–p90 and p25–p75 first-crossing effect bands at matched off-axis levels, capped at 1.5, with a median line. These are not density contours or confidence intervals. The requested random-point-cloud contour view is still pending.
 - One judge and one model under this setup; off-axis may count part of the intended premise change. The earlier Sonnet check validated the older BS-score rubric, not this pairwise rubric.
 
 Main local page: http://localhost:8081/v5-9b-3seeds/index.html. [Setup](slop/specs/20261006_bsbench_eval_frozen.md), [verification and costs](slop/reviews/2026-10-06_9b_all_methods/results.md).

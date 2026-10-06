@@ -644,3 +644,15 @@ Cost evidence from `verify_final.log`:
 This already exceeds my $100-150 estimate, before the failed attempt and unrecorded overhead. It is a duration-based estimate plus retained judge charges, not an invoice. No new paid work was launched during closeout.
 
 The main report is ready to inspect; the outstanding diagnostics remain separate from the completed runs.
+
+## 2026-10-06 -- Browser random-zone visibility fix
+
+The random reference was invisible in the interactive page despite appearing in the exported plot.
+
+Author PI/OpenAI. Browser inspection found `.zone{stroke:none}` overriding the SVG attributes while the paths also had no fill. After wassname reported the missing zone, I removed that rule and restored shaded bands in both renderers. The new computed-style assertion fails on the old build:
+
+> AssertionError: CSS must not hide random percentile lines
+
+Source: `slop/reviews/2026-10-06_9b_all_methods/random_zone_regression_before.log`. The rebuilt page passes the same test in `random_zone_uat.log`; direct screenshot inspection and independent visual review confirm the zone is visible in both browser and PNG. Scores and reference statistics are unchanged.
+
+Interpretation: the previous attribute-only browser test and PNG-only review were insufficient for CSS visibility bugs. Browser image inspection is now part of the evidence for this repair.

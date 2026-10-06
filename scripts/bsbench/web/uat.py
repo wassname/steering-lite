@@ -54,6 +54,10 @@ with sync_playwright() as p:
     assert "not density contours" in explanation and "not a measured coherence boundary" in explanation
     zones = page.locator(".zone")
     assert zones.count() == 3
+    assert zones.evaluate_all("els => els.every(el => getComputedStyle(el).stroke !== 'none' && parseFloat(getComputedStyle(el).strokeWidth) > 0)"), "CSS must not hide random percentile lines"
+    fills = page.locator('.zone-fill')
+    assert fills.count() == png_marks['random_fills'] == 2, "PNG and page need both shaded random bands"
+    assert fills.evaluate_all("els => els.every(el => getComputedStyle(el).fill !== 'none' && el.getBBox().width > 0 && el.getBBox().height > 0)"), "random shading must be rendered with nonzero area"
     for i, zone in enumerate(data["zones"]):
         assert zones.nth(i).get_attribute("data-percentile") == str(zone["percentile"])
         assert zones.nth(i).get_attribute("fill") == "none"
@@ -63,7 +67,7 @@ with sync_playwright() as p:
         assert "User-turn steering" in page.locator("h1").text_content()
         assert "only while the model reads the user's message" in explanation
         assert not any(p["method"].endswith("-user") for p in data["points"]), "user view renames <method>-user to <method>"
-    print("random conditional quantiles: p10/p90 dotted, p25/p75 dashed, median solid; unfilled open paths")
+    print("random zone: two visible shaded bands; CSS-visible dotted/dashed quantile boundaries and solid median")
     for curve in data["curves"]:
         assert [p["C"] for p in curve["points"]] == sorted(p["C"] for p in curve["points"]), "sweep must be in dose order"
         if curve["points"]:

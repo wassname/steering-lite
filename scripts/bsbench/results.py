@@ -495,7 +495,13 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
     margin = {"l": 75, "r": 10, "t": 70, "b": 150}
-    for zone in zones:  # PI/OpenAI: open conditional quantile lines, not density contours.
+    for zone in zones:  # PI/OpenAI: shaded conditional quantile bands, not density contours.
+        if zone["percentile"] != 50:
+            figure.add_trace(go.Scatter(
+                x=[p[0] for p in zone["path"]], y=[p[1] for p in zone["path"]],
+                mode="lines", fill="toself", fillcolor=f"rgba(150,150,150,{zone['opacity']})",
+                line={"width": 0}, hoverinfo="skip", showlegend=False,
+            ))
         n = len(zone["path"]) // 2
         edges = [zone["path"][:n]] if zone["percentile"] == 50 else [zone["path"][:n], zone["path"][n:]]
         for edge in edges:
@@ -545,7 +551,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="low off-axis change → goes along", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"selected methods: smoothed dose sweeps; dot = dose; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: dotted p10/p90, dashed p25/p75, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
+                          text=f"selected methods: smoothed dose sweeps; dot = dose; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: shaded p10–p90 and p25–p75 bands, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
@@ -773,7 +779,7 @@ def main() -> None:
     figure.write_image(out / f"plot.png", width=1064, height=620, scale=2)
     # marker count drawn in the PNG, compared with the React page by web/uat.py
     sweep_marks = sum(len(trace.x) for trace in figure.data if trace.name == "sweep")
-    (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown}) + "\n")
+    (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown, "random_fills": sum(trace.fill == "toself" for trace in figure.data)}) + "\n")
     print(table)
     print(f"wrote {out}/points.json ({len(points)} points), index.md, plot.html, plot.png")
 

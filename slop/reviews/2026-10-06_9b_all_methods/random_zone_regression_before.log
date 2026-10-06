@@ -1,0 +1,12 @@
+127.0.0.1 - - [07/Oct/2026 06:13:52] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:13:52] "GET /assets/index-Cf-nkZ1N.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:13:52] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:13:52] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 06:13:54] "GET /controls.png HTTP/1.1" 200 -
+curve points in points.json=89 drawn=89
+PNG sweep marks (plot_marks.json from results.py)=89 page drawn=89 methods png=['vjp_resid', 'vjp_value', 'cosine_gated', 'sspace_pool', 'topk_clusters'] page=['vjp_resid', 'vjp_value', 'cosine_gated', 'sspace_pool', 'topk_clusters']
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/web/uat.py", line 57, in <module>
+    assert zones.evaluate_all("els => els.every(el => getComputedStyle(el).stroke !== 'none' && parseFloat(getComputedStyle(el).strokeWidth) > 0)"), "CSS must not hide random percentile lines"
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: CSS must not hide random percentile lines
