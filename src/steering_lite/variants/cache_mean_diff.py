@@ -20,7 +20,7 @@ from torch import Tensor
 from .. import positions
 from ..config import SteeringConfig, register, register_config
 from ..target import _get_blocks
-from .value_gram import DynamicCache, DynamicLayer, SteeredDynamicCache, ValueGram, _require_dynamic_cache
+from .value_gram import DynamicLayer, SteeredDynamicCache, ValueGram, _require_dynamic_cache
 from .vjp_resid import _encode
 
 
@@ -57,14 +57,6 @@ class PromptValueCache(SteeredDynamicCache):
             values[rows, :, last, :] += self._steering_coeff * directions.to(values).sum(0)
             layer.values = values
         self.edited = True
-
-    @classmethod
-    def promote(cls, cache, **kwargs):
-        populated = cache.get_seq_length() > 0
-        promoted = super().promote(cache, **kwargs)
-        if populated:
-            promoted.edit_prompt()
-        return promoted
 
 
 @register
@@ -115,6 +107,8 @@ class CacheMeanDiff:
             if type(cache) is not PromptValueCache:
                 raise TypeError("cache_mean_diff requires a returned PromptValueCache")
             mask = kwargs.get("attention_mask")
+            if mask is not None:
+                assert mask.ndim == 2, "cache_mean_diff needs a 2-D attention mask"
             cache.edit_prompt(None if mask is None else mask.bool())
 
         handles.append(model.register_forward_hook(finish_prefill, with_kwargs=True))
