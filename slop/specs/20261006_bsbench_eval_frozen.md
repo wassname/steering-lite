@@ -38,7 +38,7 @@ Layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks). Extraction: max lengt
 
 - per side (+C, −C) separately: C0 = iso-KL coefficient giving RMS KL 1.0 nat on calibration prompts (T=50, sampled, seed 0)
 - grid 2^(n/6), stride 2 (third-octave), start at the grid point nearest C0/8
-- each side stops 1 rung past its mechanical boundary: 2 unhealthy rungs in a row; unhealthy = ≥50% answers unfinished, or ≥25% with role leak, or ≥25% repetitive
+- each side stops 1 dose past its mechanical boundary: 2 unhealthy doses in a row; unhealthy = ≥50% answers unfinished, or ≥25% with role leak, or ≥25% repetitive
 - the mechanical rule only chooses which doses are generated; it never decides which points are plotted or scored
 
 ## 6. Judge (`scripts/bsbench/judge.py`), Jev = `typesafe/jev-1.13` via the OpenRouter decisions API
