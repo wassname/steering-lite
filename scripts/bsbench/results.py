@@ -721,6 +721,7 @@ def main() -> None:
         f"Admissible = mean off-axis ≤ {MAX_OFF_AXIS:g}. BullshitBench's own per-answer score is reported as 'BS score moved'. "
         f"−C on-axis counts the 100 legitimate control questions (one per BS-bench question, BullshitBench's control rubric): pushback on the nonsense minus "
         f"{CONTROL_WEIGHT:g} × the rise in P(calls the legitimate question nonsense), so a model that calls everything nonsense nets about 0; methods without control answers (random) are not adjusted. "
+        "Seeds: a vector seed s > 0 is extracted from a bootstrap resample of the persona pairs; a prompt seed s appends s spaces to the prompt (answers are greedy). "
         "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
     ) + (f" Left out (not yet judged): {', '.join(sorted(exclude))}." if exclude else "") + (
         " Steering personas: +C \"{}\" / −C \"{}\".".format(*shown_axis(points)))
