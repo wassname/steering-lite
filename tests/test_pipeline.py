@@ -394,11 +394,18 @@ def test_cache_hybrid_generate(method, tiny_model):
         "cache_mean_diff": sl.CacheMeanDiffC(layers=(2,), coeff=0.2, dtype=torch.float32),
     }[method]
     vector = sl.train(model, tok, POS, NEG, cfg, batch_size=2, max_length=64)
-    with vector(model):
-        output = model.generate(
-            torch.tensor([[1, 4, 5]]), max_new_tokens=2, do_sample=False
-        )
+    prompt = torch.tensor([[1, 4, 5]])
+    with torch.no_grad(), vector(model):
+        output = model.generate(prompt, max_new_tokens=2, do_sample=False)
+        if method == "cache_mean_diff":
+            generated = output[:, prompt.shape[1]:]
+            logits = REGISTRY[method].score_continuation(model, prompt, generated)
+            assert torch.equal(logits.argmax(-1), generated)
     assert output.shape == (1, 5)
+    if method == "cache_mean_diff":
+        vector.cfg.coeff = 0.0
+        zero = sl.measure_kl(vector, model, tok, [prompt[0]], T=3, device="cpu", show_pbar=False)
+        assert zero["kl_rms"] < 1e-5
 
 
 def test_vjp_value_gradient_flows_through_real_cache_values(tiny_model):
@@ -680,6 +687,26 @@ def test_cache_mean_diff_one_shot_prompt_edit(padding_side, tiny_model):
                     torch.testing.assert_close(continued.logits, bare_next.logits, rtol=0, atol=0)
             after = model(next_ids, past_key_values=cache, use_cache=True)
             torch.testing.assert_close(after.past_key_values.layers[1].values[:, :, :-2], expected, rtol=0, atol=0)
+
+
+def test_cache_mean_diff_populated_prefix_edits_final_prompt_token(tiny_model):
+    """A supplied prefix stays unedited until the complete prompt forward. PI/OpenAI."""
+    model, tok = tiny_model
+    sl.detach(model)
+    vector = sl.train(model, tok, POS, NEG, sl.CacheMeanDiffC(layers=(1,), coeff=2.0, dtype=torch.float32), batch_size=2, max_length=64)
+    prefix = tok("Tell me", return_tensors="pt").input_ids
+    suffix = tok(" the truth.", add_special_tokens=False, return_tensors="pt").input_ids
+    with torch.no_grad():
+        ordinary = model(prefix, use_cache=True).past_key_values
+        history = ordinary.layers[1].values.clone()
+        with vector(model):
+            steered = model(suffix, past_key_values=ordinary, use_cache=True)
+        torch.testing.assert_close(ordinary.layers[1].values, history, rtol=0, atol=0)
+        bare = model(suffix, past_key_values=ordinary, use_cache=True)
+        torch.testing.assert_close(steered.logits, bare.logits, rtol=0, atol=0)
+        expected = bare.past_key_values.layers[1].values.clone()
+        expected[:, :, -1] += 2.0 * vector.stacked[1]["c"].sum(0)
+        torch.testing.assert_close(steered.past_key_values.layers[1].values, expected, rtol=0, atol=0)
 
 
 def test_cache_mean_diff_calibration_scores_cached_continuation(tiny_model):
