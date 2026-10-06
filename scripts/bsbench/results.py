@@ -461,10 +461,20 @@ def sweep_path(rows: list[dict], n: int = 12) -> list[list[float]]:
     return path
 
 
+def prompt_marks(points: list[dict]) -> list[dict]:
+    """One star per (prompt method, side): the mean over prompt seeds (s spaces appended). Clicking a star shows seed 0's answers."""
+    out = []
+    for method, side in sorted({(p["method"], p["side"]) for p in points if p["method"] in PROMPTS}):
+        at = sorted((p for p in points if p["method"] == method and p["side"] == side), key=lambda p: p["seed"])
+        means = {k: mean(p[k] for p in at) for k in ("effect", "premise_effect", "off_axis", "control_claims", "control_claims_bare") if k in at[0]}
+        out.append({**at[0], **means, "seeds": len(at), "admissible": means["off_axis"] <= MAX_OFF_AXIS})
+    return out
+
+
 def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
-    prompting = [point for point in points if point["method"] in PROMPTS]  # baselines stay visible; open star = fails the judge's limits
+    prompting = prompt_marks(points)  # baselines stay visible; open star = fails the judge's limits
     # axes fit what is drawn: each line up to its x, the prompt stars, the grey band (random points are not drawn)
     shown = [point for curve in curves.values() for point in sweep(before_reversal(curve))] + prompting
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
@@ -521,11 +531,11 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer → goes along with the nonsense", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; ★ = plain prompt (open ☆ = judge rates it incoherent)<br>× = last dose the judge rates coherent, or before the effect reverses past bare<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
+                          text=f"line = one method's dose sweep from bare, smoothed over neighbouring doses; dot = dose; × = last coherent dose, or before the effect reverses past bare<br>★ = plain prompt, mean over prompt seeds (open ☆ = judge rates it incoherent)<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions at the same doses, both signs: outer band 10–90% of their effects, inner 25–75%, line = median<br>bands use observed ranks, so with few directions they span min–max; not confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=590, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": f"premise change vs bare, −3..+3 (Jev, pairwise; −C less {CONTROL_WEIGHT:g} × legitimate questions called nonsense): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "premise change vs bare (Jev, pairwise; −C net of false rejections): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
@@ -624,7 +634,7 @@ def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figur
         if rows:
             figure.add_trace(go.Scatter(x=[0, *(r[0] for r in rows)], y=[bare, *(r[1] for r in rows)], mode="lines+markers", name=LABELS[method],
                                         text=[""] + [f"C={r[2]:.3g}" for r in rows], line={"color": COLORS[method], "width": 3}, marker={"color": COLORS[method], "size": 7}))
-    for point in (p for p in points if p["method"] in PROMPTS and p["side"] == "-C" and "control_claims" in p):
+    for point in (p for p in prompt_marks(points) if p["side"] == "-C" and "control_claims" in p):
         figure.add_trace(go.Scatter(x=[-point["premise_effect"]], y=[100 * point["control_claims"]], mode="markers", name=PROMPTS[point["method"]] + " −C",
                                     marker={"color": COLORS[point["method"]], "size": 15, "symbol": "star"}))
         bare = 100 * point["control_claims_bare"]
@@ -638,7 +648,7 @@ def control_plot(points: list[dict], methods: list[str], title: str) -> go.Figur
 def svg_labels(site: dict) -> list[dict]:
     """Reuse PNG label placement at the browser's default-view dimensions. PI/OpenAI."""
     curves = [c for c in site["curves"] if c["method"] in site["shown"] and c["points"]]
-    prompts = [p for p in site["points"] if p["method"] in PROMPTS]
+    prompts = site["prompt_marks"]
     shown = [p for c in curves for p in c["points"]] + prompts
     zones = [p for zone in site["zones"] for p in zone["path"]]
     x_max = 1.08 * max([abs(p["effect"]) for p in shown] + [abs(p[0]) for p in zones] + [.5])
@@ -700,6 +710,7 @@ def main() -> None:
                   for row in rows for side in ("-C", "+C") for dose in ("best", "strongest") if row[dose][side] is not None],
         "points": points,
     }
+    site["prompt_marks"] = prompt_marks(points)
     site["plot_labels"] = svg_labels(site)
     (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]

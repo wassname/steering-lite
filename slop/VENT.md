@@ -20,3 +20,5 @@ A chained `pi --model X --no-tools --no-session -p "..."` sat 3 h with 2 s CPU u
 
 ## 2026-10-04 duplicate random walks -- PI/OpenAI
 I chained `run_modal ... methods` then `run_modal ... random` in one process, and also launched `random` in parallel to save time. The chained copy started while the parallel one was still RUNNING; run_modal only skips COMPLETE certificates, so it spawned the same 5 walks again. Both appended to the same answer files for ~7 min. Rule: never launch the same (method, seed, cohort, preset) twice; kill the chained duplicate when you start a parallel copy.
+
+- 2026-10-06 PI/OpenAI: the Read tool lags on freshly written files: it returned ENOENT for a PNG that `ls` showed, and once served the previous version of an overwritten plot.png. Workaround: copy to a new filename and wait ~20 s before Read. Cost me a stale-image look that I almost reported as "fixed".

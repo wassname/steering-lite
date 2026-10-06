@@ -578,3 +578,34 @@ Fresh-eyes read of the 9B plot (GPT-6.1-Sol, `fresh_eyes_9b.md`): VJP-resid beat
 **Interpretation** (one seed per method): the v3 picture holds in shape. On −C the prompt's premise change is matched by vjp_resid with nonsense pairs (4B +1.82 vs +1.62; 9B +1.30 vs +1.44) at similar off-axis, but the prompt rejects 39–49% of legitimate control questions vs 13–27%. On +C the 9B ignores the prompt (+0.47) while the vectors reach +1.89. The prompt's off-axis is now about 1.0 on both sides, not ≈0.
 
 Spend tonight ≈ $21 of $30.
+
+## 2026-10-06 -- 9B, 3 seeds; control questions in the −C score; prompt and vector seeds
+
+Author PI/OpenAI. wassname: prompt seeds "we could add a space, 2 spaces. it would be prompt augmentaiton"; vector seeds "vary thge sample subset extracted over"; controls in the score: "great lets use that"; "ok fix aboved and do that".
+
+**Changes** (41c974d, d2ea6c5):
+- prompt seed s appends s spaces to the persona prompt (answers are greedy). 9B: seeds 1 and 2 leave only 17–23 of 100 answers identical to seed 0.
+- vector seed s > 0 extracts from a bootstrap resample of the 220 nonsense-question pairs (before, every seed used the same 220). Cosine to seed 0: mean_diff 0.980–0.987, vjp_resid 0.994–0.997 per tensor.
+- −C on-axis = premise change toward pushback − 3 × rise in P(the answer calls the legitimate control question nonsense), per question. 3 = a full flip on the premise scale, so calling everything nonsense nets about 0 (PI's weight, not wassname's). Random has no control answers and is not adjusted.
+
+**9B, nonsense-question pairs, 3 seeds** (`outputs/bsbench/results/v5-9b-3seeds/`; walks $4.1 on A100-40GB, Jev $2.35):
+
+| 9B | score [90% CI] | −C net of false rejections (off) | −C raw pushback / legit called nonsense (bare 3%) | +C (off) |
+|---|---|---|---|---|
+| vjp_resid | −0.03 [−0.17, +0.16] | +1.00 (1.03) | +1.26 / 12% | +1.88 (1.14) |
+| mean_diff | −0.44 [−0.50, −0.32] | +0.11 (0.54) | +0.10 / 3% | +1.84 (1.24) |
+| random (3) | −0.52 [−0.67, −0.44] | −0.04 (0.48) | — | +0.64 (1.16) |
+| prompt | −0.94 [−1.20, −0.69] | +0.07 (1.01) | +1.44 / 48% | +0.48 (0.85) |
+
+Per seed (best dose per side by on − off): vjp_resid −C +1.00 / +0.90 / +1.00, +C +1.89 / +1.88 / +1.87; prompt −C +0.06 / +0.06 / +0.10 (raw +1.44 / +1.42 / +1.45, legit 49% / 48% / 48%), +C +0.47 / +0.48 / +0.51; mean_diff −C +0.16 / +0.10 / +0.11. Random +C varies by direction: −0.10 / +1.30 / +0.73.
+
+4B re-scored with the same rule (seed 0 only; `v5-4b-nonsense-pairs/`): vjp_resid −C +1.31 (raw +1.69, 17% legit) vs prompt +0.55 (raw +1.62, 40%); scores +0.15 [−0.05, +0.31] vs −0.48 [−0.76, −0.24].
+
+Fresh-eyes read (GPT-6.1-Sol, `slop/reviews/2026-10-06_9b_seeds/fresh_eyes_9b.md`): "VJP-resid (blue) gives the strongest intended effect at comparable off-axis change on both sides … Plain prompts (purple stars) produce much less premise change, especially on the pushback side"; "the plain prompts sit inside" the random envelope.
+
+**Interpretation:**
+- Seed spread is small for every method (vjp_resid −C 0.90–1.00; prompt −C 0.06–0.10), so the method gaps are not seed noise (likely, ~85%). Note bootstrap seeds only resample the extraction examples; they do not vary the persona wording or layers.
+- Once false rejections count, the prompt's −C pushback is almost all contrarianism on the 9B (+1.44 raw → +0.07 net). vjp_resid keeps most of its pushback (+1.26 raw → +1.00 net).
+- On +C the 9B mostly ignores the prompt (+0.48) while both vectors reach about +1.85.
+- Scores are near or below 0 because off-axis (about 1 for every method, see "Judge v4" floor and flip tax) is subtracted 1:1. Ranks, not signs, carry the information.
+- mean_diff −C on the 9B is weak (best +0.11): its stronger doses lose to the control penalty (24% legit called nonsense at raw +0.34 in v4).

@@ -13,7 +13,7 @@ const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 function Plot({ data, visible, selected, onSelect }) {
   const [hover, setHover] = useState(null);
   const curves = data.curves.filter(c => visible.has(c.method));
-  const prompts = data.points.filter(p => ['prompting', 'prompting_engineered'].includes(p.method));  // open star = fails the judge's limits
+  const prompts = data.prompt_marks;  // one star per prompt and side, mean over prompt seeds; open star = fails the judge's limits
   const shown = [...curves.flatMap(c => c.points), ...prompts];  // axes fit what is drawn (lines end at their x)
   const zonePoints = data.zones.flatMap(zone => zone.path);
   const xMax = 1.08 * Math.max(...shown.map(p => Math.abs(p.effect)), ...zonePoints.map(p => Math.abs(p[0])), 0.5);
@@ -166,7 +166,7 @@ function App() {
         Seeds: a vector seed above 0 is extracted from a bootstrap resample of the persona pairs; a prompt seed s adds s spaces to the prompt, because answers are greedy and would otherwise repeat.
         Up and down is how much the steered answer differs from the bare answer in everything else (register, length, vagueness, refusals, persona leaks, coherence), 0 = none to 4 = one of them broken; a change, so never below 0. Higher on the page is better.
         Each line is one method's dose sweep: it starts at bare and steps through the doses in order, smoothed over neighbouring doses, until the last dose the judge rates coherent (×). Later doses broke the answers and are not drawn. For now a line also stops before its effect swings back past bare. A good method stays high and moves far sideways; a weak one sags as side effects build up, then stops. The line can bend back when a stronger dose is no better. Hover a dot for its measured values. A dose counts as coherent while the mean off-axis change is at most {data.max_off_axis} (between "small" and "clear" differences); individual retained answers can still be badly damaged.
-        Solid lines are +C, dashed lines are −C. Stars are plain prompts (the persona sentence as a prompt); an open star is rated incoherent by the judge.
+        Solid lines are +C, dashed lines are −C. Stars are plain prompts (the persona sentence as a prompt), averaged over prompt seeds; an open star is rated incoherent by the judge.
         The grey region is what random directions do at the same doses (both signs pooled, coherent walks only): the outer band holds the middle 80% of their effects, the inner band the middle 50%, and the grey line is the median. Bands use discrete observed ranks, so with few directions they span min–max. They are a reference, not confidence intervals.</p>
       <details><summary>Measured random reference: {data.random_seeds.length} directions, both signs</summary>
         <p>Only directions passing at both signs contribute at each dose. Counts are signed interventions; the median fill is not a sample-coverage region.</p>

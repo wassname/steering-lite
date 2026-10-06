@@ -69,7 +69,7 @@ with sync_playwright() as p:
         for mark in curve["tested"]:
             at = [p for p in data["points"] if p["method"] == curve["method"] and p["side"] == curve["side"] and p["C"] == mark["C"]]
             assert {p["seed"] for p in at} == seeds and all(p["admissible"] for p in at), "curve includes a rejected dose"
-    prompt_count = sum(p["method"] in ("prompting", "prompting_engineered") for p in data["points"])  # failing prompts drawn as open stars
+    prompt_count = len({(p["method"], p["side"]) for p in data["points"] if p["method"] in ("prompting", "prompting_engineered")})  # one star per prompt and side
     assert page.locator(".prompt-baseline").count() == prompt_count, "one star per plain prompt"
     assert page.locator(".prompt-baseline path").evaluate_all("els => els.every(el => { const t = el.transform.baseVal.consolidate().matrix; return t.e >= 0 && t.e <= 1000 && t.f >= 0 && t.f <= 560; })"), "prompt baseline outside SVG view"
     print(f"prompt baseline stars={prompt_count}; no rejected curve points, rejected stars, or swept-prompt stars")
