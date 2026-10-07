@@ -1,0 +1,32 @@
+COMMITTED INVENTORY (files, bytes)
+.gitignore 1 171
+.gitmodules 1 124
+.pi 27 1045800
+AGENTS.md 1 2194
+README.md 1 25814
+RESEARCH_JOURNAL.md 1 76968
+TODO.md 1 7770
+assets 7 2422591
+data 4 337967
+justfile 1 1716
+pyproject.toml 1 1451
+scripts 18 204615
+slop 383 39006054
+src 36 261626
+tests 1 34605
+uv.lock 1 473340
+LARGEST BLOBS
+5381051 slop/research/2026-10-04_persona_axes/screen.json
+4744717 slop/research/2026-10-04_persona_axes/inspect/2026-10-04T03-23-39-00-00_persona-axis-validation_2nU4qt7Ejf4RehVKcy4ntW.eval
+3647528 slop/reviews/2026-10-07_low_dose/summary_before.json
+3142244 slop/reviews/2026-10-06_9b_all_methods/walks.log
+2224321 slop/research/persona_poles/answers.jsonl
+1899149 slop/reviews/2026-09-25_deepseek_vs_jev/judge_frontiers.png
+896254 slop/reviews/2026-10-02_prompt_refinement/random-walks.log
+791941 slop/reviews/2026-10-06_9b_random20/walks.log
+726528 slop/reviews/2026-10-02_user_turn/learned-walks.log
+627852 slop/reviews/2026-10-07_low_dose/pre_backfill_sha256.txt
+549589 slop/reviews/2026-10-02_user_turn/random-walks-wave1.log
+530451 slop/reviews/2026-10-07_low_dose/walks_learned.log
+MACHINE/KEY PATH MATCHES []
+SUBMODULES ['docs/vendor/vjp-steering']

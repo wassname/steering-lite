@@ -1,0 +1,3 @@
+LINKS_PASS README.md: 24 local file targets
+LINKS_PASS slop/research/20261007_historical_bsbench_results/README.md: 50 local file targets
+FIGURE_PASS README asset equals the generated main 9B plot

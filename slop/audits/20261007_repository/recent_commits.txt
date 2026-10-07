@@ -1,0 +1,12 @@
+fb1fd14 Defer supplied-prefix cache edits until complete prompt prefill
+004dd7c Check cached continuation logits for one-shot benchmark methods
+7cc060d Add one-shot prompt value-cache mean-difference steering
+d78ce35 Correct shared cache attachment and config runtime types
+1b094ad Report measured low-dose sweeps and keep plot markers at measured seed means
+4977303 Measure sparse low-dose points and backfill completed walks without repeating extraction
+8747682 Restore shaded random zone and remove CSS hiding its percentile lines
+ddca0c5 Make completed 9B comparison the main result; correct cutoff and random-reference labels
+183f0e4 Random reference as open quantile contours from bare (p10/p25/p50/p75/p90 by off-axis level); float64 SVD in _pca_direction (corda_pca 9B s1 failed to converge on bootstrap duplicates)
+c9813f3 Random band by off-axis level: each walk's premise change where its sweep first reaches the level, up to the 1.5 coherence limit
+a609c4e 9B: 20 random directions judged; plot with fuller random band
+739b8c3 spec: dose, not rung

@@ -1,0 +1,8 @@
+just --list
+uv run --extra benchmark modal run scripts/bsbench/run_modal.py::main --cohort full --methods cache_mean_diff --seeds 0,1,2 --extra "--preset qwen3.5-9b --pairs bsbench_v1 --controls"
+uv run --extra benchmark python scripts/bsbench/judge.py --cohort full --model-dir outputs/bsbench/Qwen--Qwen3.5-9B-g2351502a --refresh
+uv run --extra benchmark python scripts/bsbench/results.py --cohort full --model-dir outputs/bsbench/Qwen--Qwen3.5-9B-g2351502a --out outputs/bsbench/results/v5-9b-3seeds
+cd scripts/bsbench/web && pnpm install --frozen-lockfile --silent && pnpm exec vite build --outDir ../../../outputs/bsbench/results/v5-9b-3seeds --emptyOutDir false
+uv run --with playwright python scripts/bsbench/web/uat.py outputs/bsbench/results/v5-9b-3seeds
+mkdir -p assets/bsbench
+cp outputs/bsbench/results/v5-9b-3seeds/plot.png assets/bsbench/qwen3.5-9b.png
