@@ -42,8 +42,6 @@ I compare to prompting, which I suspect is better if the model wants to change b
 
 <sub>One row per method, sorted by score (higher is better). An LLM judge compares each steered answer with the unsteered one. It rates the change in premise acceptance (−3..+3) and how much everything else changed (0..4); the table shows means over questions and seeds. Each side (+C, −C) uses the method's best dose: the largest premise change minus other change, with other change at most 1.5 in every seed. The score is the lower of the two sides' premise change minus other change, so it is negative when other change outweighs premise change. −C pushback is the premise change with its sign flipped, reduced by 3 × the rise in legit rejected: the share of 100 sensible control questions, one per benchmark question, that the −C answer calls nonsense (unsteered: 3%). Random has no control questions. — means no dose passed in every seed. [more columns](slop/reviews/2026-10-07_cache_mean_diff/table.md) · [setup details](slop/specs/20261006_bsbench_eval_frozen.md) · [earlier evaluations](slop/research/20261007_historical_bsbench_results/README.md)</sub>
 
-The score has a weak spot. A method can score well by barely changing anything: `cache_mean_diff` is near the top for this reason, not because it steers well.
-
 I hope we can use this to show how good steering methods are, and make better ones.
 
 ## Quickstart
@@ -103,11 +101,11 @@ just sweep my_method  # the full run: 3 seeds, 100 questions; then `just pull` a
 
 ## Methods
 
-Each file includes its math and paper references. Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py). Newer variants are [VJP residual](src/steering_lite/variants/vjp_resid.py), [VJP value](src/steering_lite/variants/vjp_value.py), [Value Gram](src/steering_lite/variants/value_gram.py), [query steering](src/steering_lite/variants/query_steer.py) and [cache mean difference](src/steering_lite/variants/cache_mean_diff.py). [Random](src/steering_lite/variants/random.py) is the null baseline.
+Each file includes its math and paper references. Start with [mean difference](src/steering_lite/variants/mean_diff.py) or [PCA](src/steering_lite/variants/pca.py).
 
-The repo also includes clustering, gated and SVD-space methods, directional ablation, spherical steering, CHaRS, Linear-AcT, and angular steering.
+## See also
 
-See also [weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
+[weight-steering](https://github.com/wassname/weight-steering), [IBM AISteer360](https://github.com/IBM/AISteer360), and [repeng](https://github.com/vgel/repeng).
 
 ## Citation
 
