@@ -3,7 +3,7 @@
 
 <!-- Generated from README.qmd by `just docs`; edit README.qmd, not this file. -->
 
-steering-lite changes a model's hidden activations during inference, without retraining.
+steering-lite is a collection of steering methods, kept hackable and easy to evaluate.
 
 When we steer a model, we want to change one thing without changing everything else. We might want less sycophancy, for example, while keeping its answers to ordinary factual questions the same.
 
