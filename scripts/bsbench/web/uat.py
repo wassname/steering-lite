@@ -31,6 +31,7 @@ with sync_playwright() as p:
     page.goto(url)
     page.wait_for_selector("svg")
     assert data["setup"] in page.locator("svg").text_content(), "the plot names model, extraction data, seeds and controls"
+    assert page.locator('a[href="https://github.com/wassname/steering-lite"]').count() == 1, "the published page links back to the repo"
     empty = [m for m in {c["method"] for c in data["curves"]} if not any(c["points"] for c in data["curves"] if c["method"] == m)]
     for method in empty:
         chip = page.get_by_role("button", name=method, exact=True)
