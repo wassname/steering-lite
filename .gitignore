@@ -16,3 +16,6 @@ docs/
 spec/
 .env
 node_modules/
+# PI/OpenAI: machine-only downloads and agent runtime state; research evidence stays tracked.
+.local/
+.pi/subagents/

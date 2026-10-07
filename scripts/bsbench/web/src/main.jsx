@@ -139,8 +139,10 @@ function Explorer({ data, selected, onSelect }) {
 function Chips({ data, visible, setVisible }) {
   const methods = [...new Set(data.curves.map(c => c.method))];
   const toggle = m => { const next = new Set(visible); next.has(m) ? next.delete(m) : next.add(m); setVisible(next); };
-  return <div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
-    <span className="swatch" style={{ background: data.colors[m] }} />{m}</button>)}</div>;
+  const empty = methods.filter(m => visible.has(m) && !data.curves.some(c => c.method === m && c.points.length));
+  return <><div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
+    <span className="swatch" style={{ background: data.colors[m] }} />{m}</button>)}</div>
+    {empty.length > 0 && <p role="status">{empty.join(', ')}: measured, but no common dose across seeds meets the mean off-axis cutoff of {data.max_off_axis}. No curve is drawn.</p>}</>;
 }
 
 function App() {
@@ -155,7 +157,7 @@ function App() {
     <h1>{{ user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
     <p className="lede"><b>{data.setup}</b></p>
     {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Plain prompts also act only on the prompt.</p>}
-    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
+    <p className="lede">How far can each steering method change premise acceptance, and how much else changes with it? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.control_claims != null) && <section id="controls">

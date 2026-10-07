@@ -28,6 +28,15 @@ with sync_playwright() as p:
     page.goto(url)
     page.wait_for_selector("svg")
     assert data["setup"] in page.locator("svg").text_content(), "the plot names model, extraction data, seeds and controls"
+    empty = [m for m in {c["method"] for c in data["curves"]} if not any(c["points"] for c in data["curves"] if c["method"] == m)]
+    for method in empty:
+        chip = page.get_by_role("button", name=method, exact=True)
+        selected = chip.get_attribute("aria-pressed") == "true"
+        if not selected:
+            chip.click()
+        assert method in page.get_by_role("status").text_content(), "empty method selection must explain its missing curve (PI/OpenAI)"
+        if not selected:
+            chip.click()
     curve_points = sum(len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
     drawn = page.locator("circle.mark, path.mark.end").count()
     print(f"curve points in points.json={curve_points} drawn={drawn}")
