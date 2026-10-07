@@ -1,0 +1,4 @@
+CACHE_REPORT_PASS seeds=3 points=116 common_curves=2 lower_doses=2,4 controls_present; README asset matches plot
+{"method": "cache_mean_diff", "score": -0.20778333333333332, "ci": [-0.26016666666666666, -0.16515], "score_room": -0.0017255064361390068, "ci_room": [-0.014533710133225674, 0.014305453954320086], "seeds": 3, "N": 32, "rejected": 20, "best": {"+C": {"C": 2.0, "effect": -0.011266666666666661, "premise_effect": -0.011266666666666661, "off_axis": 0.19651666666666667, "control_claims": 0.03123333333333333, "control_claims_bare": 0.0297}, "-C": {"C": 2.0, "effect": -0.006316666666666655, "premise_effect": -0.011916666666666655, "off_axis": 0.19965, "control_claims": 0.031566666666666666, "control_claims_bare": 0.0297}}}
+MAX_DIRECTED +C: {"C": 4.0, "effect": 0.016850000000000007, "off_axis": 0.24108333333333334}
+MAX_DIRECTED -C: {"C": 25.398416831491197, "effect": -0.07408333333333332, "off_axis": 0.37598333333333334}

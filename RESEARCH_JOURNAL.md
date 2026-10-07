@@ -676,3 +676,24 @@ Interpretation: the additions improve dose coverage, not necessarily method perf
 The old plotting median filter shifted low-dose dots toward larger-dose observations. Removed that filter and point thinning; dots now retain measured seed means, while lines still interpolate. The regression first failed with "dose dots must retain measured seed means" and then passed (`dots_regression_before.log`, `uat.log`). PNG, browser and controls images were inspected directly and independently (`visual_review.md`). This is artifact and presentation verification, not a full scientific-validity audit.
 
 The plot now shows the new measurements rather than replacing them with neighboring-dose averages.
+
+## 2026-10-07 -- Cache mean-difference steering in the main report
+
+The requested cache-method evaluation is complete. Author: PI/OpenAI.
+
+Integrated `cache_mean_diff` from the separate reviewed worktree, then ran `just sweep cache_mean_diff` and `just results`. It edits the final prompt token's value cache once, leaving the first generated token unchanged. This keeps our existing prompts but differs from the paper's offset-token and CoT-demonstration protocol. Code state: `slop/reviews/2026-10-07_cache_mean_diff/source_commit.txt` plus `source_worktree.patch`.
+
+> CACHE_WALKS_PASS seeds=3 controls=100 lower_points=12 dose_points=116 seconds=8024.498 estimated_GPU_USD=4.6810
+
+Source: `slop/reviews/2026-10-07_cache_mean_diff/verify_walks.log`. The real tiny-model checks passed before generation: 68 library tests, 11 typed cache tests, and the benchmark walk including lower doses and controls.
+
+> MAX_DIRECTED +C: {"C": 4.0, "effect": 0.016850000000000007, "off_axis": 0.24108333333333334}
+> MAX_DIRECTED -C: {"C": 25.398416831491197, "effect": -0.07408333333333332, "off_axis": 0.37598333333333334}
+
+Source: `slop/reviews/2026-10-07_cache_mean_diff/verify_report.log`. Effect is signed premise change, control-adjusted on -C; negative means pushback. These maxima use common doses passing the off-axis cutoff in every seed. The headline score is -0.2078, selecting C=2 on both sides with directed effects approximately +0.006 and -0.011. Full aggregates: `metrics.json` in that directory.
+
+Interpretation: the tested adaptation produces little directed premise change before off-axis change grows. It appears among the five highest scores by changing nearly nothing at its selected dose. This is a scoring limitation, not evidence of effective cache steering. It does not invalidate the paper or exclude an implementation error; the first-token and extraction-protocol differences have not been isolated. Continuation-logit checks rule out a wholly bypassed intervention, not a misidentified semantic direction.
+
+Judging ended with `JUDGE_COMPLETE missing=0` (`judge_report.log`). Recorded judge costs are $1.1679 and $0.0026; together with completed GPU runtime the accounted addition is about $5.85. Browser checks, direct PNG inspection and independent image review passed with crowding/color caveats (`uat_final.log`, `visual_review.md`). Actual lowest/middle/highest-dose answers for the first scenario, both signs and every seed, are retained in `answer_samples.md`.
+
+The result is now available through the same maintained benchmark commands and main page.

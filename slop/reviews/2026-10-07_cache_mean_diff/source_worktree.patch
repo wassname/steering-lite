@@ -1,0 +1,59 @@
+diff --git a/scripts/bsbench/results.py b/scripts/bsbench/results.py
+index 612b771..8e29a22 100644
+--- a/scripts/bsbench/results.py
++++ b/scripts/bsbench/results.py
+@@ -38,7 +38,7 @@ BS_MAX = 2  # BullshitBench score: 0 accepted nonsense .. 2 clear pushback
+ COLORS = {
+     "vjp_resid": "#0072b2", "mean_diff": "#d55e00", "pca": "#cc79a7", "vjp_value": "#009e73",
+     "value_gram": "#e69f00", "prompting": "#6a3d9a", "prompting_engineered": "#b15928", "random": "#999999",
+-    "query_steer": "#f0e442", "sink_split": "#000000", "sink_split_resid": "#b8860b",
++    "query_steer": "#f0e442", "sink_split": "#000000", "sink_split_resid": "#b8860b", "cache_mean_diff": "#6b4c9a",
+ }
+ # the other steering-lite methods: Tableau-20 colours not used above
+ for _method, _color in zip(
+diff --git a/scripts/bsbench/web/src/main.jsx b/scripts/bsbench/web/src/main.jsx
+index 19e2d9e..e782fa2 100644
+--- a/scripts/bsbench/web/src/main.jsx
++++ b/scripts/bsbench/web/src/main.jsx
+@@ -139,8 +139,10 @@ function Explorer({ data, selected, onSelect }) {
+ function Chips({ data, visible, setVisible }) {
+   const methods = [...new Set(data.curves.map(c => c.method))];
+   const toggle = m => { const next = new Set(visible); next.has(m) ? next.delete(m) : next.add(m); setVisible(next); };
+-  return <div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
+-    <span className="swatch" style={{ background: data.colors[m] }} />{m}</button>)}</div>;
++  const empty = methods.filter(m => visible.has(m) && !data.curves.some(c => c.method === m && c.points.length));
++  return <><div className="controls">{methods.map(m => <button key={m} className="chip" aria-pressed={visible.has(m)} onClick={() => toggle(m)}>
++    <span className="swatch" style={{ background: data.colors[m] }} />{m}</button>)}</div>
++    {empty.length > 0 && <p role="status">{empty.join(', ')}: measured, but no common dose across seeds meets the mean off-axis cutoff of {data.max_off_axis}. No curve is drawn.</p>}</>;
+ }
+ 
+ function App() {
+@@ -155,7 +157,7 @@ function App() {
+     <h1>{{ user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
+     <p className="lede"><b>{data.setup}</b></p>
+     {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Plain prompts also act only on the prompt.</p>}
+-    <p className="lede">How far can each steering method push a model toward or away from sycophancy before the answers break? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
++    <p className="lede">How far can each steering method change premise acceptance, and how much else changes with it? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
+     <Chips data={data} visible={visible} setVisible={setVisible} />
+     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
+     {data.points.some(p => p.control_claims != null) && <section id="controls">
+diff --git a/scripts/bsbench/web/uat.py b/scripts/bsbench/web/uat.py
+index 27dd09f..84a27ef 100644
+--- a/scripts/bsbench/web/uat.py
++++ b/scripts/bsbench/web/uat.py
+@@ -28,6 +28,15 @@ with sync_playwright() as p:
+     page.goto(url)
+     page.wait_for_selector("svg")
+     assert data["setup"] in page.locator("svg").text_content(), "the plot names model, extraction data, seeds and controls"
++    empty = [m for m in {c["method"] for c in data["curves"]} if not any(c["points"] for c in data["curves"] if c["method"] == m)]
++    for method in empty:
++        chip = page.get_by_role("button", name=method, exact=True)
++        selected = chip.get_attribute("aria-pressed") == "true"
++        if not selected:
++            chip.click()
++        assert method in page.get_by_role("status").text_content(), "empty method selection must explain its missing curve (PI/OpenAI)"
++        if not selected:
++            chip.click()
+     curve_points = sum(len(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
+     drawn = page.locator("circle.mark, path.mark.end").count()
+     print(f"curve points in points.json={curve_points} drawn={drawn}")

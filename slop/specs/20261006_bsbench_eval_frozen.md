@@ -32,9 +32,9 @@ Naming: answers are cached under `EVAL_VERSION = 3` (part of the generation cach
 | prompting | the persona sentence prefixed to the user turn, C = 1 | seed s appends s spaces (answers are greedy) |
 | random | random unit direction per seed, same layers and doses | seed = direction; default 20 directions (`data.RANDOM_SEEDS`) |
 
-The main report now includes all 21 learned methods in `slop/reviews/2026-10-07_low_dose/table.md`, each with seeds 0–2; `cache_mean_diff` remains in a separate, unintegrated worktree. `corda_pca` seed 1 used float64 in the shared PCA SVD after its float32 run failed; the other completed extractions were not redone.
+The main report now includes 22 learned methods in `slop/reviews/2026-10-07_cache_mean_diff/table.md`, each with seeds 0–2. `cache_mean_diff` is integrated and evaluated: one-shot final-prompt-token value-cache edits, leaving keys and the first answer token unchanged. It uses full-attention layers except layer zero, and cached-continuation calibration. Its persona pairs and unchanged prompt protocol differ from the paper's CoT/offset-token setup. `corda_pca` seed 1 used float64 in the shared PCA SVD after its float32 run failed; the other completed extractions were not redone.
 
-Layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks). Extraction: max length 384 tokens.
+Default residual layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks); cache/attention-specific methods select compatible full-attention layers. Extraction: max length 384 tokens.
 
 ## 5. Dose walk (`scripts/bsbench/walk.py`)
 
@@ -71,7 +71,7 @@ $$\text{on}_{+C} = \text{premise change}, \qquad \text{on}_{-C} = -\text{premise
 
 The earlier estimates below covered the two initial methods only and underestimated the all-methods expansion. The 57 completed additional walks took 216,675.795 GPU-seconds: $126.39 at A100-40GB $2.10/hour. The two retained judge logs total $32.37, giving $158.76 accounted, above the $100–150 estimate. This excludes the failed attempt and unrecorded overhead; it is not an invoice. See `slop/reviews/2026-10-06_9b_all_methods/verify_final.log`.
 
-The separately requested low-dose backfill added $14.27 estimated GPU runtime plus $1.58 recorded judge charges, about $15.85 total. Evidence: `slop/reviews/2026-10-07_low_dose/results.md`.
+The separately requested low-dose backfill added $14.27 estimated GPU runtime plus $1.58 recorded judge charges, about $15.85 total. Evidence: `slop/reviews/2026-10-07_low_dose/results.md`. The subsequent cache-method evaluation added $4.68 estimated GPU runtime and $1.17 judge charges, about $5.85 (`slop/reviews/2026-10-07_cache_mean_diff/results.md`).
 
 ### Earlier two-method estimates (not an all-methods budget)
 

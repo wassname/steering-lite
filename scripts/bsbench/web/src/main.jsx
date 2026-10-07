@@ -157,7 +157,7 @@ function App() {
     <h1>{{ user: 'User-turn steering on Bullshit Bench v2' }[data.view] ?? 'steering-lite on Bullshit Bench v2'}</h1>
     <p className="lede"><b>{data.setup}</b></p>
     {data.view === 'user' && <p className="lede">Every vector here is added only while the model reads the user's message: not at the chat template, not at the answer tokens. Same vectors and C0 as the steering-everywhere report, one seed per method. The grey regions come from random directions steered the same way. Plain prompts also act only on the prompt.</p>}
-    <p className="lede">How far can each steering method change premise acceptance, and how much else changes with it? The plot starts with the best-scoring methods. Click a name to add or hide it.</p>
+    <p className="lede">How far can each steering method change premise acceptance, and how much else changes with it? The plot starts with the highest-scoring methods; nearly inactive doses can score well by changing little. Click a name to add or hide it.</p>
     <Chips data={data} visible={visible} setVisible={setVisible} />
     <Plot data={data} visible={visible} selected={selected} onSelect={p => { setSelected(p); document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' }); }} />
     {data.points.some(p => p.control_claims != null) && <section id="controls">
