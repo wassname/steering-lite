@@ -54,5 +54,6 @@ results:
 
 # PI/OpenAI: README.md is generated from README.qmd (edit the .qmd); the table comes from `just results`.
 docs:
-	quarto render README.qmd
-	sed -i 's/ data-fig-alt="[^"]*"//; s/\\\[/[/g; s/\\\]/]/g' README.md
+	quarto render README.qmd --to all
+	quarto pandoc README.md -f gfm -t gfm --wrap=none --lua-filter docs/readme/flatten-xref.lua -o README.md
+	sed -i 's/\\[[]/[/g; s/\\[]]/]/g' README.md

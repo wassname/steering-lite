@@ -599,9 +599,9 @@ def readme_table(rows: list[dict]) -> str:
         text = f"{v:.0%}" if i == 5 else f"{v:.2f}" if i in (2, 4) else f"{v:+.2f}"
         if i == 0:
             lo, hi = row["ci"]
-            text += f" <sub>[{lo:+.2f}, {hi:+.2f}]</sub>"
+            text += f" ({lo:+.2f}, {hi:+.2f})"
         return f"**{text}**" if i in (0, 1, 3) and v == best[i] else text  # lowest "other" is usually a method that does nothing; not bolded
-    lines = ["| method | score↑ <sub>[90% CI]</sub> | −C pushback↑ | −C other↓ | +C goes along↑ | +C other↓ | legit rejected↓ |",
+    lines = ["| method | score↑ (90% CI) | −C pushback↑ | −C other↓ | +C goes along↑ | +C other↓ | legit rejected↓ |",
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for row in rows:
         lines.append("| " + " | ".join([link(row["method"]), *(fmt(i, v, row) for i, v in enumerate(values[row["method"]]))]) + " |")
