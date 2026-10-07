@@ -539,8 +539,9 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict, caption
         bgcolor="rgba(255,255,255,0.9)", arrowcolor="rgba(45,24,16,0.6)",
     ):
         figure.add_annotation(**annotation)
-    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="low off-axis change → pushes back", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="low off-axis change → goes along", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="clean steer -> pushes back", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="clean steer -> sycophantic", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
+    figure.add_annotation(x=0, y=y_range[0], yanchor="bottom", yshift=6, text="mostly side effects", showarrow=False, font={"color": "#c0404a", "size": 14})
     if captioned:
         figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
@@ -548,8 +549,8 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict, caption
     figure.update_layout(
         title={"text": title if captioned else "", "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
-        xaxis={"title": "premise change vs bare (Jev, pairwise; −C net of false rejections): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
-        yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        xaxis={"title": "judge on-axis change", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
+        yaxis={"title": "off-axis damage (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
     )
     return figure
 
