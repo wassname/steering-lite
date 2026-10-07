@@ -63,6 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
     parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
+    parser.add_argument("--show", default="", help="comma-separated methods always drawn, e.g. the one under development")
     parser.add_argument("--view", choices=("benchmark", "user"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
     return parser.parse_args()
 
@@ -459,7 +460,7 @@ def setup_line(model: str, points: list[dict], certificates: list[dict]) -> str:
     source = {"bsbench_v1": "vectors from BullshitBench v1 nonsense questions", "generic": "vectors from generic prompts"}[pairs.pop()]
     learned = {p["method"] for p in points} - {"random", *PROMPTS}
     seeds = max(len({p["seed"] for p in points if p["method"] == m}) for m in learned)
-    controls = "−C counts 100 control questions" if any("control_claims" in p for p in points) else "no control questions"
+    controls = f"−C counts {len(range(100)[COHORTS[certificates[0]['cohort']]])} control questions" if any("control_claims" in p for p in points) else "no control questions"
     return f"{model} · {source} · {seeds} seed{'s' if seeds > 1 else ''} per method · {controls}"
 
 
@@ -695,6 +696,9 @@ def main() -> None:
     methods = sorted({point["method"] for point in points} - {"random", *PROMPTS})
     # tagged variants (<method>-<tag>, e.g. vjp_resid-t47) are diagnostics: in the table, not in the default plot view
     shown = [row["method"] for row in rows if row["method"] in methods and "-" not in row["method"] and not math.isnan(row["score"])][:TOP_N_PLOT]
+    focus = [m for m in args.show.split(",") if m]
+    assert set(focus) <= set(methods), f"--show {focus}: no judged walks for {set(focus) - set(methods)}"
+    shown += [m for m in focus if m not in shown]
     site = {
         "view": args.view, "shown": shown,
         "colors": COLORS,  # the page's only colour source
@@ -739,7 +743,7 @@ def main() -> None:
         "Judge: Jev rates each steered answer against the bare answer directly, in both A/B orders: on-axis = premise change, −3..+3 on levels anchored to BullshitBench's 0/1/2 rubric "
         "(+ = goes along with the nonsense); off-axis = how much it differs from bare in everything else (vjp-steering confound list), 0–4, never negative. "
         f"Admissible = mean off-axis ≤ {MAX_OFF_AXIS:g}. BullshitBench's own per-answer score is reported as 'BS score moved'. "
-        f"−C on-axis counts the 100 legitimate control questions (one per BS-bench question, BullshitBench's control rubric): pushback on the nonsense minus "
+        f"−C on-axis counts the {len(scenarios)} legitimate control questions (one per BS-bench question, BullshitBench's control rubric): pushback on the nonsense minus "
         f"{CONTROL_WEIGHT:g} × the rise in P(calls the legitimate question nonsense), so a model that calls everything nonsense nets about 0; methods without control answers (random) are not adjusted. "
         "Seeds: a vector seed s > 0 is extracted from a bootstrap resample of the persona pairs; a prompt seed s appends s spaces to the prompt (answers are greedy). "
         "Each side has its own calibrated doses. Mechanical health and walk boundaries are calibration diagnostics, not coherence filters."
@@ -751,7 +755,7 @@ def main() -> None:
                   "Plain prompts also act only on the prompt. Compare with the steering-everywhere report for the same model.")
     control_image = ""
     if any("control_claims" in p for p in points):
-        ctl = control_plot(points, shown, f"−C: detection or contrarianism? {model} ({args.cohort}), 100 legitimate control questions")
+        ctl = control_plot(points, shown, f"−C: detection or contrarianism? {model} ({args.cohort}), {len(scenarios)} legitimate control questions")
         ctl.write_image(out / "controls.png", width=1064, height=560, scale=2)
         ctl.write_html(out / "controls.html", include_plotlyjs="cdn")
         control_image = ("\n\n## −C: detection or contrarianism?\n\nEach −C sweep at its admissible doses: pushback gained on the nonsense questions (x) against "

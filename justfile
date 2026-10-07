@@ -3,6 +3,7 @@ set dotenv-load
 
 main_model_dir := "outputs/bsbench/Qwen--Qwen3.5-9B-g2351502a"
 main_report_dir := "outputs/bsbench/results/v5-9b-3seeds"
+dev_report_dir := "outputs/bsbench/results/v5-9b-dev"
 
 default:
 	@just --list
@@ -24,6 +25,19 @@ sweep methods cohort="full" seeds="0,1,2":
 # PI/OpenAI: random has no control penalty; keep this reference separate from learned methods.
 sweep-random cohort="full" seeds="auto":
 	uv run --extra benchmark modal run scripts/bsbench/run_modal.py::main --cohort {{cohort}} --methods random --seeds {{seeds}} --extra "--preset qwen3.5-9b --pairs bsbench_v1"
+
+# PI/OpenAI: try a new method on 9B, 1 seed, 20 questions; compared with every finished method sliced to the same questions.
+dev method:
+	just sweep {{method}} dev 0
+	just pull
+	just dev-results {{method}}
+
+# PI/OpenAI: judge and render the dev page without new GPU work.
+dev-results method="":
+	uv run --extra benchmark python scripts/bsbench/judge.py --cohort dev --model-dir {{main_model_dir}} --refresh
+	uv run --extra benchmark python scripts/bsbench/results.py --cohort dev --model-dir {{main_model_dir}} --out {{dev_report_dir}} --show "{{method}}"
+	cd scripts/bsbench/web && pnpm install --frozen-lockfile --silent && pnpm exec vite build --outDir ../../../{{dev_report_dir}} --emptyOutDir false
+	uv run --with playwright python scripts/bsbench/web/uat.py {{dev_report_dir}}
 
 pull:
 	uv run --extra benchmark modal volume get --force steering-lite-bsbench-v3 bsbench outputs/

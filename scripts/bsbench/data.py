@@ -52,9 +52,12 @@ def walk_certificates(model_dir: Path, cohort: str, view: str = "benchmark") -> 
 
     view: benchmark = steering everywhere; user = user-positions walks (renamed without -user) plus prompt
     walks, which also act only on the prompt; all = both populations, unrenamed (for the judge)."""
-    certificates = []
-    for path in sorted((model_dir / "walks").glob(f"*_{cohort}.json")):
+    certificates = {}
+    # dev also reads full walks, sliced to the dev questions, so new methods compare against every finished one for free
+    paths = [*sorted((model_dir / "walks").glob("*_full.json")), *sorted((model_dir / "walks").glob("*_dev.json"))] if cohort == "dev" else sorted((model_dir / "walks").glob(f"*_{cohort}.json"))
+    for path in paths:
         certificate = json.loads(path.read_text())
+        certificate["cohort"] = cohort
         user = certificate["method"].endswith("-user")
         if view == "benchmark" and user or view == "user" and not user and certificate["method"] not in PROMPT_WALKS:
             continue
@@ -67,8 +70,8 @@ def walk_certificates(model_dir: Path, cohort: str, view: str = "benchmark") -> 
             continue
         if view == "user" and user:
             certificate["method"] = certificate["method"].removesuffix("-user")
-        certificates.append(certificate)
-    return certificates
+        certificates[certificate["method"], certificate["seed"]] = certificate  # a dev walk replaces the sliced full walk
+    return list(certificates.values())
 
 
 def read_answers(path: Path) -> dict[str, dict]:

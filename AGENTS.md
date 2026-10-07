@@ -15,6 +15,8 @@ Inherits conventions from sibling project `lora-lite`. Read [../lora-lite/AGENTS
 
 `just smoke` -> every registered method passes extract -> attach -> generate -> save/load on tiny-random-Llama. It asserts non-zero state, a non-zero residual delta, and a save/load round-trip below `1e-4`.
 
+`just dev METHOD` -> the method on Qwen3.5-9B, seed 0, 20 questions, compared with every finished full walk sliced to the same questions (`outputs/bsbench/results/v5-9b-dev`). Costs GPU and judge credits.
+
 `just smoke-bsbench` -> the BS-bench dose walk (`scripts/bsbench/walk.py`) runs 2 rungs on a tiny random Qwen3 on CPU. `just check` runs both.
 
 ## Benchmark
