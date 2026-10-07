@@ -1,0 +1,128 @@
+PRESERVED angular_steering_s0_full.json added=4 seconds=293.349
+PRESERVED angular_steering_s1_full.json added=4 seconds=200.550
+PRESERVED angular_steering_s2_full.json added=4 seconds=197.460
+PRESERVED chars_s0_full.json added=4 seconds=258.782
+PRESERVED chars_s1_full.json added=4 seconds=169.228
+PRESERVED chars_s2_full.json added=4 seconds=166.974
+PRESERVED corda_pca_s0_full.json added=4 seconds=447.245
+PRESERVED corda_pca_s1_full.json added=4 seconds=744.803
+PRESERVED corda_pca_s2_full.json added=4 seconds=852.576
+PRESERVED cosine_gated_s0_full.json added=4 seconds=351.007
+PRESERVED cosine_gated_s1_full.json added=4 seconds=153.933
+PRESERVED cosine_gated_s2_full.json added=4 seconds=202.133
+PRESERVED directional_ablation_s0_full.json added=4 seconds=349.417
+PRESERVED directional_ablation_s1_full.json added=4 seconds=222.499
+PRESERVED directional_ablation_s2_full.json added=4 seconds=225.068
+PRESERVED linear_act_s0_full.json added=4 seconds=350.537
+PRESERVED linear_act_s1_full.json added=4 seconds=150.799
+PRESERVED linear_act_s2_full.json added=4 seconds=227.932
+PRESERVED mean_diff_s0_full.json added=4 seconds=344.013
+PRESERVED mean_diff_s1_full.json added=4 seconds=147.362
+PRESERVED mean_diff_s2_full.json added=4 seconds=144.625
+PRESERVED pca_s0_full.json added=4 seconds=344.037
+PRESERVED pca_s1_full.json added=4 seconds=144.918
+PRESERVED pca_s2_full.json added=4 seconds=140.719
+PRESERVED query_steer_s0_full.json added=4 seconds=330.709
+PRESERVED query_steer_s1_full.json added=4 seconds=131.525
+PRESERVED query_steer_s2_full.json added=4 seconds=133.154
+PRESERVED random_s0_full.json added=4 seconds=255.240
+PRESERVED random_s10_full.json added=4 seconds=119.999
+PRESERVED random_s11_full.json added=4 seconds=177.714
+PRESERVED random_s12_full.json added=4 seconds=131.641
+PRESERVED random_s13_full.json added=4 seconds=155.474
+PRESERVED random_s14_full.json added=4 seconds=155.887
+PRESERVED random_s15_full.json added=4 seconds=172.773
+PRESERVED random_s16_full.json added=4 seconds=176.113
+PRESERVED random_s17_full.json added=4 seconds=175.582
+PRESERVED random_s18_full.json added=4 seconds=180.948
+PRESERVED random_s19_full.json added=4 seconds=120.686
+PRESERVED random_s1_full.json added=4 seconds=341.166
+PRESERVED random_s2_full.json added=4 seconds=339.704
+PRESERVED random_s3_full.json added=4 seconds=341.617
+PRESERVED random_s4_full.json added=4 seconds=267.865
+PRESERVED random_s5_full.json added=4 seconds=258.481
+PRESERVED random_s6_full.json added=4 seconds=256.353
+PRESERVED random_s7_full.json added=4 seconds=317.810
+PRESERVED random_s8_full.json added=4 seconds=197.257
+PRESERVED random_s9_full.json added=4 seconds=203.478
+PRESERVED sink_split_resid_s0_full.json added=4 seconds=157.910
+PRESERVED sink_split_resid_s1_full.json added=4 seconds=159.639
+PRESERVED sink_split_resid_s2_full.json added=4 seconds=216.907
+PRESERVED sink_split_s0_full.json added=4 seconds=334.866
+PRESERVED sink_split_s1_full.json added=4 seconds=228.990
+PRESERVED sink_split_s2_full.json added=4 seconds=147.173
+PRESERVED spherical_s0_full.json added=4 seconds=155.709
+PRESERVED spherical_s1_full.json added=4 seconds=156.031
+PRESERVED spherical_s2_full.json added=4 seconds=234.451
+PRESERVED sspace_ablate_s0_full.json added=4 seconds=702.626
+PRESERVED sspace_ablate_s1_full.json added=4 seconds=647.357
+PRESERVED sspace_ablate_s2_full.json added=4 seconds=313.131
+PRESERVED sspace_pca_s0_full.json added=4 seconds=762.057
+PRESERVED sspace_pca_s1_full.json added=4 seconds=673.799
+PRESERVED sspace_pca_s2_full.json added=4 seconds=336.852
+PRESERVED sspace_pool_s0_full.json added=4 seconds=664.035
+PRESERVED sspace_pool_s1_full.json added=4 seconds=662.963
+PRESERVED sspace_pool_s2_full.json added=4 seconds=281.933
+PRESERVED sspace_s0_full.json added=4 seconds=779.004
+PRESERVED sspace_s1_full.json added=4 seconds=301.883
+PRESERVED sspace_s2_full.json added=4 seconds=800.014
+PRESERVED sspace_scale_s0_full.json added=4 seconds=706.217
+PRESERVED sspace_scale_s1_full.json added=4 seconds=291.476
+PRESERVED sspace_scale_s2_full.json added=4 seconds=658.817
+PRESERVED topk_clusters_s0_full.json added=4 seconds=232.996
+PRESERVED topk_clusters_s1_full.json added=4 seconds=158.264
+PRESERVED topk_clusters_s2_full.json added=4 seconds=238.100
+PRESERVED value_gram_s0_full.json added=4 seconds=189.585
+PRESERVED value_gram_s1_full.json added=4 seconds=207.973
+PRESERVED value_gram_s2_full.json added=4 seconds=188.012
+PRESERVED vjp_resid_s0_full.json added=4 seconds=146.067
+PRESERVED vjp_resid_s1_full.json added=4 seconds=218.646
+PRESERVED vjp_resid_s2_full.json added=4 seconds=191.027
+PRESERVED vjp_value_s0_full.json added=4 seconds=135.119
+PRESERVED vjp_value_s1_full.json added=4 seconds=203.665
+PRESERVED vjp_value_s2_full.json added=4 seconds=200.555
+SHARED angular_steering +C: [0.0078125, 0.015625]
+SHARED angular_steering -C: [0.0078125, 0.015625]
+SHARED chars +C: [0.015625]
+SHARED chars -C: [0.015625, 0.03125]
+SHARED corda_pca +C: [0.5, 1.0]
+SHARED corda_pca -C: [0.5, 1.0]
+SHARED cosine_gated +C: [0.25, 0.5]
+SHARED cosine_gated -C: [0.25, 0.5]
+SHARED directional_ablation +C: [0.125, 0.25]
+SHARED directional_ablation -C: [0.125, 0.25]
+SHARED linear_act +C: [0.015625]
+SHARED linear_act -C: [0.015625, 0.03125]
+SHARED mean_diff +C: [0.0625, 0.125]
+SHARED mean_diff -C: [0.03125, 0.0625]
+SHARED pca +C: [0.0625, 0.125]
+SHARED pca -C: [0.0625, 0.125]
+SHARED query_steer +C: [4.0, 8.0]
+SHARED query_steer -C: [2.0, 4.0]
+SHARED random +C: [0.125]
+SHARED random -C: [0.125, 0.25]
+SHARED sink_split +C: [0.125, 0.25]
+SHARED sink_split -C: [0.125, 0.25]
+SHARED sink_split_resid +C: [0.125]
+SHARED sink_split_resid -C: [0.0625, 0.125]
+SHARED spherical +C: [0.0078125, 0.015625]
+SHARED spherical -C: [0.0078125, 0.015625]
+SHARED sspace +C: [1.0, 2.0]
+SHARED sspace -C: [1.0, 2.0]
+SHARED sspace_ablate +C: [0.0625, 0.125]
+SHARED sspace_ablate -C: [0.0625, 0.125]
+SHARED sspace_pca +C: [0.0625, 0.125]
+SHARED sspace_pca -C: [0.0625, 0.125]
+SHARED sspace_pool +C: [0.25, 0.5]
+SHARED sspace_pool -C: [0.25, 0.5]
+SHARED sspace_scale +C: [0.5]
+SHARED sspace_scale -C: [0.5, 1.0]
+SHARED topk_clusters +C: [0.0625, 0.125]
+SHARED topk_clusters -C: [0.0625, 0.125]
+SHARED value_gram +C: [0.25, 0.5]
+SHARED value_gram -C: [0.25, 0.5]
+SHARED vjp_resid +C: [0.015625, 0.03125]
+SHARED vjp_resid -C: [0.03125, 0.0625]
+SHARED vjp_value +C: [0.25, 0.5]
+SHARED vjp_value -C: [0.5, 1.0]
+BACKFILL_PASS walks=83 doses=332 new_answers=33200 new_controls=25200 original_files=4097 unchanged_or_exactly_archived; seconds=24454.991; GPU_USD_at_2.10_per_hour=14.2654

@@ -1,0 +1,17 @@
+/workspace/2026/lite/steering-lite-bsbench/slop/reviews/2026-10-07_low_dose/refresh_display.py:21: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / 'plot.png', width=1064, height=620, scale=2)
+DISPLAY_REFRESH measured dots; scores and ratings unchanged
+[WARN] Failed to replace env in config: ${NPM_TOKEN}
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../outputs/bsbench/results/v5-9b-3seeds/index.html                   0.39 kB │ gzip:  0.28 kB
+../../../outputs/bsbench/results/v5-9b-3seeds/assets/index-TASEMJO4.css    2.37 kB │ gzip:  1.05 kB
+../../../outputs/bsbench/results/v5-9b-3seeds/assets/index-BHKWfifn.js   239.33 kB │ gzip: 75.53 kB
+
+✓ built in 247ms

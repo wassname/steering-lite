@@ -80,7 +80,7 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 
 ### Main result: steering Qwen3.5-9B on BullshitBench v2
 
-<!-- PI/OpenAI: final all-methods report; table copied from v5-9b-3seeds/index.md. -->
+<!-- PI/OpenAI: all-methods report with measured low-dose additions, 2026-10-07. -->
 
 21 learned methods, 3 extraction seeds each, 3 prompt variants, and 20 random directions. All 100 BullshitBench v2 questions and 100 legitimate control questions are retained. The plot initially shows the five highest-scoring methods; the interactive page lets you select any method.
 
@@ -88,18 +88,20 @@ v.calibrate(model, tok, target_kl=1.0, target_stat="kl_rms")
 
 | method | score↑ [90% CI] | −C net↑ | −C off↓ | +C on↑ | +C off↓ | control rejection↓ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | **−0.03** [−0.17, +0.17] | **+1.00** | 1.03 | +1.88 | 1.14 | 12% |
-| [vjp_value](src/steering_lite/variants/vjp_value.py) | −0.22 [−0.34, −0.05] | +0.59 | 0.81 | +1.90 | 1.19 | 4% |
-| [cosine_gated](src/steering_lite/variants/cosine_gated.py) | −0.35 [−0.42, −0.28] | +0.07 | **0.42** | +1.81 | 1.23 | **3%** |
-| [sspace_pool](src/steering_lite/variants/sspace_pool.py) | −0.36 [−0.43, −0.29] | +0.05 | **0.42** | +1.71 | 1.14 | **3%** |
-| [topk_clusters](src/steering_lite/variants/topk_clusters.py) | −0.38 [−0.45, −0.21] | +0.41 | 0.78 | **+1.95** | 1.29 | 4% |
-| *[mean_diff](src/steering_lite/variants/mean_diff.py)* | −0.44 [−0.50, −0.32] | +0.11 | 0.54 | +1.84 | 1.24 | **3%** |
-| *random (20 directions)* | −0.56 [−0.65, −0.47] | −0.05¹ | 0.51 | +1.02 | 1.22 | not measured |
+| [vjp_resid](src/steering_lite/variants/vjp_resid.py) | **−0.03** [−0.17, +0.16] | **+1.00** | 1.03 | +1.88 | 1.14 | 12% |
+| [cosine_gated](src/steering_lite/variants/cosine_gated.py) | −0.20 [−0.26, −0.14] | −0.01 | **0.20** | +1.81 | 1.23 | **3%** |
+| *[mean_diff](src/steering_lite/variants/mean_diff.py)* | −0.20 [−0.26, −0.15] | +0.03 | 0.24 | +1.84 | 1.24 | **3%** |
+| [sspace_pool](src/steering_lite/variants/sspace_pool.py) | −0.21 [−0.26, −0.15] | +0.05 | 0.25 | +1.71 | 1.14 | **3%** |
+| [vjp_value](src/steering_lite/variants/vjp_value.py) | −0.22 [−0.34, −0.04] | +0.59 | 0.81 | +1.90 | 1.19 | 4% |
+| [topk_clusters](src/steering_lite/variants/topk_clusters.py) | −0.25 [−0.30, −0.19] | +0.03 | 0.28 | **+1.95** | 1.29 | **3%** |
+| *random (20 directions)* | −0.31 [−0.37, −0.25] | −0.02¹ | 0.29 | +1.02 | 1.22 | not measured |
 | *prompt* | −0.94 [−1.21, −0.68] | +0.07 | 1.01 | +0.48 | **0.85** | 48% |
 
-Each side uses its dose maximizing directed premise change minus off-axis change, subject to mean off-axis ≤1.5 in every seed. The score is the weaker side. −C net subtracts 3 times the rise in legitimate control questions called nonsense (bare: 3%). ¹Random has no control adjustment. Intervals bootstrap seeds and questions with dose selection repeated; they do not establish pairwise significance. [All methods and raw score components](slop/reviews/2026-10-06_9b_all_methods/table_final.md).
+Each side uses its dose maximizing directed premise change minus off-axis change, subject to mean off-axis ≤1.5 in every seed. The score is the weaker side. −C net subtracts 3 times the rise in legitimate control questions called nonsense (bare: 3%). ¹Random has no control adjustment. Intervals bootstrap seeds and questions with dose selection repeated; they do not establish pairwise significance. [All methods and raw score components](slop/reviews/2026-10-07_low_dose/table.md).
 
-VJP-resid has the highest observed score. Prompting produces more raw pushback (+1.44 versus +1.26), but rejects more legitimate questions (48% versus 12%). `angular_steering` has no admissible dose on either side; `spherical` has none on −C. Those are limits of the tested implementations and dose ranges, not proof the methods cannot work.
+VJP-resid has the highest observed score. Prompting produces more raw pushback (+1.44 versus +1.26), but rejects more legitimate questions (48% versus 12%). `angular_steering` still has no common admissible dose across all three seeds, even at the new lowest C=0.0078125. The lower doses give `spherical` a passing −C point: net pushback +0.50, off-axis 0.96.
+
+Two lower doses were added per signed walk, without changing earlier answers. Several scores improve because a nearly inactive dose incurs less off-axis change, not because it produces more pushback. VJP-resid and VJP-value retain their previous best doses and scores. Plot dots are measured seed means; only the connecting lines interpolate. The remaining gap from bare to the first dot is still unmeasured. <!-- PI/OpenAI -->
 
 Setup and limits:
 - Jev rates each steered answer against the bare answer in both orders: premise change −3..+3, other change 0..4. The off-axis cutoff is a reporting choice, not a measured coherence boundary.

@@ -40,6 +40,9 @@ with sync_playwright() as p:
     assert page.locator(".curve-line").count() == sum(bool(c["points"]) for c in data["curves"] if c["method"] in data["shown"])
     for curve in data["curves"]:
         assert all((x is None) == (y is None) for x, y in curve["path"])
+        measured = {p["C"]: p for p in curve["tested"]}
+        for dot in curve["points"]:
+            assert all(dot[k] == measured[dot["C"]][k] for k in ("effect", "off_axis")), "dose dots must retain measured seed means (PI/OpenAI)"
     for label in data["plot_labels"]:
         drawn_label = page.locator(f'.curve-label[data-method="{label["method"]}"][data-side="{label["side"]}"] text')
         assert drawn_label.text_content() == label["text"], "default-view curves need labels"

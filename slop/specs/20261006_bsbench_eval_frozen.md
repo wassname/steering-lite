@@ -32,7 +32,7 @@ Naming: answers are cached under `EVAL_VERSION = 3` (part of the generation cach
 | prompting | the persona sentence prefixed to the user turn, C = 1 | seed s appends s spaces (answers are greedy) |
 | random | random unit direction per seed, same layers and doses | seed = direction; default 20 directions (`data.RANDOM_SEEDS`) |
 
-The main report now includes all 21 learned methods in `slop/reviews/2026-10-06_9b_all_methods/table_final.md`, each with seeds 0–2; `cache_mean_diff` remains in a separate, unintegrated worktree. `corda_pca` seed 1 used float64 in the shared PCA SVD after its float32 run failed; the other completed extractions were not redone.
+The main report now includes all 21 learned methods in `slop/reviews/2026-10-07_low_dose/table.md`, each with seeds 0–2; `cache_mean_diff` remains in a separate, unintegrated worktree. `corda_pca` seed 1 used float64 in the shared PCA SVD after its float32 run failed; the other completed extractions were not redone.
 
 Layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks). Extraction: max length 384 tokens.
 
@@ -40,6 +40,7 @@ Layers: blocks 20%–80% of depth (9B: 6–24, 19 blocks). Extraction: max lengt
 
 - per side (+C, −C) separately: C0 = iso-KL coefficient giving RMS KL 1.0 nat on calibration prompts (T=50, sampled, seed 0)
 - grid 2^(n/6), stride 2 (third-octave), start at the grid point nearest C0/8
+- since 2026-10-07, also measure two sparse lower doses per side: one quarter and one half of the largest power of two no greater than the grid start. They do not change mechanical stopping. Old COMPLETE walks are backfilled with cached vectors and archived original certificates
 - each side stops 1 dose past its mechanical boundary: 2 unhealthy doses in a row; unhealthy = ≥50% answers unfinished, or ≥25% with role leak, or ≥25% repetitive
 - the mechanical rule only chooses which doses are generated; it never decides which points are plotted or scored
 
@@ -64,10 +65,13 @@ $$\text{on}_{+C} = \text{premise change}, \qquad \text{on}_{-C} = -\text{premise
 - method score = min over sides of (on − off) at the best doses
 - 90% CI: 1,000 hierarchical bootstrap draws (seeds, then questions, with replacement), dose choice redone in each draw
 - random has no control answers, so its −C is not adjusted
+- the minimum sampled dose matters: near-inactive doses can improve a negative score through lower off-axis change rather than greater desired effect; bare is not a candidate dose
 
 ## 8. Cost
 
 The earlier estimates below covered the two initial methods only and underestimated the all-methods expansion. The 57 completed additional walks took 216,675.795 GPU-seconds: $126.39 at A100-40GB $2.10/hour. The two retained judge logs total $32.37, giving $158.76 accounted, above the $100–150 estimate. This excludes the failed attempt and unrecorded overhead; it is not an invoice. See `slop/reviews/2026-10-06_9b_all_methods/verify_final.log`.
+
+The separately requested low-dose backfill added $14.27 estimated GPU runtime plus $1.58 recorded judge charges, about $15.85 total. Evidence: `slop/reviews/2026-10-07_low_dose/results.md`.
 
 ### Earlier two-method estimates (not an all-methods budget)
 
@@ -86,7 +90,9 @@ The earlier estimates below covered the two initial methods only and underestima
 - bootstrap seeds vary extraction examples only, not persona wording or layers
 - extraction suffixes for the 9B are the 4B's answer prefixes
 
-## 10. Current random reference (presentation only)
+## 10. Plot markers and random reference (presentation only)
+
+Every retained method dot is its measured seed mean. Lines interpolate between dots. The earlier median filtering and 16-point thinning were removed on 2026-10-07 because they shifted low-dose markers toward larger doses. Scoring never used that plotting filter.
 
 Each of 20 random directions supplies two signed dose walks. Insert bare (0,0), interpolate each walk's first crossing of each off-axis level, then take observed effect ranks across reaching walks. Shade p10–p90 and p25–p75 bands; draw p10/p90 boundaries dotted, p25/p75 dashed, median solid; smooth the boundaries. Stop if fewer than half the walks reach a level or at off-axis 1.5. Values between bare and the first tested dose are interpolations, not observations.
 

@@ -430,22 +430,10 @@ def before_reversal(curve: list[dict]) -> list[dict]:
 
 
 def sweep(curve: list[dict]) -> list[dict]:
-    """Passing doses in dose order, median-filtered over neighbouring doses as in the reference
-    (docs/vendor/vjp-steering/src/vjp_steering/results.py::plot): log-C half-window 0.15, else the 5 nearest
-    rungs; then at most 16 points kept. Returns C, smoothed effect/off_axis, and the raw values. PI/OpenAI."""
-    points = sorted(curve, key=lambda p: p["C"])
-    out = [{"C": p["C"], "effect": p["effect"], "off_axis": p["off_axis"], "raw_effect": p["effect"], "raw_off_axis": p["off_axis"]} for p in points]
-    if len(points) >= 5:
-        log_c = [math.log(p["C"]) if p["C"] > 0 else -math.inf for p in points]
-        for i, row in enumerate(out):
-            window = [points[j] for j, lc in enumerate(log_c) if abs(lc - log_c[i]) <= 0.15]
-            if len(window) < 3:
-                window = points[max(0, i - 2):i + 3]
-            row["effect"] = median(p["effect"] for p in window)
-            row["off_axis"] = median(p["off_axis"] for p in window)
-    if len(out) > 16:
-        out = [out[i] for i in sorted({round(i * (len(out) - 1) / 15) for i in range(16)} | {len(out) - 1})]
-    return out
+    """Keep every measured seed-mean dot; smooth only the connecting line. PI/OpenAI."""
+    return [{"C": p["C"], "effect": p["effect"], "off_axis": p["off_axis"],
+             "raw_effect": p["effect"], "raw_off_axis": p["off_axis"]}
+            for p in sorted(curve, key=lambda p: p["C"])]
 
 
 def sweep_path(rows: list[dict], n: int = 12) -> list[list[float]]:
@@ -551,7 +539,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="low off-axis change → goes along", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
-                          text=f"selected methods: smoothed dose sweeps; dot = dose; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: shaded p10–p90 and p25–p75 bands, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
+                          text=f"selected methods: lines interpolate between doses; dot = measured seed mean; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: shaded p10–p90 and p25–p75 bands, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
     figure.update_layout(
         title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,

@@ -1,0 +1,12 @@
+127.0.0.1 - - [07/Oct/2026 08:05:56] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 08:05:56] "GET /assets/index-TASEMJO4.css HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 08:05:56] "GET /assets/index-CSGiWHDf.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 08:05:56] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [07/Oct/2026 08:05:58] "GET /controls.png HTTP/1.1" 200 -
+curve points in points.json=110 drawn=110
+PNG sweep marks (plot_marks.json from results.py)=110 page drawn=110 methods png=['vjp_resid', 'cosine_gated', 'mean_diff', 'sspace_pool', 'vjp_value'] page=['vjp_resid', 'cosine_gated', 'mean_diff', 'sspace_pool', 'vjp_value']
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/web/uat.py", line 45, in <module>
+    assert all(dot[k] == measured[dot["C"]][k] for k in ("effect", "off_axis")), "dose dots must retain measured seed means (PI/OpenAI)"
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: dose dots must retain measured seed means (PI/OpenAI)

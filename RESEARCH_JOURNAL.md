@@ -656,3 +656,23 @@ Author PI/OpenAI. Browser inspection found `.zone{stroke:none}` overriding the S
 Source: `slop/reviews/2026-10-06_9b_all_methods/random_zone_regression_before.log`. The rebuilt page passes the same test in `random_zone_uat.log`; direct screenshot inspection and independent visual review confirm the zone is visible in both browser and PNG. Scores and reference statistics are unchanged.
 
 Interpretation: the previous attribute-only browser test and PNG-only review were insufficient for CSS visibility bugs. Browser image inspection is now part of the evidence for this repair.
+
+## 2026-10-07 -- Measured lower doses and corrected dose markers
+
+Added sparse low-dose measurements to shorten the unmeasured gaps near bare. Author: PI/OpenAI.
+
+Generation used commit `4977303`, the existing Qwen3.5-9B preset, cached vectors and unchanged scoring. The user requested "same for all methods and side... or at least 1 between lowest and zero", then "run it pls". Command: `bash slop/reviews/2026-10-07_low_dose/run.sh`.
+
+> BACKFILL_PASS walks=83 doses=332 new_answers=33200 new_controls=25200 original_files=4097 unchanged_or_exactly_archived; seconds=24454.991; GPU_USD_at_2.10_per_hour=14.2654
+
+Source: `slop/reviews/2026-10-07_low_dose/verify_backfill.log`. Judge log: `JUDGE_COMPLETE missing=0`, with completion charges $1.4958 and $0.0874. Accounted addition is about $15.85, not an invoice.
+
+> REPORT_PASS old point metrics unchanged; 332 new points; all learned-method sides except angular have measured lower dots; angular has no common passing dose
+
+Source: `slop/reviews/2026-10-07_low_dose/verify_report.log`; full results in `table.md` beside it. VJP-value +C now includes C=0.25 and 0.5; top-k -C includes C=0.0625 and 0.125. Angular's new samples still exceed the reporting cutoff. Spherical now has a passing -C point, so its previous no-passing-dose description no longer applies.
+
+Interpretation: the additions improve dose coverage, not necessarily method performance. Several scores improve by choosing an almost-inactive dose with less off-axis change. VJP-resid and VJP-value retain their previous best doses. Minimum sampled coefficient is therefore a scoring sensitivity; no scoring rule was changed.
+
+The old plotting median filter shifted low-dose dots toward larger-dose observations. Removed that filter and point thinning; dots now retain measured seed means, while lines still interpolate. The regression first failed with "dose dots must retain measured seed means" and then passed (`dots_regression_before.log`, `uat.log`). PNG, browser and controls images were inspected directly and independently (`visual_review.md`). This is artifact and presentation verification, not a full scientific-validity audit.
+
+The plot now shows the new measurements rather than replacing them with neighboring-dose averages.
