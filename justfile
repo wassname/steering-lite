@@ -49,7 +49,7 @@ results:
 	cd scripts/bsbench/web && pnpm install --frozen-lockfile --silent && pnpm exec vite build --outDir ../../../{{main_report_dir}} --emptyOutDir false
 	uv run --with playwright python scripts/bsbench/web/uat.py {{main_report_dir}}
 	mkdir -p assets/bsbench
-	cp {{main_report_dir}}/plot.png assets/bsbench/qwen3.5-9b.png
+	cp {{main_report_dir}}/plot_readme.png assets/bsbench/qwen3.5-9b.png
 	just docs
 
 # PI/OpenAI: README.md is generated from README.qmd (edit the .qmd); the table comes from `just results`.
@@ -57,3 +57,14 @@ docs:
 	quarto render README.qmd --to all
 	quarto pandoc README.md -f gfm -t gfm --wrap=none --lua-filter docs/readme/flatten-xref.lua -o README.md
 	sed -i 's/\\[[]/[/g; s/\\[]]/]/g' README.md
+
+# PI/OpenAI: publish the main 9B page to GitHub Pages (gh-pages branch, one orphan commit, force-pushed so old sites do not pile up).
+pages_url := "https://wassname.github.io/steering-lite/bsbench/qwen3.5-9b/"
+publish:
+	rm -rf .local/pages && mkdir -p .local/pages/bsbench/qwen3.5-9b
+	cp -r {{main_report_dir}}/index.html {{main_report_dir}}/assets {{main_report_dir}}/points.json {{main_report_dir}}/answers {{main_report_dir}}/plot.png {{main_report_dir}}/controls.png {{main_report_dir}}/controls.html .local/pages/bsbench/qwen3.5-9b/
+	touch .local/pages/.nojekyll
+	printf '<meta http-equiv="refresh" content="0; url=bsbench/qwen3.5-9b/">\n' > .local/pages/index.html
+	cd .local/pages && git init -q -b gh-pages && git add -A && git commit -qm "Publish main 9B BS-bench page from $(git -C ../.. rev-parse --short HEAD)" && git push -qf https://github.com/wassname/steering-lite.git gh-pages
+	du -sh .local/pages
+	@echo "PUBLISHED {{pages_url}}"

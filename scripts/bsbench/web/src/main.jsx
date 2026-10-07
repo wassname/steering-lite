@@ -7,7 +7,7 @@ import './style.css';
 const W = 1000, H = 576, M = { l: 70, r: 20, t: 46, b: 50 };
 const fmt = (x, d = 2) => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d));
 const anchor = px => (px > W - 140 ? 'end' : px < M.l + 90 ? 'start' : 'middle');  // keep edge labels inside the plot
-const pointId = p => `${p.method}_s${p.seed}_${p.side}_C${p.C}`;
+const pointId = p => p.id;  // set by results.py; answers/<scenario>.json is keyed by it
 const directed = p => (p.side === '+C' ? p.effect : -p.effect);
 
 function Plot({ data, visible, selected, onSelect }) {
@@ -53,7 +53,7 @@ function Plot({ data, visible, selected, onSelect }) {
         return <g key={c.method + c.side}>
           <path className="curve-line" d={c.path.map(([a, b], i) => a === null ? '' : `${i === 0 || c.path[i - 1][0] === null ? 'M' : 'L'}${x(a)},${y(b)}`).join(' ')} fill="none" stroke={data.colors[c.method]} strokeWidth="2.5" strokeDasharray={c.side === '-C' ? '6 4' : ''} />
           {c.points.map((p, i) => {
-            const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C);
+            const full = data.points.find(q => q.method === c.method && q.side === c.side && q.C === p.C && q.seed === 0);
             const isSel = selected && full && pointId(full) === pointId(selected);
             const events = { onPointerEnter: () => setHover({ ...p, method: c.method, side: c.side }), onPointerLeave: () => setHover(null), onClick: () => full && onSelect(full) };
             return i === c.points.length - 1
@@ -105,16 +105,14 @@ function Blind({ data }) {
 
 function Explorer({ data, selected, onSelect }) {
   // default rows: each method-side at its Pareto-best dose; the selected point is added on top
-  const best = useMemo(() => data.summary.flatMap(r => ['-C', '+C'].map(side => r.best[side] && data.points.find(p => p.method === r.method && p.side === side && p.C === r.best[side].C && (r.method !== 'random' || p.seed === 0))))
+  const best = useMemo(() => data.summary.flatMap(r => ['-C', '+C'].map(side => r.best[side] && data.points.find(p => p.method === r.method && p.side === side && p.C === r.best[side].C && p.seed === 0)))
     .filter(Boolean), [data]);
   const rows = selected && !best.some(p => pointId(p) === pointId(selected)) ? [selected, ...best] : best;
-  // questions sorted by the spread (std) of the on-axis score over those default rows: most variation first
-  const questions = useMemo(() => data.questions.map(q => {
-    const xs = best.map(p => p.questions.find(a => a.scenario === q.scenario)).filter(Boolean).map(a => a.effect);
-    const m = xs.reduce((s, x) => s + x, 0) / xs.length;
-    return { ...q, std: Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length) };
-  }).sort((a, b) => b.std - a.std), [data, best]);
+  // questions come sorted by the spread (std) of the on-axis score over the best-dose rows (results.py)
+  const questions = data.questions;
   const [scenario, setScenario] = useState(questions[0].scenario);
+  const [answers, setAnswers] = useState(null);
+  useEffect(() => { setAnswers(null); fetch(`answers/${scenario}.json`).then(r => r.json()).then(setAnswers); }, [scenario]);
   const question = questions.find(q => q.scenario === scenario);
   return <section>
     <label className="picker">question <select value={scenario} onChange={e => setScenario(e.target.value)}>
@@ -123,14 +121,14 @@ function Explorer({ data, selected, onSelect }) {
     <div className="question"><p><strong>Question.</strong> {question.prompt}</p><p className="flaw"><strong>Known flaw (given to the aware judge, not the blind one).</strong> {question.flaw}</p></div>
     <div className="answer bare"><h3>bare</h3><p>{question.bare}</p></div>
     {rows.map(p => {
-      const q = p.questions.find(q => q.scenario === scenario);
+      const q = answers?.[p.id];
       return <div key={pointId(p)} className={`answer ${selected && pointId(p) === pointId(selected) ? 'selected' : ''}`} style={{ borderLeftColor: data.colors[p.method] }}>
         <h3>{p.method} s{p.seed} {p.side} C={p.C.toPrecision(3)} {p.admissible ? '' : <em>(not admissible)</em>}</h3>
         {q ? <>
           <p>{q.text}</p>
           <p className="judge">aware judge (Jev): on-axis {fmt(q.effect)} (toward {p.side === '+C' ? 'sycophancy' : 'candour'}: {fmt(p.side === '+C' ? q.effect : -q.effect)}), off-axis {q.off_axis.toFixed(2)}. “{q.evidence}”</p>
           {q.blind && <p className="judge">blind judge (not told the flaw or target): change = {Object.entries(q.blind.concept.probabilities).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.05).map(([k, v], i) => <span key={k}>{i ? ' · ' : ''}{i ? k : <strong>{k}</strong>} {Math.round(100 * v)}%</span>)}; premise stance bare {q.blind.stance_A.choice} → steered {q.blind.stance_B.choice}</p>}
-        </> : <p>no judged answer for this question</p>}
+        </> : <p>{answers ? 'answer not published (only seed 0 at displayed doses)' : 'loading…'}</p>}
       </div>;
     })}
   </section>;

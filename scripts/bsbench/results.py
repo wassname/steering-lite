@@ -17,7 +17,8 @@ import html
 import json
 import math
 import random
-from statistics import mean, median
+import shutil
+from statistics import mean, median, pstdev
 from typing import Iterable
 from pathlib import Path
 
@@ -475,7 +476,8 @@ def prompt_marks(points: list[dict]) -> list[dict]:
     return out
 
 
-def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.Figure:
+def plot(points: list[dict], title: str, methods: list[str], best: dict, captioned: bool = True) -> go.Figure:
+    """captioned=False: no title or footer, for the README, whose own caption explains the plot."""
     figure = go.Figure()
     curves = {(method, side): method_curve(points, method, side) for method in methods for side in ("+C", "-C")}
     prompting = prompt_marks(points)  # baselines stay visible; open star = fails the judge's limits
@@ -484,7 +486,7 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
     x_limit = 1.08 * max(abs(point["effect"]) for point in shown)
     zones = random_zones(points)
     y_range = (1.08 * max([point["off_axis"] for point in shown] + [p[1] for zone in zones for p in zone["path"]]), -0.07)
-    margin = {"l": 75, "r": 10, "t": 70, "b": 150}
+    margin = {"l": 75, "r": 10, "t": 70, "b": 150} if captioned else {"l": 75, "r": 10, "t": 30, "b": 70}
     for zone in zones:  # PI/OpenAI: shaded conditional quantile bands, not density contours.
         if zone["percentile"] != 50:
             figure.add_trace(go.Scatter(
@@ -539,11 +541,12 @@ def plot(points: list[dict], title: str, methods: list[str], best: dict) -> go.F
         figure.add_annotation(**annotation)
     figure.add_annotation(x=0, y=1, xref="paper", yref="paper", text="low off-axis change → pushes back", showarrow=False, xanchor="left", font={"color": "#287a4d", "size": 14})
     figure.add_annotation(x=1, y=1, xref="paper", yref="paper", text="low off-axis change → goes along", showarrow=False, xanchor="right", font={"color": "#287a4d", "size": 14})
-    figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
+    if captioned:
+        figure.add_annotation(x=0, y=-0.18, xref="paper", yref="paper", xanchor="left", yanchor="top", align="left", showarrow=False,
                           font={"color": "#555555", "size": 12},
                           text=f"selected methods: lines interpolate between doses; dot = measured seed mean; × = last displayed dose (mean off-axis ≤ {MAX_OFF_AXIS:g}), or before reversal<br>★ = prompt, averaged over seeds; open ☆ = above off-axis limit. Off-axis magnitude is not a coherence test.<br>grey = {len({p['seed'] for p in points if p['method'] == 'random'})} random directions, both signs: shaded p10–p90 and p25–p75 bands, solid median; random has no control penalty<br>first-crossing quantiles among reaching walks, capped at {MAX_OFF_AXIS:g}; not density contours or confidence intervals")
     figure.update_layout(
-        title={"text": title, "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
+        title={"text": title if captioned else "", "x": 0.5, "xanchor": "center"}, height=620, margin=margin,
         font={"color": "#111", "size": 15}, plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
         xaxis={"title": "premise change vs bare (Jev, pairwise; −C net of false rejections): ← pushes back · goes along →", "range": [-x_limit, x_limit], "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
         yaxis={"title": "off-axis: other change vs bare, 0–4 (lower is better)", "range": y_range, "showline": True, "linecolor": "#333333", "gridcolor": "#e5e5e5", "zeroline": False},
@@ -606,6 +609,38 @@ def readme_table(rows: list[dict]) -> str:
     for row in rows:
         lines.append("| " + " | ".join([link(row["method"]), *(fmt(i, v, row) for i, v in enumerate(values[row["method"]]))]) + " |")
     return "\n".join(lines)
+
+
+ANSWER_KEYS = ("text", "effect", "off_axis", "evidence", "blind")  # what the page's answer explorer shows
+
+
+def point_id(point: dict) -> str:
+    return f"{point['method']}_s{point['seed']}_{point['side']}_C{point['C']!r}"
+
+
+def write_site(site: dict, out: Path):
+    """points.json without answer text, plus answers/<scenario>.json: seed-0 answers keyed by point id, fetched when the
+    page opens that question. Only seed 0 is published (clicks and best-dose rows show seed 0), and only doses the page can
+    show. Keeps the page small enough for GitHub Pages; the full answers stay in the walk outputs. PI/OpenAI"""
+    shown = [p for p in site["points"] if p["seed"] == 0 and (p["admissible"] or p["method"] in PROMPTS)]
+    answers = {}
+    for point in shown:
+        for q in point["questions"]:
+            answers.setdefault(q["scenario"], {})[point_id(point)] = {k: q[k] for k in ANSWER_KEYS}
+    best = [p for row in site["summary"] for side, b in row["best"].items() if b for p in shown
+            if p["method"] == row["method"] and p["side"] == side and p["C"] == b["C"]]
+    def spread(scenario: str) -> float:  # questions whose best-dose answers differ most come first
+        effects = [q["effect"] for p in best for q in p["questions"] if q["scenario"] == scenario]
+        return pstdev(effects) if effects else 0.0
+    questions = sorted(({**q, "std": spread(q["scenario"])} for q in site["questions"]), key=lambda q: -q["std"])
+    slim = lambda p: {**{k: v for k, v in p.items() if k != "questions"}, "id": point_id(p)}
+    site = {**site, "questions": questions, "points": [slim(p) for p in site["points"]], "prompt_marks": [slim(p) for p in site["prompt_marks"]]}
+    if (out / "answers").exists():
+        shutil.rmtree(out / "answers")
+    (out / "answers").mkdir(parents=True)
+    for scenario, by_point in answers.items():
+        (out / "answers" / f"{scenario}.json").write_text(json.dumps(_no_nan(by_point), separators=(",", ":")) + "\n")
+    (out / "points.json").write_text(json.dumps(_no_nan(site), separators=(",", ":"), allow_nan=False) + "\n")
 
 
 def _no_nan(value):
@@ -759,7 +794,7 @@ def main() -> None:
     site["plot_labels"] = svg_labels(site)
     model = model_dir.name.rsplit("-g", 1)[0].split("--")[-1]
     site["setup"] = setup_line(model, points, walk_certificates(model_dir, args.cohort, args.view))
-    (out / f"points.json").write_text(json.dumps(_no_nan(site), indent=1, allow_nan=False) + "\n")
+    write_site(site, out)
     heading = {"user": "User-turn steering on Bullshit Bench v2"}.get(args.view, "steering-lite on Bullshit Bench v2")
     title = f"{heading}: {model} ({args.cohort}, {len(scenarios)} questions) — judge: Jev<br><sup>{site['setup'].split(' · ', 1)[1]}</sup>"
     best = {(row["method"], side): p for row in rows for side, p in row["best"].items()}
@@ -802,6 +837,7 @@ def main() -> None:
         f"<h1>Results ({html.escape(args.cohort)})</h1><p>{html.escape(intro)}</p>{figure_html}<pre>{html.escape(table)}</pre>"
     )
     figure.write_image(out / f"plot.png", width=1064, height=620, scale=2)
+    plot(points, title, shown, best, captioned=False).write_image(out / "plot_readme.png", width=1064, height=620, scale=2)
     # marker count drawn in the PNG, compared with the React page by web/uat.py
     sweep_marks = sum(len(trace.x) for trace in figure.data if trace.name == "sweep")
     (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown, "random_fills": sum(trace.fill == "toself" for trace in figure.data)}) + "\n")

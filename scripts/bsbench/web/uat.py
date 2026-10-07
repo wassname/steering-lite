@@ -15,6 +15,9 @@ from playwright.sync_api import sync_playwright
 
 site = Path(sys.argv[1]).resolve()
 data = json.loads((site / "points.json").read_text())
+size_mb = sum(f.stat().st_size for f in site.rglob("*") if f.is_file() and not f.name.startswith("uat_")) / 1e6
+print(f"site size={size_mb:.1f} MB (points.json {(site / 'points.json').stat().st_size / 1e6:.1f} MB); SHOULD stay under ~50 MB for GitHub Pages")
+assert (site / "points.json").stat().st_size < 10e6, "points.json carries answer text again; answers belong in answers/<scenario>.json"
 handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(site))
 server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -106,6 +109,7 @@ with sync_playwright() as p:
 
     question = data["questions"][1]["scenario"]
     page.select_option("select", question)
+    page.wait_for_selector("p.judge")  # answers/<scenario>.json is fetched when the question opens
     blocks = page.locator(".answer").count()
     print(f"question={question} answer blocks={blocks}")
     assert blocks > 1

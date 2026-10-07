@@ -11,5 +11,5 @@ for path in (Path('README.md'), Path('slop/research/20261007_historical_bsbench_
         assert (path.parent / target).exists(), (path, target)
         checked += 1
     print(f'LINKS_PASS {path}: {checked} local file targets')
-assert Path('assets/bsbench/qwen3.5-9b.png').read_bytes() == Path('outputs/bsbench/results/v5-9b-3seeds/plot.png').read_bytes()
+assert Path('assets/bsbench/qwen3.5-9b.png').read_bytes() == Path('outputs/bsbench/results/v5-9b-3seeds/plot_readme.png').read_bytes()
 print('FIGURE_PASS README asset equals the generated main 9B plot')
