@@ -63,6 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--out", type=Path, help="default: outputs/bsbench/results/<cohort>")
     parser.add_argument("--exclude", default="", help="comma-separated methods to leave out (e.g. not yet judged); named in index.md")
+    parser.add_argument("--readme-table", type=Path, help="also write the short public table here (README.qmd includes it)")
     parser.add_argument("--show", default="", help="comma-separated methods always drawn, e.g. the one under development")
     parser.add_argument("--view", choices=("benchmark", "user"), default="benchmark", help="opening plot: best methods or prompt sweeps with mean difference")
     return parser.parse_args()
@@ -575,6 +576,38 @@ def tables(rows: list[dict]) -> str:
         f"(bare BS score for +C, {BS_MAX} − bare BS score for −C), weaker side; comparable with their leaderboard scale. Off-axis is handled by the dose choice and the {MAX_OFF_AXIS:g} limit, not in this number.")
 
 
+def readme_table(rows: list[dict]) -> str:
+    """Short public table: one row per method at each side's best admissible dose, linked to its code.
+    Column order is the rule (markdown-tables): index, headline, then its inputs in formula order. PI/OpenAI"""
+    def link(method: str) -> str:
+        path = "scripts/bsbench/walk.py" if method in PROMPTS else f"src/steering_lite/variants/{method.removesuffix('_resid') if method == 'sink_split_resid' else method}.py"
+        assert (ROOT / path).is_file(), path
+        name = f"[{method}]({path})"
+        return f"*{name}*" if method in ("random", *PROMPTS) else name
+    def cells(row: dict) -> list[float]:
+        minus, plus = row["best"]["-C"], row["best"]["+C"]
+        if minus is None or plus is None:
+            return [math.nan] * 6
+        rejected = minus["control_claims"] if "control_claims" in minus else math.nan
+        return [row["score"], -minus["effect"], minus["off_axis"], plus["effect"], plus["off_axis"], rejected]
+    values = {row["method"]: cells(row) for row in rows}
+    best = [max if up else min for up in (True, True, False, True, False, False)]
+    best = [pick(v[i] for v in values.values() if not math.isnan(v[i])) for i, pick in enumerate(best)]
+    def fmt(i: int, v: float, row: dict) -> str:
+        if math.isnan(v):
+            return "—"
+        text = f"{v:.0%}" if i == 5 else f"{v:.2f}" if i in (2, 4) else f"{v:+.2f}"
+        if i == 0:
+            lo, hi = row["ci"]
+            text += f" <sub>[{lo:+.2f}, {hi:+.2f}]</sub>"
+        return f"**{text}**" if i in (0, 1, 3) and v == best[i] else text  # lowest "other" is usually a method that does nothing; not bolded
+    lines = ["| method | score↑ <sub>[90% CI]</sub> | −C pushback↑ | −C other↓ | +C goes along↑ | +C other↓ | legit rejected↓ |",
+             "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
+    for row in rows:
+        lines.append("| " + " | ".join([link(row["method"]), *(fmt(i, v, row) for i, v in enumerate(values[row["method"]]))]) + " |")
+    return "\n".join(lines)
+
+
 def _no_nan(value):
     """JSON has no NaN; an unscored method (no admissible dose on a side) is null."""
     if isinstance(value, float):
@@ -772,6 +805,9 @@ def main() -> None:
     # marker count drawn in the PNG, compared with the React page by web/uat.py
     sweep_marks = sum(len(trace.x) for trace in figure.data if trace.name == "sweep")
     (out / f"plot_marks.json").write_text(json.dumps({"sweep_marks": sweep_marks, "methods": shown, "random_fills": sum(trace.fill == "toself" for trace in figure.data)}) + "\n")
+    (out / "readme_table.md").write_text(readme_table(rows) + "\n")
+    if args.readme_table:
+        args.readme_table.write_text(readme_table(rows) + "\n")
     print(table)
     print(f"wrote {out}/points.json ({len(points)} points), index.md, plot.html, plot.png")
 

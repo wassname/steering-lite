@@ -11,7 +11,8 @@ logs/
 *.pyc
 # manually added id at all
 PLAN.md
-docs/
+docs/*
+!docs/readme/
 *.bak
 spec/
 .env
@@ -19,3 +20,5 @@ node_modules/
 # PI/OpenAI: machine-only downloads and agent runtime state; research evidence stays tracked.
 .local/
 .pi/subagents/
+README.html
+README_files/

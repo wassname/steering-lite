@@ -21,7 +21,7 @@ controls = results.control_plot(site['points'], site['shown'], '−C: detection 
 controls.write_image(out / 'controls.png', width=1064, height=560, scale=2)
 controls.write_html(out / 'controls.html', include_plotlyjs='cdn')
 (out / 'plot_marks.json').write_text(json.dumps({'sweep_marks': sum(len(t.x) for t in figure.data if t.name == 'sweep'), 'methods': site['shown'], 'random_fills': sum(t.fill == 'toself' for t in figure.data)}) + '\n')
-shutil.copy2(out / 'plot.png', 'assets/bsbench_qwen3.5-9b_main.png')
+shutil.copy2(out / 'plot.png', 'assets/bsbench/qwen3.5-9b.png')
 shutil.copy2(out / 'plot.png', Path(__file__).parent / 'plot_all_final.png')
 report = (out / 'index.md').read_text().replace('at its coherent doses:', 'at its admissible doses:').replace('Reported, not scored.', 'These raw components feed the control-adjusted −C score.')
 (out / 'index.md').write_text(report)

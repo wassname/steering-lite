@@ -70,7 +70,7 @@ Judge totals come from the completion rows of each refresh, not the last line of
 ## Deliverables and review
 
 - `README.md`: main 9B plot/table; earlier results collapsed, their text preserved.
-- `assets/bsbench_qwen3.5-9b_main.png`: final PNG, inspected directly.
+- `assets/bsbench/qwen3.5-9b.png`: final PNG, inspected directly.
 - `uat_final.log`: page/PNG point parity and unfilled open quantile paths checked.
 - `fresh_eyes_final.md`: initial independent visual review.
 - `fresh_eyes_recheck.md`: corrected-image review, "PASS - presentation correctness" (source uses a typographic dash); remaining crowding of right endpoints disclosed.
