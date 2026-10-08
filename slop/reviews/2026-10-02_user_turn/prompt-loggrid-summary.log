@@ -1,0 +1,12 @@
+05:05:04 | PROMPT_C1_IDENTITY_PASS side=+C check={'answers': 20, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 0, 'cached_C1_mism
+05:05:10 | PROMPT_C1_IDENTITY_PASS side=-C check={'answers': 20, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 0, 'cached_C1_mism
+05:05:10 | PROMPT_C1_IDENTITY_PASS side=+C check={'answers': 20, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 9, 'cached_C1_mism
+05:05:15 | PROMPT_C1_IDENTITY_PASS side=-C check={'answers': 20, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 3, 'cached_C1_mism
+DONE	prompting_scale	s0	prompting_scale --seed 0 --cohort dev
+DONE	prompting_engineered_scale	s0	prompting_engineered_scale --seed 0 --cohort dev
+04:48:30 | PROMPT_C1_IDENTITY_PASS side=+C check={'answers': 100, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 47, 'cached_C1_mi
+04:48:33 | PROMPT_C1_IDENTITY_PASS side=+C check={'answers': 100, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 41, 'cached_C1_mi
+04:48:58 | PROMPT_C1_IDENTITY_PASS side=-C check={'answers': 100, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 39, 'cached_C1_mi
+04:49:04 | PROMPT_C1_IDENTITY_PASS side=-C check={'answers': 100, 'exact': True, 'batches': 'identical, one process', 'historical_mismatches': 44, 'cached_C1_mi
+DONE	prompting_scale	s0	prompting_scale --seed 0 --cohort full
+DONE	prompting_engineered_scale	s0	prompting_engineered_scale --seed 0 --cohort full

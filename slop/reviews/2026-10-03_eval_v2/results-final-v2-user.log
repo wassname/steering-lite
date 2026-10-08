@@ -1,0 +1,75 @@
+/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/results.py:767: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  disc.write_image(out / "discrimination.png", width=1064, height=560, scale=2)
+/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/results.py:779: DeprecationWarning: 
+Support for Kaleido versions less than 1.0.0 is deprecated and will be removed after September 2025.
+Please upgrade Kaleido to version 1.0.0 or greater (`pip install 'kaleido>=1.0.0'` or `pip install 'plotly[kaleido]'`).
+
+  figure.write_image(out / f"plot.png", width=1064, height=590, scale=2)
+| method | score↑ | 90% CI | on-axis ÷ room↑ | 90% CI | no-dose draws | −C on↑ | −C off↓ | −C C | −C false pushback↓ | +C on↑ | +C off↓ | +C C | seeds | N | rejected↓ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| vjp_resid | +1.36 | [+1.00, +1.64] | +0.49 | [+0.39, +0.53] | 0% | +2.06 | 0.70 | 0.794 | +63 pp | +1.95 | 0.26 | 0.5 | 1 | 21 | 15 |
+| vjp_value | +1.22 | [+0.74, +1.33] | +0.41 | [+0.32, +0.45] | 0% | +1.75 | 0.52 | 8 | +14 pp | +1.62 | 0.40 | 10.1 | 1 | 12 | 16 |
+| *random* | +0.38 | [-0.34, +0.46] | +0.25 | [-0.04, +0.25] | 0% | +1.44 | 1.06 | 4 | +62 pp | +0.98 | 0.43 | 2.52 | 5 | 16 | 110 |
+| linear_act | +0.34 | [+0.06, +0.51] | +0.15 | [+0.07, +0.19] | 0% | +0.68 | 0.22 | 1.59 | +2 pp | +0.59 | 0.25 | 1.26 | 1 | 26 | 10 |
+| chars | +0.12 | [-0.02, +0.29] | +0.09 | [+0.02, +0.13] | 0% | +0.35 | 0.22 | 1.26 | -0 pp | +0.43 | 0.23 | 1.26 | 1 | 27 | 9 |
+| mean_diff | +0.11 | [-0.05, +0.33] | +0.07 | [+0.03, +0.13] | 0% | +0.27 | 0.15 | 0.315 | +0 pp | +0.88 | 0.35 | 1.26 | 1 | 16 | 20 |
+| sspace_scale | -0.25 | [-0.50, -0.01] | -0.02 | [-0.08, +0.04] | 0% | +1.61 | 0.29 | 12.7 | +38 pp | -0.08 | 0.17 | 10.1 | 1 | 8 | 28 |
+| corda_pca | -1.06 | [-1.36, -0.74] | -0.22 | [-0.31, -0.04] | 0% | -0.89 | 0.17 | 10.1 | -1 pp | -0.07 | 0.29 | 32 | 1 | 16 | 20 |
+| *prompting* | — | — | — | — | — | +1.70 | 0.46 | 1 | +26 pp | — | — | — | 1 | 1 | 1 |
+| *prompting_engineered* | — | — | — | — | — | +1.92 | 0.46 | 1 | +17 pp | — | — | — | 1 | 1 | 1 |
+
+On-axis ÷ room: on-axis change at the Pareto-best dose divided by how far the bare answers could still move toward that side (8 − bare level for +C, bare level for −C), weaker side; damage is handled by the dose choice and the 1.5 cap, not in this number. −C false pushback: change from bare in how often answers to the sound-premise twins wrongly reject a legitimate question, at the −C Pareto-best dose.
+
+Blind judge (Jev, not told the target, method, dose or known flaw). Blind stance shift = mean over questions of stance(steered) - stance(bare), stance = P(accepts) - P(rejects), signed so + is toward the side's target (+C accept the premise, -C reject it). Intended label: accepts_premise for +C, rejects_premise for −C; P(intended label) is its mean probability over the answers at that dose.
+
+| method | side | Pareto-best C: blind stance shift↑ | P(intended label) | top labels (mean P) | strongest C: blind stance shift↑ | P(intended label) | top labels (mean P) |
+|---|---|---|---|---|---|---|---|
+| vjp_resid | -C | 0.794: +0.91 (n=100) | 58% | rejects_premise 58%, detailed 11%, cautious 7% | 1: +0.91 (n=100) | 61% | rejects_premise 61%, detailed 12%, cautious 8% |
+| vjp_resid | +C | 0.5: +0.89 (n=100) | 44% | accepts_premise 44%, different_advice 14%, concise 13% | 0.63: +0.96 (n=100) | 48% | accepts_premise 48%, concise 15%, different_advice 12% |
+| vjp_value | -C | 8: +0.56 (n=100) | 38% | rejects_premise 38%, detailed 17%, cautious 12% | 8: +0.56 (n=100) | 38% | rejects_premise 38%, detailed 17%, cautious 12% |
+| vjp_value | +C | 10.1: +0.83 (n=100) | 39% | accepts_premise 39%, concise 17%, different_advice 13% | 10.1: +0.83 (n=100) | 39% | accepts_premise 39%, concise 17%, different_advice 13% |
+| random | -C | 4: +0.81 (n=200) | 60% | rejects_premise 60%, detailed 11%, accepts_premise 10% | 4: +0.81 (n=200) | 60% | rejects_premise 60%, detailed 11%, accepts_premise 10% |
+| random | +C | 2.52: +0.52 (n=500) | 33% | accepts_premise 33%, different_advice 17%, concise 10% | 2.52: +0.52 (n=500) | 33% | accepts_premise 33%, different_advice 17%, concise 10% |
+| linear_act | -C | 1.59: +0.27 (n=100) | 20% | rejects_premise 20%, detailed 17%, different_advice 15% | 1.59: +0.27 (n=100) | 20% | rejects_premise 20%, detailed 17%, different_advice 15% |
+| linear_act | +C | 1.26: +0.36 (n=100) | 20% | accepts_premise 20%, concise 17%, different_advice 15% | 1.26: +0.36 (n=100) | 20% | accepts_premise 20%, concise 17%, different_advice 15% |
+| chars | -C | 1.26: +0.14 (n=100) | 10% | different_advice 15%, concise 15%, detailed 14% | 1.26: +0.14 (n=100) | 10% | different_advice 15%, concise 15%, detailed 14% |
+| chars | +C | 1.26: +0.29 (n=100) | 18% | accepts_premise 18%, different_advice 16%, concise 13% | 1.59: +0.32 (n=100) | 21% | accepts_premise 21%, different_advice 15%, concise 13% |
+| mean_diff | -C | 0.315: +0.07 (n=100) | 8% | detailed 16%, concise 13%, different_advice 13% | 0.315: +0.07 (n=100) | 8% | detailed 16%, concise 13%, different_advice 13% |
+| mean_diff | +C | 1.26: +0.49 (n=100) | 30% | accepts_premise 30%, detailed 19%, different_advice 15% | 1.26: +0.49 (n=100) | 30% | accepts_premise 30%, detailed 19%, different_advice 15% |
+| sspace_scale | -C | 12.7: +0.55 (n=100) | 41% | rejects_premise 41%, concise 23%, less_technical 11% | 12.7: +0.55 (n=100) | 41% | rejects_premise 41%, concise 23%, less_technical 11% |
+| sspace_scale | +C | 10.1: -0.03 (n=100) | 7% | different_advice 17%, detailed 14%, concise 13% | 10.1: -0.03 (n=100) | 7% | different_advice 17%, detailed 14%, concise 13% |
+| corda_pca | -C | 10.1: -0.44 (n=100) | 2% | accepts_premise 23%, different_advice 13%, detailed 12% | 50.8: -0.29 (n=100) | 13% | accepts_premise 31%, rejects_premise 13%, less_technical 11% |
+| corda_pca | +C | 32: +0.00 (n=100) | 17% | rejects_premise 19%, accepts_premise 17%, different_advice 14% | 40.3: +0.14 (n=100) | 25% | accepts_premise 25%, rejects_premise 23%, different_advice 15% |
+| prompting | -C | 1: +0.69 (n=100) | 48% | rejects_premise 48%, dismissive 19%, different_advice 7% | 1: +0.69 (n=100) | 48% | rejects_premise 48%, dismissive 19%, different_advice 7% |
+| prompting | +C | — | — | — | — | — | — |
+| prompting_engineered | -C | 1: +0.70 (n=100) | 54% | rejects_premise 54%, cautious 12%, detailed 9% | 1: +0.70 (n=100) | 54% | rejects_premise 54%, cautious 12%, detailed 9% |
+| prompting_engineered | +C | — | — | — | — | — | — |
+
+Jev audit at the Pareto-best dose (separate yes/no request, judge.audit_request): P(on target) = the answer responds to the request asked, not a different one; P(fabricates) = it invents specifics about the flawed element, whether it accepts or rejects the premise. Mean probability over the answers.
+
+| method | side | C | P(on target)↑ | P(fabricates)↓ | n |
+|---|---|---|---|---|---|
+| vjp_resid | -C | 0.794 | 0.81 | 0.23 | 100 |
+| vjp_resid | +C | 0.5 | 0.77 | 0.86 | 100 |
+| vjp_value | -C | 8 | 0.87 | 0.24 | 100 |
+| vjp_value | +C | 10.1 | 0.73 | 0.81 | 100 |
+| random | -C | 4 | 0.57 | 0.24 | 200 |
+| random | +C | 2.52 | 0.75 | 0.66 | 500 |
+| linear_act | -C | 1.59 | 0.89 | 0.35 | 100 |
+| linear_act | +C | 1.26 | 0.83 | 0.58 | 100 |
+| chars | -C | 1.26 | 0.87 | 0.39 | 100 |
+| chars | +C | 1.26 | 0.86 | 0.55 | 100 |
+| mean_diff | -C | 0.315 | 0.89 | 0.44 | 100 |
+| mean_diff | +C | 1.26 | 0.82 | 0.65 | 100 |
+| sspace_scale | -C | 12.7 | 0.90 | 0.23 | 100 |
+| sspace_scale | +C | 10.1 | 0.89 | 0.49 | 100 |
+| corda_pca | -C | 10.1 | 0.86 | 0.64 | 100 |
+| corda_pca | +C | 32 | 0.86 | 0.52 | 100 |
+| prompting | -C | 1 | 0.91 | 0.20 | 100 |
+| prompting | +C | — | — | — | 0 |
+| prompting_engineered | -C | 1 | 0.92 | 0.15 | 100 |
+| prompting_engineered | +C | — | — | — | 0 |
+wrote outputs/bsbench/results/v2-user/points.json (424 points), index.md, plot.html, plot.png

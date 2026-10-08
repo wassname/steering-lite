@@ -1,0 +1,45 @@
+2026-10-03 13:06:25.075 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 13:06:25.075 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 13:06:25.075 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 13:06:25.077 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 13:06:25.080 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 13:06:25.081 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 13:06:25.081 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 13:06:25.081 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 13:06:25.082 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 13:06:25.082 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 13:07:18.621 | INFO     | data:manifest:81 - manifest walks=109 rows=328200
+2026-10-03 13:07:49.094 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK aware required=247245 cached=243543 missing=3702
+2026-10-03 13:07:57.568 | INFO     | __main__:_refresh:188 - jev progress=400/3702 cost=$0.0172
+2026-10-03 13:08:03.869 | INFO     | __main__:_refresh:188 - jev progress=800/3702 cost=$0.0345
+2026-10-03 13:08:10.842 | INFO     | __main__:_refresh:188 - jev progress=1200/3702 cost=$0.0517
+2026-10-03 13:08:16.895 | INFO     | __main__:_refresh:188 - jev progress=1600/3702 cost=$0.0689
+2026-10-03 13:08:24.019 | INFO     | __main__:_refresh:188 - jev progress=2000/3702 cost=$0.0861
+2026-10-03 13:08:30.316 | INFO     | __main__:_refresh:188 - jev progress=2400/3702 cost=$0.1033
+2026-10-03 13:08:36.695 | INFO     | __main__:_refresh:188 - jev progress=2800/3702 cost=$0.1204
+2026-10-03 13:08:42.797 | INFO     | __main__:_refresh:188 - jev progress=3200/3702 cost=$0.1375
+2026-10-03 13:08:49.043 | INFO     | __main__:_refresh:188 - jev progress=3600/3702 cost=$0.1546
+2026-10-03 13:08:50.810 | INFO     | __main__:_refresh:188 - jev progress=3702/3702 cost=$0.1589
+2026-10-03 13:09:07.460 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 13:09:07.481 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 13:09:07.483 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 13:09:07.856 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 13:09:07.971 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 13:09:07.972 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 13:09:07.972 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 13:09:07.973 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 13:09:07.973 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 13:10:07.374 | INFO     | data:walk_certificates:47 - exclude corda_pca_s3_full.json: seed outside published full report
+2026-10-03 13:10:07.390 | INFO     | data:walk_certificates:47 - exclude corda_pca_s4_full.json: seed outside published full report
+2026-10-03 13:10:07.390 | INFO     | data:walk_certificates:47 - exclude corda_pca_s5_full.json: seed outside published full report
+2026-10-03 13:10:07.822 | INFO     | data:walk_certificates:47 - exclude mean_diff_s3_full.json: seed outside published full report
+2026-10-03 13:10:07.978 | INFO     | data:walk_certificates:47 - exclude random_s11_full.json: seed outside published full report
+2026-10-03 13:10:07.978 | INFO     | data:walk_certificates:47 - exclude random_s12_full.json: seed outside published full report
+2026-10-03 13:10:07.979 | INFO     | data:walk_certificates:47 - exclude random_s13_full.json: seed outside published full report
+2026-10-03 13:10:07.979 | INFO     | data:walk_certificates:47 - exclude random_s14_full.json: seed outside published full report
+2026-10-03 13:10:07.979 | INFO     | data:walk_certificates:47 - exclude random_s15_full.json: seed outside published full report
+2026-10-03 13:12:29.175 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 13:13:55.824 | WARNING  | data:walk_certificates:43 - skip random-user_s16_full.json status=RUNNING
+2026-10-03 13:15:49.669 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK blind required=18806 cached=18509 missing=297
+2026-10-03 13:15:55.139 | INFO     | __main__:_refresh:188 - jev progress=297/297 cost=$0.0162
+2026-10-03 13:15:55.580 | INFO     | __main__:main:252 - JUDGE_COMPLETE missing=0

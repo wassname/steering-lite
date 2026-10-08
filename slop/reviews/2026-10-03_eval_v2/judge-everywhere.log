@@ -1,0 +1,136 @@
+2026-10-03 18:32:01.241 | INFO     | data:manifest:106 - manifest walks=2 rows=13600
+2026-10-03 18:32:16.345 | INFO     | __main__:refresh:219 - JUDGE_CACHE_CHECK aware required=18357 cached=897 missing=17460
+2026-10-03 18:32:23.936 | INFO     | __main__:_refresh:213 - jev progress=400/17460 cost=$0.0120
+2026-10-03 18:32:30.140 | INFO     | __main__:_refresh:213 - jev progress=800/17460 cost=$0.0247
+2026-10-03 18:32:36.337 | INFO     | __main__:_refresh:213 - jev progress=1200/17460 cost=$0.0377
+2026-10-03 18:32:43.054 | INFO     | __main__:_refresh:213 - jev progress=1600/17460 cost=$0.0509
+2026-10-03 18:32:49.084 | INFO     | __main__:_refresh:213 - jev progress=2000/17460 cost=$0.0641
+2026-10-03 18:32:55.183 | INFO     | __main__:_refresh:213 - jev progress=2400/17460 cost=$0.0772
+2026-10-03 18:33:01.274 | INFO     | __main__:_refresh:213 - jev progress=2800/17460 cost=$0.0903
+2026-10-03 18:33:07.384 | INFO     | __main__:_refresh:213 - jev progress=3200/17460 cost=$0.1036
+2026-10-03 18:33:13.560 | INFO     | __main__:_refresh:213 - jev progress=3600/17460 cost=$0.1168
+2026-10-03 18:33:20.299 | INFO     | __main__:_refresh:213 - jev progress=4000/17460 cost=$0.1299
+2026-10-03 18:33:26.466 | INFO     | __main__:_refresh:213 - jev progress=4400/17460 cost=$0.1432
+2026-10-03 18:33:32.575 | INFO     | __main__:_refresh:213 - jev progress=4800/17460 cost=$0.1564
+2026-10-03 18:33:38.803 | INFO     | __main__:_refresh:213 - jev progress=5200/17460 cost=$0.1700
+2026-10-03 18:33:44.944 | INFO     | __main__:_refresh:213 - jev progress=5600/17460 cost=$0.1843
+2026-10-03 18:33:51.130 | INFO     | __main__:_refresh:213 - jev progress=6000/17460 cost=$0.2021
+2026-10-03 18:33:57.178 | INFO     | __main__:_refresh:213 - jev progress=6400/17460 cost=$0.2221
+2026-10-03 18:34:03.498 | INFO     | __main__:_refresh:213 - jev progress=6800/17460 cost=$0.2429
+2026-10-03 18:34:09.552 | INFO     | __main__:_refresh:213 - jev progress=7200/17460 cost=$0.2636
+2026-10-03 18:34:15.512 | INFO     | __main__:_refresh:213 - jev progress=7600/17460 cost=$0.2779
+2026-10-03 18:34:21.549 | INFO     | __main__:_refresh:213 - jev progress=8000/17460 cost=$0.2902
+2026-10-03 18:34:27.560 | INFO     | __main__:_refresh:213 - jev progress=8400/17460 cost=$0.3028
+2026-10-03 18:34:33.874 | INFO     | __main__:_refresh:213 - jev progress=8800/17460 cost=$0.3156
+2026-10-03 18:34:40.105 | INFO     | __main__:_refresh:213 - jev progress=9200/17460 cost=$0.3287
+2026-10-03 18:34:46.268 | INFO     | __main__:_refresh:213 - jev progress=9600/17460 cost=$0.3417
+2026-10-03 18:34:52.200 | INFO     | __main__:_refresh:213 - jev progress=10000/17460 cost=$0.3548
+2026-10-03 18:34:58.164 | INFO     | __main__:_refresh:213 - jev progress=10400/17460 cost=$0.3680
+2026-10-03 18:35:04.261 | INFO     | __main__:_refresh:213 - jev progress=10800/17460 cost=$0.3814
+2026-10-03 18:35:10.356 | INFO     | __main__:_refresh:213 - jev progress=11200/17460 cost=$0.3947
+2026-10-03 18:35:16.391 | INFO     | __main__:_refresh:213 - jev progress=11600/17460 cost=$0.4094
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/http11.py", line 136, in handle_async_request
+    raise exc
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_async/http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/judge.py", line 282, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/judge.py", line 270, in main
+    missing = refresh(aware_requests(manifest(model_dir, args.cohort)), "aware", args.refresh)
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/judge.py", line 221, in refresh
+    asyncio.run(_refresh(todo))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/judge.py", line 212, in _refresh
+    await asyncio.gather(*(run(client, k, request) for k, request in items[start : start + 400]))
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/bsbench/judge.py", line 192, in run
+    response = await client.post(URL, json=request, headers=headers, timeout=60)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1859, in post
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<13 lines>...
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadError
+error: command `uv` `run` `--extra` `benchmark` `python` `scripts/bsbench/judge.py` `--cohort` `full` `--refresh` failed: exit status: 1

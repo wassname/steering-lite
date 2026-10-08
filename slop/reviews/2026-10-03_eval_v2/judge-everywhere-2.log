@@ -1,0 +1,23 @@
+2026-10-03 18:35:47.017 | INFO     | data:manifest:106 - manifest walks=2 rows=13600
+2026-10-03 18:35:57.678 | INFO     | __main__:refresh:219 - JUDGE_CACHE_CHECK aware required=18357 cached=12619 missing=5738
+2026-10-03 18:36:09.740 | INFO     | __main__:_refresh:213 - jev progress=400/5738 cost=$0.0143
+2026-10-03 18:36:15.808 | INFO     | __main__:_refresh:213 - jev progress=800/5738 cost=$0.0283
+2026-10-03 18:36:21.980 | INFO     | __main__:_refresh:213 - jev progress=1200/5738 cost=$0.0443
+2026-10-03 18:36:28.055 | INFO     | __main__:_refresh:213 - jev progress=1600/5738 cost=$0.0602
+2026-10-03 18:36:34.158 | INFO     | __main__:_refresh:213 - jev progress=2000/5738 cost=$0.0741
+2026-10-03 18:36:40.246 | INFO     | __main__:_refresh:213 - jev progress=2400/5738 cost=$0.0887
+2026-10-03 18:36:46.345 | INFO     | __main__:_refresh:213 - jev progress=2800/5738 cost=$0.1073
+2026-10-03 18:36:52.545 | INFO     | __main__:_refresh:213 - jev progress=3200/5738 cost=$0.1229
+2026-10-03 18:37:34.062 | WARNING  | __main__:run:197 - jev 520 attempt=1/6
+2026-10-03 18:37:34.063 | WARNING  | __main__:run:197 - jev 520 attempt=1/6
+2026-10-03 18:37:39.479 | INFO     | __main__:_refresh:213 - jev progress=3600/5738 cost=$0.1389
+2026-10-03 18:37:45.635 | INFO     | __main__:_refresh:213 - jev progress=4000/5738 cost=$0.1580
+2026-10-03 18:37:51.749 | INFO     | __main__:_refresh:213 - jev progress=4400/5738 cost=$0.1772
+2026-10-03 18:37:57.797 | INFO     | __main__:_refresh:213 - jev progress=4800/5738 cost=$0.1972
+2026-10-03 18:38:03.823 | INFO     | __main__:_refresh:213 - jev progress=5200/5738 cost=$0.2160
+2026-10-03 18:38:10.014 | INFO     | __main__:_refresh:213 - jev progress=5600/5738 cost=$0.2365
+2026-10-03 18:38:12.089 | INFO     | __main__:_refresh:213 - jev progress=5738/5738 cost=$0.2437
+2026-10-03 18:38:43.806 | INFO     | __main__:refresh:219 - JUDGE_CACHE_CHECK blind required=599 cached=25 missing=574
+2026-10-03 18:38:49.942 | INFO     | __main__:_refresh:213 - jev progress=400/574 cost=$0.0220
+2026-10-03 18:38:52.639 | INFO     | __main__:_refresh:213 - jev progress=574/574 cost=$0.0317
+2026-10-03 18:38:53.010 | INFO     | __main__:main:278 - JUDGE_COMPLETE missing=0

@@ -1,11 +1,11 @@
-127.0.0.1 - - [04/Oct/2026 13:10:40] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Oct/2026 13:10:40] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
-127.0.0.1 - - [04/Oct/2026 13:10:40] "GET /assets/index-BLjAgQGk.js HTTP/1.1" 200 -
-127.0.0.1 - - [04/Oct/2026 13:10:40] "GET /points.json HTTP/1.1" 200 -
+127.0.0.1 - - [04/Oct/2026 17:08:02] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [04/Oct/2026 17:08:02] "GET /assets/index-CQXCMfuK.css HTTP/1.1" 200 -
+127.0.0.1 - - [04/Oct/2026 17:08:02] "GET /assets/index-VGQRDjAz.js HTTP/1.1" 200 -
+127.0.0.1 - - [04/Oct/2026 17:08:02] "GET /points.json HTTP/1.1" 200 -
 curve points in points.json=47 drawn=47
 PNG sweep marks (plot_marks.json from results.py)=47 page drawn=47 methods png=['mean_diff', 'vjp_resid'] page=['mean_diff', 'vjp_resid']
 random regions: p90/p75/p50 with distinct fills; requested opening methods visible
 prompt baseline stars=2; no rejected curve points, rejected stars, or swept-prompt stars
 question=syco_bullshit_v2_leg_pnf_02 answer blocks=9
 blind judge lines=8 (default blocks are Pareto-best doses, which judge.py rates blind)
-UAT_PASS http://127.0.0.1:36863/index.html screenshots: uat_plot.png uat_selected.png uat_full.png
+UAT_PASS http://127.0.0.1:42885/index.html screenshots: uat_plot.png uat_selected.png uat_full.png

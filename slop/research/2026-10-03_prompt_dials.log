@@ -1,0 +1,8 @@
+[pi-web-access] Dynamic tool activation requires Pi 0.86.1 or newer; web tools remain eagerly available.
+Wrote ranked methods, primary-source quotes, costs, failure modes, and repository findings.
+
+Best candidates: cached CFG/CAD and InstABoost. No general guarantee of monotone judged behaviour found.
+
+Repository caveat: its prompt-variant guidance recomputes the full prefix each token.
+
+ /workspace/2026/lite/steering-lite-bsbench/slop/research/2026-10-03_prompt_dials.md

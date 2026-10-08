@@ -1,0 +1,20 @@
+2026-10-03 19:49:47.421 | INFO     | data:manifest:106 - manifest walks=1 rows=6000
+2026-10-03 19:50:07.800 | INFO     | __main__:refresh:222 - JUDGE_CACHE_CHECK aware required=8595 cached=2971 missing=5624
+2026-10-03 19:50:16.642 | INFO     | __main__:_refresh:216 - jev progress=400/5624 cost=$0.0113
+2026-10-03 19:50:22.966 | INFO     | __main__:_refresh:216 - jev progress=800/5624 cost=$0.0228
+2026-10-03 19:50:28.993 | INFO     | __main__:_refresh:216 - jev progress=1200/5624 cost=$0.0343
+2026-10-03 19:50:35.011 | INFO     | __main__:_refresh:216 - jev progress=1600/5624 cost=$0.0461
+2026-10-03 19:50:41.064 | INFO     | __main__:_refresh:216 - jev progress=2000/5624 cost=$0.0578
+2026-10-03 19:50:47.105 | INFO     | __main__:_refresh:216 - jev progress=2400/5624 cost=$0.0693
+2026-10-03 19:50:53.364 | INFO     | __main__:_refresh:216 - jev progress=2800/5624 cost=$0.0812
+2026-10-03 19:50:59.536 | INFO     | __main__:_refresh:216 - jev progress=3200/5624 cost=$0.0929
+2026-10-03 19:51:05.553 | INFO     | __main__:_refresh:216 - jev progress=3600/5624 cost=$0.1046
+2026-10-03 19:51:11.823 | INFO     | __main__:_refresh:216 - jev progress=4000/5624 cost=$0.1163
+2026-10-03 19:51:18.124 | INFO     | __main__:_refresh:216 - jev progress=4400/5624 cost=$0.1319
+2026-10-03 19:51:24.451 | INFO     | __main__:_refresh:216 - jev progress=4800/5624 cost=$0.1477
+2026-10-03 19:51:30.664 | INFO     | __main__:_refresh:216 - jev progress=5200/5624 cost=$0.1647
+2026-10-03 19:51:36.851 | INFO     | __main__:_refresh:216 - jev progress=5600/5624 cost=$0.1822
+2026-10-03 19:51:37.450 | INFO     | __main__:_refresh:216 - jev progress=5624/5624 cost=$0.1834
+2026-10-03 19:52:37.552 | INFO     | __main__:refresh:222 - JUDGE_CACHE_CHECK blind required=300 cached=92 missing=208
+2026-10-03 19:52:41.521 | INFO     | __main__:_refresh:216 - jev progress=208/208 cost=$0.0114
+2026-10-03 19:52:41.979 | INFO     | __main__:main:281 - JUDGE_COMPLETE missing=0

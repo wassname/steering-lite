@@ -1,0 +1,7 @@
+2026-10-03 13:34:48.810 | WARNING  | data:walk_certificates:43 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-03 13:35:56.652 | INFO     | data:manifest:81 - manifest walks=57 rows=32480
+2026-10-03 13:36:20.512 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK aware required=26628 cached=26628 missing=0
+2026-10-03 13:36:46.590 | WARNING  | data:walk_certificates:43 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-03 13:38:51.960 | WARNING  | data:walk_certificates:43 - skip angular_steering_s0_dev.json status=RUNNING
+2026-10-03 13:43:16.649 | INFO     | __main__:refresh:194 - JUDGE_CACHE_CHECK blind required=2290 cached=2290 missing=0
+2026-10-03 13:43:17.089 | INFO     | __main__:main:252 - JUDGE_COMPLETE missing=0

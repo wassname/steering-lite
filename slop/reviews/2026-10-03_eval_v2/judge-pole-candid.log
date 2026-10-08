@@ -1,0 +1,24 @@
+2026-10-03 19:43:21.499 | INFO     | data:manifest:106 - manifest walks=1 rows=5600
+2026-10-03 19:43:32.917 | INFO     | __main__:refresh:222 - JUDGE_CACHE_CHECK aware required=7942 cached=687 missing=7255
+2026-10-03 19:43:40.533 | INFO     | __main__:_refresh:216 - jev progress=400/7255 cost=$0.0127
+2026-10-03 19:43:46.587 | INFO     | __main__:_refresh:216 - jev progress=800/7255 cost=$0.0256
+2026-10-03 19:43:53.418 | INFO     | __main__:_refresh:216 - jev progress=1200/7255 cost=$0.0388
+2026-10-03 19:43:59.533 | INFO     | __main__:_refresh:216 - jev progress=1600/7255 cost=$0.0520
+2026-10-03 19:44:05.524 | INFO     | __main__:_refresh:216 - jev progress=2000/7255 cost=$0.0652
+2026-10-03 19:44:11.725 | INFO     | __main__:_refresh:216 - jev progress=2400/7255 cost=$0.0784
+2026-10-03 19:44:17.820 | INFO     | __main__:_refresh:216 - jev progress=2800/7255 cost=$0.0915
+2026-10-03 19:44:23.890 | INFO     | __main__:_refresh:216 - jev progress=3200/7255 cost=$0.1048
+2026-10-03 19:44:29.958 | INFO     | __main__:_refresh:216 - jev progress=3600/7255 cost=$0.1179
+2026-10-03 19:44:35.931 | INFO     | __main__:_refresh:216 - jev progress=4000/7255 cost=$0.1310
+2026-10-03 19:44:41.972 | INFO     | __main__:_refresh:216 - jev progress=4400/7255 cost=$0.1445
+2026-10-03 19:44:48.077 | INFO     | __main__:_refresh:216 - jev progress=4800/7255 cost=$0.1598
+2026-10-03 19:44:54.026 | INFO     | __main__:_refresh:216 - jev progress=5200/7255 cost=$0.1739
+2026-10-03 19:45:00.239 | INFO     | __main__:_refresh:216 - jev progress=5600/7255 cost=$0.1930
+2026-10-03 19:45:06.482 | INFO     | __main__:_refresh:216 - jev progress=6000/7255 cost=$0.2117
+2026-10-03 19:45:12.979 | INFO     | __main__:_refresh:216 - jev progress=6400/7255 cost=$0.2325
+2026-10-03 19:45:19.191 | INFO     | __main__:_refresh:216 - jev progress=6800/7255 cost=$0.2531
+2026-10-03 19:45:25.207 | INFO     | __main__:_refresh:216 - jev progress=7200/7255 cost=$0.2734
+2026-10-03 19:45:26.364 | INFO     | __main__:_refresh:216 - jev progress=7255/7255 cost=$0.2762
+2026-10-03 19:45:59.685 | INFO     | __main__:refresh:222 - JUDGE_CACHE_CHECK blind required=300 cached=0 missing=300
+2026-10-03 19:46:04.473 | INFO     | __main__:_refresh:216 - jev progress=300/300 cost=$0.0165
+2026-10-03 19:46:04.906 | INFO     | __main__:main:281 - JUDGE_COMPLETE missing=0
