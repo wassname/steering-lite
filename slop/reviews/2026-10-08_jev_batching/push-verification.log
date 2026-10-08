@@ -1,0 +1,14 @@
+REMOTE_MATCH refs/heads/bsbench-attn 1b277a8f7a64a9f338aad200ebe7d29c74b41911
+REMOTE_MATCH refs/heads/bsbench-meanvjp 0c4d619e48b35799a8c374a16db41672b23d8845
+REMOTE_MATCH refs/heads/bsbench-v3 e107a17ebca4348b48e7732523b3978b85e48f41
+REMOTE_MATCH refs/heads/dev/prompt-gains-random-reference a702541e459bad7f1882e400737f8a6f5c289725
+REMOTE_MATCH refs/heads/feat/cache-mean-diff fd30a409e60f674c4cb47b17411027d85db79ce1
+REMOTE_MATCH refs/heads/feat/corda-space-steering 34a130a7b40edcd6172cf991b4895d50db7a4ac9
+REMOTE_MATCH refs/heads/feat/foundation-steer 549bcb4666aec830dca8c0b6ab948fb8fffe2e2d
+REMOTE_MATCH refs/heads/feat/kv-cache-gram 7987a93f3351fb4f107157a5d46292c7488d84c9
+REMOTE_MATCH refs/heads/feat/suppressed-activation-subspace ff9b5c6d386026fd65acec95bd5ea6ee3694c7ee
+REMOTE_MATCH refs/heads/integrate-main d260801d34084112c69aada2847ec7d2657f1b1c
+REMOTE_MATCH refs/heads/multi-vec 18a1f3af97cc4a4309653ef5c4fd51d24f14906c
+REMOTE_MATCH refs/heads/rewrite/bsbench-vjp e525c7c516f0836ae797381d7ec08442c23c290c
+REMOTE_MATCH refs/heads/svdkv bc7e96aad9ac498bab8114f46aa1720f4a2fdf9a
+VERIFIED_BRANCHES 13

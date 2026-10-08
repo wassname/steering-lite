@@ -697,3 +697,25 @@ Interpretation: the tested adaptation produces little directed premise change be
 Judging ended with `JUDGE_COMPLETE missing=0` (`judge_report.log`). Recorded judge costs are $1.1679 and $0.0026; together with completed GPU runtime the accounted addition is about $5.85. Browser checks, direct PNG inspection and independent image review passed with crowding/color caveats (`uat_final.log`, `visual_review.md`). Actual lowest/middle/highest-dose answers for the first scenario, both signs and every seed, are retained in `answer_samples.md`.
 
 The result is now available through the same maintained benchmark commands and main page.
+
+## 2026-10-08 -- Jev batching costs and file-judge order averaging
+
+I checked whether the selective blind-rating pass should be combined with every aware pair request.
+
+Across six saved pairs from one scenario, the real API returned these input-token totals (`slop/reviews/2026-10-08_jev_batching/summary.json`):
+
+```json
+{"aware_original": 11343, "aware_isolated": 11865, "blind": 7755, "combined": 16983}
+```
+
+Interpretation (PI/gpt-6.1-sol): combining is probably more expensive for this benchmark, because the long blind questions are needed only for selected doses. The measured break-even selection fraction is about two-thirds; this small billing probe does not establish judge accuracy. I kept the benchmark requests unchanged. Details, controls and limitations are in `slop/reviews/2026-10-08_jev_batching/results.md`.
+
+The external file judge now reuses the main benchmark's two-order `pair_change` function. Its real API smoke check ended:
+
+> FILE_JUDGE_PASS real API; both orders; identical=0; 5 deduplicated cache cells; matches judge.pair_change
+
+Source: `slop/reviews/2026-10-08_jev_batching/cli_verification.log`. Independent review was blocked by the OpenRouter key limit.
+
+Keep selective blind grading and use the same order correction in both entry points.
+
+PI/gpt-6.1-sol

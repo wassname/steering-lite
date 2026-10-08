@@ -1,0 +1,3 @@
+LOSSLESS_GZIP slop/verification/20260922_actual-just-sweep.command.log 118147783 -> 13036352
+LOSSLESS_GZIP slop/verification/20260922_corrected-modal-sweep-random-config-retry.log 119244856 -> 13161107
+UNPUBLISHED_TIP_REPLACED 20a2f70274f6d74d7a8d3192f16254a96fae1e58 e525c7c516f0836ae797381d7ec08442c23c290c

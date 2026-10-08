@@ -1,0 +1,62 @@
+[
+  {
+    "index": 1,
+    "kind": "blind",
+    "max_probability_delta": 0.020000000000000004
+  },
+  {
+    "index": 0,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.03
+  },
+  {
+    "index": 1,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.019999999999999962
+  },
+  {
+    "index": 0,
+    "kind": "blind",
+    "max_probability_delta": 0.039999999999999925
+  },
+  {
+    "index": 2,
+    "kind": "blind",
+    "max_probability_delta": 0.030000000000000027
+  },
+  {
+    "index": 2,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.020000000000000018
+  },
+  {
+    "index": 3,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.02999999999999997
+  },
+  {
+    "index": 3,
+    "kind": "blind",
+    "max_probability_delta": 0.06999999999999995
+  },
+  {
+    "index": 4,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.03999999999999998
+  },
+  {
+    "index": 4,
+    "kind": "blind",
+    "max_probability_delta": 0.020000000000000018
+  },
+  {
+    "index": 5,
+    "kind": "aware_isolated",
+    "max_probability_delta": 0.0
+  },
+  {
+    "index": 5,
+    "kind": "blind",
+    "max_probability_delta": 0.06000000000000005
+  }
+]

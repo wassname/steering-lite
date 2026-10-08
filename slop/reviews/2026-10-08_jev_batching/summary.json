@@ -1,0 +1,78 @@
+{
+  "n_pairs": 6,
+  "n_requests": 36,
+  "usage": {
+    "aware_original": {
+      "input_tokens": 11343,
+      "cost": 0.00047640599999999996
+    },
+    "aware_isolated": {
+      "input_tokens": 11865,
+      "cost": 0.00049833
+    },
+    "blind": {
+      "input_tokens": 7755,
+      "cost": 0.00032571
+    },
+    "combined": {
+      "input_tokens": 16983,
+      "cost": 0.000713286
+    },
+    "answer_original": {
+      "input_tokens": 9887,
+      "cost": 0.000415254
+    },
+    "answer_isolated": {
+      "input_tokens": 9923,
+      "cost": 0.000416766
+    }
+  },
+  "probability_deltas": [
+    {
+      "index": 0,
+      "aware_batch_max_probability_delta": 0.019999999999999907,
+      "blind_batch_max_probability_delta": 0.030000000000000027,
+      "aware_context_max_probability_delta": 0.18,
+      "answer_context_max_probability_delta": 0.010000000000000009
+    },
+    {
+      "index": 1,
+      "aware_batch_max_probability_delta": 0.020000000000000018,
+      "blind_batch_max_probability_delta": 0.010000000000000009,
+      "aware_context_max_probability_delta": 0.06,
+      "answer_context_max_probability_delta": 0.010000000000000009
+    },
+    {
+      "index": 2,
+      "aware_batch_max_probability_delta": 0.08999999999999997,
+      "blind_batch_max_probability_delta": 0.009999999999999995,
+      "aware_context_max_probability_delta": 0.12,
+      "answer_context_max_probability_delta": 0.06999999999999995
+    },
+    {
+      "index": 3,
+      "aware_batch_max_probability_delta": 0.050000000000000044,
+      "blind_batch_max_probability_delta": 0.06999999999999995,
+      "aware_context_max_probability_delta": 0.11000000000000001,
+      "answer_context_max_probability_delta": 0.040000000000000036
+    },
+    {
+      "index": 4,
+      "aware_batch_max_probability_delta": 0.010000000000000009,
+      "blind_batch_max_probability_delta": 0.020000000000000018,
+      "aware_context_max_probability_delta": 0.06,
+      "answer_context_max_probability_delta": 0.010000000000000009
+    },
+    {
+      "index": 5,
+      "aware_batch_max_probability_delta": 0.0,
+      "blind_batch_max_probability_delta": 0.030000000000000027,
+      "aware_context_max_probability_delta": 0.010000000000000009,
+      "answer_context_max_probability_delta": 0.020000000000000018
+    }
+  ],
+  "combined_tokens": 16983,
+  "separate_tokens": 19620,
+  "saving_fraction_if_all_pairs_need_blind": 0.1344036697247707,
+  "break_even_blind_fraction": 0.6599613152804642
+}

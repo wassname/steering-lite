@@ -1,0 +1,7 @@
+{
+  "source": "outputs/bsbench/results/v5-9b-3seeds/points.json",
+  "forward_dose_question_pairs": 273200,
+  "blind_pairs_upper_bound": 32700,
+  "note": "Snapshot only; blind count includes overlaps between best and strongest doses. Request de-duplication can reduce both counts.",
+  "blind_dose_pair_fraction_upper_bound": 0.11969253294289897
+}

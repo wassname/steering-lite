@@ -1,0 +1,5 @@
+2026-10-08 17:22:47.919 | INFO     | judge:refresh:254 - JUDGE_CACHE_CHECK file required=5 cached=5 missing=0
+forward	n=1	effect=+2.97	off_axis=1.28	bs_lost=+1.66	p_fail=0.03	off_topic=0.03 repeats=0.00 incoherent=0.01 role_leak=0.00 refuses_or_moralizes=0.00	coherent=True
+identical	n=1	effect=+0.00	off_axis=0.00	bs_lost=+0.00	p_fail=0.00	off_topic=0.00 repeats=0.00 incoherent=0.00 role_leak=0.00 refuses_or_moralizes=0.00	coherent=True
+reversed	n=1	effect=-2.97	off_axis=1.28	bs_lost=-1.66	p_fail=0.00	off_topic=0.00 repeats=0.00 incoherent=0.00 role_leak=0.00 refuses_or_moralizes=0.00	coherent=True
+FILE_JUDGE_PASS real API; both orders; identical=0; 5 deduplicated cache cells; matches judge.pair_change
