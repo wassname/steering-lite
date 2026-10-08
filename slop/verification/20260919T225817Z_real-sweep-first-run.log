@@ -1,0 +1,99 @@
+started_at=2026-09-19T22:58:17Z
+command=just sweep '--run --backend real' 'Qwen/Qwen3.5-4B' 'outputs/bsbench-v2'
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --run --backend real --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+2026-09-20 06:58:21.223 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-20 06:58:21.225 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation da5f8724a4dc
+2026-09-20 06:58:21.227 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health 193b985bc814
+2026-09-20 06:58:21.229 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation fc844e74ba82
+2026-09-20 06:58:21.231 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health 432a3455d934
+2026-09-20 06:58:21.233 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit target-aware-requests 1dc3aaebba20
+2026-09-20 06:58:21.234 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit blind-requests 73317ca4cc7e
+2026-09-20 06:58:21.236 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit persona-validation 361374acd537
+2026-09-20 06:58:21.238 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 9829714b3fbe
+2026-09-20 06:58:21.240 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health a9ee81510f21
+2026-09-20 06:58:21.242 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware c3969894c2a0
+2026-09-20 06:58:21.244 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind d865fa943900
+2026-09-20 06:58:21.245 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 7471efc55b84
+2026-09-20 06:58:21.247 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 6451e9642991
+2026-09-20 06:58:21.249 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware ee74c5565efa
+2026-09-20 06:58:21.251 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 3bdf8fb5f33f
+2026-09-20 06:58:21.252 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 7f768d41fb61
+2026-09-20 06:58:21.254 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health f0361916835e
+2026-09-20 06:58:21.256 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware eaa1415ed660
+2026-09-20 06:58:21.258 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 7d331ee79953
+2026-09-20 06:58:21.260 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 4c09ecce72c5
+2026-09-20 06:58:21.261 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 7674f5fd5430
+2026-09-20 06:58:21.263 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 6294674da497
+2026-09-20 06:58:21.265 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind e4003456924b
+2026-09-20 06:58:21.267 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 17549fde3a94
+2026-09-20 06:58:21.268 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 50c832e52458
+2026-09-20 06:58:21.271 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware caa7d3ff4a74
+2026-09-20 06:58:21.273 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind f4999fe2023d
+2026-09-20 06:58:21.274 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 244cfdc9cf74
+2026-09-20 06:58:21.276 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health e831ae9a332a
+2026-09-20 06:58:21.278 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware ceb7253f6583
+2026-09-20 06:58:21.280 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 891bbb4217e7
+2026-09-20 06:58:25.055 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-20 06:58:25.057 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 5a27bc2f0335
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 223, in <module>
+    main()
+    ~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 195, in main
+    result = run_full_sweep(
+        args.out,
+    ...<6 lines>...
+        methods=(args.method,) if args.method else METHODS,
+    )
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_sweep.py", line 36, in run_full_sweep
+    conditions[method] = run_condition(
+                         ~~~~~~~~~~~~~^
+        root,
+        ^^^^^
+    ...<11 lines>...
+        transfer_records=transfer_records,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 569, in run_condition
+    return run_direct_condition(
+        root,
+    ...<8 lines>...
+        judge=judge,
+    )
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 400, in run_direct_condition
+    generation = production_stage(root, ledger, stage="generation", model=model, data=data, method=method, config=generation_config, prompts=prompts, backend=backend, validate_result=lambda result: len(result.get("answers", [])) == len(prompts) or (_ for _ in ()).throw(ValueError("direct backend must return one answer per prompt")))
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 47, in production_stage
+    result = cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 68, in cached_stage
+    return cached(root, stage, identity, compute)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 38, in cached
+    result = compute()
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/production.py", line 38, in compute
+    result = backend.gpu(stage=stage, method=method, config=backend_config, prompts=prompts)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 43, in gpu
+    return self._stage_call(stage=stage, method=method, config=config, prompts=prompts)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/scripts/run_bsbench_modal.py", line 310, in call
+    return run_stage.remote(
+           ~~~~~~~~~~~~~~~~^
+        stage=stage,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        model_id=model_id,
+        ^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_object.py", line 45, in wrapped
+    await self.hydrate()
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_object.py", line 382, in hydrate
+    self._validate_is_hydrated()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/workspace/2026/lite/steering-lite-bsbench/.venv/lib/python3.13/site-packages/modal/_object.py", line 203, in _validate_is_hydrated
+    raise ExecutionError(
+        f"{object_type} has not been hydrated with the metadata it needs to run on Modal{reason}."
+    )
+modal.exception.ExecutionError: Function has not been hydrated with the metadata it needs to run on Modal, because the App it is defined on is not running.
+error: recipe `sweep` failed on line 16 with exit code 1
+finished_at=2026-09-19T22:58:26Z
+exit_code=1

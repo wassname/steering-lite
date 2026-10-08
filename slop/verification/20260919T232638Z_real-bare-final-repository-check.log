@@ -1,0 +1,29 @@
+head=23d9973
+staged_files=0
+diff_check=passed
+worktree_status:
+?? .pi/
+?? slop/audits/
+?? slop/research/20260919_scout-recovery.md
+?? slop/verification/20260919T224920Z_real-sweep-credential-check.log
+?? slop/verification/20260919T225626Z_real-sweep-dry-preflight.log
+?? slop/verification/20260919T225817Z_real-sweep-first-run.log
+?? slop/verification/20260919T232253Z_real-bare-credential-check.log
+?? slop/verification/20260919T232314Z_real-bare-dry-preflight.log
+?? slop/verification/20260919T232327Z_real-bare-first-inspection.log
+?? slop/verification/20260919T232327Z_real-bare-first-run.log
+?? slop/verification/20260919T232327Z_real-bare-modal-app-annotated.log
+?? slop/verification/20260919T232327Z_real-bare-modal-app.log
+?? slop/verification/20260919T232638Z_real-bare-final-inspection.log
+?? slop/verification/20260919T232638Z_real-bare-final-repository-check.log
+?? slop/verification/20260919T232638Z_real-bare-reuse-modal-app.log
+?? slop/verification/20260919T232638Z_real-bare-reuse-run.log
+?? slop/verification/20260920_modal-hydration-local-repro.log
+?? slop/verification/20260920_modal-hydration-minimal-repro.log
+?? slop/verification/20260920_modal-hydration-zero-receipt.json
+?? slop/verification/20260920_modal-hydration-zero-reconciliation.log
+?? slop/verification/20260920_modal-postfailure-app-list.log
+ledger_event_counts:
+{'estimated_at_reservation_upper': 1, 'receipt_imported': 1, 'reserved': 2, 'settled': 1, 'unresolved': 1}
+judge_reservations 0
+current_bare_reservation ['bb0e1f3f954d903d8fb5250edf46a5535e481971b4dc3dff83823319b44d3e43']

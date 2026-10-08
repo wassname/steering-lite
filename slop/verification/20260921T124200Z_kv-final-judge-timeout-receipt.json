@@ -1,0 +1,20 @@
+{
+  "reservation": "18d7a16e5d1a08639b657a3fa615adbe6ee2b69089c5a5f8df12131d4393f10e",
+  "upper_usd": 0.0022643999999999997,
+  "provider": "OpenRouter",
+  "model": "deepseek/deepseek-chat",
+  "stage": "final-judgments",
+  "method": "kv_cache_gram",
+  "payload_sha256": "cde04006c77c3e6c33bfae0488f2ae8adeed147a0eac62cd7b1d5491baeed83e",
+  "response_schema": "demo_rating",
+  "dispatch_started_at": "2026-09-21T12:35:22.105000+00:00",
+  "elapsed_seconds": 301.5014542990248,
+  "outcome": "OpenRouter response was not received before the fixed 300-second read limit",
+  "evidence": [
+    "outputs/bsbench-v2/provider-evidence/cde04006c77c3e6c33bfae0488f2ae8adeed147a0eac62cd7b1d5491baeed83e-000179-failed.json",
+    "slop/verification/20260921T114500Z_kv-cache-gram-final-retry.log",
+    "slop/verification/20260921T124100Z_kv-final-judge-failure-openrouter-metadata.json"
+  ],
+  "accounting": "OpenRouter may have accepted work but gave no usable response and exposes no request-level receipt. This reservation is conservatively estimated at its full upper bound rather than zero.",
+  "author": "PI[gpt-5.6-terra]"
+}

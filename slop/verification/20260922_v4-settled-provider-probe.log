@@ -1,0 +1,112 @@
+2026-09-22 19:12:01.666 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.669 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation 0be045b888e8
+2026-09-22 19:12:01.672 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation-health 77d568a12f0e
+2026-09-22 19:12:01.674 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation c1381b800868
+2026-09-22 19:12:01.677 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation-health 21d352aca977
+2026-09-22 19:12:01.679 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit target-aware-requests 04f3970684fb
+2026-09-22 19:12:01.682 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit blind-requests b43fd665ab8c
+2026-09-22 19:12:01.684 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit persona-validation 5c739be07938
+2026-09-22 19:12:01.687 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates dc5073de942c
+2026-09-22 19:12:01.689 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 21ead5b07642
+2026-09-22 19:12:01.692 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 525a068ba850
+2026-09-22 19:12:01.694 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 7f960802c3b8
+2026-09-22 19:12:01.697 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health acec759f9da5
+2026-09-22 19:12:01.699 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware f243f35b42ed
+2026-09-22 19:12:01.701 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates b928e0ec4372
+2026-09-22 19:12:01.704 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 294412247f72
+2026-09-22 19:12:01.706 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 155148d7cf74
+2026-09-22 19:12:01.709 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 111ed7bbe3fa
+2026-09-22 19:12:01.711 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health b046a6070c58
+2026-09-22 19:12:01.713 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 614bafd4809a
+2026-09-22 19:12:01.716 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates b0439c908646
+2026-09-22 19:12:01.719 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health a44e3d8c68e6
+2026-09-22 19:12:01.721 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware fd9243bd1867
+2026-09-22 19:12:01.723 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates ff07faf030e4
+2026-09-22 19:12:01.726 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health fec1ffe55322
+2026-09-22 19:12:01.729 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware d9579a67340f
+2026-09-22 19:12:01.731 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 54fe33139fca
+2026-09-22 19:12:01.733 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 9366e9521373
+2026-09-22 19:12:01.736 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 6ee29ad65b60
+2026-09-22 19:12:01.738 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 5caedbd981cd
+2026-09-22 19:12:01.741 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 26a6c46b3fbd
+2026-09-22 19:12:01.743 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 0110d564242c
+2026-09-22 19:12:01.746 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 32e48322a745
+2026-09-22 19:12:01.748 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health d78d4dec4e14
+2026-09-22 19:12:01.751 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 3cdf0050dc85
+2026-09-22 19:12:01.753 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates a908e07dea67
+2026-09-22 19:12:01.755 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 1d3f3df61ffe
+2026-09-22 19:12:01.758 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 1f1213a96a87
+2026-09-22 19:12:01.770 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.773 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.776 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.779 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.782 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.784 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.787 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.791 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.793 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.796 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.838 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:12:01.883 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request 12be5b29aaa7
+2026-09-22 19:12:01.889 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request d860b9da2a2b
+2026-09-22 19:12:01.898 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request 2ed2d2507746
+2026-09-22 19:12:01.898 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request e9fa29c4bb53
+2026-09-22 19:12:01.898 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request d9f4e0427e7f
+2026-09-22 19:12:01.908 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss judge-request 1952096a7735
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 97, in call
+    judgment = json.loads(content)
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 13 (char 12)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<stdin>", line 13, in <module>
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "scripts/run_bsbench_sweep.py", line 453, in <module>
+    main()
+    ~~~~^^
+  File "scripts/run_bsbench_sweep.py", line 296, in main
+    result = run_provider_probe(args.out, ledger, model_id=args.model, endpoint=args.judge_endpoint, api_key=api_key, budget=budget)
+  File "scripts/run_bsbench_sweep.py", line 258, in run_provider_probe
+    responses = judge.complete(requests)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 237, in complete
+    return list(executor.map(self._complete_one, requests))
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py", line 619, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py", line 317, in _result_or_cancel
+    return fut.result(timeout)
+           ~~~~~~~~~~^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 230, in _complete_one
+    response = cached(self._root / "cache", "judge-request", identity, compute)["response"]
+               ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/cache.py", line 40, in cached
+    result = compute()
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 201, in compute
+    response = self._request_call(_attempt_payload(request, attempt))
+  File "scripts/run_bsbench_sweep.py", line 153, in call
+    response = request_call(payload)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 99, in call
+    raise OpenRouterResponseParseError(
+    ...<8 lines>...
+    ) from error
+steering_lite.benchmark.adapters.OpenRouterResponseParseError: OpenRouter assistant content is not strict JSON

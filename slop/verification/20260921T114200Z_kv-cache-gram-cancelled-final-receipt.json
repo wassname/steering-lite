@@ -1,0 +1,19 @@
+{
+  "reservation": "2b9e4297a8f5275dbf71f8c6443b1d1523bec12c3f93027b0cdea9145fc8d704",
+  "upper_usd": 0.8843460000000001,
+  "provider": "Modal",
+  "app_id": "ap-tbopwa8x7ZjPo2oyiJw6gm",
+  "function_id": "fu-DfsQlZPxHk9wRYj5oxk0Sy",
+  "function_call_id": "fc-01M31VEP8X578MZKGAPS6P7DTV",
+  "container_id": "ta-01M31VEPE7CC2N6XPSPHZQC7NR",
+  "stage": "final-generation",
+  "method": "kv_cache_gram",
+  "outcome": "client cancellation before a serialized stage result; no final-generation cache record",
+  "evidence": [
+    "slop/verification/20260921T112500Z_kv-cache-gram-final-evaluation.log",
+    "slop/verification/20260921T114000Z_kv-cache-gram-interrupted-modal-app.log",
+    "slop/verification/20260921T114100Z_kv-cache-gram-interrupted-function-call.log"
+  ],
+  "accounting": "Modal executed the function and received cancellation during input processing. No provider invoice/usage receipt was recovered, so this reservation is conservatively estimated at its full upper bound rather than zero.",
+  "author": "PI[gpt-5.6-terra]"
+}

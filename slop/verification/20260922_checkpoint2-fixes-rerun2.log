@@ -1,0 +1,123 @@
+........................................................................ [ 88%]
+..FFF....                                                                [100%]
+=================================== FAILURES ===================================
+________ test_final_stages_carry_complete_data_flow_and_stable_identity ________
+
+    def test_final_stages_carry_complete_data_flow_and_stable_identity():
+        inputs = _final_inputs()
+>       stages = final_stages(**inputs)
+                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_sweep.py:259: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:308: in final_stages
+    "signed_candidate_doses": sorted(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0x7c06b83d85b0>
+
+>           ({"magnitude": float(row["magnitude"]), "side": row["side"]} for row in ordered_observed),
+                                 ^^^^^^^^^^^^^^^^
+            key=lambda row: (row["magnitude"], row["side"]),
+        ),
+        "final_dose_plans": ordered_plans,
+        "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
+        "case_prompt_hashes": prompt_hashes,
+        "case_prompt_provenance": {
+            case_id: transfer_provenance(records)
+            for case_id, records in actual_case_records.items()
+        },
+        "prompt_spec": prompt_spec,
+        "prompt_spec_sha256": content_key(prompt_spec),
+    }
+E   KeyError: 'magnitude'
+
+src/steering_lite/benchmark/sweep.py:309: KeyError
+________ test_final_stage_identity_invalidates_each_input_independently ________
+
+    def test_final_stage_identity_invalidates_each_input_independently():
+        inputs = _final_inputs()
+>       baseline = final_stages(**inputs)[0]["config"]
+                   ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_sweep.py:295: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:308: in final_stages
+    "signed_candidate_doses": sorted(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0x7c06b83dae60>
+
+>           ({"magnitude": float(row["magnitude"]), "side": row["side"]} for row in ordered_observed),
+                                 ^^^^^^^^^^^^^^^^
+            key=lambda row: (row["magnitude"], row["side"]),
+        ),
+        "final_dose_plans": ordered_plans,
+        "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
+        "case_prompt_hashes": prompt_hashes,
+        "case_prompt_provenance": {
+            case_id: transfer_provenance(records)
+            for case_id, records in actual_case_records.items()
+        },
+        "prompt_spec": prompt_spec,
+        "prompt_spec_sha256": content_key(prompt_spec),
+    }
+E   KeyError: 'magnitude'
+
+src/steering_lite/benchmark/sweep.py:309: KeyError
+____ test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch ____
+
+    def test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch():
+        inputs = _final_inputs()
+        for changed, message in (
+            ({"vector_sha256": ""}, "vector"),
+            ({"observed": []}, "observed"),
+            ({"transfer_predictions": []}, "transfer predictions"),
+            ({"case_prompts": {}}, "prompts"),
+            ({"prompt_spec": {}}, "prompt spec"),
+            ({"case_prompts": {"bsbench-v2-heldout-transfer": [_record("SYN-001", "only one")] }}, "complete prompt records"),
+        ):
+            with pytest.raises(ValueError, match=message):
+                final_stages(**(inputs | changed))
+        with pytest.raises(ValueError, match="auditable PromptRecord"):
+            final_stages(**(inputs | {"case_prompts": {case.case_id: ["placeholder"] for case in inputs["transfer_cases"]}}))
+    
+        records = load_transfer_records()
+>       default_stages = final_stages(
+            **(inputs | {
+                "transfer_cases": TRANSFER_CASES,
+                "transfer_predictions": [_prediction(case, 0.5) for case in TRANSFER_CASES],
+                "case_prompts": records,
+            })
+        )
+
+tests/test_benchmark_sweep.py:324: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:308: in final_stages
+    "signed_candidate_doses": sorted(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0x7c06b83d8eb0>
+
+>           ({"magnitude": float(row["magnitude"]), "side": row["side"]} for row in ordered_observed),
+                                 ^^^^^^^^^^^^^^^^
+            key=lambda row: (row["magnitude"], row["side"]),
+        ),
+        "final_dose_plans": ordered_plans,
+        "final_dose_plans_sha256": content_key({"plans": ordered_plans}),
+        "case_prompt_hashes": prompt_hashes,
+        "case_prompt_provenance": {
+            case_id: transfer_provenance(records)
+            for case_id, records in actual_case_records.items()
+        },
+        "prompt_spec": prompt_spec,
+        "prompt_spec_sha256": content_key(prompt_spec),
+    }
+E   KeyError: 'magnitude'
+
+src/steering_lite/benchmark/sweep.py:309: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_benchmark_sweep.py::test_final_stages_carry_complete_data_flow_and_stable_identity
+FAILED tests/test_benchmark_sweep.py::test_final_stage_identity_invalidates_each_input_independently
+FAILED tests/test_benchmark_sweep.py::test_final_stages_reject_missing_or_placeholder_inputs_before_dispatch
+3 failed, 78 passed in 328.24s (0:05:28)

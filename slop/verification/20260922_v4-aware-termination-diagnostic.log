@@ -1,0 +1,84 @@
+2026-09-22 19:17:30.934 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:30.937 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss generation 3e3e5813dc20
+2026-09-22 19:17:30.941 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss generation-health f574abbd934f
+2026-09-22 19:17:30.945 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss generation a005bb204276
+2026-09-22 19:17:30.948 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss generation-health a9d47554c26f
+2026-09-22 19:17:30.950 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss target-aware-requests 1c5672dbd2e9
+2026-09-22 19:17:30.953 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss blind-requests d1f2d2a85d13
+2026-09-22 19:17:30.955 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss persona-validation 05642a14172b
+2026-09-22 19:17:30.958 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates c2a2f53f5769
+2026-09-22 19:17:30.960 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 8eadf55e3b7a
+2026-09-22 19:17:30.963 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware e311ae865980
+2026-09-22 19:17:30.965 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 3b27a00f96bb
+2026-09-22 19:17:30.968 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 805428635753
+2026-09-22 19:17:30.972 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware aaa4f8a75811
+2026-09-22 19:17:30.976 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates c71b349a2c3d
+2026-09-22 19:17:30.979 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 15976065f8dc
+2026-09-22 19:17:30.981 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 946ff7bf6d90
+2026-09-22 19:17:30.984 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates bee0ded90300
+2026-09-22 19:17:30.986 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health e911786ff1e2
+2026-09-22 19:17:30.989 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 44defaff0816
+2026-09-22 19:17:30.991 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates af5a5c3b09b6
+2026-09-22 19:17:30.994 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 8575c377b3a2
+2026-09-22 19:17:30.997 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware f0b0be169471
+2026-09-22 19:17:31.000 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 6a651acbf486
+2026-09-22 19:17:31.004 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 607d274a9f5d
+2026-09-22 19:17:31.007 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware e3217171e971
+2026-09-22 19:17:31.011 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 4ecf8a88c6fd
+2026-09-22 19:17:31.013 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 01b24e4a2a70
+2026-09-22 19:17:31.016 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 979cb52f0f70
+2026-09-22 19:17:31.018 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 942cd360bd40
+2026-09-22 19:17:31.021 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health f2fdbfa8cd31
+2026-09-22 19:17:31.024 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 34e79eb7734b
+2026-09-22 19:17:31.026 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 14f51f1461ee
+2026-09-22 19:17:31.029 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health f34303595dac
+2026-09-22 19:17:31.032 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 011e4dec0bca
+2026-09-22 19:17:31.035 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss calibration-candidates 5633418e7b91
+2026-09-22 19:17:31.038 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-health 8e9a0ef701cf
+2026-09-22 19:17:31.042 | INFO     | steering_lite.benchmark.cache:cached:39 - cache miss candidate-aware 73e47b2a3279
+2026-09-22 19:17:31.055 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.057 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.060 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.063 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.065 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.068 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.070 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.073 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.075 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.078 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:17:31.123 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+Traceback (most recent call last):
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 99, in call
+    judgment = json.loads(content)
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 13 (char 12)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<stdin>", line 13, in <module>
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "scripts/run_bsbench_sweep.py", line 477, in <module>
+    main()
+    ~~~~^^
+  File "scripts/run_bsbench_sweep.py", line 320, in main
+    result = run_provider_probe(args.out, ledger, model_id=args.model, endpoint=args.judge_endpoint, api_key=api_key, budget=budget, aware_once=args.probe_aware_once)
+  File "scripts/run_bsbench_sweep.py", line 265, in run_provider_probe
+    response = callback(request["payload"])
+  File "scripts/run_bsbench_sweep.py", line 153, in call
+    response = request_call(payload)
+  File "/workspace/2026/lite/steering-lite-bsbench/src/steering_lite/benchmark/adapters.py", line 101, in call
+    raise OpenRouterResponseParseError(
+    ...<9 lines>...
+    ) from error
+steering_lite.benchmark.adapters.OpenRouterResponseParseError: OpenRouter assistant content is not strict JSON

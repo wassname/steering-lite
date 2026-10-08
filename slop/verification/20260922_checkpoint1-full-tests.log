@@ -1,0 +1,489 @@
+uv run --extra test --extra hf-test --extra benchmark pytest -q
+..............................F..F..............F.F..................... [ 49%]
+.......................FFF.............................................. [ 98%]
+..                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_fake_production_reservations_use_shared_dry_stage_upper _________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_fake_production_reservati0')
+
+    def test_fake_production_reservations_use_shared_dry_stage_upper(tmp_path: Path):
+        backend = FakeBackend()
+        rows = read_dev_cohort()
+        direct = run_direct_condition(
+            tmp_path / "direct",
+            tmp_path / "direct-ledger.jsonl",
+            model={"id": "fake"},
+            data=cohort_identity(rows[:2]),
+            method="bare",
+            prompts=[row["prompt"] for row in rows[:2]],
+            backend=backend,
+            prompt_spec={"max_new_tokens": 8},
+        )
+        kwargs, _, _ = inputs(backend)
+        live = run_live_two_step(tmp_path / "vector", tmp_path / "vector-ledger.jsonl", **kwargs)
+    
+        assert direct["generation"]["reused"] is False
+        assert live["candidate"]["reused"] is False and live["final"]["reused"] is False
+        assert [config["upper_usd"] for config in backend.configs] == [
+            MODAL_GPU_STAGE_UPPER_USD,
+            MODAL_GPU_STAGE_UPPER_USD,
+            MODAL_GPU_STAGE_UPPER_USD,
+        ]
+>       manifest = dry_manifest(tmp_path / "dry")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_live_orchestration.py:180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:445: in dry_manifest
+    cost_estimate(remaining_stages, retry_stages=retry_stages),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/sweep.py:124: in cost_estimate
+    expected, request_counts, input_tokens, output_tokens = _cost_lines(stages)
+                                                            ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+stages = [{'config': {'calibration_case': None, 'calibration_prompts_sha256': None, 'candidate_dose_upper': None, 'condition': ...'method': 'prompting', 'prompts_sha256': 'ae7c92a22c6a733f49443709bbd5451aa5470c987c96c1e46fea21b00a03f9f2', ...}, ...]
+
+    def _cost_lines(stages: list[dict]) -> tuple[list[BudgetLine], dict[str, int], int, int]:
+        if JUDGE_SOURCE is None or JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+>           raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid preflight is disabled")
+E           RuntimeError: judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid preflight is disabled
+
+src/steering_lite/benchmark/sweep.py:100: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:24.713 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 7589ab23dae3
+2026-09-22 06:33:24.715 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health b76f2ef6d21a
+2026-09-22 06:33:24.716 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:24.720 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4cae81dfb0b8
+2026-09-22 06:33:24.722 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 32b97c295db0
+2026-09-22 06:33:24.724 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 83b102c92722
+2026-09-22 06:33:24.726 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 4530b5f75323
+2026-09-22 06:33:24.729 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss fit-target f0a4f4ae64d8
+2026-09-22 06:33:24.731 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss transfer-prediction 940fb4565ac5
+2026-09-22 06:33:24.736 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-generation 615f160c809f
+2026-09-22 06:33:24.740 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-health b1af8fcf9bc6
+2026-09-22 06:33:24.743 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-aware e833ee6085a7
+2026-09-22 06:33:24.746 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-blind 3bebf11455c0
+2026-09-22 06:33:24.748 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:24.752 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 4a2a45e865ed
+2026-09-22 06:33:24.757 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 6cd0fbb78adb
+2026-09-22 06:33:24.760 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation ec78c56fbb43
+2026-09-22 06:33:24.764 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health d096702555a9
+2026-09-22 06:33:24.769 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests e0e1896a2267
+2026-09-22 06:33:24.773 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 0711e440900a
+2026-09-22 06:33:24.777 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss persona-validation 3303d62e3660
+2026-09-22 06:33:24.780 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6c1243940df4
+2026-09-22 06:33:24.783 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 1fe69990f26d
+2026-09-22 06:33:24.787 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 1c924bc0d639
+2026-09-22 06:33:24.790 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cfb63af5fe48
+2026-09-22 06:33:24.793 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates f2f97668cdab
+2026-09-22 06:33:24.795 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health bf79f2fa92ab
+2026-09-22 06:33:24.798 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 62c339cde25e
+2026-09-22 06:33:24.800 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind f1b443d9d31e
+2026-09-22 06:33:24.802 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 3c284dcc533b
+2026-09-22 06:33:24.805 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health b4c7594d9c39
+2026-09-22 06:33:24.807 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware e68177539e69
+2026-09-22 06:33:24.810 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 5a417a331dcb
+2026-09-22 06:33:24.814 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4b370d29110d
+2026-09-22 06:33:24.817 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health d73e4d1b81d8
+2026-09-22 06:33:24.821 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 38cb963501dc
+2026-09-22 06:33:24.825 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 8f7fb79a431b
+2026-09-22 06:33:24.829 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 5b02c55abb9c
+2026-09-22 06:33:24.832 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health fa8616096fab
+2026-09-22 06:33:24.837 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware d4a8049eace5
+2026-09-22 06:33:24.840 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 41460ce9ea89
+2026-09-22 06:33:24.844 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6d8ba43244b7
+2026-09-22 06:33:24.847 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3c5c60426e3
+2026-09-22 06:33:24.850 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 2822acdd9023
+2026-09-22 06:33:24.854 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 66d5ad853c93
+___________ test_prompting_reuses_bare_and_persists_paired_judgments ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_prompting_reuses_bare_and0')
+
+    def test_prompting_reuses_bare_and_persists_paired_judgments(tmp_path: Path):
+        backend = FakeBackend(); rows = read_dev_cohort()[:2]; judge = DirectJudge()
+        common = dict(model={"id": "fake", "judge_model": "fake-judge"}, data=cohort_identity(rows), method="prompting", prompts=[row["prompt"] for row in rows], rows=rows, backend=backend, prompt_spec={"max_new_tokens": 8}, judge=judge)
+        bare = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **(common | {"method": "bare", "judge": None}))
+        result = run_direct_condition(tmp_path, tmp_path / "ledger.jsonl", **common)
+        assert backend.calls == ["generation", "generation"]
+        assert result["baseline_answers"] == bare["generation"]["answers"]
+>       assert len(result["judgments"]["requests"]) == len(result["judgments"]["responses"]) == 8
+E       AssertionError: assert 12 == 8
+E        +  where 12 = len([{'blind': False, 'comparison_id': 'b950eaa6daf1988b', 'order': 'AB', 'pass': 0, ...}, {'blind': False, 'comparison_id...rder': 'BA', 'pass': 1, ...}, {'blind': True, 'comparison_id': 'b950eaa6daf1988b', 'order': 'BA', 'pass': 0, ...}, ...])
+
+tests/test_benchmark_live_orchestration.py:246: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:24.955 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 06a9a6f682ef
+2026-09-22 06:33:24.957 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health baf9ca419806
+2026-09-22 06:33:24.959 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 06a9a6f682ef
+2026-09-22 06:33:24.961 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation acd3d3fb3e1f
+2026-09-22 06:33:24.963 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 737b4812df1a
+2026-09-22 06:33:24.965 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss prompting-judgments df49af37db7f
+2026-09-22 06:33:24.968 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests fb607928e697
+2026-09-22 06:33:24.970 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 237f5239284a
+__________ test_sweep_recipe_exports_project_env_without_printing_key __________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0')
+
+    def test_sweep_recipe_exports_project_env_without_printing_key(tmp_path: Path):
+        root = Path(__file__).parents[1]
+        env_file = tmp_path / "project.env"
+        sentinel = "sentinel-openrouter-key"
+        env_file.write_text(f"OPENROUTER_API_KEY={sentinel}\n")
+        environment = os.environ.copy()
+        environment.pop("OPENROUTER_API_KEY", None)
+        command = [
+            "just", "sweep", "--check-openrouter-env", "Qwen/Qwen3.5-4B",
+            str(tmp_path / "check"), str(env_file),
+        ]
+        checked = subprocess.run(command, cwd=root, env=environment, check=True, capture_output=True, text=True)
+        assert json.loads(checked.stdout.splitlines()[-1]) == {
+            "mode": "check-openrouter-env", "openrouter_api_key_present": True,
+        }
+        assert sentinel not in checked.stdout + checked.stderr
+>       absent = subprocess.run(
+            ["just", "sweep", "--dry-run", "Qwen/Qwen3.5-4B", str(tmp_path / "dry"), str(tmp_path / "missing.env")],
+            cwd=root, env=environment, check=True, capture_output=True, text=True,
+        )
+
+tests/test_benchmark_production.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['just', 'sweep', '--dry-run', 'Qwen/Qwen3.5-4B', '/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0/dry', '/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0/missing.env'],)
+kwargs = {'cwd': PosixPath('/workspace/2026/lite/steering-lite-bsbench'), 'env': {'AI_AGENT': 'pi', 'BUN_INSTALL': '/home/code/.bun', 'COLORTERM': 'truecolor', 'CONDA_CHANGEPS1': 'no', ...}, 'stderr': -1, 'stdout': -1, ...}
+process = <Popen: returncode: 1 args: ['just', 'sweep', '--dry-run', 'Qwen/Qwen3.5-4B'...>
+stdout = ''
+stderr = 'if [ -f "/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0/missing.env" ]; then set -a; . "/tmp/pytest-of...eepseek/deepseek-v4-flash-0731; paid preflight is disabled\nerror: recipe `sweep` failed on line 16 with exit code 1\n'
+retcode = 1
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['just', 'sweep', '--dry-run', 'Qwen/Qwen3.5-4B', '/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0/dry', '/tmp/pytest-of-code/pytest-14/test_sweep_recipe_exports_proj0/missing.env']' returned non-zero exit status 1.
+
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+_____ test_local_judge_work_persists_persona_checks_and_both_request_kinds _____
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_local_judge_work_persists0')
+
+    def test_local_judge_work_persists_persona_checks_and_both_request_kinds(tmp_path: Path):
+        row = {"question_id": "BSV2-001", "question_number": 1, "prompt": "Is this real?", "nonsensical_element": "No.", "bare": "No, it is not real.", "steered": "No, it is not real.", "side": "+C", "method": "vjp_cache", "coefficient": 0.2}
+        example = {"pair_id": "pair-1", "positive_persona": "candid", "negative_persona": "agreeable", "positive": "I disagree. Shared.", "negative": "I agree. Shared.", "shared_suffix": "Shared."}
+        result = persist_local_judge_work(tmp_path, model={"id": "Qwen/Qwen3.5-4B", "judge_model": "deepseek/deepseek-chat"}, data={"sha256": "dev"}, rows=[row], persona_examples=[example], endpoint="offline")
+        assert result["persona_checks"][0]["status"] == "local_structural_checks"
+>       assert len(result["requests"]) == 4
+E       AssertionError: assert 6 == 4
+E        +  where 6 = len([{'blind': False, 'comparison_id': '246be3892ec451d8', 'order': 'AB', 'pass': 0, ...}, {'blind': False, 'comparison_id...', 'order': 'BA', 'pass': 1, ...}, {'blind': True, 'comparison_id': '246be3892ec451d8', 'order': 'BA', 'pass': 0, ...}])
+
+tests/test_benchmark_production.py:127: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:48.240 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss local-judge-work 3c77b996be52
+_______ test_negative_candidate_score_does_not_prevent_final_evaluation ________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_negative_candidate_score_0')
+
+    def test_negative_candidate_score_does_not_prevent_final_evaluation(tmp_path: Path):
+        root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+        stage_call = RandomNamedStageCall()
+        judge_call = NonUsefulRandomJudgeCall()
+        prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+    
+>       first = _run(
+            root, ledger, stage_call, judge_call,
+            endpoint="https://judge.example/v1", prompt_spec=prompt_spec,
+            methods=("random", "mean_diff"),
+        )
+
+tests/test_full_sweep_entrypoint.py:198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_full_sweep_entrypoint.py:179: in _run
+    return _entrypoint_module().run_full_sweep(
+scripts/run_bsbench_sweep.py:42: in run_full_sweep
+    conditions[method] = run_condition(
+src/steering_lite/benchmark/production.py:600: in run_condition
+    return run_live_two_step(
+src/steering_lite/benchmark/production.py:494: in run_live_two_step
+    judgment_outputs = _local(
+src/steering_lite/benchmark/production.py:102: in _local
+    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:87: in cached_stage
+    return cached(root, stage, identity, compute)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:38: in cached
+    result = compute()
+             ^^^^^^^^^
+src/steering_lite/benchmark/production.py:502: in <lambda>
+    compute=lambda: _candidate_judgments(
+src/steering_lite/benchmark/production.py:169: in _candidate_judgments
+    raw_responses = judge.complete(requests)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:222: in complete
+    return list(executor.map(self._complete_one, requests))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:170: in _complete_one
+    upper_usd = judge_request_upper_usd(request)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = {'blind': False, 'comparison_id': 'a957f5bd6ab3fc31', 'order': 'AB', 'pass': 0, ...}
+
+    def judge_request_upper_usd(request: dict) -> float:
+        if JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+>           raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled")
+E           RuntimeError: judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled
+
+src/steering_lite/benchmark/adapters.py:131: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:57.764 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:57.769 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 44eb899a9450
+2026-09-22 06:33:57.771 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-judgments e7c198652389
+__ test_render_report_uses_final_evaluation_points_after_negative_calibration __
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_render_report_uses_final_0')
+
+    def test_render_report_uses_final_evaluation_points_after_negative_calibration(tmp_path: Path):
+        root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+>       summary = _run(
+            root,
+            ledger,
+            RandomNamedStageCall(),
+            NonUsefulRandomJudgeCall(),
+            endpoint="https://judge.example/v1",
+            prompt_spec={"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8},
+        )
+
+tests/test_full_sweep_entrypoint.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_full_sweep_entrypoint.py:179: in _run
+    return _entrypoint_module().run_full_sweep(
+scripts/run_bsbench_sweep.py:42: in run_full_sweep
+    conditions[method] = run_condition(
+src/steering_lite/benchmark/production.py:581: in run_condition
+    return run_direct_condition(
+src/steering_lite/benchmark/production.py:429: in run_direct_condition
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/production.py:102: in _local
+    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:87: in cached_stage
+    return cached(root, stage, identity, compute)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:38: in cached
+    result = compute()
+             ^^^^^^^^^
+src/steering_lite/benchmark/production.py:429: in <lambda>
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+                                                                                                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/production.py:381: in _direct_judgments
+    raw_responses = judge.complete(requests)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:222: in complete
+    return list(executor.map(self._complete_one, requests))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:170: in _complete_one
+    upper_usd = judge_request_upper_usd(request)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = {'blind': False, 'comparison_id': 'b950eaa6daf1988b', 'order': 'AB', 'pass': 0, ...}
+
+    def judge_request_upper_usd(request: dict) -> float:
+        if JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+>           raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled")
+E           RuntimeError: judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled
+
+src/steering_lite/benchmark/adapters.py:131: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:57.872 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:57.875 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 007f901799b6
+2026-09-22 06:33:57.879 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 677d9d7b3e8f
+2026-09-22 06:33:57.880 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:57.883 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 007f901799b6
+2026-09-22 06:33:57.886 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 6fcab632342b
+2026-09-22 06:33:57.890 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 880ec71786f4
+2026-09-22 06:33:57.893 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss prompting-judgments abe252f4ca0f
+_ test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream _
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-14/test_full_entrypoint_runs_cano0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7118ac8b1470>
+
+    def test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        root, ledger = tmp_path / "run", tmp_path / "ledger.jsonl"
+        stage_call = FakeRemoteStageCall()
+        judge_call = FakeJudgeCall()
+        prompt_spec = {"template": "Answer in 2 short sentences.", "enable_thinking": False, "max_new_tokens": 8}
+    
+>       first = _run(root, ledger, stage_call, judge_call, endpoint="https://judge-a.example/v1", prompt_spec=prompt_spec)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_full_sweep_entrypoint.py:251: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_full_sweep_entrypoint.py:179: in _run
+    return _entrypoint_module().run_full_sweep(
+scripts/run_bsbench_sweep.py:42: in run_full_sweep
+    conditions[method] = run_condition(
+src/steering_lite/benchmark/production.py:581: in run_condition
+    return run_direct_condition(
+src/steering_lite/benchmark/production.py:429: in run_direct_condition
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/production.py:102: in _local
+    return cached_stage(root / "cache", stage, model=model, data=data, method=method, config=config, prompts=prompts, compute=compute, compatible_code_sha256s=compatible_code_sha256s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:87: in cached_stage
+    return cached(root, stage, identity, compute)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:38: in cached
+    result = compute()
+             ^^^^^^^^^
+src/steering_lite/benchmark/production.py:429: in <lambda>
+    judgments = _local(root, stage="prompting-judgments", model=model, data=data, method=method, prompts=prompts, config=judgment_config, compute=lambda: _direct_judgments(paired_rows, model=model, judge=judge), compatible_code_sha256s=UPSTREAM_COMPATIBLE_CODE_SHA256S)
+                                                                                                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/production.py:381: in _direct_judgments
+    raw_responses = judge.complete(requests)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:222: in complete
+    return list(executor.map(self._complete_one, requests))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/code/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/adapters.py:170: in _complete_one
+    upper_usd = judge_request_upper_usd(request)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = {'blind': False, 'comparison_id': 'b950eaa6daf1988b', 'order': 'AB', 'pass': 0, ...}
+
+    def judge_request_upper_usd(request: dict) -> float:
+        if JUDGE_INPUT_USD_PER_MTOKEN is None or JUDGE_OUTPUT_USD_PER_MTOKEN is None:
+>           raise RuntimeError("judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled")
+E           RuntimeError: judge pricing is unsourced for deepseek/deepseek-v4-flash-0731; paid dispatch is disabled
+
+src/steering_lite/benchmark/adapters.py:131: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:33:58.004 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:58.007 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 007f901799b6
+2026-09-22 06:33:58.009 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health fcb4e2758c8d
+2026-09-22 06:33:58.010 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:33:58.013 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 007f901799b6
+2026-09-22 06:33:58.015 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 6fcab632342b
+2026-09-22 06:33:58.018 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 2b25ddbfbed7
+2026-09-22 06:33:58.020 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss prompting-judgments d77126abdfba
+=========================== short test summary info ============================
+FAILED tests/test_benchmark_live_orchestration.py::test_fake_production_reservations_use_shared_dry_stage_upper
+FAILED tests/test_benchmark_live_orchestration.py::test_prompting_reuses_bare_and_persists_paired_judgments
+FAILED tests/test_benchmark_production.py::test_sweep_recipe_exports_project_env_without_printing_key
+FAILED tests/test_benchmark_production.py::test_local_judge_work_persists_persona_checks_and_both_request_kinds
+FAILED tests/test_full_sweep_entrypoint.py::test_negative_candidate_score_does_not_prevent_final_evaluation
+FAILED tests/test_full_sweep_entrypoint.py::test_render_report_uses_final_evaluation_points_after_negative_calibration
+FAILED tests/test_full_sweep_entrypoint.py::test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream
+7 failed, 139 passed in 69.30s (0:01:09)
+error: recipe `test` failed on line 9 with exit code 1

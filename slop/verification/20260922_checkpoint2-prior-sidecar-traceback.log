@@ -1,0 +1,10 @@
+Recovered from the prior full-suite process output after its tee log was overwritten.
+
+FAILED tests/test_full_sweep_entrypoint.py::test_full_entrypoint_runs_canonical_remote_contract_and_reuses_then_invalidates_downstream
+RuntimeError: durable vector sidecar is missing or corrupt; refusing final dispatch
+Location: src/steering_lite/benchmark/production.py::_load_sidecar
+Changed input: judge endpoint judge-a -> judge-b
+Reported artifact: artifacts/vectors/8efbac...bin
+Suite summary: 1 failed, 153 passed in 7360.77s
+
+This is a faithful bounded record of the traceback details still recoverable from the session transcript, not the original complete traceback. The extracted deterministic endpoint regression subsequently showed that the sidecar remained present and hash-valid and that candidate/final GPU stages were reused. — PI/OpenAI

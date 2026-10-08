@@ -1,0 +1,870 @@
+..F...............................................FF....F...F.FFF...     [100%]
+=================================== FAILURES ===================================
+_ test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_observations _
+
+    def test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_observations():
+        calls = []
+    
+        def solver(*_args, **kwargs):
+            calls.append(kwargs)
+            coefficient = 0.7 * kwargs["sign"]
+            return coefficient, [
+                {"coeff": 0.2 * kwargs["sign"], "kl_rms": 0.4},
+                {"coeff": coefficient, "kl_rms": 1.25, "final": True},
+            ]
+    
+        target = {
+            "target_id": "target-a",
+            "target_stat": "kl_rms",
+            "target_rms": 1.25,
+            "source": {"method": "vjp_cache", "model": "tiny"},
+        }
+>       record = predict_transfer(
+            object(),
+            object(),
+            object(),
+            ["transfer prompt"],
+            target,
+            TRANSFER_CASES[0],
+            bracket=(0.1, 4.0),
+            solver_kwargs={"device": "cpu"},
+            solver=solver,
+        )
+
+tests/test_dose_search.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+vector = <object object at 0x7ff868ee0d30>
+model = <object object at 0x7ff868ee0da0>
+tokenizer = <object object at 0x7ff868ee0ca0>, prompts = ['transfer prompt']
+target = {'source': {'method': 'vjp_cache', 'model': 'tiny'}, 'target_id': 'target-a', 'target_rms': 1.25, 'target_stat': 'kl_rms'}
+case = Case(case_id='bsbench-v2-heldout-a', dataset='bsbench-v2-heldout', prompt_ids=('BSV2-021', 'BSV2-022'))
+
+    def predict_transfer(vector, model, tokenizer, prompts, target: dict, case: Case, *, bracket: tuple[float, float], solver_kwargs: dict, solver=calibrate_iso_kl) -> dict:
+        """Solve positive and negative magnitudes separately against one pooled RMS target."""
+        if target["target_stat"] != "kl_rms" or target.get("kl_spec") != BENCHMARK_KL_SPEC:
+>           raise ValueError("transfer requires the benchmark RMS-KL specification")
+E           ValueError: transfer requires the benchmark RMS-KL specification
+
+src/steering_lite/benchmark/dose_search.py:124: ValueError
+___________ test_vjp_cache_gradient_flows_through_real_cache_values ____________
+
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    def test_vjp_cache_gradient_flows_through_real_cache_values(tiny_model):
+        """VJP-cache differentiates the target through the actual values returned by
+        DynamicCache.update, not through a projection/activation hook.
+    
+        The activation hook below never marks any activation as requiring grad (the
+        model is detached), so the only graph root is the value-cache input set by
+        ValueGradientCache. A nonzero gradient w.r.t. the stored cache tensor is
+        therefore proof the path runs through the real full-attention value cache.
+        """
+        model, tok = tiny_model
+        sl.detach(model)
+        model.requires_grad_(False)
+        prompt = POS[:1]
+        layers, target_layer = (0,), 1
+    
+        # Discriminator: with only the activation hook (no value-cache graph root)
+        # the target cannot require grad, so no hook-only gradient exists.
+        encoded = _encode(model, tok, prompt, 64)
+        with _activations(model, (target_layer,)) as found:
+            model(**encoded)
+        assert not found[target_layer].requires_grad, \
+            "activation hook must not create a gradient path on its own"
+    
+        cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
+>       gradients, _valid, sources = _cache_gradients(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+            model, tok, prompt, layers, target_layer, cotangent, 0, 64,
+        )
+E       ValueError: not enough values to unpack (expected 3, got 2)
+
+tests/test_pipeline.py:399: ValueError
+___________ test_vjp_cache_two_source_real_storage_hybrid_exclusion ____________
+
+tiny_model = (LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 16, padding_idx=31999)
+    (layers): Mo...ecial=True),
+	2: AddedToken("</s>", rstrip=False, lstrip=False, single_word=False, normalized=False, special=True),
+}))
+
+    def test_vjp_cache_two_source_real_storage_hybrid_exclusion(tiny_model):
+        """Two preceding full-attention source layers and a later target.
+    
+        A direct real-model observation (3 full-attention layers) showed that
+        DynamicCache.update returns concatenated storage, so even the earliest
+        selected layer's returned tensor is a non-leaf intermediate; both returned
+        cache tensors are still valid `autograd.grad` inputs with finite nonzero
+        VJPs. We therefore assert real-storage identity, finite/nonzero gradients
+        and expected shapes, and selected/non-selected exclusion - not `is_leaf`.
+        The Qwen3.5 hybrid proves non-selected recurrent (linear-attention) layers
+        stay excluded while full-attention layers remain the only valid sources.
+        """
+        _, tok = tiny_model
+        config = Qwen3_5TextConfig(
+            vocab_size=len(tok),
+            hidden_size=32,
+            intermediate_size=64,
+            num_hidden_layers=5,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            linear_key_head_dim=8,
+            linear_value_head_dim=8,
+            linear_num_key_heads=4,
+            linear_num_value_heads=4,
+            layer_types=[
+                "full_attention", "full_attention", "linear_attention",
+                "full_attention", "linear_attention",
+            ],
+            pad_token_id=0,
+            bos_token_id=1,
+            eos_token_id=2,
+        )
+        model = Qwen3_5ForCausalLM(config).eval()
+        sl.detach(model)
+        model.requires_grad_(False)
+        prompt = POS[:1]
+        # Two preceding full-attention source layers (0,1) plus a third (3) all
+        # feed the later target; layer 2 is a non-selected recurrent layer sitting
+        # between the sources and the target and must stay excluded.
+        layers, target_layer = (0, 1, 3), 4
+    
+        encoded = _encode(model, tok, prompt, 64)
+        expected_shape = (
+            1, config.num_key_value_heads, encoded["input_ids"].shape[1], config.head_dim,
+        )
+    
+        cotangent = _target_mean(model, tok, prompt, target_layer, 1, 64)
+>       gradients, _valid, sources = _cache_gradients(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+            model, tok, prompt, layers, target_layer, cotangent, 0, 64,
+        )
+E       ValueError: not enough values to unpack (expected 3, got 2)
+
+tests/test_pipeline.py:471: ValueError
+____ test_live_two_step_uses_real_calibration_functions_plan_and_full_cache ____
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+>               coefficient = float(prediction["predicted_coefficient"])
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               KeyError: 'predicted_coefficient'
+
+src/steering_lite/benchmark/sweep.py:283: KeyError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_live_two_step_uses_real_c0')
+
+    def test_live_two_step_uses_real_calibration_functions_plan_and_full_cache(tmp_path: Path):
+        backend = FakeBackend(); kwargs, measured, solved = inputs(backend)
+>       first = run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_live_orchestration.py:53: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/production.py:567: in run_live_two_step
+    stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+                coefficient = float(prediction["predicted_coefficient"])
+            except (KeyError, TypeError, ValueError) as error:
+>               raise ValueError("final stages require a numeric predicted coefficient") from error
+E               ValueError: final stages require a numeric predicted coefficient
+
+src/steering_lite/benchmark/sweep.py:285: ValueError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 16:18:17.172 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 16:18:17.203 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates e1354f065b5b
+2026-09-22 16:18:17.207 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 4352e96d1648
+2026-09-22 16:18:17.209 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 5330a973b666
+2026-09-22 16:18:17.211 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 173b0cf35650
+2026-09-22 16:18:17.214 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss fit-target-signed-v2 8407481472a5
+2026-09-22 16:18:17.217 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss transfer-prediction-signed-v2 8a6ee5da428a
+_________ test_missing_final_or_direct_answers_fail_before_settlement __________
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+>               coefficient = float(prediction["predicted_coefficient"])
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               KeyError: 'predicted_coefficient'
+
+src/steering_lite/benchmark/sweep.py:283: KeyError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_missing_final_or_direct_a0')
+
+    def test_missing_final_or_direct_answers_fail_before_settlement(tmp_path: Path):
+        class ShortAnswers(FakeBackend):
+            def gpu(self, **kwargs):
+                result = super().gpu(**kwargs)
+                if kwargs["stage"] in {"final-generation", "generation"}: result["answers"] = result["answers"][:-1]
+                return result
+        backend = ShortAnswers(); kwargs, _, _ = inputs(backend)
+        with pytest.raises(ValueError, match="one answer"):
+>           run_live_two_step(tmp_path / "vector", tmp_path / "vector-ledger.jsonl", **kwargs)
+
+tests/test_benchmark_live_orchestration.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/production.py:567: in run_live_two_step
+    stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+                coefficient = float(prediction["predicted_coefficient"])
+            except (KeyError, TypeError, ValueError) as error:
+>               raise ValueError("final stages require a numeric predicted coefficient") from error
+E               ValueError: final stages require a numeric predicted coefficient
+
+src/steering_lite/benchmark/sweep.py:285: ValueError
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_missing_final_or_direct_a0')
+
+    def test_missing_final_or_direct_answers_fail_before_settlement(tmp_path: Path):
+        class ShortAnswers(FakeBackend):
+            def gpu(self, **kwargs):
+                result = super().gpu(**kwargs)
+                if kwargs["stage"] in {"final-generation", "generation"}: result["answers"] = result["answers"][:-1]
+                return result
+        backend = ShortAnswers(); kwargs, _, _ = inputs(backend)
+>       with pytest.raises(ValueError, match="one answer"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'one answer'
+E         Actual message: 'final stages require a numeric predicted coefficient'
+
+tests/test_benchmark_live_orchestration.py:107: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 16:18:17.277 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 16:18:17.281 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates e1354f065b5b
+2026-09-22 16:18:17.284 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 699ab1c18df1
+2026-09-22 16:18:17.286 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 962b59df05e0
+2026-09-22 16:18:17.288 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 696c732adea2
+2026-09-22 16:18:17.290 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss fit-target-signed-v2 94b1b233d7a9
+2026-09-22 16:18:17.293 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss transfer-prediction-signed-v2 8a6ee5da428a
+__________ test_missing_or_corrupt_vector_fails_before_final_dispatch __________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_missing_or_corrupt_vector0')
+
+    def test_missing_or_corrupt_vector_fails_before_final_dispatch(tmp_path: Path):
+        backend = FakeBackend(); kwargs, _, _ = inputs(backend)
+        with pytest.raises(ValueError, match="explicit candidate"):
+            run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **(kwargs | {"candidate_judgments": None}))
+        with pytest.raises(ValueError, match="magnitude/side cells"):
+>           run_live_two_step(tmp_path, tmp_path / "ledger.jsonl", **(kwargs | {"candidate_judgments": [kwargs["candidate_judgments"][0]]}))
+
+tests/test_benchmark_live_orchestration.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/production.py:479: in run_live_two_step
+    candidate = cached_stage(root / "cache", "calibration-candidates", model=model, data=data, method=method, config=calibration_config, prompts=calibration_prompts, compute=candidate_compute)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/steering_lite/benchmark/cache.py:87: in cached_stage
+    return cached(root, stage, identity, compute)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+root = PosixPath('/tmp/pytest-of-code/pytest-78/test_missing_or_corrupt_vector0/cache')
+stage = 'calibration-candidates'
+identity = {'code_sha256': '0ea65d2bbaae4e43efb87f04cdecb9a8e7b05060b63ef0954edef3d947f360d7', 'config': {'calibration_case': {'c...{'rows': 20, 'sha256': 'c220039523b581f6698e55c67842511c63f5f4e8ef93c3638e16d32000560ae9'}, 'method': 'vjp_cache', ...}
+compute = <function run_live_two_step.<locals>.candidate_compute at 0x7ff8593c4ea0>
+
+    def cached(root: Path, stage: str, identity: dict, compute) -> dict:
+        key = content_key(identity)
+        path = root / stage / f"{key}.json"
+        if path.exists():
+            record = json.loads(path.read_text())
+            if record.get("identity") != identity or content_key(record["identity"]) != key:
+>               raise RuntimeError(f"cache identity mismatch at {path}")
+E               RuntimeError: cache identity mismatch at /tmp/pytest-of-code/pytest-78/test_missing_or_corrupt_vector0/cache/calibration-candidates/e1354f065b5bdbba9fd3b0b608ef27eb42e8d2667e3eedd57b9333758c8a3ea9.json
+
+src/steering_lite/benchmark/cache.py:34: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 16:18:17.338 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 16:18:17.344 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates e1354f065b5b
+2026-09-22 16:18:17.346 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+_________________________ test_invalidation_boundaries _________________________
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+>               coefficient = float(prediction["predicted_coefficient"])
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               KeyError: 'predicted_coefficient'
+
+src/steering_lite/benchmark/sweep.py:283: KeyError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_invalidation_boundaries0')
+
+    def test_invalidation_boundaries(tmp_path: Path):
+        backend = FakeBackend(); kwargs, _, _ = inputs(backend); ledger = tmp_path / "ledger.jsonl"
+>       run_live_two_step(tmp_path, ledger, **kwargs)
+
+tests/test_benchmark_live_orchestration.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/production.py:567: in run_live_two_step
+    stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+                coefficient = float(prediction["predicted_coefficient"])
+            except (KeyError, TypeError, ValueError) as error:
+>               raise ValueError("final stages require a numeric predicted coefficient") from error
+E               ValueError: final stages require a numeric predicted coefficient
+
+src/steering_lite/benchmark/sweep.py:285: ValueError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 16:18:17.378 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 16:18:17.382 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates e1354f065b5b
+2026-09-22 16:18:17.385 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3acbc9f0716
+2026-09-22 16:18:17.388 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware f7b498f9ddc0
+2026-09-22 16:18:17.390 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cd9725294450
+2026-09-22 16:18:17.393 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss fit-target-signed-v2 df289d7b6931
+2026-09-22 16:18:17.395 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss transfer-prediction-signed-v2 8a6ee5da428a
+_________ test_fake_production_reservations_use_shared_dry_stage_upper _________
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+>               coefficient = float(prediction["predicted_coefficient"])
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               KeyError: 'predicted_coefficient'
+
+src/steering_lite/benchmark/sweep.py:283: KeyError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-78/test_fake_production_reservati0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff85899ee70>
+
+    def test_fake_production_reservations_use_shared_dry_stage_upper(tmp_path: Path, monkeypatch):
+        import steering_lite.benchmark.sweep as sweep_module
+    
+        monkeypatch.setattr(sweep_module, "JUDGE_SOURCE", "synthetic-test-pricing")
+        monkeypatch.setattr(sweep_module, "JUDGE_INPUT_USD_PER_MTOKEN", 0.0001)
+        monkeypatch.setattr(sweep_module, "JUDGE_OUTPUT_USD_PER_MTOKEN", 0.0001)
+        backend = FakeBackend()
+        rows = read_dev_cohort()
+        direct = run_direct_condition(
+            tmp_path / "direct",
+            tmp_path / "direct-ledger.jsonl",
+            model={"id": "fake"},
+            data=cohort_identity(rows[:2]),
+            method="bare",
+            prompts=[row["prompt"] for row in rows[:2]],
+            backend=backend,
+            prompt_spec={"max_new_tokens": 8},
+        )
+        kwargs, _, _ = inputs(backend)
+>       live = run_live_two_step(tmp_path / "vector", tmp_path / "vector-ledger.jsonl", **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_live_orchestration.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/production.py:567: in run_live_two_step
+    stages = final_stages(method=method, vector_sha256=candidate["vector_sha256"], observed=observed, transfer_predictions=prediction["predictions"], case_prompts=records, prompt_spec=prompt_spec, transfer_cases=PREDICTION_CASES)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def final_stages(
+        *,
+        method: str,
+        vector_sha256: str,
+        observed: list[dict],
+        transfer_predictions: list[dict],
+        case_prompts: dict[str, tuple[PromptRecord, ...] | list[PromptRecord]],
+        prompt_spec: dict,
+        transfer_cases: tuple[Case, ...] = PREDICTION_CASES,
+    ) -> tuple[dict, ...]:
+        """Describe the post-judgment generation graph without dispatching it."""
+        if not vector_sha256 or not observed or not transfer_predictions or not case_prompts or not prompt_spec:
+            raise ValueError("final stages require vector, observed records, transfer predictions, prompts and prompt spec")
+        disjoint_cases = tuple(case for case in transfer_cases if case.case_id != EVALUATION_CASE.case_id)
+        validate_cases(CALIBRATION_CASE, disjoint_cases)
+        if any(case.case_id == EVALUATION_CASE.case_id and case != EVALUATION_CASE for case in transfer_cases):
+            raise ValueError("evaluation case identity changed")
+        case_ids = [case.case_id for case in transfer_cases]
+        if set(case_prompts) != set(case_ids):
+            raise ValueError("final stages require complete prompt records for every transfer case")
+        actual_case_records = {case_id: tuple(case_prompts[case_id]) for case_id in case_ids}
+        for case in transfer_cases:
+            records = actual_case_records[case.case_id]
+            if not records or any(not isinstance(record, PromptRecord) for record in records):
+                raise ValueError("final stages require auditable PromptRecord transfer data")
+            if tuple(record.prompt_id for record in records) != case.prompt_ids:
+                raise ValueError("final stages require complete prompt records matching each transfer case")
+            if any(record.dataset != case.dataset for record in records):
+                raise ValueError("final stages require prompt-record dataset provenance matching each transfer case")
+            if any(
+                not record.prompt or not record.source_path or not record.source_revision or not record.source_sha256
+                or not record.answer_key
+                or record.content_sha256 != hashlib.sha256(record.prompt.encode()).hexdigest()
+                or record.answer_key_sha256 != hashlib.sha256(record.answer_key.encode()).hexdigest()
+                for record in records
+            ):
+                raise ValueError("final stages require loadable non-placeholder prompt records with valid provenance")
+        actual_case_prompts = {
+            case_id: [record.prompt for record in records]
+            for case_id, records in actual_case_records.items()
+        }
+    
+        expected_cases = {case.case_id: case_identity(case) for case in transfer_cases}
+        target_ids = set()
+        for prediction in transfer_predictions:
+            if not isinstance(prediction, dict):
+                raise ValueError("final stages require transfer prediction records")
+            if prediction.get("schema") != "bsbench-rms-kl-transfer-v1":
+                raise ValueError("final stages require RMS-KL transfer prediction records")
+            if prediction.get("method") != method:
+                raise ValueError("final stages require transfer predictions for the requested method")
+            case = prediction.get("case")
+            if not isinstance(case, dict) or case.get("case_id") not in expected_cases or case != expected_cases[case["case_id"]]:
+                raise ValueError("final stages require complete matching transfer case identities")
+            target_id = prediction.get("target_id")
+            if not isinstance(target_id, str) or not target_id:
+                raise ValueError("final stages require a transfer target ID")
+            target_ids.add(target_id)
+            try:
+                coefficient = float(prediction["predicted_coefficient"])
+            except (KeyError, TypeError, ValueError) as error:
+>               raise ValueError("final stages require a numeric predicted coefficient") from error
+E               ValueError: final stages require a numeric predicted coefficient
+
+src/steering_lite/benchmark/sweep.py:285: ValueError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 16:18:17.432 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 82a9646a0027
+2026-09-22 16:18:17.435 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health a1e9c569e6be
+2026-09-22 16:18:17.436 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 16:18:17.441 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates e1354f065b5b
+2026-09-22 16:18:17.444 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 32189ce5f152
+2026-09-22 16:18:17.447 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 8a202c34364d
+2026-09-22 16:18:17.449 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 7cc22d684984
+2026-09-22 16:18:17.452 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss fit-target-signed-v2 59b41092f2a6
+2026-09-22 16:18:17.455 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss transfer-prediction-signed-v2 8a6ee5da428a
+=========================== short test summary info ============================
+FAILED tests/test_dose_search.py::test_predict_transfer_calls_solver_at_fitted_target_without_behavioral_observations
+FAILED tests/test_pipeline.py::test_vjp_cache_gradient_flows_through_real_cache_values
+FAILED tests/test_pipeline.py::test_vjp_cache_two_source_real_storage_hybrid_exclusion
+FAILED tests/test_benchmark_live_orchestration.py::test_live_two_step_uses_real_calibration_functions_plan_and_full_cache
+FAILED tests/test_benchmark_live_orchestration.py::test_missing_final_or_direct_answers_fail_before_settlement
+FAILED tests/test_benchmark_live_orchestration.py::test_missing_or_corrupt_vector_fails_before_final_dispatch
+FAILED tests/test_benchmark_live_orchestration.py::test_invalidation_boundaries
+FAILED tests/test_benchmark_live_orchestration.py::test_fake_production_reservations_use_shared_dry_stage_upper
+8 failed, 60 passed in 48.79s

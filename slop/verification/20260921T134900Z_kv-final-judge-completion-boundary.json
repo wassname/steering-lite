@@ -1,0 +1,72 @@
+{
+  "completed_exact_cache_records": 292,
+  "completed_unique_raw_payloads": 266,
+  "duplicate_raw_payload_groups": 34,
+  "first_missing": [
+    {
+      "blind": false,
+      "comparison_id": "bb38df3e2b787423",
+      "order": "AB",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "bbc6320b4e3cd89c5e303a12ded9c6b91d4eefd7c76a324c1e99ffefd1110ec9"
+    },
+    {
+      "blind": true,
+      "comparison_id": "bb38df3e2b787423",
+      "order": "AB",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "1b387651d7b788ea9852cfb150c7425f0e586f041a4225288b58be6b8dfb90ce"
+    },
+    {
+      "blind": false,
+      "comparison_id": "bb38df3e2b787423",
+      "order": "BA",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "bbc6320b4e3cd89c5e303a12ded9c6b91d4eefd7c76a324c1e99ffefd1110ec9"
+    },
+    {
+      "blind": true,
+      "comparison_id": "bb38df3e2b787423",
+      "order": "BA",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "1b387651d7b788ea9852cfb150c7425f0e586f041a4225288b58be6b8dfb90ce"
+    },
+    {
+      "blind": false,
+      "comparison_id": "01ff308aef797ac5",
+      "order": "AB",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "bbc6320b4e3cd89c5e303a12ded9c6b91d4eefd7c76a324c1e99ffefd1110ec9"
+    },
+    {
+      "blind": true,
+      "comparison_id": "01ff308aef797ac5",
+      "order": "AB",
+      "question_id": "PNFCA-001",
+      "question_number": 25,
+      "request_key": "1b387651d7b788ea9852cfb150c7425f0e586f041a4225288b58be6b8dfb90ce"
+    }
+  ],
+  "largest_raw_payload_multiplicity": 6,
+  "missing_by_schema": {
+    "blind_change_description": 22,
+    "demo_rating": 22
+  },
+  "missing_exact_cache_records": 44,
+  "missing_question_numbers": [
+    25,
+    26,
+    27,
+    28
+  ],
+  "missing_unique_raw_payloads": 26,
+  "plan_rows": 84,
+  "planned_requests": 336,
+  "schema": "bsbench-kv-final-judge-completion-boundary-v1",
+  "unique_raw_payloads": 290
+}

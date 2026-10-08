@@ -1,0 +1,2 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --openrouter-metadata --out outputs/bsbench-v2 --metadata-out slop/verification/20260921T124100Z_kv-final-judge-failure-openrouter-metadata.json --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+{"evidence_path": "slop/verification/20260921T124100Z_kv-final-judge-failure-openrouter-metadata.json", "mode": "openrouter-metadata", "statuses": {"credits": 200, "key": 200}}

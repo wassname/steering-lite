@@ -1,0 +1,105 @@
+{
+  "recomputed_cells": 14,
+  "sample_effects": [
+    {
+      "magnitude": 1.6,
+      "side": "+C",
+      "per_question_effect": [
+        0.2750000000000002,
+        0.7000000000000002,
+        0.2749999999999999,
+        6.800000000000001
+      ]
+    },
+    {
+      "magnitude": 1.6,
+      "side": "-C",
+      "per_question_effect": [
+        -0.025000000000000022,
+        6.725,
+        0.050000000000000044,
+        3.55
+      ]
+    },
+    {
+      "magnitude": 3.2,
+      "side": "+C",
+      "per_question_effect": [
+        0.44999999999999996,
+        0.07500000000000018,
+        0.9500000000000002,
+        5.35
+      ]
+    },
+    {
+      "magnitude": 3.2,
+      "side": "-C",
+      "per_question_effect": [
+        0.19999999999999996,
+        -0.8250000000000002,
+        0.025000000000000022,
+        6.325
+      ]
+    }
+  ],
+  "identical_text_pairs": [
+    {
+      "magnitude": 0.1,
+      "side": "+C",
+      "question_id": "BSV2-004",
+      "directed_deltas": [
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ]
+    },
+    {
+      "magnitude": 0.1,
+      "side": "-C",
+      "question_id": "BSV2-004",
+      "directed_deltas": [
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ]
+    },
+    {
+      "magnitude": 0.2,
+      "side": "+C",
+      "question_id": "BSV2-004",
+      "directed_deltas": [
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ]
+    },
+    {
+      "magnitude": 0.2,
+      "side": "-C",
+      "question_id": "BSV2-004",
+      "directed_deltas": [
+        0.0,
+        0.0,
+        0.5,
+        -0.0
+      ]
+    },
+    {
+      "magnitude": 0.4,
+      "side": "+C",
+      "question_id": "BSV2-004",
+      "directed_deltas": [
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ]
+    }
+  ],
+  "vector_hash_matches": true,
+  "payload_pass_keys_unique": 188,
+  "full_request_identities_unique": 224
+}

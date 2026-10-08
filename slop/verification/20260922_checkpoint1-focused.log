@@ -1,0 +1,189 @@
+............................F.F.......F.                                 [100%]
+=================================== FAILURES ===================================
+_ test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse __
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-12/test_dry_manifest_has_exact_ph0')
+
+    def test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse(tmp_path: Path):
+>       first = dry_manifest(tmp_path, "Qwen/Qwen3.5-4B")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_sweep.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:443: in dry_manifest
+    manifest["cost_estimate"] = preflight_budget(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+ledger = PosixPath('/tmp/pytest-of-code/pytest-12/test_dry_manifest_has_exact_ph0/costs.jsonl')
+estimate = {'expected_work': [{'kind': 'Modal A10G GPU', 'quantity': 10.5, 'rate_source': 'https://modal.com/pricing (accessed 20...request_upper': 3, 'blind_input_tokens_per_request': 2000, 'concurrency': 6, 'cpu_cores_per_gpu_stage': 1.0, ...}, ...}
+
+    def preflight_budget(ledger: Path, estimate: dict, *, external_committed_usd: float = 0.0) -> dict:
+        existing_ledger_usd = committed(ledger)
+        existing = existing_ledger_usd + external_committed_usd
+        total = existing + estimate["total_upper_usd"]
+        if total >= BUDGET_LIMIT_USD:
+>           raise RuntimeError(f"budget: ${total:.2f} is at or above ${BUDGET_LIMIT_USD:.2f}")
+E           RuntimeError: budget: $82.69 is at or above $50.00
+
+src/steering_lite/benchmark/sweep.py:164: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:32:14.200 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:32:14.203 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 4a2a45e865ed
+2026-09-22 06:32:14.206 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 6cd0fbb78adb
+2026-09-22 06:32:14.209 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation ec78c56fbb43
+2026-09-22 06:32:14.211 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health d096702555a9
+2026-09-22 06:32:14.214 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests e0e1896a2267
+2026-09-22 06:32:14.216 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 0711e440900a
+2026-09-22 06:32:14.219 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss persona-validation 3303d62e3660
+2026-09-22 06:32:14.221 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6c1243940df4
+2026-09-22 06:32:14.224 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 1fe69990f26d
+2026-09-22 06:32:14.226 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 1c924bc0d639
+2026-09-22 06:32:14.228 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cfb63af5fe48
+2026-09-22 06:32:14.230 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates f2f97668cdab
+2026-09-22 06:32:14.232 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health bf79f2fa92ab
+2026-09-22 06:32:14.234 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 62c339cde25e
+2026-09-22 06:32:14.237 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind f1b443d9d31e
+2026-09-22 06:32:14.240 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 3c284dcc533b
+2026-09-22 06:32:14.242 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health b4c7594d9c39
+2026-09-22 06:32:14.245 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware e68177539e69
+2026-09-22 06:32:14.247 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 5a417a331dcb
+2026-09-22 06:32:14.250 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4b370d29110d
+2026-09-22 06:32:14.253 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health d73e4d1b81d8
+2026-09-22 06:32:14.255 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 38cb963501dc
+2026-09-22 06:32:14.257 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 8f7fb79a431b
+2026-09-22 06:32:14.259 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 5b02c55abb9c
+2026-09-22 06:32:14.261 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health fa8616096fab
+2026-09-22 06:32:14.263 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware d4a8049eace5
+2026-09-22 06:32:14.266 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 41460ce9ea89
+2026-09-22 06:32:14.268 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6d8ba43244b7
+2026-09-22 06:32:14.270 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3c5c60426e3
+2026-09-22 06:32:14.273 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 2822acdd9023
+2026-09-22 06:32:14.275 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 66d5ad853c93
+____ test_phase6_external_commitment_handles_absent_and_discovered_ledgers _____
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-12/test_phase6_external_commitmen0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a0b5103bb0>
+
+    def test_phase6_external_commitment_handles_absent_and_discovered_ledgers(tmp_path: Path, monkeypatch):
+        import steering_lite.benchmark.sweep as sweep_module
+    
+        smoke_ledger = tmp_path / "phase6-smoke.jsonl"
+        monkeypatch.setattr(sweep_module, "PHASE6_SMOKE_LEDGER", smoke_ledger)
+>       absent = dry_manifest(tmp_path / "absent")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_sweep.py:209: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:443: in dry_manifest
+    manifest["cost_estimate"] = preflight_budget(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+ledger = PosixPath('/tmp/pytest-of-code/pytest-12/test_phase6_external_commitmen0/absent/costs.jsonl')
+estimate = {'expected_work': [{'kind': 'Modal A10G GPU', 'quantity': 10.5, 'rate_source': 'https://modal.com/pricing (accessed 20...request_upper': 3, 'blind_input_tokens_per_request': 2000, 'concurrency': 6, 'cpu_cores_per_gpu_stage': 1.0, ...}, ...}
+
+    def preflight_budget(ledger: Path, estimate: dict, *, external_committed_usd: float = 0.0) -> dict:
+        existing_ledger_usd = committed(ledger)
+        existing = existing_ledger_usd + external_committed_usd
+        total = existing + estimate["total_upper_usd"]
+        if total >= BUDGET_LIMIT_USD:
+>           raise RuntimeError(f"budget: ${total:.2f} is at or above ${BUDGET_LIMIT_USD:.2f}")
+E           RuntimeError: budget: $80.69 is at or above $50.00
+
+src/steering_lite/benchmark/sweep.py:164: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:32:14.505 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:32:14.508 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 4a2a45e865ed
+2026-09-22 06:32:14.514 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 6cd0fbb78adb
+2026-09-22 06:32:14.517 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation ec78c56fbb43
+2026-09-22 06:32:14.520 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health d096702555a9
+2026-09-22 06:32:14.523 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests e0e1896a2267
+2026-09-22 06:32:14.526 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 0711e440900a
+2026-09-22 06:32:14.528 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss persona-validation 3303d62e3660
+2026-09-22 06:32:14.531 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6c1243940df4
+2026-09-22 06:32:14.534 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 1fe69990f26d
+2026-09-22 06:32:14.536 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 1c924bc0d639
+2026-09-22 06:32:14.538 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cfb63af5fe48
+2026-09-22 06:32:14.541 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates f2f97668cdab
+2026-09-22 06:32:14.543 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health bf79f2fa92ab
+2026-09-22 06:32:14.546 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 62c339cde25e
+2026-09-22 06:32:14.548 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind f1b443d9d31e
+2026-09-22 06:32:14.551 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 3c284dcc533b
+2026-09-22 06:32:14.554 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health b4c7594d9c39
+2026-09-22 06:32:14.556 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware e68177539e69
+2026-09-22 06:32:14.559 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 5a417a331dcb
+2026-09-22 06:32:14.561 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4b370d29110d
+2026-09-22 06:32:14.564 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health d73e4d1b81d8
+2026-09-22 06:32:14.567 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 38cb963501dc
+2026-09-22 06:32:14.569 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 8f7fb79a431b
+2026-09-22 06:32:14.572 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 5b02c55abb9c
+2026-09-22 06:32:14.574 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health fa8616096fab
+2026-09-22 06:32:14.576 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware d4a8049eace5
+2026-09-22 06:32:14.579 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 41460ce9ea89
+2026-09-22 06:32:14.581 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6d8ba43244b7
+2026-09-22 06:32:14.584 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3c5c60426e3
+2026-09-22 06:32:14.587 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 2822acdd9023
+2026-09-22 06:32:14.589 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 66d5ad853c93
+_____________ test_costs_use_per_stage_counts_and_blind_filtering ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-code/pytest-12/test_costs_use_per_stage_count0')
+
+    def test_costs_use_per_stage_counts_and_blind_filtering(tmp_path: Path):
+>       manifest = dry_manifest(tmp_path)
+                   ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_benchmark_sweep.py:420: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/steering_lite/benchmark/sweep.py:443: in dry_manifest
+    manifest["cost_estimate"] = preflight_budget(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+ledger = PosixPath('/tmp/pytest-of-code/pytest-12/test_costs_use_per_stage_count0/costs.jsonl')
+estimate = {'expected_work': [{'kind': 'Modal A10G GPU', 'quantity': 10.5, 'rate_source': 'https://modal.com/pricing (accessed 20...request_upper': 3, 'blind_input_tokens_per_request': 2000, 'concurrency': 6, 'cpu_cores_per_gpu_stage': 1.0, ...}, ...}
+
+    def preflight_budget(ledger: Path, estimate: dict, *, external_committed_usd: float = 0.0) -> dict:
+        existing_ledger_usd = committed(ledger)
+        existing = existing_ledger_usd + external_committed_usd
+        total = existing + estimate["total_upper_usd"]
+        if total >= BUDGET_LIMIT_USD:
+>           raise RuntimeError(f"budget: ${total:.2f} is at or above ${BUDGET_LIMIT_USD:.2f}")
+E           RuntimeError: budget: $82.69 is at or above $50.00
+
+src/steering_lite/benchmark/sweep.py:164: RuntimeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-22 06:32:14.662 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 06:32:14.665 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation 4a2a45e865ed
+2026-09-22 06:32:14.668 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health 6cd0fbb78adb
+2026-09-22 06:32:14.670 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation ec78c56fbb43
+2026-09-22 06:32:14.672 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss generation-health d096702555a9
+2026-09-22 06:32:14.674 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss target-aware-requests e0e1896a2267
+2026-09-22 06:32:14.677 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss blind-requests 0711e440900a
+2026-09-22 06:32:14.679 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss persona-validation 3303d62e3660
+2026-09-22 06:32:14.681 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6c1243940df4
+2026-09-22 06:32:14.685 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health 1fe69990f26d
+2026-09-22 06:32:14.688 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 1c924bc0d639
+2026-09-22 06:32:14.691 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind cfb63af5fe48
+2026-09-22 06:32:14.695 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates f2f97668cdab
+2026-09-22 06:32:14.698 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health bf79f2fa92ab
+2026-09-22 06:32:14.701 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 62c339cde25e
+2026-09-22 06:32:14.704 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind f1b443d9d31e
+2026-09-22 06:32:14.707 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 3c284dcc533b
+2026-09-22 06:32:14.711 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health b4c7594d9c39
+2026-09-22 06:32:14.714 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware e68177539e69
+2026-09-22 06:32:14.718 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 5a417a331dcb
+2026-09-22 06:32:14.722 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 4b370d29110d
+2026-09-22 06:32:14.727 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health d73e4d1b81d8
+2026-09-22 06:32:14.730 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 38cb963501dc
+2026-09-22 06:32:14.732 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 8f7fb79a431b
+2026-09-22 06:32:14.735 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 5b02c55abb9c
+2026-09-22 06:32:14.737 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health fa8616096fab
+2026-09-22 06:32:14.739 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware d4a8049eace5
+2026-09-22 06:32:14.741 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 41460ce9ea89
+2026-09-22 06:32:14.743 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss calibration-candidates 6d8ba43244b7
+2026-09-22 06:32:14.745 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-health a3c5c60426e3
+2026-09-22 06:32:14.747 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-aware 2822acdd9023
+2026-09-22 06:32:14.749 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss candidate-blind 66d5ad853c93
+=========================== short test summary info ============================
+FAILED tests/test_benchmark_sweep.py::test_dry_manifest_has_exact_phase_a_graph_identities_counts_and_cache_reuse
+FAILED tests/test_benchmark_sweep.py::test_phase6_external_commitment_handles_absent_and_discovered_ledgers
+FAILED tests/test_benchmark_sweep.py::test_costs_use_per_stage_counts_and_blind_filtering
+3 failed, 37 passed in 58.72s

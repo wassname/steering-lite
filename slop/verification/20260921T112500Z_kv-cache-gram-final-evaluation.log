@@ -1,0 +1,40 @@
+if [ -f ".env" ]; then set -a; . ".env"; set +a; fi; .venv/bin/python scripts/run_bsbench_sweep.py --run --backend real --method kv_cache_gram --openrouter-read-timeout 300 --model Qwen/Qwen3.5-4B --out outputs/bsbench-v2
+2026-09-21 19:26:01.909 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-21 19:26:01.911 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 481496e427e4
+2026-09-21 19:26:01.914 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health 7d3ea465bca3
+2026-09-21 19:26:01.916 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation 45f370c2cd96
+2026-09-21 19:26:01.919 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit generation-health f7892eb2e840
+2026-09-21 19:26:01.921 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit target-aware-requests 9e7494cbde05
+2026-09-21 19:26:01.923 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit blind-requests 53c202703920
+2026-09-21 19:26:01.926 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit persona-validation 535f48e03ff5
+2026-09-21 19:26:01.928 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 2d37274ea538
+2026-09-21 19:26:01.930 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health c07c7ba11e4b
+2026-09-21 19:26:01.933 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 5559bafbfa60
+2026-09-21 19:26:01.935 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind c1379936fbeb
+2026-09-21 19:26:01.937 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates cf051ecad4e8
+2026-09-21 19:26:01.940 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 8b960754caaa
+2026-09-21 19:26:01.942 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware f724016305d3
+2026-09-21 19:26:01.944 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 7922f334b2f4
+2026-09-21 19:26:01.946 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 7d44bb5d411c
+2026-09-21 19:26:01.949 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health bbe8cb740172
+2026-09-21 19:26:01.951 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware a6c2841833db
+2026-09-21 19:26:01.953 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 4ee6fc923a32
+2026-09-21 19:26:01.955 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates ba988d056405
+2026-09-21 19:26:01.957 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health bc8ee31aa275
+2026-09-21 19:26:01.960 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware fb94398b2cad
+2026-09-21 19:26:01.962 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 64e2d798da78
+2026-09-21 19:26:01.964 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates 9b0a21f5ab37
+2026-09-21 19:26:01.967 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 9a3929c29951
+2026-09-21 19:26:01.969 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 51f686f79612
+2026-09-21 19:26:01.971 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 1d36d6178987
+2026-09-21 19:26:01.974 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit calibration-candidates e2cdf12745d4
+2026-09-21 19:26:01.976 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-health 60e52efa2f01
+2026-09-21 19:26:01.978 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-aware 958995598e22
+2026-09-21 19:26:01.981 | INFO     | steering_lite.benchmark.cache:cached:35 - cache hit candidate-blind 9587063cb2f5
+2026-09-21 19:26:06.556 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-21 19:26:06.666 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible calibration-candidates da7468f825a1
+2026-09-21 19:26:06.774 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-judgments 7927e48e3799
+2026-09-21 19:26:06.864 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-health 71dd1bea1acc
+2026-09-21 19:26:06.904 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-aware 893905000868
+2026-09-21 19:26:06.973 | INFO     | steering_lite.benchmark.cache:cached_stage:85 - cache reuse compatible candidate-blind edbd4d72fd8c
+2026-09-21 19:26:06.988 | INFO     | steering_lite.benchmark.cache:cached:37 - cache miss final-generation f05418b39b6a

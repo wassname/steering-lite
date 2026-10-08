@@ -1,0 +1,59 @@
+2026-09-22 19:29:27.719 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.722 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation 0ed00ba9bd5e
+2026-09-22 19:29:27.725 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation-health 772ad614ada6
+2026-09-22 19:29:27.727 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation e3b87b1b63e0
+2026-09-22 19:29:27.730 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit generation-health 93e8837caa83
+2026-09-22 19:29:27.733 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit target-aware-requests 3224bcbd82cb
+2026-09-22 19:29:27.735 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit blind-requests 397764dc86c3
+2026-09-22 19:29:27.738 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit persona-validation b4fd6a2eb496
+2026-09-22 19:29:27.741 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates cc9a8a46d5ac
+2026-09-22 19:29:27.743 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health e3b1f9cb09a4
+2026-09-22 19:29:27.745 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware c58b8caddbb2
+2026-09-22 19:29:27.748 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates b27f87e02b72
+2026-09-22 19:29:27.750 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health dfe41e8d8711
+2026-09-22 19:29:27.753 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware dbbada965452
+2026-09-22 19:29:27.755 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 7f21a37d7faf
+2026-09-22 19:29:27.758 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 4fcfbc2b60de
+2026-09-22 19:29:27.760 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 3530692d86ff
+2026-09-22 19:29:27.763 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 5d1542bbfec0
+2026-09-22 19:29:27.765 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 4f236d6fb287
+2026-09-22 19:29:27.767 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware b9fe39d0cc4e
+2026-09-22 19:29:27.770 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 668b972b469b
+2026-09-22 19:29:27.772 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health a2eaac4fa39e
+2026-09-22 19:29:27.774 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 607fc738b2da
+2026-09-22 19:29:27.777 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates ec229627f11e
+2026-09-22 19:29:27.779 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health b21417c1557e
+2026-09-22 19:29:27.781 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware d289fdea672a
+2026-09-22 19:29:27.784 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 3500de009660
+2026-09-22 19:29:27.786 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 63c1331df5cd
+2026-09-22 19:29:27.789 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware bdca7ca8223f
+2026-09-22 19:29:27.791 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates cc66819e2cad
+2026-09-22 19:29:27.793 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 1c05e2c49298
+2026-09-22 19:29:27.796 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 7744dcc021fe
+2026-09-22 19:29:27.798 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates de703b761500
+2026-09-22 19:29:27.800 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health 15b96afdee77
+2026-09-22 19:29:27.802 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 2608810baf4a
+2026-09-22 19:29:27.805 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit calibration-candidates 201821fa264b
+2026-09-22 19:29:27.807 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-health f4dfca0cebfc
+2026-09-22 19:29:27.810 | INFO     | steering_lite.benchmark.cache:cached:37 - cache hit candidate-aware 19ade62d8580
+2026-09-22 19:29:27.821 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.824 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.826 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.829 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.831 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.834 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.837 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.839 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.842 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+2026-09-22 19:29:27.845 | INFO     | steering_lite.data.personas:load_suffixes:47 - Loaded 200 branching suffixes
+Traceback (most recent call last):
+  File "<stdin>", line 9, in <module>
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "scripts/run_bsbench_sweep.py", line 477, in <module>
+    main()
+    ~~~~^^
+  File "scripts/run_bsbench_sweep.py", line 437, in main
+    from run_bsbench_modal import app, remote_stage_call
+ModuleNotFoundError: No module named 'run_bsbench_modal'

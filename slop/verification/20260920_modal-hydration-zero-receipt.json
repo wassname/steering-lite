@@ -1,0 +1,13 @@
+{
+  "reservation": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8",
+  "actual_usd": 0.0,
+  "receipt": {
+    "provider": "Modal",
+    "outcome": "not_dispatched_client_hydration_failure",
+    "attempted_at": "2026-09-19T22:58:25Z",
+    "modal_version": "1.5.5",
+    "provider_status_evidence": "slop/verification/20260920_modal-postfailure-app-list.log",
+    "client_traceback_evidence": "slop/verification/20260919T225817Z_real-sweep-first-run.log",
+    "audit": "slop/audits/20260920_modal_hydration_failure.md"
+  }
+}

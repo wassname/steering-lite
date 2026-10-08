@@ -1,0 +1,41 @@
+SHOULD: Markdown/HTML ranks and all62 PNG point identities match one dataframe; verified. Scientific hashes and ledger unchanged.
+{
+  "output": "outputs/bsbench-v2/results",
+  "point_count": 62,
+  "points_sha256": "18a13310d382ae8c569af2671a86dd13ede5773bdd28c59c37aeb30f7eded050",
+  "non_experimental": false,
+  "kl_misses": 11,
+  "random_regions": [
+    {
+      "multiplier": 0.8,
+      "eligible_seeds": [
+        1,
+        2,
+        4
+      ],
+      "minimum_seeds": 5,
+      "included": false
+    },
+    {
+      "multiplier": 1.0,
+      "eligible_seeds": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "minimum_seeds": 5,
+      "included": false
+    },
+    {
+      "multiplier": 1.2,
+      "eligible_seeds": [
+        1,
+        2,
+        3
+      ],
+      "minimum_seeds": 5,
+      "included": false
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+--- ledger after first ---
+     1	{"event": "reserved", "kind": "modal-generation-bare", "upper_usd": 0.8843460000000001, "time": "2026-09-19T22:58:25.057477+00:00", "id": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8"}
+     2	{"event": "unresolved", "reservation": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8", "reason": "dispatch_or_validation_failure"}
+     3	{"event": "settled", "reservation": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8", "actual_usd": 0.0}
+     4	{"event": "receipt_imported", "reservation": "f6291f9d0ca998bfccd83bd826a7c08a501dbc552230256e1bf29c575b544ca8", "receipt": {"provider": "Modal", "outcome": "not_dispatched_client_hydration_failure", "attempted_at": "2026-09-19T22:58:25Z", "modal_version": "1.5.5", "provider_status_evidence": "slop/verification/20260920_modal-postfailure-app-list.log", "client_traceback_evidence": "slop/verification/20260919T225817Z_real-sweep-first-run.log", "audit": "slop/audits/20260920_modal_hydration_failure.md"}}
+     5	{"event": "reserved", "kind": "modal-generation-bare", "upper_usd": 0.8843460000000001, "time": "2026-09-19T23:23:36.835704+00:00", "id": "bb0e1f3f954d903d8fb5250edf46a5535e481971b4dc3dff83823319b44d3e43"}
+     6	{"event": "estimated_at_reservation_upper", "reservation": "bb0e1f3f954d903d8fb5250edf46a5535e481971b4dc3dff83823319b44d3e43", "estimated_usd": 0.8843460000000001, "receipt": {"status": "pending", "provider": "Modal", "usage": {"elapsed_seconds": 60.537890815}}}
+--- cache files ---
+generation/5a27bc2f03357ec980334eaa421ce6e111656eef7fd50300a1658b6b0104b126.json 14552 bytes
+generation-health/76ea5cb9a039ee95b2e9d0d456b6d6da504b57ea085f1fa0ffa6050d3e90af0e.json 6509 bytes
+--- run summary inspection ---
+--- cache identity ---
+{
+  "identity": {
+    "code_sha256": "d2a8eb38eebf8b090ae0eb66c73bb9b766b3e3762860e440089529385633ee88",
+    "config": {
+      "condition": "bare",
+      "prompt_ids": [
+        "BSV2-001",
+        "BSV2-002",
+        "BSV2-003",
+        "BSV2-004",
+        "BSV2-005",
+        "BSV2-006",
+        "BSV2-007",
+        "BSV2-008",
+        "BSV2-009",
+        "BSV2-010",
+        "BSV2-011",
+        "BSV2-012",
+        "BSV2-013",
+        "BSV2-014",
+        "BSV2-015",
+        "BSV2-016",
+        "BSV2-017",
+        "BSV2-018",
+        "BSV2-019",
+        "BSV2-020"
+      ],
+      "prompt_spec": {
+        "enable_thinking": false,
+        "max_new_tokens": 128,
+        "template": "Answer in 2 short sentences."
+      },
+      "upper_usd": 0.8843460000000001
+    },
+    "data": {
+      "rows": 20,
+      "sha256": "c220039523b581f6698e55c67842511c63f5f4e8ef93c3638e16d32000560ae9"
+    },
+    "method": "bare",
+    "model": {
+      "id": "Qwen/Qwen3.5-4B",
+      "judge_model": "deepseek/deepseek-chat"
+    },
+    "prompts_sha256": "ae7c92a22c6a733f49443709bbd5451aa5470c987c96c1e46fea21b00a03f9f2",
+    "schema": "bsbench-stage-v1",
+    "stage": "generation"
+  },
+  "path": "outputs/bsbench-v2/cache/generation/5a27bc2f03357ec980334eaa421ce6e111656eef7fd50300a1658b6b0104b126.json",
+  "result_keys": [
+    "answers",
+    "cost_receipt",
+    "health_records",
+    "reservation"
+  ]
+}
+--- modal apps ---
+[
+  {
+    "app_id": "ap-ivp9gYfkrHL2aGwjH6h8ii",
+    "description": "steering-lite-bsbench",
+    "state": "stopped",
+    "tasks": "0",
+    "created_at": "2026-09-20 07:23:33+08:00",
+    "stopped_at": "2026-09-20 07:24:50+08:00"
+  }
+]

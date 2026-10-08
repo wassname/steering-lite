@@ -1,0 +1,47 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+[ERROR] `loss` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+[ERROR] `logits` is part of Qwen3_5CausalLMOutputWithPast.__init__'s signature, but not documented. Make sure to add it to the docstring of the function in /usr/local/lib/python3.13/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py.
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 792.28it/s]
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+
+[1ALoading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+[1ALoading weights:   4%|▎         | 15/426 [00:00<00:14, 27.74it/s]
+[1ALoading weights:   5%|▌         | 22/426 [00:00<00:18, 22.44it/s]
+[1ALoading weights:   8%|▊         | 33/426 [00:01<00:12, 31.58it/s]
+[1ALoading weights:  10%|▉         | 42/426 [00:01<00:09, 40.94it/s]
+[1ALoading weights:  19%|█▉        | 80/426 [00:01<00:03, 102.52it/s]
+[1ALoading weights:  25%|██▌       | 108/426 [00:01<00:02, 137.57it/s]
+[1ALoading weights:  30%|███       | 128/426 [00:01<00:02, 128.45it/s]
+[1ALoading weights:  39%|███▉      | 166/426 [00:01<00:01, 181.70it/s]
+[1ALoading weights:  46%|████▌     | 196/426 [00:01<00:01, 204.02it/s]
+[1ALoading weights:  55%|█████▍    | 233/426 [00:01<00:00, 237.25it/s]
+[1ALoading weights:  62%|██████▏   | 266/426 [00:02<00:00, 256.70it/s]
+[1ALoading weights:  69%|██████▉   | 295/426 [00:02<00:00, 252.50it/s]
+[1ALoading weights:  76%|███████▋  | 325/426 [00:02<00:00, 263.35it/s]
+[1ALoading weights:  83%|████████▎ | 354/426 [00:02<00:00, 261.28it/s]
+[1ALoading weights:  90%|█████████ | 384/426 [00:02<00:00, 267.74it/s]
+[1ALoading weights: 100%|██████████| 426/426 [00:02<00:00, 164.70it/s]
+2026-09-19 23:23:59.286 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 1/20
+2026-09-19 23:24:01.980 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 2/20
+2026-09-19 23:24:04.306 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 3/20
+2026-09-19 23:24:06.390 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 4/20
+2026-09-19 23:24:09.494 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 5/20
+2026-09-19 23:24:12.194 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 6/20
+2026-09-19 23:24:14.544 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 7/20
+2026-09-19 23:24:17.169 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 8/20
+2026-09-19 23:24:19.791 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 9/20
+2026-09-19 23:24:22.421 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 10/20
+2026-09-19 23:24:24.660 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 11/20
+2026-09-19 23:24:27.368 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 12/20
+2026-09-19 23:24:30.286 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 13/20
+2026-09-19 23:24:33.789 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 14/20
+2026-09-19 23:24:36.204 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 15/20
+2026-09-19 23:24:38.472 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 16/20
+2026-09-19 23:24:41.329 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 17/20
+2026-09-19 23:24:43.312 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 18/20
+2026-09-19 23:24:45.510 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 19/20
+2026-09-19 23:24:47.635 | INFO     | steering_lite.benchmark.generation:generate:82 - generation 20/20
+Stopping app - local entrypoint completed.
