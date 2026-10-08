@@ -43,6 +43,8 @@ from steering_lite.eval.foundations import (
 
 # On-axis intent for the shared metric, lowercase probe names as in raw_logratios(=clr).
 INTENT = {"authority": -1, "care": +1}  # persona: Auth↓, Care↑
+BIDIR_OFF_W = 0.5  # off-axis penalty for the bidirectional headline (heavier than the
+                   # 2-sided OFF_WEIGHT so a diffuse KL-matched random null scores below focused steering)
 
 # vignette calibrated_<F> loading columns (human attribution %) for the
 # base-vs-humans reference table + moral-map human point.
@@ -106,10 +108,22 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             sel_neg = gated_selectivity(
                 neg["raw_logratios"], bare["raw_logratios"], INTENT,
                 pmass_pos=_pmass(neg), pmass_neg=bare_pmass, pmass_base=bare_pmass)
+            # Bidirectional control score: the aligned arm should move toward intent
+            # (+), the opposite arm away (-); score the weaker of the two so a method
+            # that snaps to one easy direction is penalized. Off-axis leakage is
+            # penalized on BOTH arms (weight BIDIR_OFF_W) -- do not reuse -opp_sel_gated,
+            # which flips the opp arm's off penalty into a bonus and lets a diffuse
+            # random null win. Heavier weight than the 2-sided OFF_WEIGHT because the
+            # null blasts all foundations while real steering stays focused. (Claude)
+            def _fwd(s):  # one-sided selectivity toward intent, focus-penalized
+                return (s["on"] - BIDIR_OFF_W * s["off"]) * s["coherence"] ** 2
+            aligned, opp = (sel_pos, sel_neg) if sign == +1 else (sel_neg, sel_pos)
+            back = (-opp["on"] - BIDIR_OFF_W * opp["off"]) * opp["coherence"] ** 2
+            sel_bidir = min(_fwd(aligned), back)
             methods[method] = {
                 "bidirectional": True, "sign": sign,
                 "calibrated_C": d.get("calibrated_C"),
-                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
+                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"], "sel_bidir": sel_bidir,
                 "sel_pos": sel_pos["sel_gated"], "sel_neg": sel_neg["sel_gated"],
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
@@ -123,7 +137,7 @@ def _load_sweep(sweep_dir: Path, bare_name: str = "bare.json") -> tuple[dict, di
             methods[method] = {
                 "bidirectional": False, "sign": +1,
                 "calibrated_C": d["coeff"],
-                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"],
+                "dclr": dl, "sel": sel, "si_flips": sif["si_flips"], "sel_bidir": None,
                 "abs_clr": {fo: base_abs[fo]["mean"] + dl[fo]["mean"]
                               for fo in FOUNDATION_ORDER},
             }
@@ -203,23 +217,26 @@ def print_tables(methods: dict) -> None:
     for m in methods:
         s = methods[m]["sel"]
         sp, sn = methods[m].get("sel_pos"), methods[m].get("sel_neg")
-        smin = min(sp, sn) if (sp is not None and sn is not None) else None
-        sel_rows.append([f"{m}{tag(m)}", s["sel_gated"], s["on"], s["off"],
+        bidir = methods[m].get("sel_bidir")
+        sel_rows.append([f"{m}{tag(m)}", bidir, s["sel_gated"], s["on"], s["off"],
                          s["coherence"], methods[m]["si_flips"],
-                         f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]", sp, sn, smin])
-    sel_rows.sort(key=lambda r: (-1e9 if (isinstance(r[1], float) and math.isnan(r[1])) else r[1]),
+                         f"[{s['ci_lo']:+.2f},{s['ci_hi']:+.2f}]", sp, sn])
+    # Sort by the bidirectional control score (headline); n/a (single-direction) sinks.
+    sel_rows.sort(key=lambda r: (-1e9 if (r[1] is None or (isinstance(r[1], float) and math.isnan(r[1]))) else r[1]),
                   reverse=True)
-    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4], 3), _fmt(r[5]), r[6],
-                 _fmt(r[7]), _fmt(r[8]), _fmt(r[9])] for r in sel_rows]
-    print("\n## Gated selectivity (headline; shared with j-steer via moralmaps.metrics)\n")
-    print(tabulate(sel_rows, headers=["method", "sel_gated", "on", "off", "coh", "si_flips",
-                                      "CI95", "s(+C)", "s(-C)", "min"],
+    sel_rows = [[r[0], _fmt(r[1]), _fmt(r[2]), _fmt(r[3]), _fmt(r[4]), _fmt(r[5], 3), _fmt(r[6]), r[7],
+                 _fmt(r[8]), _fmt(r[9])] for r in sel_rows]
+    print("\n## Bidirectional control (headline) + gated selectivity\n")
+    print(tabulate(sel_rows, headers=["method", "bidir", "sel_gated", "on", "off", "coh", "si_flips",
+                                      "CI95", "s(+C)", "s(-C)"],
                    tablefmt="pipe"))
-    print(f"\nsel_gated = (on − {OFF_WEIGHT}·off)·coh²; on = mean signed Δclr on {list(INTENT)} "
+    print(f"\nbidir = min(aligned arm forward, opposite arm backward), each = (on − {BIDIR_OFF_W}·off)·coh²; "
+          "the weaker steering direction, with off-axis leakage penalized on both arms. Penalizes methods "
+          "that snap to one easy side or blast all foundations. A KL-matched random null scores low here.\n"
+          f"sel_gated = (on − {OFF_WEIGHT}·off)·coh²; on = mean signed Δclr on {list(INTENT)} "
           "(Auth↓,Care↑), off = mean|Δclr| over the other 5, coh = min(1, min-arm pmass / base). "
           "si_flips = signed argmax pick-rate change (behavioral, bounded). CI95 = 2000× row bootstrap.\n"
-          "s(+C)/s(-C) = each arm's one-sided sel_gated vs bare; min = the weaker arm (robustness). "
-          "Both arms positive is the generic-disruption signature (any push helps), not a specific axis move.")
+          "s(+C)/s(-C) = each arm's one-sided sel_gated vs bare.")
 
     # --- Δclr table ---
     dl_rows = []
